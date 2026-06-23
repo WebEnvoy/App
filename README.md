@@ -75,15 +75,12 @@ Browser 区域负责呈现 Harbor 浏览器身份和运行现场。
 
 ```text
 WebEnvoy App
-  ↓
-WebEnvoy API Server
-  ↓
-WebEnvoy Core Runtime
-  ↓                 ↓
-Lode                Harbor Runtime API
+  ├── WebEnvoy API Server → WebEnvoy Core Runtime
+  ├── Lode 资产接口 / 本地资产来源
+  └── Harbor Runtime API
 ```
 
-App 可以调用 WebEnvoy API Server、Harbor Runtime API 和 Lode 相关接口，但不应绕过 Core 写任务记录，不应保存 Lode 能力资产真相，也不应绕过 Harbor API 操作浏览器会话。
+涉及任务执行必须通过 WebEnvoy API Server 进入 Core；涉及能力资产真相必须落到 Lode；涉及浏览器身份和运行现场必须通过 Harbor Runtime API。App 不应绕过 Core 写任务记录，不应保存 Lode 能力资产真相，也不应绕过 Harbor API 操作浏览器会话。
 
 ## 第一阶段产品表面
 
@@ -111,6 +108,7 @@ WebEnvoy App 不应：
 - [愿景](VISION.md)
 - [架构](docs/architecture.md)
 - [产品表面](docs/product-surface.md)
+- [Library 工作台](docs/library-workbench.md)
 - [本地运行形态](docs/local-runtime.md)
 
 ## 许可证
