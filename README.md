@@ -106,12 +106,7 @@ WebEnvoy App 不应：
 ## 文档
 
 - [愿景](VISION.md)
-- [设计文档](docs/draft/README.md)
-- [架构](docs/draft/architecture.md)
-- [产品表面](docs/draft/product-surface.md)
-- [Library 工作台](docs/draft/library-workbench.md)
-- [本地运行形态](docs/draft/local-runtime.md)
 
 ## 许可证
 
-本仓库采用 GNU Affero General Public License v3.0。
+本仓库采用 [GNU Affero General Public License v3.0](LICENSE)。
