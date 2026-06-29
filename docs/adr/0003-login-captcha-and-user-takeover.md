@@ -49,8 +49,8 @@ App 不保存 credential，不自动解 captcha，也不把登录成功当作任
 
 ## Open Questions
 
-- Core 和 Harbor 应向 App 暴露什么最小 recovery reason taxonomy。
-- App 是否需要为用户 takeover prompt 显示倒计时、超时或 SLA。
-- 用户手动改变页面状态后，App 应如何展示 unknown outcome。
-- 哪些 recovery prompt 可以 deferred，而不保持 Harbor session 存活。
-- clipboard 和 file upload 支持属于 viewer UX，还是后续 Harbor 决策。
+- [PD-0007](pending-decisions.md#pd-0007)：Core 和 Harbor 应向 App 暴露什么最小 recovery reason taxonomy。
+- [PD-0008](pending-decisions.md#pd-0008)：App 是否需要为用户 takeover prompt 显示倒计时、超时或 SLA。
+- [PD-0009](pending-decisions.md#pd-0009)：用户手动改变页面状态后，App 应如何展示 unknown outcome。
+- [PD-0010](pending-decisions.md#pd-0010)：哪些 recovery prompt 可以 deferred，而不保持 Harbor session 存活。
+- [PD-0011](pending-decisions.md#pd-0011)：clipboard 和 file upload 支持属于 viewer UX，还是后续 Harbor 决策。

@@ -57,7 +57,7 @@ App 不把 raw CDP、VNC 或 provider endpoint 暴露为稳定任务接口。这
 
 ## Open Questions
 
-- Core 应暴露哪些最小 handoff facts 供 App 渲染，而不要求 App 理解完整状态机。
-- Harbor 第一阶段只提供 mediated viewer URL，还是同时提供本地浏览器窗口入口。
-- 用户控制 session 时，mutating automation 是否必须硬暂停，read-only observation 是否可继续。
-- 哪些 viewer failure 应作为 run recovery blocker，哪些只作为 Harbor runtime health issue。
+- [PD-0003](pending-decisions.md#pd-0003)：Core 应暴露哪些最小 handoff facts 供 App 渲染，而不要求 App 理解完整状态机。
+- [PD-0004](pending-decisions.md#pd-0004)：Harbor 第一阶段只提供 mediated viewer URL，还是同时提供本地浏览器窗口入口。
+- [PD-0005](pending-decisions.md#pd-0005)：用户控制 session 时，mutating automation 是否必须硬暂停，read-only observation 是否可继续。
+- [PD-0006](pending-decisions.md#pd-0006)：哪些 viewer failure 应作为 run recovery blocker，哪些只作为 Harbor runtime health issue。
