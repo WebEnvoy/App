@@ -50,10 +50,10 @@ App 不把 raw CDP、VNC 或 provider endpoint 暴露为稳定任务接口。这
 
 ## Research Evidence
 
-- `research/synthesis.md` 将 Run Record 和 evidence 识别为 Core/Harbor/App 的公共决策边界。
-- `research/absorability/themes/human-handoff-and-recovery.md` 说明 viewer endpoint 适合作为 Runtime Session 观察入口，但 live VNC 不等于完整 handoff workflow。
-- `research/absorability/themes/evidence-and-observability.md` 区分 runtime session facts 和 durable run records，并把 viewer/CDP evidence ownership 标为产品决策。
-- `research/absorability/themes/api-cli-mcp-and-agent-interface.md` 拒绝把低层 browser tools 当作稳定站点任务 API。
+- <https://github.com/WebEnvoy/research/blob/main/synthesis.md> 将 Run Record 和 evidence 识别为 Core/Harbor/App 的公共决策边界。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/human-handoff-and-recovery.md> 说明 viewer endpoint 适合作为 Runtime Session 观察入口，但 live VNC 不等于完整 handoff workflow。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/evidence-and-observability.md> 区分 runtime session facts 和 durable run records，并把 viewer/CDP evidence ownership 标为产品决策。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/api-cli-mcp-and-agent-interface.md> 拒绝把低层 browser tools 当作稳定站点任务 API。
 
 ## Open Questions
 

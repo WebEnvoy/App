@@ -106,6 +106,7 @@ WebEnvoy App 不应：
 ## 文档
 
 - [愿景](VISION.md)
+- [架构决策记录](docs/adr/0001-record-architecture-decisions.md)
 
 ## 许可证
 

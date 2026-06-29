@@ -42,10 +42,10 @@ App 不保存 credential，不自动解 captcha，也不把登录成功当作任
 
 ## Research Evidence
 
-- `research/synthesis.md` 指出 runtime facts 与 task policy 必须分开，包括 captcha 和 human handoff。
-- `research/absorability/themes/human-handoff-and-recovery.md` 将显式 control ownership 和 handoff 识别为比裸 viewer 更强的参考机制。
-- `research/absorability/themes/human-handoff-and-recovery.md` 也提醒 setup/profile recovery 不应混同业务 task failure。
-- `research/absorability/themes/workflow-and-task-package.md` 显示 human interaction 可以出现在 workflow 语义中，但 package/runtime 合同归 Lode 和 Core。
+- <https://github.com/WebEnvoy/research/blob/main/synthesis.md> 指出 runtime facts 与 task policy 必须分开，包括 captcha 和 human handoff。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/human-handoff-and-recovery.md> 将显式 control ownership 和 handoff 识别为比裸 viewer 更强的参考机制。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/human-handoff-and-recovery.md> 也提醒 setup/profile recovery 不应混同业务 task failure。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/workflow-and-task-package.md> 显示 human interaction 可以出现在 workflow 语义中，但 package/runtime 合同归 Lode 和 Core。
 
 ## Open Questions
 

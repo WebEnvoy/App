@@ -49,10 +49,10 @@ App 不定义 capability package schema、workflow block schema、fixture format
 
 ## Research Evidence
 
-- `research/synthesis.md` 指出 capability/workflow asset 需要 schema 与 versioning，同时 Run Record/evidence 是公共边界。
-- `research/absorability/themes/evidence-and-observability.md` 支持最小 Run Record 方向，并拒绝默认捕获敏感 screenshot、HAR、trace、video 或 raw network body。
-- `research/absorability/themes/api-cli-mcp-and-agent-interface.md` 支持小型确定性接口和 reference-over-value evidence output。
-- `research/absorability/themes/workflow-and-task-package.md` 支持 Lode package 方向，包括 input/output schema、steps、verification checks 和 expected outcomes，并延后复杂 visual builder。
+- <https://github.com/WebEnvoy/research/blob/main/synthesis.md> 指出 capability/workflow asset 需要 schema 与 versioning，同时 Run Record/evidence 是公共边界。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/evidence-and-observability.md> 支持最小 Run Record 方向，并拒绝默认捕获敏感 screenshot、HAR、trace、video 或 raw network body。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/api-cli-mcp-and-agent-interface.md> 支持小型确定性接口和 reference-over-value evidence output。
+- <https://github.com/WebEnvoy/research/blob/main/absorability/themes/workflow-and-task-package.md> 支持 Lode package 方向，包括 input/output schema、steps、verification checks 和 expected outcomes，并延后复杂 visual builder。
 
 ## Open Questions
 
