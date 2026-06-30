@@ -11,13 +11,13 @@
 - Review Entry: .loom/reviews/GH-31.json
 - Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; hosted Loom checks
 - Closing Condition: AGENTS.md 约束合入 main，hosted checks 通过，并在 issue 中写入 post-merge closeout 证据。
-- Current Checkpoint: merge
-- Current Stop: Docs-only governance constraint is ready for PR review.
-- Next Step: Merge after hosted checks pass, then write post-merge closeout to WebEnvoy/App#31.
+- Current Checkpoint: closed_out
+- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#31 and PR #32.
+- Next Step: No further action for this Work Item.
 - Blockers: None recorded.
-- Latest Validation Summary: Local preflight passed with `git diff --check`, `loom doctor`, `loom verify`, and `loom fact-chain`; hosted checks pending PR creation.
-- Recovery Boundary: Re-run local static checks and hosted Loom checks if AGENTS.md or carrier files change.
-- Current Lane: docs-only governance
+- Latest Validation Summary: Post-merge closeout consumed PR #32, merge commit 55a1aeda6ff8f5d60183153593d68c935ce3296c, and hosted run 28424977241 with all required checks passing.
+- Recovery Boundary: Terminal carrier; open a new Work Item for future Loom governance changes.
+- Current Lane: terminal closeout
 
 ## Runtime Evidence
 
