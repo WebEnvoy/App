@@ -11,13 +11,13 @@
 - Review Entry: .loom/reviews/GH-13.json
 - Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; direct hosted-style Loom PR gate when a PR exists; hosted required checks
 - Closing Condition: PR created and pushed for review; do not merge or close issues in this execution round.
-- Current Checkpoint: implementation_ready
-- Current Stop: First-stage App issue tree conclusions are being recorded in `docs/adr/pending-decisions.md`.
-- Next Step: Validate whitespace, Loom carrier shape, PR metadata, and hosted checks after PR creation.
-- Blockers: Local global `loom doctor` / `loom verify` currently block on workstation installed-state / legacy surface diagnostics; local `loom fact-chain` reports a wrapper/target missing init-result despite `.loom/bootstrap/init-result.json` existing in the repo.
+- Current Checkpoint: merge
+- Current Stop: GH-13 docs-only boundary and review carriers are ready for PR merge gate evaluation.
+- Next Step: Consume hosted required checks and `loom-pr-merge-gate`; do not merge or close issues in this execution round.
+- Blockers: None recorded.
 - Latest Validation Summary: Baseline issue/doc/research/source read completed on 2026-06-30; no product code or UI shell added.
 - Recovery Boundary: Continue only within GH-13 docs-only scope; open new Work Items for API/schema/UI implementation.
-- Current Lane: docs-only boundary closeout
+- Current Lane: merge-ready carrier repair
 
 ## Runtime Evidence
 

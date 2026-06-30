@@ -3,10 +3,10 @@
   "item_id": "GH-13",
   "decision": "allow",
   "kind": "spec_review",
-  "summary": "GH-13 is scoped to a minimal docs-only boundary closeout for the first read-only App journey and public task consumption boundary.",
+  "summary": "GH-13 minimal docs-only spec remains approved for the first read-only App journey boundary.",
   "reviewer": "codex",
-  "reviewed_head": "pending-pr-head",
-  "reviewed_validation_summary": "Initial carrier created before final commit; update or supersede review if merge-ready requires current-head semantic approval.",
+  "reviewed_head": "162d9f03c24773de8e7f944d17bf1fe3068c2180",
+  "reviewed_validation_summary": "Baseline issue/doc/research/source read completed on 2026-06-30; no product code or UI shell added.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
