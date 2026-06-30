@@ -53,3 +53,22 @@ examples/
 ## 许可证
 
 本仓库属于 AGPL 核心产品表面仓库。面向外部集成的通用 SDK、协议定义和生成类型如需更宽松许可，应优先放入独立 contracts / SDK 仓库，而不是放入 App 内部实现路径。
+
+<!-- LOOM_BOOTSTRAP_START -->
+## Loom Bootstrap
+
+本仓库采用 Loom 来管理 agent 执行流程、工作事实载体、review、merge-ready 和 closeout；开始实现、review、merge-ready 或 closeout 前，先完成以下 bootstrap 检查。
+
+1. 检查 `.loom/installed-state.json`。
+2. 若本机没有 `loom`，执行：
+   `npm install -g @mc-and-his-agents/loom`
+3. 运行：
+   `loom doctor --target . --json`
+4. 若 Codex Loom plugin 缺失，执行：
+   `loom host install --host codex --scope user --apply --json`
+   `loom host register --host codex --scope user --apply --json`
+5. 重新运行：
+   `loom doctor --target . --json`
+
+不要把 Loom runtime、plugin 或 skills payload 写入仓库；它们属于用户级全局安装。
+<!-- LOOM_BOOTSTRAP_END -->
