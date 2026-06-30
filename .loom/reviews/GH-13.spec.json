@@ -1,0 +1,15 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-13",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "GH-13 is scoped to a minimal docs-only boundary closeout for the first read-only App journey and public task consumption boundary.",
+  "reviewer": "codex",
+  "reviewed_head": "pending-pr-head",
+  "reviewed_validation_summary": "Initial carrier created before final commit; update or supersede review if merge-ready requires current-head semantic approval.",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this as implementation of UI, API, CLI, MCP, Core, Harbor, or Lode contracts."
+  ]
+}

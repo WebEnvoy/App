@@ -1,0 +1,26 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-13",
+  "decision": "allow",
+  "kind": "general_review",
+  "summary": "Docs-only GH-13 changes stay within the approved boundary: pending decisions plus item-specific Loom carrier.",
+  "reviewer": "codex",
+  "reviewed_head": "pending-pr-head",
+  "reviewed_validation_summary": "Initial carrier created before final commit; update or supersede review if merge-ready requires current-head semantic approval.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Open separate Work Items for executable UI/API/schema work."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The change records product boundary decisions and does not alter executable behavior."
+  },
+  "consumed_inputs": {
+    "spec": ".loom/specs/GH-13/spec.md",
+    "plan": ".loom/specs/GH-13/plan.md",
+    "suite_path": "minimal",
+    "validation": "git diff --check; loom doctor/verify/fact-chain; loom installed-state validate; direct PR gate; hosted required checks"
+  }
+}
