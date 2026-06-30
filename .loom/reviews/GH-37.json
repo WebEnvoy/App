@@ -3,26 +3,23 @@
   "item_id": "GH-37",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Semantic review approved for the docs-only App Stage 2 task entry and display contract in PR #62.",
+  "summary": "Post-merge closeout for PR #62 is approved; the docs-only App Stage 2 task entry and display contract plus GH-37 carrier are merged to main and ready for issue closeout.",
   "reviewer": "codex-coordinator",
-  "reviewed_head": "4d715ce6d47a3056a2ffa835a494d038e67490ef",
-  "reviewed_validation_summary": "2026-06-30 merge-ready carrier prepared for PR #62; content head 4d715ce6d47a3056a2ffa835a494d038e67490ef passed local validation and hosted basic checks, with current-head hosted checks pending after carrier commit.",
+  "reviewed_head": "7ef8fde98515b4a1c89afc80ca8063e815a13a4b",
+  "reviewed_validation_summary": "Post-merge closeout consumed PR #62, head 93cec39be47fa66d825e3abfba19f606e55eb048, merge commit 7ef8fde98515b4a1c89afc80ca8063e815a13a4b, target branch main, and hosted run 28447018336 with all required checks passing.",
   "fallback_to": null,
-  "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Do not treat this approval as implementation of UI/code/schema/API/runtime/storage/evidence viewer/Settings behavior.",
-    "Close App #36-#53/#55-#57/#59 only after merge and post-merge closeout evidence consume the PR, merge commit, target branch, and hosted run."
+    "Do not treat this approval as App UI, App shell, schema/API client, runtime, storage, evidence viewer, Settings implementation, shared fixture files, conformance runner, or true-write behavior completion."
   ],
+  "findings": [],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "ADR 0006 defines the App Stage 2 task submission, run viewer, result/failure/evidence display, action request, Browser runtime, handoff, and Settings/local-cache contracts without claiming implementation completion."
+    "reason": "Post-merge closeout consumes the merged docs-only App Stage 2 task entry and display contract and records terminal evidence without claiming implementation completion."
   },
   "consumed_inputs": {
-    "spec": ".loom/specs/GH-37/spec.md",
-    "plan": ".loom/specs/GH-37/plan.md",
-    "task_carrier": ".loom/specs/GH-37/task-carrier.md",
-    "suite_path": "minimal",
-    "pull_request": "https://github.com/WebEnvoy/App/pull/62"
+    "pull_request": "https://github.com/WebEnvoy/App/pull/62",
+    "merge_commit": "7ef8fde98515b4a1c89afc80ca8063e815a13a4b",
+    "evidence": "https://github.com/WebEnvoy/App/actions/runs/28447018336"
   }
 }
