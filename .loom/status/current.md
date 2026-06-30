@@ -10,14 +10,14 @@
 - Recovery Entry: .loom/progress/GH-13.md
 - Review Entry: .loom/reviews/GH-13.json
 - Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; direct hosted-style Loom PR gate when a PR exists; hosted required checks
-- Closing Condition: PR created and pushed for review; do not merge or close issues in this execution round.
-- Current Checkpoint: merge
-- Current Stop: GH-13 docs-only boundary and review carriers are ready for PR merge gate evaluation.
-- Next Step: Consume hosted required checks and `loom-pr-merge-gate`; do not merge or close issues in this execution round.
+- Closing Condition: PR #34 merged into `main`; hosted required checks passed; issue closeout is owned by the coordinator as the next external step.
+- Current Checkpoint: closed_out
+- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#13 via PR #34.
+- Next Step: No further action for this Work Item after coordinator issue closeout comments are posted and covered issues are closed.
 - Blockers: None recorded.
-- Latest Validation Summary: Baseline issue/doc/research/source read completed on 2026-06-30; no product code or UI shell added.
-- Recovery Boundary: Continue only within GH-13 docs-only scope; open new Work Items for API/schema/UI implementation.
-- Current Lane: merge-ready carrier repair
+- Latest Validation Summary: Post-merge closeout consumed PR #34, head 4f45c34e12907f7b9482a9d864214052ba17a831, merge commit 4bc42aced71c5750ca9837a62e117c4f381c9f58, and hosted run 28427108610 with all required checks passing.
+- Recovery Boundary: Terminal carrier for this docs-only user journey item; open new Work Items for API/schema/UI implementation.
+- Current Lane: terminal closeout
 
 ## Runtime Evidence
 

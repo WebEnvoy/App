@@ -3,24 +3,24 @@
   "item_id": "GH-13",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Docs-only GH-13 carrier refresh approves the first read-only App journey boundary without changing product semantics.",
+  "summary": "Closeout-only carrier sync records merged PR #34 and terminal GH-13 state without changing product semantics.",
   "reviewer": "codex",
-  "reviewed_head": "162d9f03c24773de8e7f944d17bf1fe3068c2180",
-  "reviewed_validation_summary": "Baseline issue/doc/research/source read completed on 2026-06-30; no product code or UI shell added.",
+  "reviewed_head": "9263ff845cb203ff62030c3de9a8661af176e031",
+  "reviewed_validation_summary": "git diff --check passed; closeout-only diff is limited to .loom/work-items/GH-13.md, .loom/status/current.md, .loom/progress/GH-13.md, and .loom/reviews/GH-13.json; post-merge facts consumed PR #34, merge commit 4bc42aced71c5750ca9837a62e117c4f381c9f58, and hosted run 28427108610.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Open separate Work Items for executable UI/API/schema work."
+    "Coordinator must post issue closeout comments and close covered issues after this closeout carrier PR is merged."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Docs-only boundary and carrier changes remain within GH-13 scope; this does not approve UI, API, CLI, MCP, Core, Harbor, or Lode implementation."
+    "reason": "The closeout-only change records terminal carrier facts after the already-merged docs-only PR; this does not approve UI, API, CLI, MCP, Core, Harbor, or Lode implementation."
   },
   "consumed_inputs": {
     "spec": ".loom/specs/GH-13/spec.md",
     "plan": ".loom/specs/GH-13/plan.md",
     "suite_path": "minimal",
-    "validation": "git diff --check; loom doctor/verify/fact-chain; loom installed-state validate; direct PR gate; hosted required checks"
+    "validation": "git diff --check; post-merge PR #34 readback; hosted run 28427108610"
   }
 }
