@@ -5,7 +5,7 @@
   "kind": "spec_review",
   "summary": "Workflow-only Loom 0.22.1 maintenance spec is sufficient for PR #71.",
   "reviewer": "codex-coordinator",
-  "reviewed_head": "43b5000a8355eb5f1204e8642ebd75b117127e65",
+  "reviewed_head": "81e9a96ade9a9851fd0093785adfbe0cb5d4c370",
   "reviewed_validation_summary": "Spec scope is limited to a CI workflow version pin and GH-72 carrier evidence; no product implementation is claimed.",
   "fallback_to": null,
   "blocking_issues": [],
