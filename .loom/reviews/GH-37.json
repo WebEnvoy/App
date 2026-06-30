@@ -1,0 +1,28 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-37",
+  "decision": "allow",
+  "kind": "general_review",
+  "summary": "Semantic review approved for the docs-only App Stage 2 task entry and display contract in PR #62.",
+  "reviewer": "codex-coordinator",
+  "reviewed_head": "4d715ce6d47a3056a2ffa835a494d038e67490ef",
+  "reviewed_validation_summary": "2026-06-30 merge-ready carrier prepared for PR #62; content head 4d715ce6d47a3056a2ffa835a494d038e67490ef passed local validation and hosted basic checks, with current-head hosted checks pending after carrier commit.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this approval as implementation of UI/code/schema/API/runtime/storage/evidence viewer/Settings behavior.",
+    "Close App #36-#53/#55-#57/#59 only after merge and post-merge closeout evidence consume the PR, merge commit, target branch, and hosted run."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "ADR 0006 defines the App Stage 2 task submission, run viewer, result/failure/evidence display, action request, Browser runtime, handoff, and Settings/local-cache contracts without claiming implementation completion."
+  },
+  "consumed_inputs": {
+    "spec": ".loom/specs/GH-37/spec.md",
+    "plan": ".loom/specs/GH-37/plan.md",
+    "task_carrier": ".loom/specs/GH-37/task-carrier.md",
+    "suite_path": "minimal",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/62"
+  }
+}

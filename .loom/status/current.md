@@ -11,11 +11,11 @@
 - Review Entry: .loom/reviews/GH-37.json
 - Validation Entry: `git diff --check`; JSON validation for changed `.json` carrier files; `loom fact-chain --target . --item GH-37 --json`; `loom suite validate --target . --item GH-37 --json`; `loom suite carrier validate --target . --item GH-37 --json`; hosted basic checks after PR creation
 - Closing Condition: PR ready with docs-only contract and hosted checks classifiable; do not merge and do not close issues.
-- Current Checkpoint: build
-- Current Stop: Docs-only Stage 2 App task entry and display contract has been drafted; local validation and PR creation remain.
-- Next Step: Run local validation, commit, push, create PR, read back PR metadata, then run hosted basic checks.
+- Current Checkpoint: merge
+- Current Stop: PR #62 has docs-only content, GH-37 carrier, and authored review artifacts ready for merge-gate consumption.
+- Next Step: Run PR merge gate, wait for hosted checks on the current head, then merge and perform post-merge closeout.
 - Blockers: None recorded.
-- Latest Validation Summary: Local validation on 2026-06-30 passed `git diff --check`, JSON validation, `loom fact-chain`, `loom suite validate`, and `loom suite carrier validate` for GH-37. `loom build` build-execution passed but the wrapper-level build flow blocked because it could not consume suite validate/carrier validate CLI JSON through `tools/loom.py`; direct suite CLI runs passed and this is classified as a Loom wrapper path blocker, not a docs contract blocker.
+- Latest Validation Summary: 2026-06-30 merge-ready carrier prepared for PR #62; content head 4d715ce6d47a3056a2ffa835a494d038e67490ef passed local validation and hosted basic checks, with current-head hosted checks pending after carrier commit.
 - Recovery Boundary: Docs-only App contract and item-specific carrier only; open later Work Items for UI, App shell, schema/API client, runtime, storage, evidence viewer, Settings implementation, shared fixture files, conformance runner, true-write behavior, merge, or issue closeout.
 - Current Lane: docs-only contract convergence
 

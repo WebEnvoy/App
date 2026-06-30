@@ -1,0 +1,16 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-37",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Spec review approved for the docs-only App Stage 2 task entry and display contract in PR #62.",
+  "reviewer": "codex-coordinator",
+  "reviewed_head": "4d715ce6d47a3056a2ffa835a494d038e67490ef",
+  "reviewed_validation_summary": "2026-06-30 merge-ready carrier prepared for PR #62; content head 4d715ce6d47a3056a2ffa835a494d038e67490ef passed local validation and hosted basic checks, with current-head hosted checks pending after carrier commit.",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this approval as completion of App UI, App shell, schema/API client, runtime, storage, evidence viewer, Settings implementation, shared fixture files, conformance runner, or true-write behavior.",
+    "Downstream App implementation Work Items may consume ADR 0006 after this PR is merged."
+  ]
+}
