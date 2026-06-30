@@ -5,8 +5,8 @@
   "kind": "spec_review",
   "summary": "Minimal workflow-only spec is sufficient for the Loom PR gate target repair.",
   "reviewer": "codex",
-  "reviewed_head": "79e0dded85e3d6d72aea32a7e8f2b64e28d45ee2",
-  "reviewed_validation_summary": "Bootstrap result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.",
+  "reviewed_head": "6bebe9d90e418fea3b8805488170e802f737cf7f",
+  "reviewed_validation_summary": "Workflow-only gate repair validated by git diff --check, loom doctor/verify/fact-chain, suite not_applicable evidence, and CI stable checks.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
