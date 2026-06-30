@@ -6,7 +6,7 @@
 - Goal: Define Library capability catalog fields v0 for App #58 / #54 as a docs-only contract.
 - Scope: Update App ADR / decision facts and item-specific Loom carrier for Library catalog display fields. Ownership constraints are limited to the associated artifacts below.
 - Execution Path: docs-only/product-contract
-- Workspace Entry: /Volumes/2T/.codex/worktrees/stage2/app-library-catalog
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-54.md
 - Review Entry: .loom/reviews/GH-54.json
 - Validation Entry: `git diff --check`; JSON validation; `loom fact-chain --target . --json`; `loom suite validate --target . --json`; `loom suite carrier validate --target . --json`; hosted basic checks
