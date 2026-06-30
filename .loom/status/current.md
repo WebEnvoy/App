@@ -11,13 +11,13 @@
 - Review Entry: .loom/reviews/GH-54.json
 - Validation Entry: `git diff --check`; JSON validation; `loom fact-chain --target . --json`; `loom suite validate --target . --json`; `loom suite carrier validate --target . --json`; hosted basic checks
 - Closing Condition: PR ready with docs-only contract and hosted checks classifiable; do not merge and do not close issues.
-- Current Checkpoint: merge
-- Current Stop: Coordinator semantic review approved the docs-only Library capability catalog fields contract at product head b7a1c44e42eb476433ad89ac0aac8dd1946049c7; next PR head should contain only Loom review/status carrier drift.
-- Next Step: Push carrier refresh, update PR #60 head metadata, run hosted merge gate, then merge and perform post-merge closeout.
+- Current Checkpoint: closed_out
+- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#60.
+- Next Step: No further action for GH-58/GH-54 after coordinator issue closeout comments are posted and covered issues are closed.
 - Blockers: None recorded.
-- Latest Validation Summary: 2026-06-30 coordinator review approved PR #60 docs-only contract at product head b7a1c44e42eb476433ad89ac0aac8dd1946049c7; prior branch validation covered `git diff --check`, JSON syntax, Loom fact-chain, suite validate, and carrier validate; no UI/code, App shell, catalog store, package schema, registry, installer, marketplace, hosted registry, external writes, or issue closeout changed.
-- Recovery Boundary: Do not expand into UI/code, App shell, catalog store, marketplace, installer, registry, or issue closeout.
-- Current Lane: docs-only contract
+- Latest Validation Summary: Post-merge closeout consumed PR #60, head 7b218cafa938b27ada5f8801c782ce8e95025325, merge commit 11cf62bf67b1f4056fd12931ea5283656fbec118, target branch main, and hosted run 28440171619 with all required checks passing.
+- Recovery Boundary: Terminal carrier for docs-only Library capability catalog fields contract; open new Work Items for UI, App shell, catalog store, installer/update/lock behavior, marketplace, or hosted registry.
+- Current Lane: terminal closeout
 
 ## Runtime Evidence
 
