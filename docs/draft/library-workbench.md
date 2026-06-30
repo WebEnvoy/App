@@ -1,53 +1,23 @@
-# Library 工作台
+# Library Workbench Draft
 
-Library 是 WebEnvoy App 中对应 Lode 的产品域。
+Status: deferred
+Owner: future Library UI Work Item owner, tracked for now by [#68](https://github.com/WebEnvoy/App/issues/68)
+Linked issue: [#68](https://github.com/WebEnvoy/App/issues/68)
+Exit condition: create or select a future Library UI Work Item that defines workbench behavior beyond catalog display.
 
-它不是只读目录，而是 Lode 资产的人类工作台。App 负责操作入口，Lode 负责资产真相源。
+Judgment: this draft still has independent product value, but only for future
+Library behavior. It is not a Stage 2 contract because [ADR 0005](../adr/0005-library-capability-catalog-fields.md)
+accepted catalog display fields only and explicitly deferred installer, update,
+rollback, repair, marketplace, UI component, store, and sync behavior.
 
-## 结构
+Current authority:
 
-```text
-Library
-  ├── Platform Assets
-  ├── My Assets
-  ├── Explorer
-  └── Reports
-```
+- [ADR 0005](../adr/0005-library-capability-catalog-fields.md) covers the accepted Library capability catalog display fields.
 
-## Platform Assets
+Deferred scope:
 
-面向官方或公共资产，支持查看、安装、更新、锁定、回滚和查看变更记录。
+- Platform asset install/update/lock/rollback behavior.
+- My Assets editing, fork, overlay, export, and contribution behavior.
+- Explorer, Reports, repair, and site-change workflows.
 
-平台资产是公共基线，不应被用户直接改写。
-
-## My Assets
-
-面向用户或团队自己的资产，支持私有能力、私有任务模板、overlay、fork、草稿、测试样例、版本历史、diff、回滚、导出和可选贡献。
-
-## Explorer
-
-用于网站探索和知识形成。
-
-典型流程：
-
-```text
-选择站点
-  → 探索页面状态和入口
-  → 记录操作路径
-  → 形成站点知识草稿
-  → 形成能力草稿或任务模板草稿
-  → 测试
-  → 保存为用户个人资产
-```
-
-## Reports
-
-用于失效标记、站点变化报告、修复请求和脱敏上报。
-
-## 边界
-
-- Library 是 App 中的操作入口；
-- Lode 是资产真相源；
-- WebEnvoy Core 负责执行任务；
-- Harbor 负责运行环境；
-- App 不应复制另一套能力资产真相。
+Do not implement from this draft.
