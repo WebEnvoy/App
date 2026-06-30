@@ -1,0 +1,27 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-54",
+  "decision": "allow",
+  "kind": "general_review",
+  "summary": "PR #60 is approved for the docs-only Library capability catalog fields contract and remains within App #58/#54 scope.",
+  "reviewer": "codex-coordinator",
+  "reviewed_head": "b7a1c44e42eb476433ad89ac0aac8dd1946049c7",
+  "reviewed_validation_summary": "2026-06-30 coordinator review approved PR #60 docs-only contract at product head b7a1c44e42eb476433ad89ac0aac8dd1946049c7; prior branch validation covered `git diff --check`, JSON syntax, Loom fact-chain, suite validate, and carrier validate; no UI/code, App shell, catalog store, package schema, registry, installer, marketplace, hosted registry, external writes, or issue closeout changed.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this approval as UI/code, App shell, catalog store, installer, marketplace, hosted registry, real package registry, fixture execution, post-check execution, merge, or issue closeout completion."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "ADR 0005 defines App Library as a display projection over Lode/Core/Harbor facts, limits local persistence to non-sensitive UI state/cache, and preserves unknown/redacted/unavailable/metadata_missing/invalid_contract distinctions."
+  },
+  "consumed_inputs": {
+    "spec": ".loom/specs/GH-54/spec.md",
+    "plan": ".loom/specs/GH-54/plan.md",
+    "task_carrier": ".loom/specs/GH-54/task-carrier.md",
+    "suite_path": "minimal",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/60"
+  }
+}

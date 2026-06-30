@@ -130,6 +130,67 @@
 | 独立 App truth source | 会复制 Core Run Record、Harbor Session/Evidence、Lode Asset truth。 | 不重新评估；只能增加 owner API consumer。 | 全阶段 | rejected |
 | 完整 App/API/CLI/MCP 多入口平台 | 当前只需公共任务语义和消费边界，完整入口平台属于日常产品稳定阶段。 | 阶段二最小协议稳定并进入阶段九多入口产品化。 | 阶段二至阶段九 | deferred |
 
+## 2026-06-30 Library capability catalog fields v0
+
+本节承载 App #58 / #54 的阶段二结论。权威决策见
+[ADR 0005](0005-library-capability-catalog-fields.md)。依据来自本仓 `AGENTS.md`、
+`ROADMAP.md`、ADR 0004、GitHub issues #58/#54、Lode 已合并 package minimum
+format v0（Lode ADR 0002/0003/0004 与 pending-decisions 第一阶段结论），以及
+`research/absorability/themes/api-cli-mcp-and-agent-interface.md`、
+`research/absorability/themes/evidence-and-observability.md` 在 2026-06-30 的当前内容。
+
+### Catalog 字段显示合同
+
+| 字段或状态 | owner | consumer | 有效性/过期规则 | 失败分类 | 非目标 |
+|---|---|---|---|---|---|
+| display name | Lode | App Library card/list/detail | 随上游 catalog fact 刷新；缺失时用 capability id 兜底显示 unknown marker。 | `unknown` / `unavailable` | App 不命名官方能力。 |
+| capability id | Lode | Library deep link、run attribution display | catalog version 内稳定；缺失阻断依赖该 id 的动作显示。 | `metadata_missing` | App 不 mint id。 |
+| version / lock | Lode/Core/App local intent 分层拥有 | Library version、installed/locked/pending intent display | 上游 version 随 catalog 刷新；本地 pin 只是 pending UI intent，owner 确认前不是事实。 | `unknown version` / `lock unavailable` / `stale lock` | 不实现 install/update/rollback/store。 |
+| family / tags | Lode | grouping、轻量过滤、浏览 | 可缓存为可重建 display snapshot；taxonomy truth 不在 App。 | `uncategorized` / `unknown` | App 不定义 canonical taxonomy。 |
+| operation mode | Lode 声明，Core admission/action risk 拥有执行判断 | read / validate-only / draft-preview / write-like / unknown 显示 | metadata 或 admission 合同变化时重评估。 | `unknown mode` / `invalid_contract` | App 不决定 action risk。 |
+| lifecycle / deprecation / invalidation | Lode；Core 可报告 runtime invalid contract | proposed / experimental / stable / deprecated / invalidated / unavailable 显示 | invalidation/deprecation 优先于缓存。 | `deprecated` / `invalidated` / `invalid_contract` / `capability_unavailable` | App 不 repair 或清除 invalidation。 |
+| resource requirement summary | Lode 声明；Core 根据 Harbor facts 匹配 | 展示抽象需求摘要，不展示为当前可用性 | 当前可用性必须来自 Core/Harbor health/admission facts。 | `requirement unknown` / `resource unavailable` / `admission unavailable` | App 不选择 Profile/provider。 |
+| fixture / post-check signals | Lode owns requirements；Core owns execution result | 只显示存在、缺失、redacted、required、passed/failed 等摘要 | package facts 随 Lode 刷新；execution signals 随 Core run facts 刷新。 | `fixture missing` / `post-check unavailable` / `post-check failed` / `redacted` | App 不 inline fixture、不运行 check、不存 raw evidence。 |
+| source / evidence refs | Core/Harbor/Lode 各自 owner | refs、summary、policy-allowed thumbnail | 遵循 owner evidence/catalog policy。 | `redacted` / `expired` / `permission denied` / `unavailable` | App 不复制 screenshot、HAR、trace、DOM、network body 或 payload。 |
+
+### App 可保存与不可保存
+
+| 对象 | 结论 | 边界 | 状态 |
+|---|---|---|---|
+| 排序、分组、可见列、折叠 family、最近 Library view | App 可保存 | 非敏感 UI preference。 | accepted |
+| search text、filter chips、selected tags/family、dismissed local hints | App 可保存 | 只是本地便利，不是 catalog truth。 | accepted |
+| 非敏感 catalog display snapshot | App 可短期缓存 | 必须带 upstream source、fetched-at、stale/unknown marker，且可重建。 | accepted |
+| local pin / lock intent | App 可保存为 pending UI intent | 直到 Lode/Core owner API 返回 fact 前都不是真实 lock。 | accepted |
+| package body、fixture body、raw evidence、credential、Harbor profile/session facts、Core Run Record facts | App 不保存 | 只能按 owner policy 显示 ref 或 summary。 | rejected |
+
+### unknown / redacted / unavailable 显示边界
+
+| 状态 | 含义 | Library 规则 |
+|---|---|---|
+| `unknown` | upstream 未供应或字段尚未标准化。 | 显示 unknown marker，不启用依赖该字段的能力声明。 |
+| `redacted` | owner 有意隐藏值。 | 显示 redacted 与 owner/source，不用缓存 raw value 代替。 |
+| `unavailable` | owner endpoint、catalog、evidence 或 admission source 不可达。 | 显示 unavailable 与 source，不把缓存当 fresh success。 |
+| `metadata_missing` | 当前显示动作需要的 identity/version/lifecycle 缺失。 | 禁用依赖动作，归类为合同缺口。 |
+| `invalid_contract` | owner 明确表示 metadata 不一致或不可消费。 | 显示 invalid contract，并把 repair/report intent 指向 owner flow。 |
+
+### 研究吸收边界
+
+| 输入 | 吸收 | 裁剪 | 只参考 | 拒绝 |
+|---|---|---|---|---|
+| Lode package minimum format v0 | capability identity、operation、family、lifecycle、version、resource requirement、fixture/post-check、invalidation 都作为上游事实投影。 | App 只保留显示字段和 local UI 设置。 | 未来 registry 形态可替换事实来源。 | App-owned package schema、hosted registry 承诺、runtime/provider 选择。 |
+| API / CLI / MCP research | 小型确定性接口、reference-over-value、owner-specific surfaces。 | 本轮不设计 CLI/MCP/API。 | tool registry 可服务后续入口一致性。 | 把低层 CDP/eval/browser tools 当 Library capability truth。 |
+| Evidence / observability research | evidence refs、redacted/expired/unavailable、post-check 与 result separation。 | Library 只显示 summary/marker。 | 宽 evidence taxonomy 留给 Work/Evidence UI。 | App 默认保存 raw screenshot/HAR/trace/video/network body。 |
+| App ADR 0004 | Library 读取 Lode metadata，标记 unknown/unavailable。 | 本轮只收敛 catalog display fields。 | run history/evidence browser 继续独立。 | App-defined package schema 或 evidence store。 |
+
+### Deferred / non-goals
+
+| 事项 | 判断 | 重新进入条件 | 状态 |
+|---|---|---|---|
+| marketplace / hosted registry / sync / contribution flow | 不在本轮承诺。 | Lode 本地 package、validator、install/lock/update 事实稳定后。 | deferred |
+| App shell、UI component、catalog store | 不在本轮实现。 | 独立 UI Work Item 绑定本 ADR 消费字段。 | deferred |
+| installer、真实 lock/update/rollback/repair | 不在本轮实现。 | owner API 与 Core/Lode fact flow 稳定后。 | deferred |
+| fixture/post-check 执行 | App 只显示摘要。 | Core/Lode/Harbor 合同定义执行和证据 refs 后。 | deferred |
+
 ## 待决策索引
 
 | ID | 问题 | 来源 ADR | 阻塞什么 | 当前状态 | 后续归属/下一步 |

@@ -2,34 +2,34 @@
 
 ## Derived Fact Chain View
 
-- Item ID: GH-13
-- Goal: 用最小 docs-only PR 收敛首个低风险只读任务用户旅程，并把 App 最小公共入口消费需求、写前验证显示边界、入口吸收/非目标边界落入仓内事实载体。
-- Scope: 仅更新 `docs/adr/pending-decisions.md` 和本事项的最小 Loom carrier。
-- Execution Path: docs-only/product-boundary
+- Item ID: GH-54
+- Goal: Define Library capability catalog fields v0 for App #58 / #54 as a docs-only contract.
+- Scope: Update App ADR / decision facts and item-specific Loom carrier for Library catalog display fields. Ownership constraints are limited to the associated artifacts below.
+- Execution Path: docs-only/product-contract
 - Workspace Entry: .
-- Recovery Entry: .loom/progress/GH-13.md
-- Review Entry: .loom/reviews/GH-13.json
-- Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; direct hosted-style Loom PR gate when a PR exists; hosted required checks
-- Closing Condition: PR #34 merged into `main`; hosted required checks passed; issue closeout is owned by the coordinator as the next external step.
-- Current Checkpoint: closed_out
-- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#13 via PR #34.
-- Next Step: No further action for this Work Item after coordinator issue closeout comments are posted and covered issues are closed.
+- Recovery Entry: .loom/progress/GH-54.md
+- Review Entry: .loom/reviews/GH-54.json
+- Validation Entry: `git diff --check`; JSON validation; `loom fact-chain --target . --json`; `loom suite validate --target . --json`; `loom suite carrier validate --target . --json`; hosted basic checks
+- Closing Condition: PR ready with docs-only contract and hosted checks classifiable; do not merge and do not close issues.
+- Current Checkpoint: merge
+- Current Stop: Coordinator semantic review approved the docs-only Library capability catalog fields contract at product head b7a1c44e42eb476433ad89ac0aac8dd1946049c7; next PR head should contain only Loom review/status carrier drift.
+- Next Step: Push carrier refresh, update PR #60 head metadata, run hosted merge gate, then merge and perform post-merge closeout.
 - Blockers: None recorded.
-- Latest Validation Summary: Post-merge closeout consumed PR #34, head 4f45c34e12907f7b9482a9d864214052ba17a831, merge commit 4bc42aced71c5750ca9837a62e117c4f381c9f58, and hosted run 28427108610 with all required checks passing.
-- Recovery Boundary: Terminal carrier for this docs-only user journey item; open new Work Items for API/schema/UI implementation.
-- Current Lane: terminal closeout
+- Latest Validation Summary: 2026-06-30 coordinator review approved PR #60 docs-only contract at product head b7a1c44e42eb476433ad89ac0aac8dd1946049c7; prior branch validation covered `git diff --check`, JSON syntax, Loom fact-chain, suite validate, and carrier validate; no UI/code, App shell, catalog store, package schema, registry, installer, marketplace, hosted registry, external writes, or issue closeout changed.
+- Recovery Boundary: Do not expand into UI/code, App shell, catalog store, marketplace, installer, registry, or issue closeout.
+- Current Lane: docs-only contract
 
 ## Runtime Evidence
 
 - Run Entry: not_applicable
 - Logs Entry: not_applicable
 - Diagnostics Entry: not_applicable
-- Verification Entry: loom verify --target . --json
-- Lane Entry: not_applicable
+- Verification Entry: `loom fact-chain --target . --json`; `loom suite validate --target . --json`; `loom suite carrier validate --target . --json`
+- Lane Entry: .loom/specs/GH-54/task-carrier.md
 
 ## Sources
 
-- Static Truth: .loom/work-items/GH-13.md
-- Dynamic Truth: .loom/progress/GH-13.md
+- Static Truth: .loom/work-items/GH-54.md
+- Dynamic Truth: .loom/progress/GH-54.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
