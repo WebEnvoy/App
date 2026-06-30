@@ -1,0 +1,28 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "delegations": [],
+  "integration_evidence": [
+    {
+      "id": "main-thread-docs-contract",
+      "status": "integrated",
+      "summary": "Main thread integrated the docs-only Library capability catalog fields v0 contract into ADR 0005, pending-decisions, and GH-54 Loom carriers.",
+      "locators": [
+        "docs/adr/0005-library-capability-catalog-fields.md",
+        "docs/adr/pending-decisions.md",
+        ".loom/work-items/GH-54.md",
+        ".loom/progress/GH-54.md",
+        ".loom/specs/GH-54/spec.md",
+        ".loom/specs/GH-54/plan.md",
+        ".loom/specs/GH-54/implementation-contract.md",
+        ".loom/specs/GH-54/task-carrier.md"
+      ],
+      "validation": [
+        "git diff --check",
+        "JSON validation",
+        "loom fact-chain --target /Volumes/2T/.codex/worktrees/stage2/app-library-catalog --json",
+        "loom suite validate --target /Volumes/2T/.codex/worktrees/stage2/app-library-catalog --item GH-54 --json",
+        "loom suite carrier validate --target /Volumes/2T/.codex/worktrees/stage2/app-library-catalog --item GH-54 --json"
+      ]
+    }
+  ]
+}
