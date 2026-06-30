@@ -4,19 +4,19 @@
 
 - Item ID: GH-72
 - Goal: Upgrade the repository Loom workflow pin from 0.21.1 to 0.22.1.
-- Scope: Workflow-only CI maintenance for `.github/workflows/loom-check.yml`; no product code, product docs, roadmap, issue-tree, schema, API, runtime, fixture, or historical carrier migration.
+- Scope: Update `.github/workflows/loom-check.yml` and record the minimum item-specific Loom carrier for this workflow-only maintenance PR.
 - Execution Path: ci-maintenance/loom-version-pin
 - Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-72.md
 - Review Entry: .loom/reviews/GH-72.json
-- Validation Entry: `git diff --check`; PR metadata readback; hosted py-compile/demo-bootstrap/repo-local-cli/loom-check/loom-pr-merge-gate.
-- Closing Condition: PR #71 is merged to main and GH-72 records post-merge closeout evidence.
+- Validation Entry: `git diff --check`; hosted GitHub Actions checks for PR #71.
+- Closing Condition: PR #71 is merged and GH-72 contains post-merge closeout evidence.
 - Current Checkpoint: merge
 - Current Stop: PR #71 is ready for hosted merge gate on the GH-72 workflow-only maintenance carrier.
 - Next Step: Run hosted checks for PR #71, merge after required checks pass, then record closeout evidence for GH-72.
 - Blockers: None recorded.
 - Latest Validation Summary: PR head 81e9a96ade9a9851fd0093785adfbe0cb5d4c370 contains the Loom workflow pin update to 0.22.1 plus the GH-72 item-specific maintenance carrier; no product docs, product contracts, code, roadmap, issue tree, plugin cache path, or historical INIT-0001 migration changed.
-- Recovery Boundary: This carrier approves only Loom workflow version-pin maintenance; it does not approve product, schema, API, runtime, fixture, roadmap, issue-tree, or governance process changes.
+- Recovery Boundary: Workflow-only maintenance; re-review if the PR changes product code, product docs, roadmap, issue tree, workflow command structure, schema/API/runtime behavior, fixtures, or `.loom` carriers beyond GH-72 status/review/progress evidence.
 - Current Lane: ci-maintenance
 
 ## Runtime Evidence
