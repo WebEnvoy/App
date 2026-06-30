@@ -71,6 +71,65 @@
 | App 定义最终入口 UI、字段 schema 或状态机 | 不做 | 当前阶段只定义职责和消费边界。 | rejected |
 | 精确 evidence type、catalog search fields、handoff reason taxonomy | 后续规格 | 需要上游合同稳定后再消费。 | deferred |
 
+## 2026-06-30 首个只读任务旅程与入口吸收结论
+
+本节承载 App #12 至 #23 的第一阶段剩余结论。依据来自本仓 `AGENTS.md`、`ROADMAP.md`、`docs/adr/0002-0004`、`docs/draft/*`，GitHub issue #12 至 #23 正文，以及 `/Volumes/2T/dev/WebEnvoy/research/` 下的 `synthesis.md`、`absorability/themes/evidence-and-observability.md`、`result-normalization-and-reconciliation.md`、`human-handoff-and-recovery.md`、`task-execution-and-admission.md`、`api-cli-mcp-and-agent-interface.md`、`site-knowledge-and-capability-assets.md`、`browser-identity-and-runtime.md` 在 2026-06-30 的当前内容。外部源码 locator `/Volumes/2T/dev/WebEnvoy/sources/CloakHQ/CloakBrowser-Manager` 与 `/Volumes/2T/dev/WebEnvoy/sources/browseros-ai/BrowserOS` 仅作为 #22 非目标参考，不作为 App 源码迁入依据。
+
+### FR 汇总
+
+| Issue | 结论 | 状态 | 后续阻塞 |
+|---|---|---|---|
+| App #12 | 首个低风险只读旅程从一个公共入口提交 task intent，经 Core run status，到 result envelope、evidence refs、failure reason、viewer/takeover entry；App 只呈现上游事实。 | accepted | 精确字段合同进入阶段二；不阻塞第一阶段 closeout。 |
+| App #13 | 最小用户路径是 submit intent -> run status -> structured result -> evidence refs；App 不直接执行 capability 或写 Run Record。 | accepted | 由 Core 提供 task/run/result facts，Lode 提供 capability/result shape metadata。 |
+| App #14 | 失败路径展示 failure reason、evidence unavailable/redacted/expired、recovery prompt 和 viewer/takeover entry；App 不判断业务成功或恢复结果。 | accepted | evidence type 与 reason taxonomy 继续引用 PD-0003、PD-0006、PD-0007、PD-0012 至 PD-0014。 |
+| App #15 | preview、draft、approval request 是未来写侧的显示边界，不是已提交结果。 | accepted | 真实写入仍需后续 Core admission/action request 合同。 |
+| App #16 | 写前验证可显示 preview、draft、risk、approval request、cancel intent；提交、执行、审批结果由 owner API 产生。 | accepted | 不阻塞第一阶段；精确 action request 字段后续定义。 |
+| App #17 | 未提交内容必须标为 preview/draft/pending approval，不能进入 result history 或 run success。 | accepted | unknown outcome 与对账展示继续引用 PD-0009。 |
+| App #18 | 最小公共入口现在就要定义公共任务语义和消费边界：task、run、result、evidence、action request、Harbor runtime facts、Lode capability metadata。 | accepted | 不建设完整 App/API/CLI/MCP 多入口平台；字段合同后续收敛。 |
+| App #19 | Core 生产 task/run/result/failure/action request/evidence ref facts，App 只消费并发送用户意图。 | accepted | Core truth source 和 action risk 合同稳定前，只定义消费需求。 |
+| App #20 | Harbor 生产 session/viewer/evidence runtime facts，Lode 生产 capability metadata/result shape；App 可缓存非敏感展示 metadata。 | accepted | Lode catalog 稳定字段继续引用 PD-0015。 |
+| App #21 | 外部界面壳、hosted 平台控制台和独立 truth source 不进入 App MVP。 | accepted | 后续云端 Console 不改变 truth ownership。 |
+| App #22 | CloakBrowser-Manager、BrowserOS 等外部 UI shell 只作机制参考，不整体迁入 App。 | accepted | 如需源码复用必须另开 Work Item 做许可、边界和模块审查。 |
+| App #23 | Hosted 平台控制台、vault/persona/payment/remote provider 控制台和独立 truth store 不进入 App MVP。 | accepted | 仅在后续 team/cloud 阶段重新评估。 |
+
+### 首个低风险只读任务最小路径
+
+| 用户场景 | 展示内容 | 用户意图 | 上游事实来源 | 禁止行为 | 状态 |
+|---|---|---|---|---|---|
+| 提交只读任务 | capability/task package identity、input summary、read-only scope、resource/profile requirement summary | submit task intent、cancel before submission | Lode capability metadata/result shape；Core admission/task intent contract；Harbor profile availability facts | App 直接执行 capability、定义 task schema、保存 Run Record | accepted |
+| 查看运行状态 | run identity、status、timestamps、current step summary、capability version、runtime/session refs | stop、retry when allowed、open run | Core Run Record/status facts；Harbor Runtime Session refs；Lode capability version | App 复制 Core 状态机、把 Harbor session health 当业务结果 | accepted |
+| 读取结构化结果 | result envelope summary、typed fields from owner contract、source capability/version、result freshness | open result detail、copy/export allowed summary | Core result facts；Lode result shape metadata | App 自定义最终 result schema、把 draft/preview 写入 result history | accepted |
+| 打开证据引用 | evidence refs、summary、thumbnail if policy allows、redacted/expired/unavailable state | open evidence ref、request permission if owner exposes it | Core evidence refs；Harbor evidence/runtime policy | App 保存 raw screenshot/HAR/video/network body、绕过 evidence policy | accepted |
+| 理解失败原因 | failure reason、blocking owner、evidence refs、next suggested user action | retry、stop、open viewer/takeover、leave unresolved | Core failure/recovery facts；Harbor viewer/takeover facts；Lode capability failure marker if provided | App 判断业务成功、自动标记 capability invalid、把 viewer failure 混成 task result | accepted |
+
+### 最小公共入口消费需求
+
+| 字段/事实 | 生产者 | 消费者 | 保留/脱敏规则 | 依据 | 状态 |
+|---|---|---|---|---|---|
+| task intent、admission decision、run id、run status、timestamps | Core | App Work；未来 API/CLI/MCP 入口语义对齐 | App 只保存 UI cache 和最近视图；durable truth 在 Core | App #18/#19、ADR 0002/0004、research task-execution-and-admission | accepted |
+| result envelope、failure reason、unknown outcome、recovery prompt、action request | Core | App Work；未来多入口共用任务语义 | 不把 preview/draft/pending approval 当作 submitted result | App #13/#14/#15/#17、research result-normalization-and-reconciliation | accepted |
+| evidence ref、evidence summary、redacted/expired/unavailable marker | Core/Harbor | Work、Browser、Library Explorer | 默认 ref-over-value；raw artifact 由 owning policy 控制 | App #14/#19/#20、ADR 0004、research evidence-and-observability | accepted |
+| Profile、Runtime Session、Viewer entry、takeover availability、runtime health | Harbor | Work recovery、Browser | App 只保存选择和最近使用 UI 状态 | App #14/#20、ADR 0002/0003、research browser-identity-and-runtime | accepted |
+| capability identity、version、catalog metadata、result shape、failure marker | Lode | Work、Library | App 可缓存非敏感 metadata；asset truth 在 Lode | App #13/#20、ADR 0004、research site-knowledge-and-capability-assets | accepted |
+| 公共任务语义 | Core/Harbor/Lode owner contracts | App；未来 API/CLI/MCP | 现在只定义消费边界，不建设完整多入口平台 | App #18/#19/#20、research api-cli-mcp-and-agent-interface | accepted |
+
+### 写前验证显示边界
+
+| 写侧概念 | 早期允许范围 | 禁止范围 | 进入真实写入条件 | 依据 | 状态 |
+|---|---|---|---|---|---|
+| preview | 显示将要发生的变更、风险、目标对象、evidence refs 或 validate-only output | 显示为已提交结果、写入 run history success、触发真实外部变更 | Core admission/action risk 返回可执行 action request，并由用户确认 | App #15/#16/#17、research task-execution-and-admission | accepted |
+| draft | 作为 App UI 编辑缓冲或 Lode/owner 草稿引用 | 冒充 Lode package truth、Core result 或已发布资产 | 提交到 Lode 或 owner API 后由 owner 返回正式 identity/version | App #16/#17、docs/draft/library-workbench.md | accepted |
+| approval request | 显示 owner、action summary、risk、cancel/approve/decline intent | App 自行执行写入、保存审批结果 truth | Core 或 owner API 接收用户意图并生成正式 action/run fact | App #16/#17、ADR 0002/0003 | accepted |
+
+### 入口吸收与非目标
+
+| 非目标 | 排除原因 | 可重新评估条件 | 影响阶段 | 状态 |
+|---|---|---|---|---|
+| 外部 UI shell 整体迁入 App | CloakBrowser-Manager 是 profile/runtime/viewer 管理器，BrowserOS 是完整 Chromium fork 与 agent 平台；整体迁入会把 Harbor/App/Core/Lode 边界混在一起。 | 有明确小模块复用候选、许可证审查、owner 边界和测试计划。 | 阶段一至阶段四 | rejected |
+| Hosted 平台控制台 | vault、persona、payment、remote provider、team/cloud 运维不属于本地优先首个只读任务闭环。 | 进入 team/cloud 阶段并保持 Core/Harbor/Lode truth ownership。 | 阶段九以后 | deferred |
+| 独立 App truth source | 会复制 Core Run Record、Harbor Session/Evidence、Lode Asset truth。 | 不重新评估；只能增加 owner API consumer。 | 全阶段 | rejected |
+| 完整 App/API/CLI/MCP 多入口平台 | 当前只需公共任务语义和消费边界，完整入口平台属于日常产品稳定阶段。 | 阶段二最小协议稳定并进入阶段九多入口产品化。 | 阶段二至阶段九 | deferred |
+
 ## 待决策索引
 
 | ID | 问题 | 来源 ADR | 阻塞什么 | 当前状态 | 后续归属/下一步 |

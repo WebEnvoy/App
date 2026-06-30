@@ -2,22 +2,22 @@
 
 ## Derived Fact Chain View
 
-- Item ID: GH-31
-- Goal: 沉淀 Loom PR 与 closeout 执行约束，避免后续产品 PR 复用 `INIT-0001` 或产生 head/carrier 漂移。
-- Scope: 仅更新 `AGENTS.md` 和本事项的最小 Loom carrier。
-- Execution Path: docs-only/governance
+- Item ID: GH-13
+- Goal: 用最小 docs-only PR 收敛首个低风险只读任务用户旅程，并把 App 最小公共入口消费需求、写前验证显示边界、入口吸收/非目标边界落入仓内事实载体。
+- Scope: 仅更新 `docs/adr/pending-decisions.md` 和本事项的最小 Loom carrier。
+- Execution Path: docs-only/product-boundary
 - Workspace Entry: .
-- Recovery Entry: .loom/progress/GH-31.md
-- Review Entry: .loom/reviews/GH-31.json
-- Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; hosted Loom checks
-- Closing Condition: AGENTS.md 约束合入 main，hosted checks 通过，并在 issue 中写入 post-merge closeout 证据。
-- Current Checkpoint: closed_out
-- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#31 and PR #32.
-- Next Step: No further action for this Work Item.
+- Recovery Entry: .loom/progress/GH-13.md
+- Review Entry: .loom/reviews/GH-13.json
+- Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; direct hosted-style Loom PR gate when a PR exists; hosted required checks
+- Closing Condition: PR created and pushed for review; do not merge or close issues in this execution round.
+- Current Checkpoint: merge
+- Current Stop: GH-13 docs-only boundary and review carriers are ready for PR merge gate evaluation.
+- Next Step: Consume hosted required checks and `loom-pr-merge-gate`; do not merge or close issues in this execution round.
 - Blockers: None recorded.
-- Latest Validation Summary: Post-merge closeout consumed PR #32, merge commit 55a1aeda6ff8f5d60183153593d68c935ce3296c, and hosted run 28424977241 with all required checks passing.
-- Recovery Boundary: Terminal carrier; open a new Work Item for future Loom governance changes.
-- Current Lane: terminal closeout
+- Latest Validation Summary: Baseline issue/doc/research/source read completed on 2026-06-30; no product code or UI shell added.
+- Recovery Boundary: Continue only within GH-13 docs-only scope; open new Work Items for API/schema/UI implementation.
+- Current Lane: merge-ready carrier repair
 
 ## Runtime Evidence
 
@@ -29,7 +29,7 @@
 
 ## Sources
 
-- Static Truth: .loom/work-items/GH-31.md
-- Dynamic Truth: .loom/progress/GH-31.md
+- Static Truth: .loom/work-items/GH-13.md
+- Dynamic Truth: .loom/progress/GH-13.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
