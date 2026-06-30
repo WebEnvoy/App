@@ -1,0 +1,16 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-66",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "GH-66 spec/plan are approved for a docs-only draft closeout: they require draft lifecycle semantics, a complete draft disposition table, absorption of valid analysis into formal docs/contracts, and explicit deferred ownership without claiming implementation completion.",
+  "reviewer": "codex",
+  "reviewed_head": "c8de6373dcaba9db1a3684ee593850802d6bc5e1",
+  "reviewed_validation_summary": "Local validation for GH-66 docs-only draft closeout passed git diff --check, .loom JSON jq validation, loom fact-chain, loom suite validate, loom suite carrier validate, and loom suite evidence validate.",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this approval as UI/App shell/runtime/storage/schema/API/generated facts/fixtures behavior completion.",
+    "If a later PR introduces code, schema, API, runtime, generated facts, fixtures, storage, UI behavior, or executable product behavior, use a stronger validation suite."
+  ]
+}
