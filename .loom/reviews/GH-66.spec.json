@@ -3,14 +3,13 @@
   "item_id": "GH-66",
   "decision": "allow",
   "kind": "spec_review",
-  "summary": "GH-66 spec/plan are approved for a docs-only draft closeout: they require draft lifecycle semantics, a complete draft disposition table, absorption of valid analysis into formal docs/contracts, and explicit deferred ownership without claiming implementation completion.",
-  "reviewer": "codex",
-  "reviewed_head": "c8de6373dcaba9db1a3684ee593850802d6bc5e1",
-  "reviewed_validation_summary": "Local validation for GH-66 docs-only draft closeout passed git diff --check, .loom JSON jq validation, loom fact-chain, loom suite validate, loom suite carrier validate, and loom suite evidence validate.",
+  "summary": "Post-merge spec closeout for GH-66 is approved; the docs-only App docs draft closeout is merged and no implementation completion is implied.",
+  "reviewer": "codex-coordinator",
+  "reviewed_head": "8c62a25d7495a2ffc6588c6abd0e7bcd8fdb513e",
+  "reviewed_validation_summary": "Post-merge closeout consumed PR #69, head b707da19016248038fcda31359921ee517ffb19f, merge commit 8c62a25d7495a2ffc6588c6abd0e7bcd8fdb513e, target branch main, and hosted run 28457408285 with all required checks passing.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
-    "Do not treat this approval as UI/App shell/runtime/storage/schema/API/generated facts/fixtures behavior completion.",
-    "If a later PR introduces code, schema, API, runtime, generated facts, fixtures, storage, UI behavior, or executable product behavior, use a stronger validation suite."
+    "Do not treat this approval as code, schema, API, runtime, storage, UI, fixture, generated fact, or product behavior implementation completion."
   ]
 }

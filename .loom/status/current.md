@@ -11,13 +11,13 @@
 - Review Entry: .loom/reviews/GH-66.json
 - Validation Entry: `git diff --check`; JSON validation for `.loom/**/*.json`; `loom fact-chain --target . --item GH-66 --json`; `loom suite validate --target . --item GH-66 --json`; `loom suite carrier validate --target . --item GH-66 --json`; hosted checks after PR creation
 - Closing Condition: PR ready for WebEnvoy/App docs draft closeout milestone; do not merge and do not close issues.
-- Current Checkpoint: merge
-- Current Stop: PR #69 is open; current-head review artifacts are present and hosted merge gate is being reconciled for PR Ready.
-- Next Step: Reach PR Ready, then stop for coordinator handling; do not merge and do not close issues from this thread.
+- Current Checkpoint: closed_out
+- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#69.
+- Next Step: No further action for GH-64/GH-65/GH-66/GH-67/GH-68 after coordinator issue closeout comments are posted and covered issues are closed.
 - Blockers: None recorded.
-- Latest Validation Summary: Local validation for GH-66 docs-only draft closeout passed git diff --check, .loom JSON jq validation, loom fact-chain, loom suite validate, loom suite carrier validate, and loom suite evidence validate. The only evidence inspect limitation is non-blocking source_exists=false for a multi-file behavior_evidence locator; suite evidence validate result is pass.
-- Recovery Boundary: Docs-only closeout for `docs/draft`; no product semantics, UI/App shell/runtime/storage/schema/API/generated facts/fixture behavior changes.
-- Current Lane: docs-draft-closeout
+- Latest Validation Summary: Post-merge closeout consumed PR #69, head b707da19016248038fcda31359921ee517ffb19f, merge commit 8c62a25d7495a2ffc6588c6abd0e7bcd8fdb513e, target branch main, and hosted run 28457408285 with all required checks passing.
+- Recovery Boundary: Terminal carrier for docs-only App draft lifecycle closeout; open later Work Items for UI, App shell, runtime, storage, schema/API client, fixture, or product behavior implementation.
+- Current Lane: terminal closeout
 
 ## Runtime Evidence
 
