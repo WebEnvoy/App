@@ -9,7 +9,7 @@
 - Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-13.md
 - Review Entry: .loom/reviews/GH-13.json
-- Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; `loom installed-state validate --target . --json`; direct hosted-style Loom PR gate when a PR exists; hosted Loom checks
+- Validation Entry: `git diff --check`; `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; direct hosted-style Loom PR gate when a PR exists; hosted required checks
 - Closing Condition: PR created and pushed for review; do not merge or close issues in this execution round.
 - Current Checkpoint: implementation_ready
 - Current Stop: First-stage App issue tree conclusions are being recorded in `docs/adr/pending-decisions.md`.
