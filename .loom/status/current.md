@@ -2,21 +2,21 @@
 
 ## Derived Fact Chain View
 
-- Item ID: GH-86
-- Goal: Clarify that App uses a cross-platform desktop shell with minimal native OS integration.
-- Scope: Docs-only update to App ADR 0007 and AGENTS.md; no code, dependencies, IPC spec, or cross-repo changes.
-- Execution Path: docs-only/app-native-shell-boundary
+- Item ID: GH-89
+- Goal: Upgrade the repository Loom runtime workflow pin to 0.25.0.
+- Scope: Runtime-upgrade-only maintenance PR that updates `.github/workflows/loom-check.yml`, declares the v0.25 PR metadata carrier in `.loom/companion/repo-interface.json`, and records item-specific Loom carrier evidence.
+- Execution Path: ci-maintenance/loom-runtime-upgrade
 - Workspace Entry: .
-- Recovery Entry: `.loom/progress/GH-86.md`
-- Review Entry: `.loom/reviews/GH-86.json`
-- Validation Entry: `.loom/specs/GH-86/build-evidence.json`
-- Closing Condition: PR merged and GH-86 closed with post-merge evidence.
+- Recovery Entry: .loom/progress/GH-89.md
+- Review Entry: .loom/reviews/GH-89.json
+- Validation Entry: `git diff --check`; `jq empty .loom/companion/repo-interface.json`; `loom suite validate --item GH-89`; `loom runtime-upgrade check --item GH-89`; hosted GitHub checks for PR #90.
+- Closing Condition: PR #90 is merged, runtime-upgrade closeout evidence is recorded, issue #89 is closed, and main reads back Loom workflow pin 0.25.0.
 - Current Checkpoint: merge
-- Current Stop: Closeout carrier sync is ready for hosted gate and merge.
-- Next Step: Merge this closeout-only carrier PR; no product work remains in this follow-up.
+- Current Stop: Merge-ready carrier refresh for the Loom 0.25.0 runtime-upgrade maintenance PR.
+- Next Step: Run PR gate and hosted checks for PR #90 at the current head, then merge only if they pass.
 - Blockers: None recorded.
-- Latest Validation Summary: Post-merge closeout consumed PR https://github.com/WebEnvoy/App/pull/87, PR head c077e2640185c1f3be3403cba4f5f96201609615, merge commit 14ed4ca5ae7bfa346f8af46cb8ab294a45997b9f, target branch main, hosted run https://github.com/WebEnvoy/App/actions/runs/28494642205, and closed issue #86. Scope remains docs-only App shell/native boundary clarification; Electron/React project skeleton, dependencies, IPC/API implementation, service supervision, and Core/Harbor/Lode changes were not completed.
-- Recovery Boundary: Closed docs-only follow-up. Create a new Work Item for any implementation, dependency, IPC/API, or cross-repo work.
+- Latest Validation Summary: The initial PR updated the workflow pin to 0.25.0 and added the v0.25 repo metadata declaration/spec. Hosted checks consumed v0.25.0 and exposed that fact-chain and semantic review must be item-specific for GH-89; this refresh aligns the current fact-chain and records workflow-only review evidence. Product/runtime tests remain not applicable.
+- Recovery Boundary: Runtime-upgrade-only maintenance. Re-review if the diff touches product code, product docs semantics, schema/API/runtime behavior, fixtures, releases, workstation plugin/cache state, or dependencies unrelated to Loom.
 - Current Lane: merge-ready
 
 ## Runtime Evidence
@@ -24,16 +24,16 @@
 - Run Entry: not_applicable
 - Logs Entry: not_applicable
 - Diagnostics Entry: not_applicable
-- Verification Entry: `.loom/specs/GH-86/build-evidence.json`
-- Lane Entry: app-docs
+- Verification Entry: .loom/progress/GH-89.md
+- Lane Entry: ci-maintenance
 
 ## Sources
 
-- Static Truth: `.loom/work-items/GH-86.md`
-- Dynamic Truth: `.loom/progress/GH-86.md`
-- Locator Truth: `.loom/bootstrap/init-result.json`
-- Fact Chain CLI: `loom fact-chain --target . --json`
+- Static Truth: .loom/work-items/GH-89.md
+- Dynamic Truth: .loom/progress/GH-89.md
+- Locator Truth: .loom/bootstrap/init-result.json
+- Fact Chain CLI: loom fact-chain --target . --json
 
 ## Notes
 
-- 2026-07-01: Post-merge closeout recorded PR https://github.com/WebEnvoy/App/pull/87, merge commit `14ed4ca5ae7bfa346f8af46cb8ab294a45997b9f`, hosted run https://github.com/WebEnvoy/App/actions/runs/28494642205, and closed issue #86.
+- 2026-07-01: Runtime-upgrade carrier refreshed for Loom 0.25.0 maintenance PR #90; this does not claim product or runtime implementation.
