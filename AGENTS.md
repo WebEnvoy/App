@@ -38,6 +38,7 @@ examples/
 
 - 产品形态默认 Desktop App first；开发期 localhost/Web UI 只是调试载体，不定义最终产品体验。
 - Desktop shell 默认 Electron；UI 默认 React、TypeScript、Vite、Radix UI primitives 和 `lucide-react`。
+- App 采用“跨平台 shell + 最小原生集成”：Electron / React / Radix 承载主要产品体验；原生层只封装进程、文件、通知、窗口、keychain、profile 路径等 OS 边界能力，不承载 task/run/result/capability/evidence/recovery 等 WebEnvoy 业务协议。
 - 不安装依赖、不初始化 Electron/Vite/React 项目、不创建组件库，除非当前 Work Item 明确是代码骨架或实现项。
 - Tauri/Rust、Next.js、重型设计系统、手写图标系统或外部 UI shell 迁入，需要新的 ADR 或对应 Work Item 明确接受。
 - UI 实现前必须完成低保真 IA、状态矩阵和 Browser/connection 优先级的产品设计 checkpoint；worker 不能自行把临时 UI 当最终方向。

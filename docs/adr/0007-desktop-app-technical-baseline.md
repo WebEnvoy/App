@@ -31,11 +31,18 @@ must treat the final user surface as a desktop application. The production
 desktop shell default is Electron. The UI defaults are React, TypeScript, Vite,
 Radix UI primitives, and `lucide-react` icons.
 
+The desktop architecture is a cross-platform shell with minimal native
+integration. Electron, React, and Radix own the primary product experience.
+The native layer only wraps OS boundary capabilities such as processes, files,
+notifications, windows, keychain access, and profile paths; it must not own or
+implement task, run, result, capability, evidence, or recovery protocols.
+
 ### Product Shape and Shell Boundary
 
 | Area | Accepted baseline | Deferred | Rejected |
 | --- | --- | --- | --- |
 | Product shape | Desktop App first. Design information architecture, viewer priority, local connection states, and settings as a desktop product. | Hosted/team Console, cloud sync, and remote-only product surfaces. | Treating a localhost admin page as the final product shape. |
+| Shell architecture | Cross-platform shell plus minimal native integration. Electron/React/Radix carry the product surface; native code wraps only OS boundaries. | Exact IPC shape and native wrapper module layout until skeleton work. | Putting task/run/result/capability/evidence/recovery business protocols in the native layer. |
 | Development carrier | Local Web UI is allowed for development and review because the UI stack is web-based. | Exact dev server commands and package scripts until the skeleton Work Item. | Letting dev-server routing define product IA. |
 | Production shell | Electron is the default desktop shell for the first implementation. | Updater, installer, tray, file associations, deep links, OS permission prompts, signing, auto-start, and packaging policy. | Initializing Electron in this docs-only PR. |
 | Runtime ownership | Electron/App can display and send user intent to owner APIs. | Explicit local service supervisor Work Item. | Starting, supervising, restarting, or bypassing Core, Harbor, or Lode services from this baseline. |
