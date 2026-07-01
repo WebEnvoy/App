@@ -3,28 +3,28 @@
   "item_id": "GH-75",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "Desktop App 架构与 UI 技术基线 content head is approved for docs-only technical baseline PR Ready; coverage #74-#83 is documented and implementation is explicitly out of scope.",
+  "summary": "Desktop App 架构与 UI 技术基线 is approved for docs-only technical baseline merge gate; coverage #74-#83 is documented and implementation is explicitly out of scope.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-01T04:27:09Z",
-  "reviewed_head": "66afce4e94f6730d5acf69a2f4c8dde64fcdfa1b",
-  "reviewed_validation_summary": "Content head 66afce4e94f6730d5acf69a2f4c8dde64fcdfa1b changes documentation and item-specific Loom carriers only. Static validation passed before review carrier; hosted gate remains required before merge.",
+  "authored_at": "2026-07-01T04:35:18Z",
+  "reviewed_head": "f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69",
+  "reviewed_validation_summary": "Review artifact approves the docs-only Desktop App 架构与 UI 技术基线 at head f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69. The final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, schema, runtime, generated artifact, UI behavior, or product semantics changed after the reviewed head.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Do not close covered issues until PR merge and post-merge closeout evidence record PR head, merge commit, target branch and hosted run. This does not approve Electron/Vite/React 项目、UI、client、storage、service supervisor、Core/Harbor/Lode 实现."
+    "Do not treat this approval as Electron/Vite/React 项目、UI、client、storage、service supervisor、Core/Harbor/Lode 实现."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The reviewed content freezes the docs-only Desktop App 架构与 UI 技术基线 boundary and AGENTS/contracts constraints without adding code, dependencies, schemas, runtime behavior, generated artifacts, or user-facing implementation."
+    "reason": "The reviewed head freezes the docs-only Desktop App 架构与 UI 技术基线 and AGENTS/contracts constraints without adding code, dependencies, schemas, runtime behavior, generated artifacts, UI behavior, or user-facing implementation."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
     "work_item": "GH-75",
     "branch": "work/tech-baseline-app",
-    "reviewed_head": "66afce4e94f6730d5acf69a2f4c8dde64fcdfa1b",
+    "reviewed_head": "f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69",
     "coverage": "#74-#83",
     "suite_path": "minimal_docs_only",
-    "validation": "git diff --check; JSON readability; PR/head hosted gate pending"
+    "validation": "git diff --check; JSON readability; item-specific docs-only suite carrier; hosted gate required before merge"
   }
 }

@@ -8,14 +8,14 @@
 - Execution Path: docs-only/desktop-app-technical-baseline
 - Workspace Entry: .
 - Recovery Entry: `.loom/progress/GH-75.md`
-- Review Entry: not_created_for_pr_ready_execution_thread
-- Validation Entry: `git diff --check`; Markdown/JSON readability checks; PR body/head readback.
+- Review Entry: `.loom/reviews/GH-75.json`
+- Validation Entry: `.loom/specs/GH-75/build-evidence.json`
 - Closing Condition: PR ready for milestone #8 issue tree; do not merge and do not close issues.
 - Current Checkpoint: merge
 - Current Stop: Merge-ready carrier prepared for docs-only technical baseline; hosted PR gate, merge and post-merge closeout are coordinator-owned next steps.
 - Next Step: Create or update PR, read back PR body/head metadata, run hosted gate, merge, then write post-merge closeout evidence.
 - Blockers: None recorded.
-- Latest Validation Summary: Static validation passed before review carrier; semantic/spec review artifacts approve docs-only content head `66afce4e94f6730d5acf69a2f4c8dde64fcdfa1b` and final PR head may differ only by carrier/status updates.
+- Latest Validation Summary: Review artifact approves the docs-only Desktop App 架构与 UI 技术基线 at head f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69. The final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, schema, runtime, generated artifact, UI behavior, or product semantics changed after the reviewed head.
 - Recovery Boundary: Docs-only technical baseline. Re-review if the PR changes code, package manifests, dependencies, schemas, generated types, runtime behavior, Core/Harbor/Lode files, workflows, reviews, shadow carriers, or shared Loom carriers beyond `.loom/status/current.md` and `.loom/bootstrap/init-result.json` fact-chain entry points.
 - Current Lane: merge-ready
 
