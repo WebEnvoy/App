@@ -11,13 +11,13 @@
 - Review Entry: not_created_for_pr_ready_execution_thread
 - Validation Entry: `git diff --check`; Markdown/JSON readability checks; PR body/head readback.
 - Closing Condition: PR ready for milestone #8 issue tree; do not merge and do not close issues.
-- Current Checkpoint: implementation
-- Current Stop: Docs-only Desktop App technical baseline is being prepared for PR Ready.
-- Next Step: Validate Markdown/JSON/diff, push branch, create PR, and read back PR body/head.
+- Current Checkpoint: merge
+- Current Stop: Merge-ready carrier prepared for docs-only technical baseline; hosted PR gate, merge and post-merge closeout are coordinator-owned next steps.
+- Next Step: Create or update PR, read back PR body/head metadata, run hosted gate, merge, then write post-merge closeout evidence.
 - Blockers: None recorded.
-- Latest Validation Summary: Local initial checks passed for diff whitespace, Markdown readability, JSON readability, `loom verify`, `loom suite validate`, and `loom suite carrier validate`; final fact-chain, build evidence, and PR readback pending.
+- Latest Validation Summary: Static validation passed before review carrier; semantic/spec review artifacts approve docs-only content head `66afce4e94f6730d5acf69a2f4c8dde64fcdfa1b` and final PR head may differ only by carrier/status updates.
 - Recovery Boundary: Docs-only technical baseline. Re-review if the PR changes code, package manifests, dependencies, schemas, generated types, runtime behavior, Core/Harbor/Lode files, workflows, reviews, shadow carriers, or shared Loom carriers beyond `.loom/status/current.md` and `.loom/bootstrap/init-result.json` fact-chain entry points.
-- Current Lane: app-docs
+- Current Lane: merge-ready
 
 ## Runtime Evidence
 
