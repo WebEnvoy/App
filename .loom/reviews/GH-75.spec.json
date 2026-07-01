@@ -3,14 +3,14 @@
   "item_id": "GH-75",
   "decision": "allow",
   "kind": "spec_review",
-  "summary": "Desktop App 架构与 UI 技术基线 docs-only spec is scoped to the current milestone and covers #74-#83 without implementation completion.",
+  "summary": "App 技术基线 closeout-only carrier is approved for merge as post-merge carrier closeout evidence.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-01T04:35:18Z",
-  "reviewed_head": "f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69",
-  "reviewed_validation_summary": "Review artifact approves the docs-only Desktop App 架构与 UI 技术基线 at head f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69. The final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, schema, runtime, generated artifact, UI behavior, or product semantics changed after the reviewed head.",
+  "authored_at": "2026-07-01T04:47:55Z",
+  "reviewed_head": "47d3125acb4e3d0dda2b8a2bacd7a85f50c12787",
+  "reviewed_validation_summary": "Post-merge closeout consumed PR https://github.com/WebEnvoy/App/pull/84, PR head aa1175e1db8731e6cbd80d2da7a0ce76cdfd648f, merge commit 092dde306af8d818f686845c52e0e38abe9257a3, target branch main, hosted run https://github.com/WebEnvoy/App/actions/runs/28493861578, closed issues #74-#83, and closed milestone Desktop App 架构与 UI 技术基线 (#8). Scope remains docs-only technical architecture baseline; Electron/Vite/React project skeleton, UI, client, storage, service supervisor, Core/Harbor/Lode implementation were not completed.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
-    "Do not treat this approval as Electron/Vite/React 项目、UI、client、storage、service supervisor、Core/Harbor/Lode 实现."
+    "This approval only covers closeout carrier synchronization after the content PR was merged, issues were closed, and the milestone was closed. It does not approve new product semantics or implementation work."
   ]
 }
