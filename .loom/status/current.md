@@ -11,13 +11,13 @@
 - Review Entry: `.loom/reviews/GH-75.json`
 - Validation Entry: `.loom/specs/GH-75/build-evidence.json`
 - Closing Condition: PR ready for milestone #8 issue tree; do not merge and do not close issues.
-- Current Checkpoint: merge
-- Current Stop: Merge-ready carrier prepared for docs-only technical baseline; hosted PR gate, merge and post-merge closeout are coordinator-owned next steps.
-- Next Step: Create or update PR, read back PR body/head metadata, run hosted gate, merge, then write post-merge closeout evidence.
+- Current Checkpoint: closed_out
+- Current Stop: Closed out by coordinator after merge, issue closure, and milestone closure.
+- Next Step: None for this batch. Start a new real Work Item for any code skeleton or implementation work.
 - Blockers: None recorded.
-- Latest Validation Summary: Review artifact approves the docs-only Desktop App 架构与 UI 技术基线 at head f41db1d2ab0bfd7651bba5b7c00a8f3d3e3ace69. The final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, schema, runtime, generated artifact, UI behavior, or product semantics changed after the reviewed head.
-- Recovery Boundary: Docs-only technical baseline. Re-review if the PR changes code, package manifests, dependencies, schemas, generated types, runtime behavior, Core/Harbor/Lode files, workflows, reviews, shadow carriers, or shared Loom carriers beyond `.loom/status/current.md` and `.loom/bootstrap/init-result.json` fact-chain entry points.
-- Current Lane: merge-ready
+- Latest Validation Summary: Post-merge closeout consumed PR https://github.com/WebEnvoy/App/pull/84, PR head aa1175e1db8731e6cbd80d2da7a0ce76cdfd648f, merge commit 092dde306af8d818f686845c52e0e38abe9257a3, target branch main, hosted run https://github.com/WebEnvoy/App/actions/runs/28493861578, closed issues #74-#83, and closed milestone Desktop App 架构与 UI 技术基线 (#8). Scope remains docs-only technical architecture baseline; Electron/Vite/React project skeleton, UI, client, storage, service supervisor, Core/Harbor/Lode implementation were not completed.
+- Recovery Boundary: Closed docs-only planning batch. Reopen or create a new Work Item if future work changes Electron/Vite/React project skeleton, UI, client, storage, service supervisor, Core/Harbor/Lode implementation.
+- Current Lane: closed_out
 
 ## Runtime Evidence
 
@@ -33,3 +33,7 @@
 - Dynamic Truth: .loom/progress/GH-75.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
+
+## Notes
+
+- 2026-07-01: Post-merge closeout recorded PR https://github.com/WebEnvoy/App/pull/84, merge commit `092dde306af8d818f686845c52e0e38abe9257a3`, hosted run https://github.com/WebEnvoy/App/actions/runs/28493861578, closed issues #74-#83, and closed milestone Desktop App 架构与 UI 技术基线 (#8).
