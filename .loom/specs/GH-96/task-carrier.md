@@ -4,7 +4,7 @@
 
 - Item ID: GH-96
 - Repository: WebEnvoy/App
-- Branch: docs/fr92-desktop-ui-checkpoint
+- Branch: work/fr92-desktop-ui-checkpoint
 - Primary issue: https://github.com/WebEnvoy/App/issues/96
 - Parent FR: https://github.com/WebEnvoy/App/issues/92
 - Covered sibling Work Items: https://github.com/WebEnvoy/App/issues/97, https://github.com/WebEnvoy/App/issues/98, https://github.com/WebEnvoy/App/issues/99

@@ -3,7 +3,7 @@
   "item_id": "GH-96",
   "generated_at": "2026-07-01T17:10:04Z",
   "thread_id": "019f1e9e-60bb-7f33-847b-467f21f8994c",
-  "branch": "docs/fr92-desktop-ui-checkpoint",
+  "branch": "work/fr92-desktop-ui-checkpoint",
   "scope": "docs-only Desktop UI design checkpoint for FR #92 covering #96-#99",
   "desktop_taste": {
     "used": true,
