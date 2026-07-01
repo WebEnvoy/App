@@ -6,7 +6,7 @@
 - Goal: Freeze Desktop App first product shape and App UI technical baseline for milestone #8.
 - Scope: Docs-only updates to App ADR, README/docs indexes, AGENTS constraints, and item-specific Loom carrier covering #74-#83.
 - Execution Path: docs-only/desktop-app-technical-baseline
-- Workspace Entry: `/Volumes/2T/dev/WebEnvoy/App.worktrees/tech-baseline-app`
+- Workspace Entry: .
 - Recovery Entry: `.loom/progress/GH-75.md`
 - Review Entry: not_created_for_pr_ready_execution_thread
 - Validation Entry: `git diff --check`; Markdown/JSON readability checks; PR body/head readback.
