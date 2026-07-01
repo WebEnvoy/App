@@ -15,7 +15,7 @@
 - Current Stop: Docs-only content and carrier ready for PR review.
 - Next Step: Create PR, read back PR metadata, run hosted checks, merge, then close GH-86.
 - Blockers: None recorded.
-- Latest Validation Summary: Review artifact approves docs-only App native shell boundary clarification at head f32e8efa85ffb6fbc82a8c0179f791eda52f7ed4. Final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, IPC/API spec, runtime behavior, generated artifact, or cross-repo file changed after the reviewed head.
+- Latest Validation Summary: Review artifact approves docs-only App native shell boundary clarification at head aa7fde9052ce36eef8ec276fe7f6bde49714b092. Final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, IPC/API spec, runtime behavior, generated artifact, or cross-repo file changed after the reviewed head.
 - Recovery Boundary: Re-review if this branch adds code, dependencies, package manifests, generated files, IPC/API implementation, or Core/Harbor/Lode changes.
 - Current Lane: merge-ready
 
