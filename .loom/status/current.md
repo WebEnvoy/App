@@ -12,10 +12,10 @@
 - Validation Entry: .loom/specs/GH-96/build-evidence.json
 - Closing Condition: PR ready for FR #92 checkpoint review；不 merge，不关闭 #93/#94/#95，也不声称已实现 #93/#94/#95。
 - Current Checkpoint: build
-- Current Stop: Docs-only Desktop UI 设计 checkpoint 已起草，等待 PR review。
-- Next Step: 验证 Markdown/diff/Loom suite，提交、推送、创建 PR，并回读 PR metadata。
+- Current Stop: Docs-only Desktop UI 设计 checkpoint PR #114 已创建，等待 review。
+- Next Step: 回读 PR #114 body/head/checks，确认 PR metadata 与当前 head 一致；不进入 merge-ready，除非主控要求。
 - Blockers: #93/#94/#95 声称最终方向前，用户/product owner 必须确认 ADR 0008 列出的确认点。
-- Latest Validation Summary: `git diff --check` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with valid rationale and no missing inputs；`loom fact-chain --target . --json` pass。
+- Latest Validation Summary: `git diff --check` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with valid rationale and no missing inputs；`loom fact-chain --target . --json` pass；PR #114 created for GH-96.
 - Recovery Boundary: Docs-only checkpoint。若 diff 触碰 Electron/Vite/React code、package manifests、dependencies、schema/API/client/runtime behavior、fixtures、raw evidence handling 或 Core/Harbor/Lode repositories，必须重新 review。
 - Current Lane: build
 
@@ -37,3 +37,4 @@
 ## Notes
 
 - 2026-07-02: 当前 fact chain 切到 GH-96，用于 FR #92 Desktop UI 设计 checkpoint；这不声称 #93/#94/#95 已实现。
+- 2026-07-02: Created PR https://github.com/WebEnvoy/App/pull/114 for GH-96 docs-only checkpoint.
