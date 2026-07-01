@@ -84,7 +84,11 @@ WebEnvoy App
 
 ## 第一阶段产品表面
 
-第一阶段可以先以本地 Web UI 或 Desktop shell 承载：
+第一阶段按 Desktop App first 设计。开发期可以用本地 Web UI 调试，
+但最终产品形态、信息架构、连接状态和交互优先级按 Desktop App 收敛。
+当前技术基线见 [ADR 0007](docs/adr/0007-desktop-app-technical-baseline.md)。
+
+第一阶段桌面产品表面包括：
 
 - Work：任务提交、运行状态、结果、证据和恢复入口；
 - Library：平台资产、个人资产、网站探索、能力草稿、版本管理和失效上报；
