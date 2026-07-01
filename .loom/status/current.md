@@ -12,11 +12,11 @@
 - Validation Entry: `.loom/specs/GH-86/build-evidence.json`
 - Closing Condition: PR merged and GH-86 closed with post-merge evidence.
 - Current Checkpoint: merge
-- Current Stop: Docs-only content and carrier ready for PR review.
-- Next Step: Create PR, read back PR metadata, run hosted checks, merge, then close GH-86.
+- Current Stop: Closeout carrier sync is ready for hosted gate and merge.
+- Next Step: Merge this closeout-only carrier PR; no product work remains in this follow-up.
 - Blockers: None recorded.
-- Latest Validation Summary: Review artifact approves docs-only App native shell boundary clarification at head f5514feebd35b293fbfe9d67289bd26f119b7a31. Final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, IPC/API spec, runtime behavior, generated artifact, or cross-repo file changed after the reviewed head.
-- Recovery Boundary: Re-review if this branch adds code, dependencies, package manifests, generated files, IPC/API implementation, or Core/Harbor/Lode changes.
+- Latest Validation Summary: Post-merge closeout consumed PR https://github.com/WebEnvoy/App/pull/87, PR head c077e2640185c1f3be3403cba4f5f96201609615, merge commit 14ed4ca5ae7bfa346f8af46cb8ab294a45997b9f, target branch main, hosted run https://github.com/WebEnvoy/App/actions/runs/28494642205, and closed issue #86. Scope remains docs-only App shell/native boundary clarification; Electron/React project skeleton, dependencies, IPC/API implementation, service supervision, and Core/Harbor/Lode changes were not completed.
+- Recovery Boundary: Closed docs-only follow-up. Create a new Work Item for any implementation, dependency, IPC/API, or cross-repo work.
 - Current Lane: merge-ready
 
 ## Runtime Evidence
@@ -33,3 +33,7 @@
 - Dynamic Truth: `.loom/progress/GH-86.md`
 - Locator Truth: `.loom/bootstrap/init-result.json`
 - Fact Chain CLI: `loom fact-chain --target . --json`
+
+## Notes
+
+- 2026-07-01: Post-merge closeout recorded PR https://github.com/WebEnvoy/App/pull/87, merge commit `14ed4ca5ae7bfa346f8af46cb8ab294a45997b9f`, hosted run https://github.com/WebEnvoy/App/actions/runs/28494642205, and closed issue #86.

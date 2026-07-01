@@ -3,26 +3,26 @@
   "item_id": "GH-86",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "App native shell boundary clarification is approved for docs-only merge gate.",
+  "summary": "GH-86 closeout carrier sync is approved for merge.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-01T04:59:15Z",
-  "reviewed_head": "f5514feebd35b293fbfe9d67289bd26f119b7a31",
-  "reviewed_validation_summary": "Review artifact approves docs-only App native shell boundary clarification at head f5514feebd35b293fbfe9d67289bd26f119b7a31. Final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, IPC/API spec, runtime behavior, generated artifact, or cross-repo file changed after the reviewed head.",
+  "authored_at": "2026-07-01T05:01:18Z",
+  "reviewed_head": "965a205612bbe1c19f44d11dd9fce52bec3576f7",
+  "reviewed_validation_summary": "Post-merge closeout consumed PR https://github.com/WebEnvoy/App/pull/87, PR head c077e2640185c1f3be3403cba4f5f96201609615, merge commit 14ed4ca5ae7bfa346f8af46cb8ab294a45997b9f, target branch main, hosted run https://github.com/WebEnvoy/App/actions/runs/28494642205, and closed issue #86. Scope remains docs-only App shell/native boundary clarification; Electron/React project skeleton, dependencies, IPC/API implementation, service supervision, and Core/Harbor/Lode changes were not completed.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "This approval only covers App docs-only architecture boundary wording and does not approve Electron/Vite/React skeleton, native IPC/API implementation, service supervision, or Core/Harbor/Lode changes."
+    "This approval only covers post-merge closeout carrier synchronization for GH-86."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The reviewed content clarifies that native desktop code wraps OS boundary capabilities only and cannot own WebEnvoy task/run/result/capability/evidence/recovery protocols."
+    "reason": "Closeout carrier records merged PR #87, closed issue #86, hosted run, and scope limits only."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
     "work_item": "GH-86",
     "branch": "work/app-native-shell-boundary",
-    "reviewed_head": "f5514feebd35b293fbfe9d67289bd26f119b7a31",
+    "reviewed_head": "965a205612bbe1c19f44d11dd9fce52bec3576f7",
     "coverage": "#86",
     "suite_path": "minimal_docs_only",
     "validation": "git diff --check; loom fact-chain --target . --item GH-86 --json; hosted gate required before merge"
