@@ -1,0 +1,56 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item": "GH-75",
+  "status": "local_validation_passed_pr_readback_pending",
+  "generated_at": "2026-07-01T04:21:23Z",
+  "branch": "work/tech-baseline-app",
+  "worktree": "/Volumes/2T/dev/WebEnvoy/App.worktrees/tech-baseline-app",
+  "base_head_sha": "60ac3952945d5204310083b4393c95c0dd9fd3b1",
+  "head_sha": "recorded_by_pr_readback_after_push",
+  "commands": [
+    {
+      "command": "git diff --check",
+      "result": "pass",
+      "conclusion": "No whitespace errors in the working diff."
+    },
+    {
+      "command": "Markdown readability check for changed and untracked .md files",
+      "result": "pass",
+      "conclusion": "12 Markdown files were readable."
+    },
+    {
+      "command": "jq empty on changed and untracked .json files",
+      "result": "pass",
+      "conclusion": "2 JSON files parsed successfully."
+    },
+    {
+      "command": "loom verify --target . --json",
+      "result": "pass",
+      "conclusion": "Installed Loom delivery layers verified."
+    },
+    {
+      "command": "loom fact-chain --target . --item GH-75 --json",
+      "result": "pass",
+      "conclusion": "GH-75 fact chain can be read and validated from a single entry."
+    },
+    {
+      "command": "loom fact-chain --target . --json",
+      "result": "pass",
+      "conclusion": "Default fact chain resolves to GH-75 and validates."
+    },
+    {
+      "command": "loom suite validate --target . --item GH-75 --json",
+      "result": "not_applicable",
+      "conclusion": "Suite validate accepted the docs-only not_applicable suite path decision."
+    },
+    {
+      "command": "loom suite carrier validate --target . --item GH-75 --json",
+      "result": "pass",
+      "conclusion": "Carrier locators, normalized statuses, relationships, and Work Item backlinks validate."
+    }
+  ],
+  "notes": [
+    "Docs-only baseline changes only ADR/docs/AGENTS and GH-75 Loom carrier metadata.",
+    "PR body/head readback is required after push and PR creation."
+  ]
+}

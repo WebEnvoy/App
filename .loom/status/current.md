@@ -2,34 +2,34 @@
 
 ## Derived Fact Chain View
 
-- Item ID: GH-72
-- Goal: Upgrade the repository Loom workflow pin from 0.21.1 to 0.22.1.
-- Scope: Update `.github/workflows/loom-check.yml` and record the minimum item-specific Loom carrier for this workflow-only maintenance PR.
-- Execution Path: ci-maintenance/loom-version-pin
-- Workspace Entry: .
-- Recovery Entry: .loom/progress/GH-72.md
-- Review Entry: .loom/reviews/GH-72.json
-- Validation Entry: `git diff --check`; hosted GitHub Actions checks for PR #71.
-- Closing Condition: PR #71 is merged and GH-72 contains post-merge closeout evidence.
-- Current Checkpoint: closed_out
-- Current Stop: Post-merge closeout recorded for WebEnvoy/App#71.
-- Next Step: No further action for GH-72 after issue closeout comment is posted and the issue is closed.
+- Item ID: GH-75
+- Goal: Freeze Desktop App first product shape and App UI technical baseline for milestone #8.
+- Scope: Docs-only updates to App ADR, README/docs indexes, AGENTS constraints, and item-specific Loom carrier covering #74-#83.
+- Execution Path: docs-only/desktop-app-technical-baseline
+- Workspace Entry: `/Volumes/2T/dev/WebEnvoy/App.worktrees/tech-baseline-app`
+- Recovery Entry: `.loom/progress/GH-75.md`
+- Review Entry: not_created_for_pr_ready_execution_thread
+- Validation Entry: `git diff --check`; Markdown/JSON readability checks; PR body/head readback.
+- Closing Condition: PR ready for milestone #8 issue tree; do not merge and do not close issues.
+- Current Checkpoint: implementation
+- Current Stop: Docs-only Desktop App technical baseline is being prepared for PR Ready.
+- Next Step: Validate Markdown/JSON/diff, push branch, create PR, and read back PR body/head.
 - Blockers: None recorded.
-- Latest Validation Summary: Post-merge closeout consumed PR #71, head 28ad314f5699b80d33e656684b51944b1c333f4f, merge commit 5e9d9775fe298a49f7d4068a8e0d703d8aad8cbe, target branch main, and hosted run 28461417036 with all required checks passing.
-- Recovery Boundary: Workflow-only maintenance; re-review if the PR changes product code, product docs, roadmap, issue tree, workflow command structure, schema/API/runtime behavior, fixtures, or `.loom` carriers beyond GH-72 status/review/progress evidence.
-- Current Lane: terminal closeout
+- Latest Validation Summary: Local initial checks passed for diff whitespace, Markdown readability, JSON readability, `loom verify`, `loom suite validate`, and `loom suite carrier validate`; final fact-chain, build evidence, and PR readback pending.
+- Recovery Boundary: Docs-only technical baseline. Re-review if the PR changes code, package manifests, dependencies, schemas, generated types, runtime behavior, Core/Harbor/Lode files, workflows, reviews, shadow carriers, or shared Loom carriers beyond `.loom/status/current.md` and `.loom/bootstrap/init-result.json` fact-chain entry points.
+- Current Lane: app-docs
 
 ## Runtime Evidence
 
 - Run Entry: not_applicable
 - Logs Entry: not_applicable
 - Diagnostics Entry: not_applicable
-- Verification Entry: .loom/progress/GH-72.md
+- Verification Entry: .loom/specs/GH-75/build-evidence.json
 - Lane Entry: app-ci
 
 ## Sources
 
-- Static Truth: .loom/work-items/GH-72.md
-- Dynamic Truth: .loom/progress/GH-72.md
+- Static Truth: .loom/work-items/GH-75.md
+- Dynamic Truth: .loom/progress/GH-75.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json

@@ -32,7 +32,20 @@ examples/
 
 ## 技术默认
 
-默认主语言为 TypeScript / Node.js。UI 可以先采用本地 Web UI，后续再由 Desktop shell 承载。App-facing 类型应复用 WebEnvoy API、Harbor API 和共享 schema，不在 App 内自行定义不兼容模型。
+默认主语言为 TypeScript / Node.js。产品形态按 Desktop App first 设计；开发期可以用本地 Web UI 调试，生产承载默认由 Desktop shell 提供。App-facing 类型应复用 WebEnvoy API、Harbor API 和共享 schema，不在 App 内自行定义不兼容模型。
+
+## Desktop App 技术基线
+
+- 产品形态默认 Desktop App first；开发期 localhost/Web UI 只是调试载体，不定义最终产品体验。
+- Desktop shell 默认 Electron；UI 默认 React、TypeScript、Vite、Radix UI primitives 和 `lucide-react`。
+- 不安装依赖、不初始化 Electron/Vite/React 项目、不创建组件库，除非当前 Work Item 明确是代码骨架或实现项。
+- Tauri/Rust、Next.js、重型设计系统、手写图标系统或外部 UI shell 迁入，需要新的 ADR 或对应 Work Item 明确接受。
+- UI 实现前必须完成低保真 IA、状态矩阵和 Browser/connection 优先级的产品设计 checkpoint；worker 不能自行把临时 UI 当最终方向。
+- App 只通过 Core、Harbor、Lode owner API 读取事实或发送用户意图；Electron shell 不能绕过 owner API，也不能替代 Core/Harbor/Lode。
+- App 只可保存 endpoint choice、recent views、filters、layout preference 和带 `source` / `fetched_at` / stale marker 的非敏感 display cache。
+- App 禁止保存 credential、cookie、token、browser profile storage、Core Run Record truth、Harbor runtime/session truth、Lode package/fixture body、raw evidence、完整 DOM、HAR、trace、video、network body 或下载文件。
+- 代码实现项的测试应优先使用仓库已有脚本；UI skeleton 至少要覆盖 TypeScript/build 可运行性和关键状态渲染检查。docs-only PR 只需要 Markdown/JSON 可读性与 `git diff --check` 等最小验证。
+- 变更范围必须绑定当前 Work Item；docs-only 技术基线不得顺手创建代码骨架、安装包、重构目录或修改 Core/Harbor/Lode。
 
 ## 路线图 / 里程碑 / 功能需求 / 工作项
 
