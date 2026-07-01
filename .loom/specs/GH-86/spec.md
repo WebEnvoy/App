@@ -16,4 +16,6 @@ No implementation, dependency, project skeleton, IPC/API detailed spec, or cross
 
 ## Suite Path
 
+- Suite path: not_applicable
+
 Minimal docs-only. Recheck with stronger suite if any code, package manifest, dependency, generated file, IPC/API, runtime behavior, or cross-repo contract changes are added.
