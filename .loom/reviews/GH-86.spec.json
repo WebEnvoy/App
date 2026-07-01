@@ -5,9 +5,9 @@
   "kind": "spec_review",
   "summary": "GH-86 docs-only spec is scoped to App native shell boundary clarification only.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-01T04:58:12Z",
-  "reviewed_head": "aa7fde9052ce36eef8ec276fe7f6bde49714b092",
-  "reviewed_validation_summary": "Review artifact approves docs-only App native shell boundary clarification at head aa7fde9052ce36eef8ec276fe7f6bde49714b092. Final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, IPC/API spec, runtime behavior, generated artifact, or cross-repo file changed after the reviewed head.",
+  "authored_at": "2026-07-01T04:59:15Z",
+  "reviewed_head": "f5514feebd35b293fbfe9d67289bd26f119b7a31",
+  "reviewed_validation_summary": "Review artifact approves docs-only App native shell boundary clarification at head f5514feebd35b293fbfe9d67289bd26f119b7a31. Final PR head may differ only by Loom review/progress/status carrier refresh and PR metadata updates; no code, dependency, IPC/API spec, runtime behavior, generated artifact, or cross-repo file changed after the reviewed head.",
   "fallback_to": null,
   "blocking_issues": [],
   "follow_ups": [
