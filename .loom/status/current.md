@@ -2,38 +2,38 @@
 
 ## Derived Fact Chain View
 
-- Item ID: GH-89
-- Goal: Upgrade the repository Loom runtime workflow pin to 0.25.0.
-- Scope: Runtime-upgrade-only maintenance PR that updates `.github/workflows/loom-check.yml`, declares the v0.25 PR metadata carrier in `.loom/companion/repo-interface.json`, and records item-specific Loom carrier evidence.
-- Execution Path: ci-maintenance/loom-runtime-upgrade
-- Workspace Entry: .
-- Recovery Entry: .loom/progress/GH-89.md
-- Review Entry: .loom/reviews/GH-89.json
-- Validation Entry: `git diff --check`; `jq empty .loom/companion/repo-interface.json`; `loom suite validate --item GH-89`; `loom runtime-upgrade check --item GH-89`; hosted GitHub checks for PR #90.
-- Closing Condition: PR #90 is merged, runtime-upgrade closeout evidence is recorded, issue #89 is closed, and main reads back Loom workflow pin 0.25.0.
-- Current Checkpoint: merge
-- Current Stop: Merge-ready carrier refresh for the Loom 0.25.0 runtime-upgrade maintenance PR.
-- Next Step: Run PR gate and hosted checks for PR #90 at the current head, then merge only if they pass.
-- Blockers: None recorded.
-- Latest Validation Summary: The initial PR updated the workflow pin to 0.25.0 and added the v0.25 repo metadata declaration/spec. Hosted checks consumed v0.25.0 and exposed that fact-chain and semantic review must be item-specific for GH-89; this refresh aligns the current fact-chain and records workflow-only review evidence. Product/runtime tests remain not applicable.
-- Recovery Boundary: Runtime-upgrade-only maintenance. Re-review if the diff touches product code, product docs semantics, schema/API/runtime behavior, fixtures, releases, workstation plugin/cache state, or dependencies unrelated to Loom.
-- Current Lane: merge-ready
+- Item ID: GH-96
+- Goal: 为 milestone #9 FR #92 定义 Desktop App 低保真 IA 和设计 checkpoint 事实。
+- Scope: Docs-only checkpoint，记录 Work/Library/Browser/Settings IA、首个只读任务流、状态矩阵、failure/empty/loading/connection 规则、desktop shell native 边界，以及覆盖 #96-#99 的用户确认 gate。
+- Execution Path: docs-only/desktop-ui-design-checkpoint
+- Workspace Entry: /Volumes/2T/.codex/worktrees/f0c5/App
+- Recovery Entry: .loom/progress/GH-96.md
+- Review Entry: .loom/reviews/GH-96.json
+- Validation Entry: .loom/specs/GH-96/build-evidence.json
+- Closing Condition: PR ready for FR #92 checkpoint review；不 merge，不关闭 #93/#94/#95，也不声称已实现 #93/#94/#95。
+- Current Checkpoint: build
+- Current Stop: Docs-only Desktop UI 设计 checkpoint 已起草，等待 PR review。
+- Next Step: 验证 Markdown/diff/Loom suite，提交、推送、创建 PR，并回读 PR metadata。
+- Blockers: #93/#94/#95 声称最终方向前，用户/product owner 必须确认 ADR 0008 列出的确认点。
+- Latest Validation Summary: `git diff --check` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with valid rationale and no missing inputs；`loom fact-chain --target . --json` pass。
+- Recovery Boundary: Docs-only checkpoint。若 diff 触碰 Electron/Vite/React code、package manifests、dependencies、schema/API/client/runtime behavior、fixtures、raw evidence handling 或 Core/Harbor/Lode repositories，必须重新 review。
+- Current Lane: build
 
 ## Runtime Evidence
 
 - Run Entry: not_applicable
 - Logs Entry: not_applicable
 - Diagnostics Entry: not_applicable
-- Verification Entry: .loom/progress/GH-89.md
-- Lane Entry: ci-maintenance
+- Verification Entry: .loom/specs/GH-96/build-evidence.json
+- Lane Entry: docs-only
 
 ## Sources
 
-- Static Truth: .loom/work-items/GH-89.md
-- Dynamic Truth: .loom/progress/GH-89.md
+- Static Truth: .loom/work-items/GH-96.md
+- Dynamic Truth: .loom/progress/GH-96.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
 
 ## Notes
 
-- 2026-07-01: Runtime-upgrade carrier refreshed for Loom 0.25.0 maintenance PR #90; this does not claim product or runtime implementation.
+- 2026-07-02: 当前 fact chain 切到 GH-96，用于 FR #92 Desktop UI 设计 checkpoint；这不声称 #93/#94/#95 已实现。

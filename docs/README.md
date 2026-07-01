@@ -19,3 +19,7 @@ Desktop App first product shape, UI technology defaults, Work/Library/Browser/
 Settings desktop IA, client connection state rules, local cache boundary, and
 the UI product design checkpoint required before skeleton work treats a design
 direction as final.
+
+[ADR 0008](adr/0008-desktop-ui-design-checkpoint.md) 是当前 milestone #9 的
+Desktop UI 设计 checkpoint。后续 shell、task/run、evidence、capability 和
+Browser UI Work Item 在实现 #93、#94 或 #95 前必须先消费它。

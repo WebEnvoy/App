@@ -1,0 +1,53 @@
+{
+  "schema": "loom-build-evidence/v1",
+  "item_id": "GH-96",
+  "generated_at": "2026-07-01T17:10:04Z",
+  "thread_id": "019f1e9e-60bb-7f33-847b-467f21f8994c",
+  "branch": "docs/fr92-desktop-ui-checkpoint",
+  "scope": "docs-only Desktop UI design checkpoint for FR #92 covering #96-#99",
+  "desktop_taste": {
+    "used": true,
+    "skills": [
+      "desktop-taste",
+      "desktop-design-read",
+      "desktop-layout-composition",
+      "desktop-typography-density",
+      "desktop-native-feel",
+      "desktop-motion-interaction",
+      "desktop-brand-system",
+      "desktop-design-md",
+      "desktop-art-direction"
+    ],
+    "summary": "用于 Desktop Read、IA/layout、density、native feel、motion、brand、art direction 和设计文档结构判断。"
+  },
+  "commands": [
+    {
+      "command": "git diff --check",
+      "result": "pass",
+      "generated_at": "2026-07-01T17:10:04Z"
+    },
+    {
+      "command": "loom suite validate --target . --item GH-96 --json",
+      "result": "not_applicable",
+      "generated_at": "2026-07-01T17:10:04Z",
+      "rationale": "docs-only checkpoint and item-specific carrier-only; no code, schemas, generated facts, runtime behavior, package manifests, dependencies, migrations, fixtures, or raw evidence handling."
+    },
+    {
+      "command": "loom fact-chain --target . --json",
+      "result": "pass",
+      "generated_at": "2026-07-01T17:11:01Z"
+    }
+  ],
+  "issue_readback": {
+    "source": "gh issue view 92/96/97/98/99 and milestone 9",
+    "result": "covered",
+    "summary": "ADR 0008 覆盖 #92 的低保真 IA、状态矩阵、失败/空态/加载态/连接异常和 desktop shell 原生边界；#96-#99 均有覆盖表。"
+  },
+  "non_goals": [
+    "no Electron/Vite/React skeleton",
+    "no dependency installation",
+    "no UI implementation",
+    "no Core/Harbor/Lode changes",
+    "no #93/#94/#95 implementation or closeout"
+  ]
+}
