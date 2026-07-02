@@ -1,0 +1,38 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-96",
+  "decision": "allow",
+  "kind": "general_review",
+  "summary": "GH-96 Desktop Task Thread checkpoint is approved for merge as a docs-only product/design checkpoint. It correctly clarifies that App automatic task execution is limited to deterministic Lode workflows while App remains a global observability and management surface for non-App caller facts, Library, Browser, and manual controlled-browser launch.",
+  "reviewer": "codex-coordinator",
+  "authored_at": "2026-07-02T09:43:03Z",
+  "reviewed_head": "c0ff3e8d3a8a9106c17b69a8c74007b7012d2737",
+  "reviewed_validation_summary": "`git diff --check` pass；`jq empty .loom/specs/GH-96/build-evidence.json` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with no missing inputs；`loom fact-chain --target . --json` pass。",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not interpret Task Thread first as removing Library or Browser management surfaces.",
+    "Do not interpret the automatic task entry limitation as a WebEnvoy platform-wide limitation on Agent/API/CLI/MCP/SDK/skills callers.",
+    "Do not treat the versioned design image as a high-fidelity prototype, pixel spec, data contract, schema/API guarantee, runtime proof, or evidence policy.",
+    "#93/#94/#95 must still align real fields and states with Core/Harbor/Lode contracts before implementation."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The docs consistently define App as a human desktop entry with Task Thread first UX, deterministic Lode workflow automatic execution, global observability for non-App caller facts, manual controlled-browser launch when no site skill exists, and preserved Library/Browser management surfaces. The PR remains docs-only and does not claim implementation completion."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/114",
+    "work_item": "GH-96",
+    "reviewed_head": "c0ff3e8d3a8a9106c17b69a8c74007b7012d2737",
+    "vision": "VISION.md",
+    "readme": "README.md",
+    "design": "DESIGN.md",
+    "adr": "docs/adr/0008-desktop-ui-design-checkpoint.md",
+    "visual_reference": "docs/design/desktop-task-thread-direction.png",
+    "suite_path": "not_applicable",
+    "suite_validation": ".loom/tmp/gh96-suite-validate.json",
+    "fact_chain": ".loom/tmp/gh96-fact-chain.json"
+  }
+}
