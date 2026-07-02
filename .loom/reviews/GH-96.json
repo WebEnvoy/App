@@ -3,36 +3,30 @@
   "item_id": "GH-96",
   "decision": "allow",
   "kind": "general_review",
-  "summary": "GH-96 Desktop Task Thread checkpoint is approved for merge as a docs-only product/design checkpoint. It correctly clarifies that App automatic task execution is limited to deterministic Lode workflows while App remains a global observability and management surface for non-App caller facts, Library, Browser, and manual controlled-browser launch.",
+  "summary": "Closeout-only carrier sync records merged PR #114 and terminal GH-96 state without changing product semantics.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-02T09:43:03Z",
-  "reviewed_head": "74c37a603fe35c29a315024ab7127430b6097a83",
-  "reviewed_validation_summary": "`git diff --check` pass；`jq empty .loom/specs/GH-96/build-evidence.json` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with no missing inputs；`loom fact-chain --target . --json` pass。",
+  "authored_at": "2026-07-02T10:11:32Z",
+  "reviewed_head": "f78a8928a40f021b1f6b88eadf5188e53e4d3a96",
+  "reviewed_validation_summary": "Post-merge closeout consumed PR #114, head 6522fcd362471538e7a9ff5fd1403c64f0fad4e5, merge commit 883902bddbf7693ca516638080bb13a33deb7367, and hosted run 28582055006 with all required checks passing.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Do not interpret Task Thread first as removing Library or Browser management surfaces.",
-    "Do not interpret the automatic task entry limitation as a WebEnvoy platform-wide limitation on Agent/API/CLI/MCP/SDK/skills callers.",
-    "Do not treat the versioned design image as a high-fidelity prototype, pixel spec, data contract, schema/API guarantee, runtime proof, or evidence policy.",
-    "#93/#94/#95 must still align real fields and states with Core/Harbor/Lode contracts before implementation."
+    "Coordinator must post issue closeout comments and close #92, #96, #97, #98 and #99 after this closeout carrier PR is merged.",
+    "#93/#94/#95 remain open and must consume VISION.md, README.md, DESIGN.md, ADR 0008 and docs/design/desktop-task-thread-direction.png before implementation."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The docs consistently define App as a human desktop entry with Task Thread first UX, deterministic Lode workflow automatic execution, global observability for non-App caller facts, manual controlled-browser launch when no site skill exists, and preserved Library/Browser management surfaces. The PR remains docs-only and does not claim implementation completion."
+    "reason": "The closeout-only change records terminal carrier facts after the already-merged docs-only PR; this does not approve Electron shell, UI implementation, schema/API/runtime behavior, evidence policy, or Core/Harbor/Lode implementation."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
     "pull_request": "https://github.com/WebEnvoy/App/pull/114",
     "work_item": "GH-96",
-    "reviewed_head": "74c37a603fe35c29a315024ab7127430b6097a83",
-    "vision": "VISION.md",
-    "readme": "README.md",
-    "design": "DESIGN.md",
-    "adr": "docs/adr/0008-desktop-ui-design-checkpoint.md",
-    "visual_reference": "docs/design/desktop-task-thread-direction.png",
-    "suite_path": "not_applicable",
-    "suite_validation": ".loom/tmp/gh96-suite-validate.json",
-    "fact_chain": ".loom/tmp/gh96-fact-chain.json"
+    "content_head": "6522fcd362471538e7a9ff5fd1403c64f0fad4e5",
+    "merge_commit": "883902bddbf7693ca516638080bb13a33deb7367",
+    "hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28582055006",
+    "suite_path": "minimal",
+    "validation": "git diff --check; jq empty .loom/reviews/GH-96.json; loom fact-chain --target . --json"
   }
 }
