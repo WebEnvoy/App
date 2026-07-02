@@ -1,0 +1,28 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-96",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "GH-96 docs-only Desktop Task Thread checkpoint spec is sufficient for PR #114. The scope is VISION/README/DESIGN/ADR/design-reference/carrier only and does not claim UI, schema, API, runtime, evidence, or implementation completion.",
+  "reviewer": "codex-coordinator",
+  "authored_at": "2026-07-02T09:43:03Z",
+  "reviewed_head": "74c37a603fe35c29a315024ab7127430b6097a83",
+  "reviewed_validation_summary": "`git diff --check` pass；`jq empty .loom/specs/GH-96/build-evidence.json` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with no missing inputs；`loom fact-chain --target . --json` pass。",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this spec approval as Electron/React shell, UI implementation, schema/API/runtime implementation, fixture, evidence policy, or Core/Harbor/Lode contract completion.",
+    "#93/#94/#95 must consume VISION.md, README.md, DESIGN.md, ADR 0008, and docs/design/desktop-task-thread-direction.png before implementation."
+  ],
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/114",
+    "work_item": "GH-96",
+    "spec": ".loom/specs/GH-96/spec.md",
+    "plan": ".loom/specs/GH-96/plan.md",
+    "task_carrier": ".loom/specs/GH-96/task-carrier.md",
+    "suite_path": "not_applicable",
+    "suite_validation": ".loom/tmp/gh96-suite-validate.json",
+    "fact_chain": ".loom/tmp/gh96-fact-chain.json"
+  }
+}
