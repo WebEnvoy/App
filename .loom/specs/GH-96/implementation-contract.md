@@ -17,18 +17,24 @@
 
 ## Output
 
+- `VISION.md`
+- `DESIGN.md`
 - `docs/adr/0008-desktop-ui-design-checkpoint.md`
+- `docs/design/desktop-task-thread-direction.png`
 - docs index updates
 - GH-96 Loom carrier
 - `.loom/bootstrap/init-result.json` fact-chain entry point sync
 
 ## Acceptance
 
-- ADR 0008 覆盖 #96 low-fidelity IA。
-- ADR 0008 覆盖 #97 state matrix。
-- ADR 0008 覆盖 #98 failure/empty/loading/connection exception states。
+- VISION 明确 App 面向人类业务用户，不是 Agent 容器。
+- ADR 0008 覆盖 #96 Task Thread low-fidelity IA。
+- ADR 0008 覆盖 #97 Task/Run、站点技能、账号身份、业务输入、结果依据和执行现场关系。
+- ADR 0008 覆盖 #98 process/completion/failure/unavailable/redacted/expired/unknown outcome display rules。
 - ADR 0008 覆盖 #99 desktop shell native boundary。
-- ADR 0008 列出 user confirmation points 和 #93/#94/#95 entry conditions。
+- DESIGN.md 记录可延续的桌面设计契约。
+- 方向稿纳入版本控制，并标记为 reference, not pixel spec。
+- ADR 0008 列出 #93/#94/#95 entry conditions。
 - `.loom/bootstrap/init-result.json` 和 `.loom/status/current.md` 指向 GH-96。
 - Local validation 通过。
 

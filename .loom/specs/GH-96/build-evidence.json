@@ -1,49 +1,58 @@
 {
   "schema": "loom-build-evidence/v1",
   "item_id": "GH-96",
-  "generated_at": "2026-07-01T17:10:04Z",
+  "generated_at": "2026-07-02T08:12:20Z",
   "thread_id": "019f1e9e-60bb-7f33-847b-467f21f8994c",
   "branch": "work/fr92-desktop-ui-checkpoint",
-  "scope": "docs-only Desktop UI design checkpoint for FR #92 covering #96-#99",
+  "scope": "docs-only Desktop Task Thread design checkpoint for FR #92 covering #96-#99",
   "desktop_taste": {
     "used": true,
     "skills": [
       "desktop-taste",
-      "desktop-design-read",
       "desktop-layout-composition",
-      "desktop-typography-density",
-      "desktop-native-feel",
-      "desktop-motion-interaction",
-      "desktop-brand-system",
-      "desktop-design-md",
-      "desktop-art-direction"
+      "desktop-visual-draft",
+      "desktop-design-md"
     ],
-    "summary": "用于 Desktop Read、IA/layout、density、native feel、motion、brand、art direction 和设计文档结构判断。"
+    "summary": "用于桌面任务工作台布局、方向稿落库和 DESIGN.md 结构判断。"
+  },
+  "changed_truth": {
+    "vision": "VISION.md now defines App as a human business-user desktop entry for deterministic Lode workflows, not an Agent container.",
+    "task_model": "Task = site skill + account identity + business input; Run = one execution attempt under the same Task.",
+    "ia": "Left sidebar organizes Tasks by account identity then site skill; middle column is Task Thread with navigation rail and bottom fixed controls; right panel is contextual tabs.",
+    "visual_reference": "docs/design/desktop-task-thread-direction.png is versioned as directional reference only, not a pixel spec or data contract.",
+    "design_contract": "DESIGN.md records the desktop design contract for #93/#94/#95 consumers."
   },
   "commands": [
     {
       "command": "git diff --check",
       "result": "pass",
-      "generated_at": "2026-07-01T17:10:04Z"
+      "generated_at": "2026-07-02T08:12:18Z"
+    },
+    {
+      "command": "test -f docs/design/desktop-task-thread-direction.png && test -s docs/design/desktop-task-thread-direction.png",
+      "result": "pass",
+      "generated_at": "2026-07-02T08:12:18Z"
     },
     {
       "command": "loom suite validate --target . --item GH-96 --json",
       "result": "not_applicable",
-      "generated_at": "2026-07-01T17:10:04Z",
-      "rationale": "docs-only checkpoint and item-specific carrier-only; no code, schemas, generated facts, runtime behavior, package manifests, dependencies, migrations, fixtures, or raw evidence handling."
+      "generated_at": "2026-07-02T08:12:20Z",
+      "rationale": "docs-only checkpoint plus versioned image reference and item-specific carrier; no code, schemas, generated facts, runtime behavior, package manifests, dependencies, migrations, fixtures, or raw evidence handling."
     },
     {
       "command": "loom fact-chain --target . --json",
       "result": "pass",
-      "generated_at": "2026-07-01T17:11:01Z"
+      "generated_at": "2026-07-02T08:12:18Z"
     }
   ],
   "issue_readback": {
-    "source": "gh issue view 92/96/97/98/99 and milestone 9",
+    "source": "gh issue view 92/96/97/98/99 and milestone 9 from prior PR setup",
     "result": "covered",
-    "summary": "ADR 0008 覆盖 #92 的低保真 IA、状态矩阵、失败/空态/加载态/连接异常和 desktop shell 原生边界；#96-#99 均有覆盖表。"
+    "summary": "ADR 0008 covers #92 checkpoint direction, #96 IA, #97 task/run/context model, #98 output/state display rules, and #99 desktop shell boundary."
   },
   "non_goals": [
+    "no high-fidelity prototype",
+    "no final data structure freeze",
     "no Electron/Vite/React skeleton",
     "no dependency installation",
     "no UI implementation",
