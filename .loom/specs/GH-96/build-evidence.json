@@ -1,7 +1,7 @@
 {
   "schema": "loom-build-evidence/v1",
   "item_id": "GH-96",
-  "generated_at": "2026-07-02T08:12:20Z",
+  "generated_at": "2026-07-02T09:27:26Z",
   "thread_id": "019f1e9e-60bb-7f33-847b-467f21f8994c",
   "branch": "work/fr92-desktop-ui-checkpoint",
   "scope": "docs-only Desktop Task Thread design checkpoint for FR #92 covering #96-#99",
@@ -16,9 +16,10 @@
     "summary": "用于桌面任务工作台布局、方向稿落库和 DESIGN.md 结构判断。"
   },
   "changed_truth": {
-    "vision": "VISION.md now defines App as a human business-user desktop entry for deterministic Lode workflows, not an Agent container.",
+    "vision": "VISION.md now defines App as a human business-user desktop entry whose automatic task entry runs deterministic Lode workflows, while App still observes non-App caller runs.",
     "task_model": "Task = site skill + account identity + business input; Run = one execution attempt under the same Task.",
-    "ia": "Left sidebar organizes Tasks by account identity then site skill; middle column is Task Thread with navigation rail and bottom fixed controls; right panel is contextual tabs.",
+    "ia": "Left sidebar organizes Tasks by account identity then site skill; middle column is Task Thread with navigation rail and bottom fixed controls; right panel is contextual tabs; Library and Browser remain management surfaces.",
+    "manual_browser": "When no matching site skill exists, App may launch a controlled browser instance from account identity/browser environment, but this is not automatic workflow execution.",
     "visual_reference": "docs/design/desktop-task-thread-direction.png is versioned as directional reference only, not a pixel spec or data contract.",
     "design_contract": "DESIGN.md records the desktop design contract for #93/#94/#95 consumers."
   },
@@ -26,23 +27,23 @@
     {
       "command": "git diff --check",
       "result": "pass",
-      "generated_at": "2026-07-02T08:12:18Z"
+      "generated_at": "2026-07-02T09:27:26Z"
     },
     {
       "command": "test -f docs/design/desktop-task-thread-direction.png && test -s docs/design/desktop-task-thread-direction.png",
       "result": "pass",
-      "generated_at": "2026-07-02T08:12:18Z"
+      "generated_at": "2026-07-02T09:27:26Z"
     },
     {
       "command": "loom suite validate --target . --item GH-96 --json",
       "result": "not_applicable",
-      "generated_at": "2026-07-02T08:12:20Z",
+      "generated_at": "2026-07-02T09:27:26Z",
       "rationale": "docs-only checkpoint plus versioned image reference and item-specific carrier; no code, schemas, generated facts, runtime behavior, package manifests, dependencies, migrations, fixtures, or raw evidence handling."
     },
     {
       "command": "loom fact-chain --target . --json",
       "result": "pass",
-      "generated_at": "2026-07-02T08:12:18Z"
+      "generated_at": "2026-07-02T09:27:26Z"
     }
   ],
   "issue_readback": {

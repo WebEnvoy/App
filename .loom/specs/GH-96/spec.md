@@ -8,6 +8,10 @@
 ## Required Behavior
 
 - 修订 `VISION.md`，明确 App 面向人类业务用户，不是 Agent 容器。
+- 明确限制只作用于 App 自动任务执行入口；Agent、API、CLI、MCP、SDK、skills 等其他调用方不受此限制。
+- 明确 App 也展示非 App 调用方产生的运行事实。
+- 明确没有合适站点技能时，用户可以启动受控浏览器实例进行手动浏览、登录、观察或准备环境。
+- 明确 Library 和 Browser 管理面仍存在，不因 Task Thread first 被取消。
 - 记录 `Task = 站点技能 + 账号身份 + 业务输入`，`Run = 同一 Task 下的一次执行记录`。
 - 记录左侧任务组织：`任务 -> 账号身份 -> 站点技能 -> Task`。
 - 记录中间 Task Thread：title/chips、Codex-like navigation rail、任务结束报告、可折叠执行过程、底部固定控制区。
