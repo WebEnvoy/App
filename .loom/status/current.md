@@ -9,22 +9,22 @@
 - Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-96.md
 - Review Entry: .loom/reviews/GH-96.json
-- Validation Entry: .loom/specs/GH-96/build-evidence.json
-- Closing Condition: PR ready for FR #92 checkpoint review；不 merge，不关闭 #93/#94/#95，也不声称已实现 #93/#94/#95。
-- Current Checkpoint: merge
-- Current Stop: GH-96 docs-only checkpoint PR #114 is ready for hosted gate and controlled merge.
-- Next Step: 回读 PR #114 head/body/checks；hosted `loom-pr-merge-gate` 通过后执行 controlled merge。
-- Blockers: none
-- Latest Validation Summary: `git diff --check` pass；`jq empty .loom/specs/GH-96/build-evidence.json` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with no missing inputs；`loom fact-chain --target . --json` pass。
-- Recovery Boundary: Docs-only checkpoint。若 diff 触碰 Electron/Vite/React code、package manifests、dependencies、schema/API/client/runtime behavior、fixtures、raw evidence handling 或 Core/Harbor/Lode repositories，必须重新 review。
-- Current Lane: merge-ready
+- Validation Entry: .loom/progress/GH-96.md
+- Closing Condition: PR #114 merged into `main`; hosted required checks passed; issue closeout is owned by the coordinator as the next external step.
+- Current Checkpoint: closed_out
+- Current Stop: Post-merge carrier closeout recorded for WebEnvoy/App#96 via PR #114.
+- Next Step: No further action for GH-96 after coordinator issue closeout comments are posted and covered issues are closed.
+- Blockers: None recorded.
+- Latest Validation Summary: Post-merge closeout consumed PR #114, head 6522fcd362471538e7a9ff5fd1403c64f0fad4e5, merge commit 883902bddbf7693ca516638080bb13a33deb7367, and hosted run 28582055006 with all required checks passing.
+- Recovery Boundary: Terminal carrier for this docs-only Desktop UI design checkpoint; open or continue downstream Work Items for #93/#94/#95 implementation.
+- Current Lane: terminal closeout
 
 ## Runtime Evidence
 
 - Run Entry: not_applicable
 - Logs Entry: not_applicable
 - Diagnostics Entry: not_applicable
-- Verification Entry: .loom/specs/GH-96/build-evidence.json
+- Verification Entry: .loom/progress/GH-96.md
 - Lane Entry: docs-only
 
 ## Sources
