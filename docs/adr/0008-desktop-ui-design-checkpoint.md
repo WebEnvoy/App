@@ -10,7 +10,7 @@ Accepted for FR #92 checkpoint，2026-07-02。
 
 本 checkpoint 初稿曾按 Work/Library/Browser/Settings 划分产品域。后续产品讨论明确：App 的首个桌面产品不应被理解成 Agent App、普通 Browser tab、任意任务启动器或技术人员控制台；同时也不能把 Library 和 Browser 管理台降级成不可见后台。
 
-App 面向人类业务用户。App 的自动任务执行入口只运行 Lode 封装的确定性站点 workflow，通过 Harbor 账号身份和浏览器环境运行，通过 Core 记录 task/run/result/evidence/failure。Agent 使用 WebEnvoy 的方式是 API、CLI、MCP、SDK 或 skills，不在 App 内运行；这些非 App 调用方产生的运行事实仍应能在 App 中观测。
+App 面向人类业务用户。App 的自动任务执行入口只运行 Lode 提供的站点能力入口；当前实现先消费 capability package metadata，后续可升级为 workflow package。自动任务通过 Harbor 账号身份和浏览器环境运行，通过 Core 记录 task/run/result/evidence/failure。Agent 使用 WebEnvoy 的方式是 API、CLI、MCP、SDK 或 skills，不在 App 内运行；这些非 App 调用方产生的运行事实仍应能在 App 中观测。
 
 ## 决策
 
@@ -57,7 +57,7 @@ Task Thread first 是主体验，不取消后台能力工作台：Library 仍管
 
 | 概念 | 定义 | App 边界 |
 | --- | --- | --- |
-| 站点技能 | Lode 封装的确定性 workflow。 | App 自动执行入口必须选择站点技能；App 只展示和选择，不定义 package/schema truth。 |
+| 站点技能 | App 对 Lode 站点能力入口的产品名；当前实现先消费 capability package metadata，后续可升级为 workflow package。 | App 自动执行入口必须选择站点技能；App 只展示和选择，不定义 package/schema truth，也不提供 workflow 编辑器或 workflow runtime UI。 |
 | 账号身份 | 账号状态和浏览器环境组合；可包含登录账号，也可只是本机 Chrome/default environment。 | App 只管理入口和展示 owner facts，不保存 credential/cookie/profile storage。 |
 | 业务输入 | 用户为 workflow 提供的 URL、素材、字段或操作参数。 | App 负责表单体验和提交意图，不定义 Core task schema。 |
 | Task | `站点技能 + 账号身份 + 业务输入` 形成的任务线程。 | App 用它组织体验；durable truth 由 Core/Lode/Harbor 合同决定。 |
