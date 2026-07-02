@@ -25,7 +25,7 @@ Run = 同一 Task 下的一次执行记录
 
 左侧任务列表默认按 `账号身份 -> 站点技能 -> Task` 组织。中间栏展示当前 Task Thread、Run navigation rail、任务结束报告和执行过程。右侧是可折叠上下文面板，用 tab 承载结果依据、执行现场、账号身份、站点技能和诊断。
 
-没有合适站点技能时，App 不能自动执行任务，但可以作为账号身份和浏览器环境的启动台，让用户手动打开受控浏览器实例、登录、观察或准备环境。这条路径不是 task success，也不能伪装成自动 workflow。
+没有合适站点技能时，App 不能自动执行任务，但可以作为账号身份和浏览器环境的启动台，让用户手动打开受控浏览器实例、登录、观察或准备环境。手动浏览实例属于 Browser/Harbor session 管理路径，不创建 Core Task/Run，不产生 Result Envelope，也不代表 Lode capability 被执行。只有用户显式从站点技能发起自动任务时，App 才向 Core 提交 task intent。
 
 Task Thread first 是主体验，不取消后台能力工作台：Library 仍管理站点技能、能力包、版本、失效、fixture、更新和草稿；Browser 仍管理账号身份、浏览器环境、Runtime Session、Viewer、接管和 provider facts。
 
