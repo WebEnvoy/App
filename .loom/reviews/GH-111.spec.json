@@ -1,0 +1,26 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-111",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "GH-111 docs-only boundary clarification spec is sufficient for PR #116. The scope is wording, issue #111 body alignment, and GH-111 carrier only; it does not claim implementation completion.",
+  "reviewer": "codex-coordinator",
+  "authored_at": "2026-07-02T13:15:21Z",
+  "reviewed_head": "16afd8e850ca215cdaf7d6c43d33092c0cb55f80",
+  "reviewed_validation_summary": "`git diff --check origin/main..work/agents-task-thread-key` pass; `jq empty .loom/specs/GH-111/build-evidence.json` pass; `loom suite validate --target . --item GH-111 --json` returned `not_applicable` with no missing inputs; `loom fact-chain --target . --json` pass.",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [
+    "Do not treat this spec approval as #111 completion.",
+    "Do not treat this spec approval as UI code, schema/API/client/runtime behavior, package manifest, generated type, fixture, Core/Harbor/Lode change, or workflow editor/runtime behavior approval."
+  ],
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/116",
+    "work_item": "GH-111",
+    "spec": ".loom/specs/GH-111/spec.md",
+    "plan": ".loom/specs/GH-111/plan.md",
+    "suite_path": "not_applicable",
+    "validation": "git diff --check origin/main..work/agents-task-thread-key"
+  }
+}
