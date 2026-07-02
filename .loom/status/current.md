@@ -40,5 +40,5 @@
 - 2026-07-02: Created PR https://github.com/WebEnvoy/App/pull/114 for GH-96 docs-only checkpoint.
 - 2026-07-02: 根据用户讨论把 checkpoint 从 Work/Library/Browser/Settings 调整为 Task Thread first；新增版本化方向稿、VISION 修订和 root DESIGN.md。
 - 2026-07-02: 根据用户澄清补充：自动执行入口才限制为 Lode 确定性 workflow；App 同时是全局观测入口；没有站点技能时可作为受控浏览器启动台；Library/Browser 管理面不被取消。
-- 2026-07-02: Recorded GH-96 spec and semantic review for product head c0ff3e8d3a8a9106c17b69a8c74007b7012d2737. Subsequent diff must remain carrier-only before merge.
+- 2026-07-02: Recorded GH-96 spec and semantic review for portable carrier head 74c37a603fe35c29a315024ab7127430b6097a83. Subsequent diff must remain carrier-only before merge.
 - 2026-07-02: #93/#94/#95 实现前仍必须消费 VISION.md、README.md、DESIGN.md 和 ADR 0008，并与 Core/Harbor/Lode 合同对齐。
