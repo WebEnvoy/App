@@ -12,12 +12,12 @@
 - Validation Entry: .loom/specs/GH-96/build-evidence.json
 - Closing Condition: PR ready for FR #92 checkpoint review；不 merge，不关闭 #93/#94/#95，也不声称已实现 #93/#94/#95。
 - Current Checkpoint: merge
-- Current Stop: GH-96 当前 head 语义 review 已记录；等待 carrier-only review commit、PR metadata 回写、hosted pr-gate 和受控合并。
-- Next Step: 提交并推送 GH-96 review carrier，更新 PR #114 Head SHA，等待 hosted `loom-pr-merge-gate` 通过后合并。
+- Current Stop: GH-96 docs-only checkpoint PR #114 is ready for hosted gate and controlled merge.
+- Next Step: 回读 PR #114 head/body/checks；hosted `loom-pr-merge-gate` 通过后执行 controlled merge。
 - Blockers: none for docs-only merge; #93/#94/#95 实现前仍必须消费 VISION.md、README.md、DESIGN.md 和 ADR 0008，并与 Core/Harbor/Lode 合同对齐。
 - Latest Validation Summary: `git diff --check` pass；`jq empty .loom/specs/GH-96/build-evidence.json` pass；`loom suite validate --target . --item GH-96 --json` returned `not_applicable` with no missing inputs；`loom fact-chain --target . --json` pass。
 - Recovery Boundary: Docs-only checkpoint。若 diff 触碰 Electron/Vite/React code、package manifests、dependencies、schema/API/client/runtime behavior、fixtures、raw evidence handling 或 Core/Harbor/Lode repositories，必须重新 review。
-- Current Lane: merge
+- Current Lane: merge-ready
 
 ## Runtime Evidence
 
