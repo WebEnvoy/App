@@ -9,13 +9,11 @@ import {
   Braces,
   ChevronDown,
   CircleDot,
-  DatabaseZap,
   ExternalLink,
   FolderKanban,
   Globe2,
   HardDrive,
   Mic,
-  MoreHorizontal,
   Paperclip,
   Plus,
   PanelRightOpen,
@@ -37,6 +35,11 @@ import {
   saveLocalConnectionConfig,
   type LocalConnectionConfig,
 } from "./localConnectionConfig";
+import {
+  SiteSkillDetailPage,
+  SiteSkillDirectoryPage,
+} from "./SiteSkillPages";
+import { siteSkillFixtures, type SiteSkill } from "./siteSkillFixtures";
 import { sourceHealthFixture, type SourceHealth } from "./sourceHealthFixture";
 import {
   directSessionFixture,
@@ -58,6 +61,7 @@ type ShellContext = {
   colorScheme: "light" | "dark";
   configScope: "local-ui-only";
 };
+type AppView = "task-thread" | "site-skills";
 
 const contextTabs = [
   { id: "evidence", label: "结果依据" },
@@ -89,13 +93,24 @@ export function App() {
   );
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
+  const [activeView, setActiveView] = useState<AppView>("task-thread");
   const [selectedTaskId, setSelectedTaskId] = useState(taskThreadFixtures[0].id);
   const [selectedRunId, setSelectedRunId] = useState(taskThreadFixtures[0].runs[0].id);
+  const [selectedSiteSkillId, setSelectedSiteSkillId] = useState(siteSkillFixtures[0].id);
+  const [isSiteSkillDetailOpen, setSiteSkillDetailOpen] = useState(false);
 
   const selectedTask =
     taskThreadFixtures.find((task) => task.id === selectedTaskId) ?? taskThreadFixtures[0];
   const selectedRun =
     selectedTask.runs.find((run) => run.id === selectedRunId) ?? selectedTask.runs[0];
+  const selectedSiteSkill =
+    siteSkillFixtures.find((skill) => skill.id === selectedSiteSkillId) ?? siteSkillFixtures[0];
+  const isSiteSkillView = activeView === "site-skills";
+  const pageTitle = isSiteSkillView
+    ? isSiteSkillDetailOpen
+      ? selectedSiteSkill.name
+      : "站点技能"
+    : selectedTask.title;
   const threadNavigationItems = useMemo<ThreadNavigationItem[]>(
     () =>
       selectedTask.runs.map((run) => ({
@@ -156,8 +171,27 @@ export function App() {
   }, []);
 
   function selectTask(task: TaskProjection) {
+    setActiveView("task-thread");
     setSelectedTaskId(task.id);
     setSelectedRunId(task.runs[0].id);
+  }
+
+  function openSiteSkillDirectory() {
+    setActiveView("site-skills");
+    setSiteSkillDetailOpen(false);
+  }
+
+  function openSiteSkillDetail(skill: SiteSkill) {
+    setActiveView("site-skills");
+    setSelectedSiteSkillId(skill.id);
+    setSiteSkillDetailOpen(true);
+  }
+
+  function openRelatedTask(taskId: string) {
+    const task = taskThreadFixtures.find((item) => item.id === taskId);
+    if (task != null) {
+      selectTask(task);
+    }
   }
 
   function updateEndpoint(field: keyof LocalConnectionConfig, value: string) {
@@ -186,22 +220,26 @@ export function App() {
         <LeftPanel>
           <aside className="sidebar" aria-label="Task Thread navigation">
             <nav className="global-nav" aria-label="Global navigation">
-              <a className="nav-item nav-item-active" href="#task-thread">
+              <button
+                className={activeView === "task-thread" ? "nav-item nav-item-active" : "nav-item"}
+                type="button"
+                onClick={() => setActiveView("task-thread")}
+              >
                 <SquarePen size={16} />
                 任务
-              </a>
-              <a className="nav-item" href="#source-health">
-                <DatabaseZap size={16} />
-                Source health
-              </a>
-              <a className="nav-item" href="#settings">
-                <Settings size={16} />
-                Settings
-              </a>
-              <a className="nav-item" href="#search">
+              </button>
+              <button
+                className={activeView === "site-skills" ? "nav-item nav-item-active" : "nav-item"}
+                type="button"
+                onClick={openSiteSkillDirectory}
+              >
+                <Box size={16} />
+                站点技能
+              </button>
+              <button className="nav-item" type="button">
                 <Search size={16} />
                 Search
-              </a>
+              </button>
             </nav>
 
             <section className="task-tree" aria-label="Tasks grouped by account identity">
@@ -253,10 +291,16 @@ export function App() {
         </LeftPanel>
       }
       header={(panelControls) => (
-        <header className="shell-topbar" aria-label="Task Thread toolbar">
+        <header className="shell-topbar" aria-label={isSiteSkillView ? "Site skill toolbar" : "Task Thread toolbar"}>
           <div className="topbar-left-slot">
             {panelControls.left}
-            <button className="topbar-icon-button" type="button" aria-label="后退" disabled>
+            <button
+              className="topbar-icon-button"
+              type="button"
+              aria-label="后退"
+              disabled={!isSiteSkillView || !isSiteSkillDetailOpen}
+              onClick={openSiteSkillDirectory}
+            >
               <ArrowLeft size={15} />
             </button>
             <button className="topbar-icon-button" type="button" aria-label="前进" disabled>
@@ -265,211 +309,225 @@ export function App() {
           </div>
           <div className="topbar-center-surface">
             <span className="topbar-thread-symbol" aria-hidden="true">
-              <FolderKanban size={15} />
+              {isSiteSkillView ? <Box size={15} /> : <FolderKanban size={15} />}
             </span>
-            <h2 id="thread-title">{selectedTask.title}</h2>
-            <span className="thread-state">已完成未读</span>
-            <CircleDot className="thread-state-dot" size={10} />
-            <button className="topbar-icon-button" type="button" aria-label="更多操作">
-              <MoreHorizontal size={16} />
-            </button>
+            <h2 id="thread-title">{pageTitle}</h2>
           </div>
-          <div className="topbar-right-slot">
-            <button className="topbar-open-button" type="button">
-              <PanelRightOpen size={15} />
-              <span>打开</span>
-              <ChevronDown size={14} />
-            </button>
-            {panelControls.rightFullscreen}
-            {panelControls.right}
-          </div>
+          {isSiteSkillView ? null : (
+            <div className="topbar-right-slot">
+              <button className="topbar-open-button" type="button">
+                <PanelRightOpen size={15} />
+                <span>打开</span>
+                <ChevronDown size={14} />
+              </button>
+              {panelControls.rightFullscreen}
+              {panelControls.right}
+            </div>
+          )}
         </header>
       )}
       workspace={
-        <ThreadWorkspace
-          composer={<ThreadComposer selectedRun={selectedRun} selectedTask={selectedTask} />}
-        >
-          <div className="thread-body">
-            <ThreadNavigationRail
-              items={threadNavigationItems}
-              onActiveItemChange={setSelectedRunId}
-            />
+        isSiteSkillView ? (
+          <ThreadWorkspace>
+            {isSiteSkillDetailOpen ? (
+              <SiteSkillDetailPage
+                skill={selectedSiteSkill}
+                onBack={openSiteSkillDirectory}
+                onOpenTask={openRelatedTask}
+              />
+            ) : (
+              <SiteSkillDirectoryPage
+                selectedSkillId={selectedSiteSkill.id}
+                onSelectSkill={openSiteSkillDetail}
+              />
+            )}
+          </ThreadWorkspace>
+        ) : (
+          <ThreadWorkspace
+            composer={<ThreadComposer selectedRun={selectedRun} selectedTask={selectedTask} />}
+          >
+            <div className="thread-body">
+              <ThreadNavigationRail
+                items={threadNavigationItems}
+                onActiveItemChange={setSelectedRunId}
+              />
 
-            <div className="thread-content">
-              <div className="thread-context-strip" aria-label="Task context">
-                <span>站点技能 · {selectedTask.siteSkill}</span>
-                <span>账号身份 · {selectedTask.accountIdentity}</span>
-                <span>业务输入 · {selectedTask.businessInput}</span>
-              </div>
+              <div className="thread-content">
+                <div className="thread-context-strip" aria-label="Task context">
+                  <span>站点技能 · {selectedTask.siteSkill}</span>
+                  <span>账号身份 · {selectedTask.accountIdentity}</span>
+                  <span>业务输入 · {selectedTask.businessInput}</span>
+                </div>
 
-              {selectedTask.blocker ? (
-                <section className="blocker-card">
-                  <div className="card-title">
-                    <AlertTriangle size={18} />
-                    <h3>Blocker: missing source</h3>
-                  </div>
-                  <p>{selectedTask.blocker}</p>
-                </section>
-              ) : null}
+                {selectedTask.blocker ? (
+                  <section className="blocker-card">
+                    <div className="card-title">
+                      <AlertTriangle size={18} />
+                      <h3>Blocker: missing source</h3>
+                    </div>
+                    <p>{selectedTask.blocker}</p>
+                  </section>
+                ) : null}
 
-              <div className="run-turn-list" aria-label="Core-owned run timeline">
-                {selectedTask.runs.map((run) => (
-                  <RunTurn
-                    isSelected={run.id === selectedRun.id}
-                    key={run.id}
-                    run={run}
-                  />
-                ))}
+                <div className="run-turn-list" aria-label="Core-owned run timeline">
+                  {selectedTask.runs.map((run) => (
+                    <RunTurn
+                      isSelected={run.id === selectedRun.id}
+                      key={run.id}
+                      run={run}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </ThreadWorkspace>
+          </ThreadWorkspace>
+        )
       }
-      right={
+      right={isSiteSkillView ? null : (
         <RightPanel>
           <aside className="context-panel" aria-label="Task context">
-        <PanelTabs
-          ariaLabel="Task context tabs"
-          defaultValue="evidence"
-          tabs={contextTabs.map((tab) => ({
-            ...tab,
-            content:
-              tab.id === "evidence" ? (
-                <div className="context-copy">
-                  <div className="card-title">
-                    <Braces size={18} />
-                    <h3>结果依据</h3>
-                  </div>
-                  <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
-                  <div className="context-card-list">
-                    {selectedRun.evidenceCards.map((evidence) => (
-                      <article className="context-card" key={evidence.id}>
-                        <strong>{evidence.title}</strong>
-                        <p>{evidence.summary}</p>
-                        <a href={evidence.viewerHref}>
-                          <ExternalLink size={14} />
-                          {evidence.viewerLabel}
-                        </a>
-                        <span className="source-chip">{evidence.source}</span>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              ) : tab.id === "session" ? (
-                <div className="context-copy">
-                  <div className="card-title">
-                    <Globe2 size={18} />
-                    <h3>执行现场</h3>
-                    <span className={`status-pill status-${directSessionFixture.providerStatus.status}`}>
-                      {directSessionFixture.providerStatus.status}
-                    </span>
-                  </div>
-                  <p>{directSessionFixture.summary}</p>
-                  <dl className="context-facts">
-                    {[
-                      ["Browser session", directSessionFixture.providerStatus.browserSessionRef],
-                      ["Provider", directSessionFixture.providerStatus.provider],
-                      ["Viewer ref", directSessionFixture.providerStatus.viewerRef],
-                      ["Fetched at", directSessionFixture.providerStatus.fetchedAt],
-                    ].map(([label, value]) => (
-                      <SourceField
-                        label={label}
-                        value={value}
-                        source={directSessionFixture.providerStatus.source}
-                        key={label}
-                      />
-                    ))}
-                  </dl>
-                  <p className="boundary-copy">{directSessionFixture.providerStatus.boundary}</p>
-                </div>
-              ) : tab.id === "identity" ? (
-                <ContextPanel
-                  icon={<ShieldCheck size={18} />}
-                  title="账号身份"
-                  body="账号身份来自 Harbor fixture；App 不保存 credential、cookie、token 或 profile storage。"
-                />
-              ) : tab.id === "skill" ? (
-                <div className="context-copy">
-                  <div className="card-title">
-                    <Box size={18} />
-                    <h3>站点技能</h3>
-                  </div>
-                  <p>Capability package source attribution comes from Lode metadata fixture.</p>
-                  <dl className="context-facts">
-                    {[
-                      ["Package", selectedTask.packageSource.name],
-                      ["Version", selectedTask.packageSource.version],
-                      ["Capability ref", selectedTask.packageSource.capabilityRef],
-                      ["Fetched at", selectedTask.packageSource.fetchedAt],
-                    ].map(([label, value]) => (
-                      <SourceField
-                        label={label}
-                        value={value}
-                        source={selectedTask.packageSource.source}
-                        key={label}
-                      />
-                    ))}
-                  </dl>
-                  <p className="boundary-copy">{selectedTask.packageSource.boundary}</p>
-                </div>
-              ) : (
-                <ContextPanel
-                  icon={<Activity size={18} />}
-                  title="诊断"
-                  body={`Shell context: ${shellContext?.platform ?? "loading"} / ${
-                    shellContext?.colorScheme ?? "loading"
-                  } / ${shellContext?.configScope ?? "loading"}. UI selection state is App local-only.`}
-                />
-              ),
-          }))}
-        />
+            <PanelTabs
+              ariaLabel="Task context tabs"
+              defaultValue="evidence"
+              tabs={contextTabs.map((tab) => ({
+                ...tab,
+                content:
+                  tab.id === "evidence" ? (
+                    <div className="context-copy">
+                      <div className="card-title">
+                        <Braces size={18} />
+                        <h3>结果依据</h3>
+                      </div>
+                      <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
+                      <div className="context-card-list">
+                        {selectedRun.evidenceCards.map((evidence) => (
+                          <article className="context-card" key={evidence.id}>
+                            <strong>{evidence.title}</strong>
+                            <p>{evidence.summary}</p>
+                            <a href={evidence.viewerHref}>
+                              <ExternalLink size={14} />
+                              {evidence.viewerLabel}
+                            </a>
+                            <span className="source-chip">{evidence.source}</span>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  ) : tab.id === "session" ? (
+                    <div className="context-copy">
+                      <div className="card-title">
+                        <Globe2 size={18} />
+                        <h3>执行现场</h3>
+                        <span className={`status-pill status-${directSessionFixture.providerStatus.status}`}>
+                          {directSessionFixture.providerStatus.status}
+                        </span>
+                      </div>
+                      <p>{directSessionFixture.summary}</p>
+                      <dl className="context-facts">
+                        {[
+                          ["Browser session", directSessionFixture.providerStatus.browserSessionRef],
+                          ["Provider", directSessionFixture.providerStatus.provider],
+                          ["Viewer ref", directSessionFixture.providerStatus.viewerRef],
+                          ["Fetched at", directSessionFixture.providerStatus.fetchedAt],
+                        ].map(([label, value]) => (
+                          <SourceField
+                            label={label}
+                            value={value}
+                            source={directSessionFixture.providerStatus.source}
+                            key={label}
+                          />
+                        ))}
+                      </dl>
+                      <p className="boundary-copy">{directSessionFixture.providerStatus.boundary}</p>
+                    </div>
+                  ) : tab.id === "identity" ? (
+                    <ContextPanel
+                      icon={<ShieldCheck size={18} />}
+                      title="账号身份"
+                      body="账号身份来自 Harbor fixture；App 不保存 credential、cookie、token 或 profile storage。"
+                    />
+                  ) : tab.id === "skill" ? (
+                    <div className="context-copy">
+                      <div className="card-title">
+                        <Box size={18} />
+                        <h3>站点技能</h3>
+                      </div>
+                      <p>Capability package source attribution comes from Lode metadata fixture.</p>
+                      <dl className="context-facts">
+                        {[
+                          ["Package", selectedTask.packageSource.name],
+                          ["Version", selectedTask.packageSource.version],
+                          ["Capability ref", selectedTask.packageSource.capabilityRef],
+                          ["Fetched at", selectedTask.packageSource.fetchedAt],
+                        ].map(([label, value]) => (
+                          <SourceField
+                            label={label}
+                            value={value}
+                            source={selectedTask.packageSource.source}
+                            key={label}
+                          />
+                        ))}
+                      </dl>
+                      <p className="boundary-copy">{selectedTask.packageSource.boundary}</p>
+                    </div>
+                  ) : (
+                    <ContextPanel
+                      icon={<Activity size={18} />}
+                      title="诊断"
+                      body={`Shell context: ${shellContext?.platform ?? "loading"} / ${
+                        shellContext?.colorScheme ?? "loading"
+                      } / ${shellContext?.configScope ?? "loading"}. UI selection state is App local-only.`}
+                    />
+                  ),
+              }))}
+            />
 
-        <section className="source-health" id="source-health">
-          <div className="section-heading">
-            <span>来源</span>
-            <span className="badge">fixture</span>
-          </div>
-          {sourceHealthFixture.map((source) => (
-            <article className="source-card" key={source.id}>
-              <div>
-                <strong>{source.name}</strong>
-                <span className={`status-pill status-${source.status}`}>{statusLabel(source.status)}</span>
-              </div>
-              <p>{source.ownerTruth}</p>
-            </article>
-          ))}
-        </section>
+                <section className="source-health" id="source-health">
+                  <div className="section-heading">
+                    <span>来源</span>
+                    <span className="badge">fixture</span>
+                  </div>
+                  {sourceHealthFixture.map((source) => (
+                    <article className="source-card" key={source.id}>
+                      <div>
+                        <strong>{source.name}</strong>
+                        <span className={`status-pill status-${source.status}`}>{statusLabel(source.status)}</span>
+                      </div>
+                      <p>{source.ownerTruth}</p>
+                    </article>
+                  ))}
+                </section>
 
-        <section className="settings-panel" id="settings">
-          <div className="card-title">
-            <AlertTriangle size={18} />
-            <h3>Settings local boundary</h3>
-          </div>
-          <p>仅保存本地 endpoint choice。不要输入 token、cookie、profile path 或 raw evidence。</p>
-          <ConnectionInput
-            label="Core endpoint"
-            value={connectionConfig.coreEndpoint}
-            onChange={(value) => updateEndpoint("coreEndpoint", value)}
-          />
-          <ConnectionInput
-            label="Harbor endpoint"
-            value={connectionConfig.harborEndpoint}
-            onChange={(value) => updateEndpoint("harborEndpoint", value)}
-          />
-          <ConnectionInput
-            label="Lode endpoint"
-            value={connectionConfig.lodeEndpoint}
-            onChange={(value) => updateEndpoint("lodeEndpoint", value)}
-          />
-          <button className="save-button" type="button" onClick={saveSettings}>
-            保存本地配置
-          </button>
-          {settingsError ? <p className="settings-error" role="alert">{settingsError}</p> : null}
-          <span className="settings-saved">{settingsSaved ? "Saved locally" : "Not saved"}</span>
-        </section>
+                <section className="settings-panel" id="settings">
+                  <div className="card-title">
+                    <AlertTriangle size={18} />
+                    <h3>Settings local boundary</h3>
+                  </div>
+                  <p>仅保存本地 endpoint choice。不要输入 token、cookie、profile path 或 raw evidence。</p>
+                  <ConnectionInput
+                    label="Core endpoint"
+                    value={connectionConfig.coreEndpoint}
+                    onChange={(value) => updateEndpoint("coreEndpoint", value)}
+                  />
+                  <ConnectionInput
+                    label="Harbor endpoint"
+                    value={connectionConfig.harborEndpoint}
+                    onChange={(value) => updateEndpoint("harborEndpoint", value)}
+                  />
+                  <ConnectionInput
+                    label="Lode endpoint"
+                    value={connectionConfig.lodeEndpoint}
+                    onChange={(value) => updateEndpoint("lodeEndpoint", value)}
+                  />
+                  <button className="save-button" type="button" onClick={saveSettings}>
+                    保存本地配置
+                  </button>
+                  {settingsError ? <p className="settings-error" role="alert">{settingsError}</p> : null}
+                  <span className="settings-saved">{settingsSaved ? "Saved locally" : "Not saved"}</span>
+                </section>
           </aside>
         </RightPanel>
-      }
+      )}
     />
   );
 }

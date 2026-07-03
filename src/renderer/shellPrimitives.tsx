@@ -39,7 +39,7 @@ type AppShellProps = {
   left: ReactNode;
   header: (panelControls: ShellPanelControls) => ReactNode;
   workspace: ReactNode;
-  right: ReactNode;
+  right: ReactNode | null;
 };
 
 export function AppShell({ left, header, workspace, right }: AppShellProps) {
@@ -72,6 +72,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
   const [hoveredFocusArea, setHoveredFocusArea] = useState<FocusAreaName>("thread-workspace");
   const contentRegionBodyRef = useRef<HTMLDivElement | null>(null);
   const leftPreviewExitTimerRef = useRef<number | null>(null);
+  const hasRightPanel = right != null;
   const rightPanelMaxWidth = getAvailableRightPanelWidth(contentRegionWidth, isRightFullscreen);
   const resolvedRightPanelRatio =
     rightWidthRatio ?? widthToRightPanelWidthRatio(RIGHT_PANEL_DEFAULT_WIDTH, contentRegionWidth);
@@ -116,10 +117,10 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
   }, [isLeftOpen]);
 
   useEffect(() => {
-    if (!isRightOpen) {
+    if (!isRightOpen || !hasRightPanel) {
       setRightFullscreen(false);
     }
-  }, [isRightOpen]);
+  }, [hasRightPanel, isRightOpen]);
 
   useEffect(() => {
     return () => {
@@ -172,7 +173,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
         {isLeftOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
       </button>
     ),
-    right: (
+    right: hasRightPanel ? (
       <button
         className="shell-panel-toggle shell-panel-toggle-right"
         type="button"
@@ -189,8 +190,8 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       >
         {isRightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
       </button>
-    ),
-    rightFullscreen: (
+    ) : null,
+    rightFullscreen: hasRightPanel ? (
       <button
         className="shell-panel-toggle shell-panel-toggle-right-fullscreen"
         type="button"
@@ -205,7 +206,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       >
         {isRightFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
       </button>
-    ),
+    ) : null,
   };
 
   return (
@@ -215,14 +216,14 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       data-hovered-focus-area={hoveredFocusArea}
       data-left-panel-open={isLeftOpen}
       data-left-panel-width={isLeftOpen ? leftWidth : 0}
-      data-right-panel-open={isRightOpen}
+      data-right-panel-open={hasRightPanel && isRightOpen}
       data-right-panel-fullscreen={isRightFullscreen}
-      data-right-panel-width={isRightOpen ? renderedRightWidth : 0}
+      data-right-panel-width={hasRightPanel && isRightOpen ? renderedRightWidth : 0}
       style={
         {
           "--header-left-slot-width": `${isLeftOpen ? leftWidth : 0}px`,
-          "--header-right-slot-width": `${renderedRightWidth}px`,
-          "--right-panel-width": `${isRightOpen ? visibleRightWidth : 34}px`,
+          "--header-right-slot-width": `${hasRightPanel ? renderedRightWidth : 0}px`,
+          "--right-panel-width": `${hasRightPanel && isRightOpen ? visibleRightWidth : 0}px`,
         } as CSSProperties
       }
       onFocusCapture={(event) => setActiveFocusArea(resolveFocusArea(event.target))}
@@ -287,34 +288,36 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
           <div className="content-region-body" ref={contentRegionBodyRef}>
             <div className="main-surface">{workspace}</div>
 
-            <ResizablePanel
-              className="right-panel-resizer"
-              defaultWidth={RIGHT_PANEL_DEFAULT_WIDTH}
-              isOpen={isRightOpen}
-              side="left"
-              width={visibleRightWidth}
-              minWidth={RIGHT_PANEL_MIN_WIDTH}
-              maxWidth={rightPanelMaxWidth}
-              collapseBelow={RIGHT_PANEL_COLLAPSE_WIDTH}
-              resizable={!isRightFullscreen}
-              animationProgress={rightPanelAnimation.progress}
-              onCollapse={() => setRightOpen(false)}
-              onOpen={() => setRightOpen(true)}
-              onResize={(width) => {
-                setRightWidth(width);
-                if (contentRegionWidth > 0) {
-                  setRightWidthRatio(widthToRightPanelWidthRatio(width, contentRegionWidth));
-                }
-              }}
-              onResizeEnd={(width) => {
-                writeStoredPanelWidth(RIGHT_PANEL_WIDTH_KEY, width);
-                if (contentRegionWidth > 0) {
-                  writeStoredPanelRatio(RIGHT_PANEL_RATIO_KEY, width, contentRegionWidth);
-                }
-              }}
-            >
-              {right}
-            </ResizablePanel>
+            {hasRightPanel ? (
+              <ResizablePanel
+                className="right-panel-resizer"
+                defaultWidth={RIGHT_PANEL_DEFAULT_WIDTH}
+                isOpen={isRightOpen}
+                side="left"
+                width={visibleRightWidth}
+                minWidth={RIGHT_PANEL_MIN_WIDTH}
+                maxWidth={rightPanelMaxWidth}
+                collapseBelow={RIGHT_PANEL_COLLAPSE_WIDTH}
+                resizable={!isRightFullscreen}
+                animationProgress={rightPanelAnimation.progress}
+                onCollapse={() => setRightOpen(false)}
+                onOpen={() => setRightOpen(true)}
+                onResize={(width) => {
+                  setRightWidth(width);
+                  if (contentRegionWidth > 0) {
+                    setRightWidthRatio(widthToRightPanelWidthRatio(width, contentRegionWidth));
+                  }
+                }}
+                onResizeEnd={(width) => {
+                  writeStoredPanelWidth(RIGHT_PANEL_WIDTH_KEY, width);
+                  if (contentRegionWidth > 0) {
+                    writeStoredPanelRatio(RIGHT_PANEL_RATIO_KEY, width, contentRegionWidth);
+                  }
+                }}
+              >
+                {right}
+              </ResizablePanel>
+            ) : null}
           </div>
         </div>
       </div>
@@ -353,13 +356,17 @@ export function ThreadWorkspace({
   composer,
 }: {
   children: ReactNode;
-  composer: ReactNode;
+  composer?: ReactNode;
 }) {
+  const hasComposer = composer != null;
+
   return (
     <FocusArea area="thread-workspace" className="thread-workspace">
       <div className="main-content-viewport">
-        <div className="main-content-frame">{children}</div>
-        <BottomPanelSlot>{composer}</BottomPanelSlot>
+        <div className={hasComposer ? "main-content-frame" : "main-content-frame no-bottom-panel"}>
+          {children}
+        </div>
+        {hasComposer ? <BottomPanelSlot>{composer}</BottomPanelSlot> : null}
       </div>
     </FocusArea>
   );
