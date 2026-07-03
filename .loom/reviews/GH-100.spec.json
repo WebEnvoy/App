@@ -1,0 +1,27 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-100",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "GH-100 minimal formal spec is sufficient for the desktop shell skeleton PR. The spec, plan, and implementation contract constrain this item to the runnable Electron/Vite/React/TypeScript shell foundation and explicitly exclude follow-on Task Thread UI/runtime behavior.",
+  "reviewer": "codex-coordinator",
+  "authored_at": "2026-07-03T03:21:17Z",
+  "reviewed_head": "5e27c0568df80e878a8063efaa9330b13ccf4fee",
+  "reviewed_validation_summary": "`git diff --check` passed; `npm audit --audit-level=high` passed with 0 vulnerabilities; `npm run typecheck` passed; `npm run smoke` passed and built Electron main/preload plus Vite renderer; `npm run start` short launch reached Electron without error output after binary install; `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, and `loom suite validate --target . --item GH-100 --json` passed.",
+  "fallback_to": null,
+  "blocking_issues": [],
+  "follow_ups": [
+    "#101/#102/#103/#104 must not treat this spec approval as completion of primitives, source health, Settings, Task Thread layout, task submission, run/result views, evidence rendering, Browser management, or Library management."
+  ],
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/126",
+    "work_item": "GH-100",
+    "spec": ".loom/specs/GH-100/spec.md",
+    "plan": ".loom/specs/GH-100/plan.md",
+    "implementation_contract": ".loom/specs/GH-100/implementation-contract.md",
+    "suite_path": "minimal",
+    "suite_validation": ".loom/tmp/gh100-suite-validate.json",
+    "fact_chain": ".loom/tmp/output-artifacts/2026-07-03T031724Z-fact-chain-446b4617f46c.json"
+  }
+}

@@ -15,7 +15,7 @@
 - Current Stop: Minimum Electron/Vite/React/TypeScript skeleton is implemented with typecheck/build/smoke passing locally.
 - Next Step: Refresh current-head review for PR #126, then rerun hosted gate.
 - Blockers: none
-- Latest Validation Summary: `git diff --check` passed; `npm audit --audit-level=high` passed with 0 vulnerabilities; `npm run typecheck` passed; `npm run smoke` passed and built Electron main/preload plus Vite renderer; `npm run start` short launch reached Electron without error output after binary install; `loom doctor --target . --json`, `loom verify --target . --json`, and `loom fact-chain --target . --json` passed.
+- Latest Validation Summary: `git diff --check` passed; `npm audit --audit-level=high` passed with 0 vulnerabilities; `npm run typecheck` passed; `npm run smoke` passed and built Electron main/preload plus Vite renderer; `npm run start` short launch reached Electron without error output after binary install; `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, and `loom suite validate --target . --item GH-100 --json` passed.
 - Recovery Boundary: Keep this PR bound to GH-100 skeleton only. Do not implement Radix/lucide primitives, source health fixture, Settings, Task Thread first layout, real task/run/result/evidence behavior, or Browser/Library management.
 - Current Lane: implementation
 
