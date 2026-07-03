@@ -4,18 +4,18 @@
 
 - Item ID: GH-105
 - Goal: Deliver the #94 read-only Task Thread batch covering #105, #106, #107, #108, and #109.
-- Scope: Batch anchor GH-105: implement the read-only Task Thread creation and run/result/failure view for #94 using Core fixture/API-facing contracts; cover #105-#109 in one implementation PR; exclude #110-#113, #95 evidence/source/session reference implementation, real production Core/Harbor/Lode calls, write-side behavior, full Library/Browser consoles, workflow runtime/editor, packaging, signing, and auto-update.
+- Scope: Batch anchor GH-105: implement the read-only Task Thread creation and run/result/failure view for #94 using Core fixture/API-facing contracts; cover #105-#109 in one implementation PR; ownership is limited to GH-105 Loom carriers, renderer fixtures/UI, and smoke coverage; exclude #110-#113, #95 evidence/source/session reference implementation, real production Core/Harbor/Lode calls, write-side behavior, full Library/Browser consoles, workflow runtime/editor, packaging, signing, and auto-update.
 - Execution Path: product-implementation/readonly-task-thread-batch
 - Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-105.md
 - Review Entry: .loom/reviews/GH-105.json
 - Validation Entry: git diff --check; npm audit --audit-level=high; npm run typecheck; npm run smoke; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json
-- Closing Condition: One implementation PR covers #105, #106, #107, #108, and #109; PR is merged to main; each covered issue receives closeout evidence; parent #94 receives FR closeout evidence only after all #105-#109 criteria are met; #110-#113 and #95 remain out of scope.
+- Closing Condition: One implementation PR covers #105, #106, #107, #108, and #109; ownership constraints remain limited to this batch and its Loom carriers; PR is merged to main; each covered issue receives closeout evidence; parent #94 receives FR closeout evidence only after all #105-#109 criteria are met; #110-#113 and #95 remain out of scope.
 - Current Checkpoint: build
-- Current Stop: GH-105 has been admitted as the #94 batch anchor; minimal spec, plan, task carrier, and implementation contract are in place.
-- Next Step: Implement one GH-105 PR covering #105, #106, #107, #108, and #109; keep #110-#113/#95 out of scope.
+- Current Stop: Renderer implementation for #105-#109 is integrated locally and has passed typecheck, smoke, audit, and diff checks.
+- Next Step: Run final Loom validation/build readiness, then create one GH-105 implementation PR covering #105-#109.
 - Blockers: None recorded.
-- Latest Validation Summary: Admission and carrier validation passed on 2026-07-03T05:56:08Z: `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `git diff --check`, `loom suite validate --target . --item GH-105 --json`, and `loom suite carrier validate --target . --item GH-105 --json`. Admission used `loom_flow.py work-item create --activate --init-recovery`; `fact_chain.mode` was minimally repaired to `work-item + recovery-entry + derived status-surface` while preserving GH-105 entry_points.
+- Latest Validation Summary: Implementation validation passed on 2026-07-03T06:04:02Z: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, and `git diff --check`. Admission and carrier validation also passed: `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-105 --json`, and `loom suite carrier validate --target . --item GH-105 --json`. Admission used `loom_flow.py work-item create --activate --init-recovery`; `fact_chain.mode` was minimally repaired to `work-item + recovery-entry + derived status-surface` while preserving GH-105 entry_points.
 - Recovery Boundary: GH-105 owns `.loom/work-items/GH-105.md`, `.loom/progress/GH-105.md`, `.loom/specs/GH-105/**`, `.loom/reviews/GH-105.json`, renderer read-only task/run/result/failure UI, local fixtures/adapters, and smoke coverage. Do not expand to #110-#113/#95.
 - Current Lane: implementation
 
