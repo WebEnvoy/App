@@ -20,6 +20,7 @@ node_modules/
 .pnpm-store/
 
 dist/
+dist-electron/
 build/
 coverage/
 .nyc_output/

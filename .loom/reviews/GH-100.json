@@ -1,0 +1,27 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-100",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Implementation review approved GH-100 desktop shell skeleton on head a0233f450f0beb4f38c5602f017ed6f29810ac95. The delta establishes the Electron/Vite/React/TypeScript carrier, keeps Electron main/preload limited to OS/local shell context, adds the minimal suite implementation contract, and does not implement follow-on Task Thread UI scope.",
+  "reviewer": "codex-coordinator",
+  "authored_at": "2026-07-03T03:16:47Z",
+  "reviewed_head": "a0233f450f0beb4f38c5602f017ed6f29810ac95",
+  "reviewed_validation_summary": "`git diff --check` passed; `npm audit --audit-level=high` passed with 0 vulnerabilities; `npm run typecheck` passed; `npm run smoke` passed and built Electron main/preload plus Vite renderer; `npm run start` short launch reached Electron without error output after binary install; `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, and `loom suite validate --target . --item GH-100 --json` passed.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "#101/#102/#103/#104 must continue from this shell foundation without expanding GH-100 scope retroactively."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Authored implementation review approved the GH-100 skeleton head with the minimal suite implementation contract; subsequent drift must remain limited to GH-100 Loom review carrier metadata for this PR."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/126",
+    "work_item": "GH-100",
+    "validation": "git diff --check; npm audit --audit-level=high; npm run typecheck; npm run smoke; npm run start short launch; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; loom suite validate --target . --item GH-100 --json"
+  }
+}
