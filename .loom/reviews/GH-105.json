@@ -3,46 +3,37 @@
   "item_id": "GH-105",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual carrier-only closeout review approved PR #161 post-merge closeout content head e3e834a94837bc359cc3d126949941ca5a706fcd. This review covers only GH-105 closeout evidence and terminal carrier sync; it does not approve #110-#113 or #95 work.",
+  "summary": "Manual current-pointer retire review approved GH-105 retire content head f39a7bbcdc5d53afc56e38b5dc7d93a0b8bfa3c2. This review covers only retiring the GH-105 current pointer to no_active_item / idle after PR #162 merged.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-03T06:26:00Z",
-  "reviewed_head": "e3e834a94837bc359cc3d126949941ca5a706fcd",
+  "authored_at": "2026-07-03T06:31:00Z",
+  "reviewed_head": "f39a7bbcdc5d53afc56e38b5dc7d93a0b8bfa3c2",
   "reviewed_validation_summary": "Post-merge closeout consumed implementation PR #161 (https://github.com/WebEnvoy/App/pull/161), PR head `00ce8908aca27fe628b62b4c62fd4b4e86900076`, squash merge commit `c72e38619416454926fcc21380025d9c5edf7416`, target branch `main`, hosted run https://github.com/WebEnvoy/App/actions/runs/28642506523, and issue closeout evidence for #105, #106, #107, #108, #109, and #94. Pre-merge validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-105 --json`, `loom suite carrier validate --target . --item GH-105 --json`, review read for `.loom/reviews/GH-105.json` and `.loom/reviews/GH-105.spec.json`, and PR metadata preflight. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, `loom-check`, and `loom-pr-merge-gate` passed on run `28642506523`. Local `loom build`, `loom review run`, `loom pr gate`, and `loom merge-ready` remain blocked by Loom suite CLI JSON consumption; no repo-local Loom shim was added.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "#110-#113 remain for #95; GH-105 closeout does not start or complete #95.",
-    "Retire GH-105 current pointer to no_active_item before admitting the next Work Item.",
-    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App closeout PR."
+    "#110-#113 and #95 remain open for the next batch; GH-105 retire does not start them.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App retire PR."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Closeout carrier consumes the merged PR, hosted run, issue closeout comments, and closed issue readback for #105-#109/#94. The diff is carrier-only and does not change App product/UI/docs behavior."
+    "reason": "The retire diff is limited to the current pointer idle carrier and bootstrap fact-chain mode. It does not change App product/UI/docs behavior or alter GH-105 implementation/closeout evidence."
   },
   "carrier_only_closeout_review": {
     "status": "passed",
-    "reason": "Authored closeout review approved only terminal GH-105 closeout metadata and status/progress synchronization for the closeout PR."
+    "reason": "Authored closeout review approved only terminal GH-105 current-pointer retire metadata for PR #163."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
+    "retire_pull_request": "https://github.com/WebEnvoy/App/pull/163",
+    "closeout_pull_request": "https://github.com/WebEnvoy/App/pull/162",
     "implementation_pull_request": "https://github.com/WebEnvoy/App/pull/161",
-    "implementation_head": "00ce8908aca27fe628b62b4c62fd4b4e86900076",
     "implementation_merge_commit": "c72e38619416454926fcc21380025d9c5edf7416",
-    "implementation_hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28642506523",
+    "closeout_merge_commit": "fbbe8a0449c9a8ee35f4a9c08b8e77e274d0738c",
     "work_item": "GH-105",
-    "covered_work_items": "#105 #106 #107 #108 #109",
     "closed_issues": "#94 #105 #106 #107 #108 #109",
-    "issue_closeout_urls": [
-      "https://github.com/WebEnvoy/App/issues/105#issuecomment-4873153947",
-      "https://github.com/WebEnvoy/App/issues/106#issuecomment-4873154278",
-      "https://github.com/WebEnvoy/App/issues/107#issuecomment-4873154696",
-      "https://github.com/WebEnvoy/App/issues/108#issuecomment-4873155000",
-      "https://github.com/WebEnvoy/App/issues/109#issuecomment-4873155322",
-      "https://github.com/WebEnvoy/App/issues/94#issuecomment-4873156045"
-    ],
-    "reviewed_diff": "git diff origin/main...e3e834a94837bc359cc3d126949941ca5a706fcd",
-    "closeout_scope": "GH-105 closeout only; #110-#113, #95, and milestone #9 remain open.",
-    "known_tool_blocker": "loom build / review run / pr gate / merge-ready suite CLI JSON consumption blocked locally; no repo-local tools/loom.py added"
+    "reviewed_diff": "git diff origin/main...f39a7bbcdc5d53afc56e38b5dc7d93a0b8bfa3c2",
+    "retire_scope": "Only .loom/status/current.md and .loom/bootstrap/init-result.json retire GH-105 to no_active_item / idle.",
+    "known_tool_blocker": "loom build / review run / local pr gate / local merge-ready suite CLI JSON consumption remains outside this App PR; no repo-local tools/loom.py added"
   }
 }
