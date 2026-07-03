@@ -34,6 +34,7 @@ const RIGHT_PANEL_RESERVED_WIDTH = 352;
 const RIGHT_PANEL_COLLAPSE_WIDTH = RIGHT_PANEL_MIN_WIDTH * PANEL_COLLAPSE_SCALE;
 const RIGHT_PANEL_WIDTH_KEY = "webenvoy.shell.v3.right-panel-width";
 const RIGHT_PANEL_RATIO_KEY = "webenvoy.shell.v3.right-panel-ratio";
+const PANEL_ANIMATION_DURATION_MS = 500;
 
 type AppShellProps = {
   left: ReactNode;
@@ -162,7 +163,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
   const panelControls: ShellPanelControls = {
     left: (
       <button
-        className="shell-panel-toggle shell-panel-toggle-left"
+        className="shell-panel-toggle shell-panel-toggle-left we-toolbar-icon-button cursor-interaction"
         type="button"
         aria-label={isLeftOpen ? "隐藏左栏" : "显示左栏"}
         aria-pressed={isLeftOpen}
@@ -175,7 +176,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
     ),
     right: hasRightPanel ? (
       <button
-        className="shell-panel-toggle shell-panel-toggle-right"
+        className="shell-panel-toggle shell-panel-toggle-right we-toolbar-icon-button cursor-interaction"
         type="button"
         aria-label={isRightOpen ? "隐藏右栏" : "显示右栏"}
         aria-pressed={isRightOpen}
@@ -193,7 +194,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
     ) : null,
     rightFullscreen: hasRightPanel ? (
       <button
-        className="shell-panel-toggle shell-panel-toggle-right-fullscreen"
+        className="shell-panel-toggle shell-panel-toggle-right-fullscreen we-toolbar-icon-button cursor-interaction"
         type="button"
         aria-label={isRightFullscreen ? "退出右栏全屏" : "全屏展开右栏"}
         aria-pressed={isRightFullscreen}
@@ -404,13 +405,13 @@ export function PanelTabs({
   ariaLabel: string;
 }) {
   return (
-    <Tabs.Root className="panel-tabs" defaultValue={defaultValue}>
+    <Tabs.Root className="panel-tabs we-panel-tabs" defaultValue={defaultValue}>
       <div className="panel-tab-strip">
         <div className="panel-tab-scroll">
           <Tabs.List className="panel-tab-list" aria-label={ariaLabel}>
             {tabs.map((tab) => (
               <Tabs.Trigger
-                className="panel-tab-trigger"
+                className="panel-tab-trigger we-panel-tab cursor-interaction"
                 title={tab.label}
                 value={tab.id}
                 key={tab.id}
@@ -560,6 +561,7 @@ function usePanelAnimation(isVisible: boolean) {
   const initialProgress = isVisible ? 1 : 0;
   const progressRef = useRef(initialProgress);
   const [progress, setProgressState] = useState(initialProgress);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const setProgress = useCallback((nextProgress: number) => {
     progressRef.current = nextProgress;
     setProgressState(nextProgress);
@@ -572,11 +574,14 @@ function usePanelAnimation(isVisible: boolean) {
     if (startProgress === targetProgress) {
       return;
     }
+    if (prefersReducedMotion) {
+      setProgress(targetProgress);
+      return;
+    }
 
-    const durationMs = 500;
     const startedAt = performance.now();
     const animate = (now: number) => {
-      const elapsed = Math.min(1, (now - startedAt) / durationMs);
+      const elapsed = Math.min(1, (now - startedAt) / PANEL_ANIMATION_DURATION_MS);
       const eased = 1 - Math.pow(1 - elapsed, 3);
       setProgress(startProgress + (targetProgress - startProgress) * eased);
       if (elapsed < 1) {
@@ -586,9 +591,24 @@ function usePanelAnimation(isVisible: boolean) {
 
     frame = window.requestAnimationFrame(animate);
     return () => window.cancelAnimationFrame(frame);
-  }, [isVisible, setProgress]);
+  }, [isVisible, prefersReducedMotion, setProgress]);
 
   return { progress };
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  return prefersReducedMotion;
 }
 
 function useDevicePixelRatio() {

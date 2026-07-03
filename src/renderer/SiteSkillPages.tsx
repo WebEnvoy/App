@@ -68,7 +68,7 @@ export function SiteSkillDirectoryPage({
         ];
 
   return (
-    <div className="site-skill-page">
+    <div className="site-skill-page we-sectioned-page">
       <header className="site-skill-directory-header">
         <div>
           <h1>站点技能</h1>
@@ -90,7 +90,11 @@ export function SiteSkillDirectoryPage({
         <div className="site-skill-directory-tabs" role="tablist" aria-label="站点技能目录">
           {directoryTabs.map((tab) => (
             <button
-              className={tab === selectedTab ? "site-skill-directory-tab selected" : "site-skill-directory-tab"}
+              className={
+                tab === selectedTab
+                  ? "site-skill-directory-tab we-panel-tab cursor-interaction selected"
+                  : "site-skill-directory-tab we-panel-tab cursor-interaction"
+              }
               type="button"
               role="tab"
               aria-selected={tab === selectedTab}
@@ -148,7 +152,7 @@ export function SiteSkillDetailPage({
   const firstRelatedTaskId = skill.relatedTaskIds[0] ?? null;
 
   return (
-    <div className="site-skill-page site-skill-detail-page">
+    <div className="site-skill-page site-skill-detail-page we-sectioned-page">
       <div className="site-skill-detail-toolbar">
         <button className="site-skill-back-button" type="button" onClick={onBack}>
           <ArrowLeft size={15} />
@@ -248,7 +252,11 @@ function SiteSkillCard({
 }) {
   return (
     <button
-      className={isSelected ? "site-skill-card selected" : "site-skill-card"}
+      className={
+        isSelected
+          ? "site-skill-card we-list-row cursor-interaction selected"
+          : "site-skill-card we-list-row cursor-interaction"
+      }
       type="button"
       onClick={onSelect}
     >

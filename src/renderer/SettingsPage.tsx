@@ -72,8 +72,8 @@ export function SettingsPage({
                   <button
                     className={
                       section.id === activeSection
-                        ? "settings-navigation-row selected"
-                        : "settings-navigation-row"
+                        ? "settings-navigation-row we-list-row cursor-interaction selected"
+                        : "settings-navigation-row we-list-row cursor-interaction"
                     }
                     type="button"
                     aria-current={section.id === activeSection ? "page" : undefined}
@@ -187,7 +187,7 @@ function SettingsGroup({
 
 function SettingsRow({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="settings-row">
+    <div className="settings-row we-settings-row">
       <div>
         <strong>{title}</strong>
         <span>{detail}</span>

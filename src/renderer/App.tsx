@@ -75,6 +75,11 @@ function localShellContext(colorScheme: ShellContext["colorScheme"]): ShellConte
   };
 }
 
+function applyDocumentTheme(colorScheme: ShellContext["colorScheme"]) {
+  document.documentElement.style.setProperty("color-scheme", colorScheme);
+  document.documentElement.dataset.weTheme = colorScheme;
+}
+
 const contextTabs = [
   { id: "evidence", label: "结果依据" },
   { id: "session", label: "执行现场" },
@@ -164,20 +169,20 @@ export function App() {
     shellContext
       .then((context) => {
         if (!cancelled) {
-          document.documentElement.style.setProperty("color-scheme", context.colorScheme);
+          applyDocumentTheme(context.colorScheme);
           setShellContext(context);
         }
       })
       .catch(() => {
         if (!cancelled) {
           const colorScheme = getBrowserColorScheme();
-          document.documentElement.style.setProperty("color-scheme", colorScheme);
+          applyDocumentTheme(colorScheme);
           setShellContext(localShellContext(colorScheme));
         }
       });
 
     const applyColorScheme = (colorScheme: ShellContext["colorScheme"]) => {
-      document.documentElement.style.setProperty("color-scheme", colorScheme);
+      applyDocumentTheme(colorScheme);
       setShellContext((context) =>
         context == null ? localShellContext(colorScheme) : { ...context, colorScheme },
       );
@@ -290,7 +295,11 @@ export function App() {
           <aside className="sidebar" aria-label="Task Thread navigation">
             <nav className="global-nav" aria-label="Global navigation">
               <button
-                className={activeView === "task-thread" ? "nav-item nav-item-active" : "nav-item"}
+                className={
+                  activeView === "task-thread"
+                    ? "nav-item we-list-row cursor-interaction nav-item-active"
+                    : "nav-item we-list-row cursor-interaction"
+                }
                 type="button"
                 onClick={openTaskThread}
               >
@@ -298,14 +307,18 @@ export function App() {
                 任务
               </button>
               <button
-                className={activeView === "site-skills" ? "nav-item nav-item-active" : "nav-item"}
+                className={
+                  activeView === "site-skills"
+                    ? "nav-item we-list-row cursor-interaction nav-item-active"
+                    : "nav-item we-list-row cursor-interaction"
+                }
                 type="button"
                 onClick={openSiteSkillDirectory}
               >
                 <Box size={16} />
                 站点技能
               </button>
-              <button className="nav-item" type="button">
+              <button className="nav-item we-list-row cursor-interaction" type="button">
                 <Search size={16} />
                 Search
               </button>
@@ -328,7 +341,11 @@ export function App() {
                   <div className="tree-skill">
                     <span>{task.siteSkill}</span>
                     <button
-                      className={task.id === selectedTask.id ? "tree-task selected" : "tree-task"}
+                      className={
+                        task.id === selectedTask.id
+                          ? "tree-task we-list-row cursor-interaction selected"
+                          : "tree-task we-list-row cursor-interaction"
+                      }
                       type="button"
                       onClick={() => selectTask(task)}
                     >
@@ -369,7 +386,7 @@ export function App() {
           <div className="topbar-left-slot">
             {panelControls.left}
             <button
-              className="topbar-icon-button"
+              className="topbar-icon-button we-toolbar-icon-button cursor-interaction"
               type="button"
               aria-label="后退"
               disabled={activeView === "task-thread" || (isSiteSkillView && !isSiteSkillDetailOpen)}
@@ -377,7 +394,7 @@ export function App() {
             >
               <ArrowLeft size={15} />
             </button>
-            <button className="topbar-icon-button" type="button" aria-label="前进" disabled>
+            <button className="topbar-icon-button we-toolbar-icon-button cursor-interaction" type="button" aria-label="前进" disabled>
               <ArrowRight size={15} />
             </button>
           </div>
