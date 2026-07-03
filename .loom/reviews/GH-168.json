@@ -3,46 +3,39 @@
   "item_id": "GH-168",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual implementation review approved GH-168 packaged Electron startup repair at head 0f8609927ff0c5cc5f9107de06fd551b0a546050. The diff fixes relative renderer asset loading, uses CommonJS preload output, and adds packaged smoke coverage for blank renderer and missing preload. Post-review drift in this commit is limited to GH-168 progress/review carriers.",
+  "summary": "GH-168 terminal closeout carrier-only review approved PR #173 metadata and idle pointer; this does not approve new product implementation behavior.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-03T09:44:13Z",
-  "reviewed_head": "0f8609927ff0c5cc5f9107de06fd551b0a546050",
-  "reviewed_validation_summary": "PR #172 head 0f8609927ff0c5cc5f9107de06fd551b0a546050 passed local `npm run smoke:packaged`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-168 --json`, and `loom suite carrier validate --target . --item GH-168 --json`. Hosted run 28652249588 passed py-compile, demo-bootstrap, repo-local-cli, and loom-check; loom-pr-merge-gate failed because review artifacts were stale for the current PR head before this update.",
+  "authored_at": "2026-07-03T09:53:49Z",
+  "reviewed_head": "f038888a6dcfd2673c45b1d7e3e5d2f62e91407d",
+  "reviewed_validation_summary": "GH-168 post-merge closeout consumed PR #172, head f3ac92d0db6d5423da4371b007c25886b5cca2d0, merge commit fe3dd981577b529409df60020537a8573af146c3, issue #168 closed at 2026-07-03T09:49:52Z, target branch main, hosted run 28652629979 with required checks passing, `loom carrier closeout-sync --target . --item GH-168 --terminal-state closed_out --issue 168 --pr 172 --merge-commit fe3dd981577b529409df60020537a8573af146c3 --target-branch main --closed-at 2026-07-03T09:49:52Z --evidence-locator https://github.com/WebEnvoy/App/actions/runs/28652629979 --apply --json` passing, `loom fact-chain --target . --json` passing, and `git diff --check` passing.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
-  "follow_ups": [
-    "Hosted loom-pr-merge-gate must be rerun after this refreshed review record is pushed.",
-    "Fix Loom build/review record suite CLI JSON consumption outside this App product PR; no repo-local shim was added."
-  ],
-  "semantic_review_disposition": {
-    "status": "passed",
-    "reason": "The implementation is narrowly scoped and has direct smoke coverage: Vite emits relative assets for file:// packaged preview, Electron loads preload.cjs, and packaged smoke fails on empty root, missing preload, missing shell context, or blank screenshot pixels."
-  },
+  "follow_ups": [],
   "consumed_inputs": {
-    "repository": "WebEnvoy/App",
-    "pull_request": "https://github.com/WebEnvoy/App/pull/172",
-    "work_item": "GH-168",
-    "covered_work_items": "#168",
-    "parent_issue": "#167",
-    "reviewed_diff": "git diff origin/main...0f8609927ff0c5cc5f9107de06fd551b0a546050",
-    "changed_runtime_files": [
-      "vite.config.ts",
-      "src/electron/main.ts",
-      "src/electron/preload.cts",
-      "tsconfig.electron.json",
-      "package.json",
-      "scripts/smoke.mjs",
-      "scripts/smoke-packaged.mjs",
-      "artifacts/gh-168-packaged-preview.png"
-    ],
-    "loom_carriers": [
-      ".loom/work-items/GH-168.md",
-      ".loom/progress/GH-168.md",
-      ".loom/specs/GH-168/**",
-      ".loom/status/current.md",
-      ".loom/bootstrap/init-result.json"
-    ],
-    "known_tool_blocker": "loom build / review record / spec-review suite CLI JSON consumption blocked locally via tools/loom.py; global suite validate and carrier validate pass"
+    "work_item": ".loom/work-items/GH-168.md",
+    "recovery_entry": ".loom/progress/GH-168.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Authored closeout review approved only terminal carrier metadata consumption; it does not approve product implementation behavior."
   }
 }
