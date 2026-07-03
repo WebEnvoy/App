@@ -11,13 +11,13 @@
 - Review Entry: `.loom/reviews/GH-100.json`
 - Validation Entry: `.loom/specs/GH-100/build-evidence.json`
 - Closing Condition: PR for GH-100 is merged into `main`, issue #100 is closed with PR/head/merge commit/hosted run evidence, and the shell skeleton has a local runnable check.
-- Current Checkpoint: build
-- Current Stop: Minimum Electron/Vite/React/TypeScript skeleton is implemented with typecheck/build/smoke passing locally.
-- Next Step: Refresh current-head review for PR #126, then rerun hosted gate.
+- Current Checkpoint: merge
+- Current Stop: PR #126 has GH-100 implementation review, spec review, metadata readback, local validation, and hosted baseline checks ready for merge gate.
+- Next Step: Run PR gate and hosted checks for PR #126 at the current head, then merge only if they pass.
 - Blockers: none
 - Latest Validation Summary: `git diff --check` passed; `npm audit --audit-level=high` passed with 0 vulnerabilities; `npm run typecheck` passed; `npm run smoke` passed and built Electron main/preload plus Vite renderer; `npm run start` short launch reached Electron without error output after binary install; `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, and `loom suite validate --target . --item GH-100 --json` passed.
 - Recovery Boundary: Keep this PR bound to GH-100 skeleton only. Do not implement Radix/lucide primitives, source health fixture, Settings, Task Thread first layout, real task/run/result/evidence behavior, or Browser/Library management.
-- Current Lane: implementation
+- Current Lane: merge-ready
 
 ## Runtime Evidence
 
