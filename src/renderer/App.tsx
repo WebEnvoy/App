@@ -4,11 +4,9 @@ import {
   ArrowRight,
   AlertTriangle,
   ArrowUp,
-  BadgeCheck,
   Box,
   Braces,
   ChevronDown,
-  CircleDot,
   ExternalLink,
   FolderKanban,
   Globe2,
@@ -49,6 +47,7 @@ import {
   type TaskProjection,
 } from "./taskThreadFixtures";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
+import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
 import {
   AppShell,
   LeftPanel,
@@ -63,6 +62,18 @@ type ShellContext = {
   configScope: "local-ui-only";
 };
 type AppView = "task-thread" | "site-skills" | "settings";
+
+function getBrowserColorScheme(): ShellContext["colorScheme"] {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function localShellContext(colorScheme: ShellContext["colorScheme"]): ShellContext {
+  return {
+    platform: "browser",
+    colorScheme,
+    configScope: "local-ui-only",
+  };
+}
 
 const contextTabs = [
   { id: "evidence", label: "结果依据" },
@@ -148,30 +159,48 @@ export function App() {
         : null;
     const shellContext =
       getShellContext?.() ??
-      Promise.resolve({
-        platform: "browser",
-        colorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
-        configScope: "local-ui-only" as const,
-      });
+      Promise.resolve(localShellContext(getBrowserColorScheme()));
 
     shellContext
       .then((context) => {
         if (!cancelled) {
+          document.documentElement.style.setProperty("color-scheme", context.colorScheme);
           setShellContext(context);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setShellContext({
-            platform: "browser",
-            colorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
-            configScope: "local-ui-only",
-          });
+          const colorScheme = getBrowserColorScheme();
+          document.documentElement.style.setProperty("color-scheme", colorScheme);
+          setShellContext(localShellContext(colorScheme));
         }
       });
 
+    const applyColorScheme = (colorScheme: ShellContext["colorScheme"]) => {
+      document.documentElement.style.setProperty("color-scheme", colorScheme);
+      setShellContext((context) =>
+        context == null ? localShellContext(colorScheme) : { ...context, colorScheme },
+      );
+    };
+    const unsubscribeShellTheme =
+      window.webenvoyShell?.subscribeToSystemThemeVariant?.((colorScheme) => {
+        if (!cancelled) {
+          applyColorScheme(colorScheme);
+        }
+      }) ?? null;
+    const mediaQuery =
+      unsubscribeShellTheme == null ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    const handleBrowserThemeChange = () => {
+      if (!cancelled) {
+        applyColorScheme(getBrowserColorScheme());
+      }
+    };
+    mediaQuery?.addEventListener("change", handleBrowserThemeChange);
+
     return () => {
       cancelled = true;
+      unsubscribeShellTheme?.();
+      mediaQuery?.removeEventListener("change", handleBrowserThemeChange);
     };
   }, []);
 
@@ -282,7 +311,7 @@ export function App() {
               </button>
             </nav>
 
-            <section className="task-tree" aria-label="Tasks grouped by account identity">
+            <section className="task-tree codex-scrollbar" aria-label="Tasks grouped by account identity">
               <div className="section-heading">
                 <span>任务</span>
                 <button type="button" aria-label="Read-only task creation entry">
@@ -303,8 +332,8 @@ export function App() {
                       type="button"
                       onClick={() => selectTask(task)}
                     >
-                      <CircleDot size={12} />
-                      {task.title}
+                      <span className="tree-task-title">{task.title}</span>
+                      <RunStatusGlyph compact run={task.runs[0]} />
                     </button>
                   </div>
                 </div>
@@ -430,7 +459,7 @@ export function App() {
       }
       right={isAppLevelView ? null : (
         <RightPanel>
-          <aside className="context-panel" aria-label="Task context">
+          <aside className="context-panel codex-scrollbar" aria-label="Task context">
             <PanelTabs
               ariaLabel="Task context tabs"
               defaultValue="evidence"
@@ -560,16 +589,17 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
       <section className="run-summary-card">
         <div className="card-title">
           <span className="disclosure">›</span>
+          <RunStatusGlyph run={run} />
           <h3>{run.label}</h3>
           <span>{run.process[0] ?? run.lifecycle}</span>
         </div>
         <button type="button">查看详情</button>
       </section>
 
-      <section className={`report-card outcome-${run.outcome}`}>
+      <section className={`report-card outcome-${run.outcome} lifecycle-${run.lifecycle}`}>
         <div className="card-title">
-          <BadgeCheck size={18} />
-          <h3>任务结束报告</h3>
+          <RunStatusGlyph run={run} />
+          <h3>{runReportTitle(run)}</h3>
           <span className="badge">{outcomeLabel(run.outcome)}</span>
         </div>
         <p>{run.summary}</p>

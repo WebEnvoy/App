@@ -307,7 +307,7 @@ function ThreadNavigationRailBody({
   return (
     <nav className="thread-navigation-rail" aria-label="Core-owned run navigation">
       <div
-        className="thread-navigation-rail-list"
+        className="thread-navigation-rail-list vertical-scroll-fade-mask hide-scrollbar"
         data-scrubbing={scrubbedItemId == null ? undefined : true}
         ref={railListRef}
         onLostPointerCapture={finishPointerScrub}

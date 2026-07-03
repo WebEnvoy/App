@@ -8,6 +8,10 @@ const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
 const packagedSmoke = process.env.WEBENVOY_PACKAGED_SMOKE === "1";
 const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
 
+function getSystemColorScheme() {
+  return nativeTheme.shouldUseDarkColors ? "dark" : "light";
+}
+
 function createMainWindow() {
   const macWindowChrome =
     process.platform === "darwin"
@@ -23,7 +27,7 @@ function createMainWindow() {
     minWidth: 960,
     minHeight: 640,
     title: "WebEnvoy App",
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#17191d" : "#f7f8fb",
+    backgroundColor: getSystemColorScheme() === "dark" ? "#17191d" : "#f7f8fb",
     ...macWindowChrome,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -282,9 +286,16 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
 app.whenReady().then(() => {
   ipcMain.handle("webenvoy:shell-context", () => ({
     platform: process.platform,
-    colorScheme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
+    colorScheme: getSystemColorScheme(),
     configScope: "local-ui-only",
   }));
+
+  nativeTheme.on("updated", () => {
+    const colorScheme = getSystemColorScheme();
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send("webenvoy:system-theme-variant", colorScheme);
+    }
+  });
 
   createMainWindow();
 

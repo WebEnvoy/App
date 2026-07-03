@@ -363,7 +363,13 @@ export function ThreadWorkspace({
   return (
     <FocusArea area="thread-workspace" className="thread-workspace">
       <div className="main-content-viewport">
-        <div className={hasComposer ? "main-content-frame" : "main-content-frame no-bottom-panel"}>
+        <div
+          className={
+            hasComposer
+              ? "main-content-frame codex-scrollbar"
+              : "main-content-frame no-bottom-panel codex-scrollbar"
+          }
+        >
           {children}
         </div>
         {hasComposer ? <BottomPanelSlot>{composer}</BottomPanelSlot> : null}

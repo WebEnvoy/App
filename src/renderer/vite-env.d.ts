@@ -9,5 +9,8 @@ type WebEnvoyShellContext = {
 interface Window {
   webenvoyShell?: {
     getShellContext: () => Promise<WebEnvoyShellContext>;
+    subscribeToSystemThemeVariant?: (
+      listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
+    ) => () => void;
   };
 }
