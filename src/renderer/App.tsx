@@ -7,6 +7,7 @@ import {
   Braces,
   CircleDot,
   DatabaseZap,
+  ExternalLink,
   FolderKanban,
   Globe2,
   HardDrive,
@@ -47,7 +48,6 @@ const contextTabs = [
   { id: "skill", label: "站点技能" },
   { id: "diagnostics", label: "诊断" },
 ];
-
 function statusLabel(status: SourceHealth["status"]) {
   if (status === "ready") {
     return "ready";
@@ -330,18 +330,49 @@ export function App() {
           </Tabs.List>
 
           <Tabs.Content className="tab-panel" value="evidence">
-            <ContextPanel
-              icon={<Braces size={18} />}
-              title="结果依据"
-              body="#110-#113 remain out of scope; this panel only links later owner refs."
-            />
+            <div className="context-copy">
+              <div className="card-title">
+                <Braces size={18} />
+                <h3>结果依据</h3>
+              </div>
+              <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
+              <div className="context-card-list">
+                {selectedRun.evidenceCards.map((evidence) => (
+                  <article className="context-card" key={evidence.id}>
+                    <strong>{evidence.title}</strong>
+                    <p>{evidence.summary}</p>
+                    <a href={evidence.viewerHref}>
+                      <ExternalLink size={14} />
+                      {evidence.viewerLabel}
+                    </a>
+                    <span className="source-chip">{evidence.source}</span>
+                  </article>
+                ))}
+              </div>
+            </div>
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="session">
-            <ContextPanel
-              icon={<Globe2 size={18} />}
-              title="执行现场"
-              body={directSessionFixture.summary}
-            />
+            <div className="context-copy">
+              <div className="card-title">
+                <Globe2 size={18} />
+                <h3>执行现场</h3>
+                <span className={`status-pill status-${directSessionFixture.providerStatus.status}`}>
+                  {directSessionFixture.providerStatus.status}
+                </span>
+              </div>
+              <p>{directSessionFixture.summary}</p>
+              <dl className="context-facts">
+                {[
+                  ["Browser session", directSessionFixture.providerStatus.browserSessionRef],
+                  ["Provider", directSessionFixture.providerStatus.provider],
+                  ["Viewer ref", directSessionFixture.providerStatus.viewerRef],
+                  ["Fetched at", directSessionFixture.providerStatus.fetchedAt],
+                ].map(([label, value]) => (
+                  <SourceField label={label} value={value} source={directSessionFixture.providerStatus.source} key={label} />
+                ))}
+              </dl>
+              <p className="boundary-copy">{directSessionFixture.providerStatus.boundary}</p>
+            </div>
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="identity">
             <ContextPanel
@@ -351,11 +382,24 @@ export function App() {
             />
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="skill">
-            <ContextPanel
-              icon={<Box size={18} />}
-              title="站点技能"
-              body="站点技能来自 Lode capability package metadata fixture；workflow runtime/editor UI 不在 GH-105 范围。"
-            />
+            <div className="context-copy">
+              <div className="card-title">
+                <Box size={18} />
+                <h3>站点技能</h3>
+              </div>
+              <p>Capability package source attribution comes from Lode metadata fixture.</p>
+              <dl className="context-facts">
+                {[
+                  ["Package", selectedTask.packageSource.name],
+                  ["Version", selectedTask.packageSource.version],
+                  ["Capability ref", selectedTask.packageSource.capabilityRef],
+                  ["Fetched at", selectedTask.packageSource.fetchedAt],
+                ].map(([label, value]) => (
+                  <SourceField label={label} value={value} source={selectedTask.packageSource.source} key={label} />
+                ))}
+              </dl>
+              <p className="boundary-copy">{selectedTask.packageSource.boundary}</p>
+            </div>
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="diagnostics">
             <ContextPanel
