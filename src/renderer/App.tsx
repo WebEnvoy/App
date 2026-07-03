@@ -28,7 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { handleTypeToComposer, registerComposerInput } from "./focusComposer";
 import {
@@ -44,6 +44,7 @@ import {
   type RunProjection,
   type TaskProjection,
 } from "./taskThreadFixtures";
+import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import {
   AppShell,
   LeftPanel,
@@ -95,14 +96,38 @@ export function App() {
     taskThreadFixtures.find((task) => task.id === selectedTaskId) ?? taskThreadFixtures[0];
   const selectedRun =
     selectedTask.runs.find((run) => run.id === selectedRunId) ?? selectedTask.runs[0];
+  const threadNavigationItems = useMemo<ThreadNavigationItem[]>(
+    () =>
+      selectedTask.runs.map((run) => ({
+        id: run.id,
+        getLabel: () => `${run.label} · ${outcomeLabel(run.outcome)}`,
+        hasOutput: run.evidenceCards.length > 0,
+        getPreview: () => ({
+          response: run.summary,
+          outputs: [
+            { type: "outcome", label: outcomeLabel(run.outcome) },
+            { type: "lifecycle", label: run.lifecycle },
+            ...run.resultRows.slice(0, 2).map((row) => ({
+              type: "field",
+              label: row.label,
+            })),
+          ],
+        }),
+      })),
+    [selectedTask],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     setConnectionConfig(loadLocalConnectionConfig());
 
+    const getShellContext =
+      window.webenvoyShell && typeof window.webenvoyShell.getShellContext === "function"
+        ? window.webenvoyShell.getShellContext
+        : null;
     const shellContext =
-      window.webenvoyShell?.getShellContext?.() ??
+      getShellContext?.() ??
       Promise.resolve({
         platform: "browser",
         colorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
@@ -213,6 +238,17 @@ export function App() {
                 <p>{directSessionFixture.summary}</p>
               </article>
             </section>
+
+            <footer className="sidebar-user-footer" aria-label="Current user">
+              <span className="user-avatar" aria-hidden="true">CH</span>
+              <span className="user-copy">
+                <strong>Chen</strong>
+                <span>Pro</span>
+              </span>
+              <button type="button" aria-label="用户设置">
+                <Settings size={16} />
+              </button>
+            </footer>
           </aside>
         </LeftPanel>
       }
@@ -241,7 +277,7 @@ export function App() {
           <div className="topbar-right-slot">
             <button className="topbar-open-button" type="button">
               <PanelRightOpen size={15} />
-              打开
+              <span>打开</span>
               <ChevronDown size={14} />
             </button>
             {panelControls.rightFullscreen}
@@ -254,99 +290,38 @@ export function App() {
           composer={<ThreadComposer selectedRun={selectedRun} selectedTask={selectedTask} />}
         >
           <div className="thread-body">
-          <nav className="run-rail" aria-label="Core-owned run navigation">
-            {selectedTask.runs.map((run) => (
-              <button
-                className={run.id === selectedRun.id ? "run-dot selected" : "run-dot"}
-                type="button"
-                key={run.id}
-                onClick={() => setSelectedRunId(run.id)}
-                aria-label={`${run.label} ${outcomeLabel(run.outcome)}`}
-              />
-            ))}
-          </nav>
+            <ThreadNavigationRail
+              items={threadNavigationItems}
+              onActiveItemChange={setSelectedRunId}
+            />
 
-          <div className="thread-content">
-            <div className="thread-context-strip" aria-label="Task context">
-              <span>站点技能 · {selectedTask.siteSkill}</span>
-              <span>账号身份 · {selectedTask.accountIdentity}</span>
-              <span>业务输入 · {selectedTask.businessInput}</span>
+            <div className="thread-content">
+              <div className="thread-context-strip" aria-label="Task context">
+                <span>站点技能 · {selectedTask.siteSkill}</span>
+                <span>账号身份 · {selectedTask.accountIdentity}</span>
+                <span>业务输入 · {selectedTask.businessInput}</span>
+              </div>
+
+              {selectedTask.blocker ? (
+                <section className="blocker-card">
+                  <div className="card-title">
+                    <AlertTriangle size={18} />
+                    <h3>Blocker: missing source</h3>
+                  </div>
+                  <p>{selectedTask.blocker}</p>
+                </section>
+              ) : null}
+
+              <div className="run-turn-list" aria-label="Core-owned run timeline">
+                {selectedTask.runs.map((run) => (
+                  <RunTurn
+                    isSelected={run.id === selectedRun.id}
+                    key={run.id}
+                    run={run}
+                  />
+                ))}
+              </div>
             </div>
-
-            <section className="run-summary-card">
-              <div className="card-title">
-                <span className="disclosure">›</span>
-                <h3>已处理 1m 27s</h3>
-                <span>打开页面、完成登录、采集字段...</span>
-              </div>
-              <button type="button">点击展开查看详情</button>
-            </section>
-
-            {selectedTask.blocker ? (
-              <section className="blocker-card">
-                <div className="card-title">
-                  <AlertTriangle size={18} />
-                  <h3>Blocker: missing source</h3>
-                </div>
-                <p>{selectedTask.blocker}</p>
-              </section>
-            ) : null}
-
-            <section className={`report-card outcome-${selectedRun.outcome}`}>
-              <div className="card-title">
-                <BadgeCheck size={18} />
-                <h3>任务结束报告</h3>
-                <span className="badge">{outcomeLabel(selectedRun.outcome)}</span>
-              </div>
-              <p>{selectedRun.summary}</p>
-              <h3 className="subsection-title">提取结果</h3>
-              <dl className="input-grid">
-                {selectedRun.resultRows.slice(0, 4).map((row) => (
-                  <SourceField
-                    label={row.label}
-                    value={row.value}
-                    source={row.source}
-                    key={`${selectedRun.id}-${row.label}`}
-                  />
-                ))}
-              </dl>
-              <h3 className="subsection-title">运行边界</h3>
-              <dl className="input-grid">
-                <SourceField label="Run" value={selectedRun.label} source={selectedRun.source} />
-                <SourceField label="Lifecycle" value={selectedRun.lifecycle} source={selectedRun.source} />
-              </dl>
-              <p className="action-intent">{selectedRun.actionIntent}</p>
-            </section>
-
-            <section className="process-card">
-              <div className="card-title compact-title">
-                <Braces size={18} />
-                <h3>证据预览</h3>
-              </div>
-              <dl className="result-table">
-                {selectedRun.evidenceCards.map((row) => (
-                  <SourceField
-                    label={row.title}
-                    value={row.summary}
-                    source={row.source}
-                    key={row.id}
-                  />
-                ))}
-              </dl>
-            </section>
-
-            <section className="process-card">
-              <div className="card-title">
-                <Waypoints size={18} />
-                <h3>执行过程</h3>
-              </div>
-              <ol>
-                {selectedRun.process.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ol>
-            </section>
-          </div>
           </div>
         </ThreadWorkspace>
       }
@@ -496,6 +471,77 @@ export function App() {
         </RightPanel>
       }
     />
+  );
+}
+
+function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean }) {
+  return (
+    <article
+      className={isSelected ? "run-turn selected" : "run-turn"}
+      data-content-search-unit-key={run.id}
+      data-turn-key={run.id}
+    >
+      <section className="run-summary-card">
+        <div className="card-title">
+          <span className="disclosure">›</span>
+          <h3>{run.label}</h3>
+          <span>{run.process[0] ?? run.lifecycle}</span>
+        </div>
+        <button type="button">查看详情</button>
+      </section>
+
+      <section className={`report-card outcome-${run.outcome}`}>
+        <div className="card-title">
+          <BadgeCheck size={18} />
+          <h3>任务结束报告</h3>
+          <span className="badge">{outcomeLabel(run.outcome)}</span>
+        </div>
+        <p>{run.summary}</p>
+        <h3 className="subsection-title">提取结果</h3>
+        <dl className="input-grid">
+          {run.resultRows.slice(0, 4).map((row) => (
+            <SourceField
+              label={row.label}
+              value={row.value}
+              source={row.source}
+              key={`${run.id}-${row.label}`}
+            />
+          ))}
+        </dl>
+        <h3 className="subsection-title">运行边界</h3>
+        <dl className="input-grid">
+          <SourceField label="Run" value={run.label} source={run.source} />
+          <SourceField label="Lifecycle" value={run.lifecycle} source={run.source} />
+        </dl>
+        <p className="action-intent">{run.actionIntent}</p>
+      </section>
+
+      <section className="process-card">
+        <div className="card-title compact-title">
+          <Braces size={18} />
+          <h3>证据预览</h3>
+        </div>
+        <dl className="result-table">
+          {run.evidenceCards.map((row) => (
+            <SourceField
+              label={row.title}
+              value={row.summary}
+              source={row.source}
+              key={row.id}
+            />
+          ))}
+        </dl>
+        <div className="card-title compact-title process-title">
+          <Waypoints size={18} />
+          <h3>执行过程</h3>
+        </div>
+        <ol>
+          {run.process.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ol>
+      </section>
+    </article>
   );
 }
 

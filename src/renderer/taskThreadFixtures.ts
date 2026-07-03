@@ -110,6 +110,57 @@ export const taskThreadFixtures: TaskProjection[] = [
     },
     runs: [
       {
+        id: "run-running",
+        label: "Run 006",
+        lifecycle: "running",
+        outcome: "partial",
+        summary: "正在采集变体价格；已返回核心商品字段，等待 Core 完成最终归档。",
+        actionIntent: "Owner-supported action intent: watch live run.",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "商品名", value: "Road Runner Keyboard", source: "Core fixture" },
+          { label: "价格", value: "Collecting variants", source: "Core fixture" },
+          { label: "库存", value: "Pending", source: "Core fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-run-006-live",
+            title: "Live run evidence projection",
+            summary: "Core fixture reports a running task projection; App does not stream raw trace.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-run-006",
+            source: "Core fixture",
+          },
+        ],
+        process: ["Core accepted task intent.", "Harbor identity attached.", "Variant price extraction is still running."],
+      },
+      {
+        id: "run-review",
+        label: "Run 005",
+        lifecycle: "needs-action",
+        outcome: "failure-safe",
+        summary: "需要用户确认站点弹窗；Core 已安全暂停，未执行写入。",
+        actionIntent: "Owner-supported action intent: inspect runtime session.",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "暂停原因", value: "Site confirmation modal", source: "Core fixture" },
+          { label: "安全边界", value: "No write attempted", source: "Core fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-run-005-modal",
+            title: "Needs-action evidence",
+            summary: "Core-owned projection records a blocked modal without raw DOM cached in App.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-run-005",
+            source: "Core fixture",
+          },
+        ],
+        process: ["Product page loaded.", "Site modal blocked automation.", "Core paused before write-capable action."],
+      },
+      {
         id: "run-success",
         label: "Run 004",
         lifecycle: "completed",
