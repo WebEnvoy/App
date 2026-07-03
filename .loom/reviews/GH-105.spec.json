@@ -1,0 +1,35 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-105",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Manual spec review approved the GH-105 minimal spec path for PR #161 content head 95de53b4241f7a68cd45eca9d7ae1840b9c314e7. The spec, plan, implementation contract, and task carrier bound the batch to #105-#109 and keep #110-#113/#95 out of scope.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-03T06:16:00Z",
+  "reviewed_head": "95de53b4241f7a68cd45eca9d7ae1840b9c314e7",
+  "reviewed_validation_summary": "PR #161 validation as of 2026-07-03T06:16Z: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-105 --json`, `loom suite carrier validate --target . --item GH-105 --json`, and `loom pr metadata-preflight --surface merge_ready` passed. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check` passed on run `28642190625`; hosted `loom-pr-merge-gate` failed only because GH-105 review artifacts were scaffold/stale before this carrier refresh. `loom build --target . --item GH-105 --build-evidence .loom/specs/GH-105/build-evidence.json --json` and `loom review run --target . --item GH-105 --json` are blocked by suite CLI JSON consumption / repo-local `tools/loom.py` surface; global suite commands passed, and no repo-local Loom shim was added. Manual review found no blocking product findings for the GH-105 #105-#109 scope.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "#110-#113 remain for the #95 evidence/source/session reference batch; GH-105 does not complete #95.",
+    "#94 can only close after PR #161 merges and closeout evidence is written for #105, #106, #107, #108, and #109.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App PR so authored spec review records can be created by the tool again."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The GH-105 minimal suite path is explicit and bounded. `loom suite validate --target . --item GH-105 --json` and `loom suite carrier validate --target . --item GH-105 --json` passed; minimal not_applicable rationale keeps full suite artifacts out of scope for this bounded renderer fixture batch."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/161",
+    "work_item": "GH-105",
+    "spec": ".loom/specs/GH-105/spec.md",
+    "plan": ".loom/specs/GH-105/plan.md",
+    "implementation_contract": ".loom/specs/GH-105/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-105/task-carrier.md",
+    "suite_path": "minimal",
+    "suite_validation": "loom suite validate --target . --item GH-105 --json; loom suite carrier validate --target . --item GH-105 --json",
+    "scope_boundary": "GH-105 covers #105-#109 for #94 only. #110-#113 and #95 are not completed by this PR."
+  }
+}

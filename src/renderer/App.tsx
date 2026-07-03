@@ -25,38 +25,20 @@ import {
   saveLocalConnectionConfig,
   type LocalConnectionConfig,
 } from "./localConnectionConfig";
-import { sourceHealthFixture, taskThreadFixture, type SourceHealth } from "./sourceHealthFixture";
+import { sourceHealthFixture, type SourceHealth } from "./sourceHealthFixture";
+import {
+  creationEntryFixture,
+  directSessionFixture,
+  taskThreadFixtures,
+  type RunProjection,
+  type TaskProjection,
+} from "./taskThreadFixtures";
 
 type ShellContext = {
   platform: string;
   colorScheme: "light" | "dark";
   configScope: "local-ui-only";
 };
-
-const taskTree = [
-  {
-    account: "运营账号 A",
-    skills: [
-      {
-        name: "商品详情采集",
-        tasks: ["采集商品详情页", "采集竞品价格"],
-      },
-      {
-        name: "评论读取",
-        tasks: ["读取最新评论"],
-      },
-    ],
-  },
-  {
-    account: "本机 Chrome",
-    skills: [
-      {
-        name: "页面采集",
-        tasks: ["未登录页面详情"],
-      },
-    ],
-  },
-];
 
 const contextTabs = [
   { id: "evidence", label: "结果依据" },
@@ -78,6 +60,10 @@ function statusLabel(status: SourceHealth["status"]) {
   return "fixture";
 }
 
+function outcomeLabel(outcome: RunProjection["outcome"]) {
+  return `outcome: ${outcome}`;
+}
+
 export function App() {
   const [shellContext, setShellContext] = useState<ShellContext | null>(null);
   const [connectionConfig, setConnectionConfig] = useState<LocalConnectionConfig>(
@@ -85,6 +71,13 @@ export function App() {
   );
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState(taskThreadFixtures[0].id);
+  const [selectedRunId, setSelectedRunId] = useState(taskThreadFixtures[0].runs[0].id);
+
+  const selectedTask =
+    taskThreadFixtures.find((task) => task.id === selectedTaskId) ?? taskThreadFixtures[0];
+  const selectedRun =
+    selectedTask.runs.find((run) => run.id === selectedRunId) ?? selectedTask.runs[0];
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +94,11 @@ export function App() {
       cancelled = true;
     };
   }, []);
+
+  function selectTask(task: TaskProjection) {
+    setSelectedTaskId(task.id);
+    setSelectedRunId(task.runs[0].id);
+  }
 
   function updateEndpoint(field: keyof LocalConnectionConfig, value: string) {
     setSettingsSaved(false);
@@ -155,46 +153,49 @@ export function App() {
         <section className="task-tree" aria-label="Tasks grouped by account identity">
           <div className="section-heading">
             <span>任务</span>
-            <button type="button" aria-label="Create task is out of scope for GH-101">
+            <button type="button" aria-label="Read-only task creation entry">
               +
             </button>
           </div>
 
-          {taskTree.map((account) => (
-            <div className="tree-account" key={account.account}>
+          {taskThreadFixtures.map((task) => (
+            <div className="tree-account" key={task.id}>
               <div className="tree-account-label">
                 <HardDrive size={14} />
-                {account.account}
+                {task.accountIdentity}
               </div>
-              {account.skills.map((skill) => (
-                <div className="tree-skill" key={skill.name}>
-                  <span>{skill.name}</span>
-                  {skill.tasks.map((task) => (
-                    <button
-                      className={task === taskThreadFixture.title ? "tree-task selected" : "tree-task"}
-                      type="button"
-                      key={task}
-                    >
-                      <CircleDot size={12} />
-                      {task}
-                    </button>
-                  ))}
-                </div>
-              ))}
+              <div className="tree-skill">
+                <span>{task.siteSkill}</span>
+                <button
+                  className={task.id === selectedTask.id ? "tree-task selected" : "tree-task"}
+                  type="button"
+                  onClick={() => selectTask(task)}
+                >
+                  <CircleDot size={12} />
+                  {task.title}
+                </button>
+              </div>
             </div>
           ))}
+
+          <article className="direct-session-card">
+            <strong>{directSessionFixture.title}</strong>
+            <span>{directSessionFixture.accountIdentity}</span>
+            <p>{directSessionFixture.summary}</p>
+          </article>
         </section>
       </aside>
 
       <section className="thread-column" id="task-thread" aria-labelledby="thread-title">
         <header className="thread-header">
           <div>
-            <p className="eyebrow">GH-101 shell batch</p>
-            <h2 id="thread-title">{taskThreadFixture.title}</h2>
+            <p className="eyebrow">GH-105 read-only task batch</p>
+            <h2 id="thread-title">{selectedTask.title}</h2>
             <div className="thread-meta">
-              <span>{taskThreadFixture.accountIdentity}</span>
-              <span>{taskThreadFixture.siteSkill}</span>
-              <span>{taskThreadFixture.state}</span>
+              <span>{selectedTask.accountIdentity}</span>
+              <span>{selectedTask.siteSkill}</span>
+              <span>{selectedTask.businessInput}</span>
+              <span>{selectedTask.source}</span>
             </div>
           </div>
           <button className="panel-button" type="button">
@@ -204,28 +205,74 @@ export function App() {
         </header>
 
         <div className="thread-body">
-          <div className="run-rail" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
+          <nav className="run-rail" aria-label="Core-owned run navigation">
+            {selectedTask.runs.map((run) => (
+              <button
+                className={run.id === selectedRun.id ? "run-dot selected" : "run-dot"}
+                type="button"
+                key={run.id}
+                onClick={() => setSelectedRunId(run.id)}
+                aria-label={`${run.label} ${outcomeLabel(run.outcome)}`}
+              />
+            ))}
+          </nav>
 
           <div className="thread-content">
-            <section className="report-card">
+            <section className="creation-card">
+              <div className="card-title">
+                <Box size={18} />
+                <h3>只读任务创建入口</h3>
+              </div>
+              <dl className="input-grid">
+                <SourceField label="站点技能" value={creationEntryFixture.siteSkill.label} source={creationEntryFixture.siteSkill.source} />
+                <SourceField label="账号身份" value={creationEntryFixture.accountIdentity.label} source={creationEntryFixture.accountIdentity.source} />
+                <SourceField label="业务输入" value={creationEntryFixture.businessInput.label} source={creationEntryFixture.businessInput.source} />
+                <SourceField label="Core source" value={creationEntryFixture.coreSource.label} source={creationEntryFixture.coreSource.source} />
+              </dl>
+              <p className="blocker-copy">{creationEntryFixture.coreSource.blocker}</p>
+              <button className="submit-intent" type="button" disabled>
+                提交 task intent read-only scope
+              </button>
+            </section>
+
+            {selectedTask.blocker ? (
+              <section className="blocker-card">
+                <div className="card-title">
+                  <AlertTriangle size={18} />
+                  <h3>Blocker: missing source</h3>
+                </div>
+                <p>{selectedTask.blocker}</p>
+              </section>
+            ) : null}
+
+            <section className={`report-card outcome-${selectedRun.outcome}`}>
               <div className="card-title">
                 <BadgeCheck size={18} />
                 <h3>任务结束报告</h3>
+                <span className="badge">{outcomeLabel(selectedRun.outcome)}</span>
               </div>
-              <p>{taskThreadFixture.report}</p>
+              <p>{selectedRun.summary}</p>
               <dl className="input-grid">
-                <div>
-                  <dt>业务输入</dt>
-                  <dd>{taskThreadFixture.businessInput}</dd>
-                </div>
-                <div>
-                  <dt>Run</dt>
-                  <dd>{taskThreadFixture.runLabel}</dd>
-                </div>
+                <SourceField label="Run" value={selectedRun.label} source={selectedRun.source} />
+                <SourceField label="Lifecycle" value={selectedRun.lifecycle} source={selectedRun.source} />
+              </dl>
+              <p className="action-intent">{selectedRun.actionIntent}</p>
+            </section>
+
+            <section className="process-card">
+              <div className="card-title">
+                <Braces size={18} />
+                <h3>结构化结果视图</h3>
+              </div>
+              <dl className="result-table">
+                {selectedRun.resultRows.map((row) => (
+                  <SourceField
+                    label={row.label}
+                    value={row.value}
+                    source={row.source}
+                    key={`${selectedRun.id}-${row.label}`}
+                  />
+                ))}
               </dl>
             </section>
 
@@ -235,7 +282,7 @@ export function App() {
                 <h3>执行过程</h3>
               </div>
               <ol>
-                {taskThreadFixture.process.map((item) => (
+                {selectedRun.process.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ol>
@@ -286,28 +333,28 @@ export function App() {
             <ContextPanel
               icon={<Braces size={18} />}
               title="结果依据"
-              body="GH-101 不展示真实 evidence。只有 Core task path 产生 result/evidence/failure 后，这里才显示 owner refs。"
+              body="#110-#113 remain out of scope; this panel only links later owner refs."
             />
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="session">
             <ContextPanel
               icon={<Globe2 size={18} />}
               title="执行现场"
-              body="direct Identity Runtime Session 属于 Browser/Harbor 管理路径，可由用户或 Agent/API/CLI/MCP 发起；它不是 Core task outcome。"
+              body={directSessionFixture.summary}
             />
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="identity">
             <ContextPanel
               icon={<ShieldCheck size={18} />}
               title="账号身份"
-              body="只显示账号身份和环境入口，不保存 credential、cookie、token 或 profile storage。"
+              body="账号身份来自 Harbor fixture；App 不保存 credential、cookie、token 或 profile storage。"
             />
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="skill">
             <ContextPanel
               icon={<Box size={18} />}
               title="站点技能"
-              body="当前读取 capability package metadata fixture；workflow package 和 runtime/editor UI 不在 GH-101 范围。"
+              body="站点技能来自 Lode capability package metadata fixture；workflow runtime/editor UI 不在 GH-105 范围。"
             />
           </Tabs.Content>
           <Tabs.Content className="tab-panel" value="diagnostics">
@@ -316,7 +363,7 @@ export function App() {
               title="诊断"
               body={`Shell context: ${shellContext?.platform ?? "loading"} / ${
                 shellContext?.colorScheme ?? "loading"
-              } / ${shellContext?.configScope ?? "loading"}`}
+              } / ${shellContext?.configScope ?? "loading"}. UI selection state is App local-only.`}
             />
           </Tabs.Content>
         </Tabs.Root>
@@ -350,6 +397,24 @@ export function App() {
         </section>
       </aside>
     </main>
+  );
+}
+
+function SourceField({
+  label,
+  value,
+  source,
+}: {
+  label: string;
+  value: string;
+  source: string;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+      <span className="source-chip">{source}</span>
+    </div>
   );
 }
 

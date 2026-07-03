@@ -274,7 +274,7 @@ h3 {
   background: linear-gradient(#2a6399, rgba(42, 99, 153, 0.15));
 }
 
-.run-rail span {
+.run-dot {
   z-index: 1;
   width: 10px;
   height: 10px;
@@ -284,6 +284,12 @@ h3 {
   background: #2a6399;
 }
 
+.run-dot.selected {
+  width: 14px;
+  height: 14px;
+  background: #153d62;
+}
+
 .thread-content {
   display: grid;
   align-content: start;
@@ -291,6 +297,8 @@ h3 {
 }
 
 .report-card,
+.creation-card,
+.blocker-card,
 .process-card,
 .source-card,
 .context-tabs,
@@ -302,6 +310,8 @@ h3 {
 }
 
 .report-card,
+.creation-card,
+.blocker-card,
 .process-card,
 .settings-panel {
   padding: 18px;
@@ -313,6 +323,8 @@ h3 {
 }
 
 .report-card p,
+.creation-card p,
+.blocker-card p,
 .process-card li,
 .source-card p,
 .context-copy p,
@@ -323,6 +335,8 @@ h3 {
 }
 
 .report-card p,
+.creation-card p,
+.blocker-card p,
 .process-card li,
 .source-card p,
 .context-copy p,
@@ -334,7 +348,7 @@ h3 {
 
 .input-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 16px 0 0;
 }
@@ -355,6 +369,59 @@ h3 {
   margin: 0;
   overflow-wrap: anywhere;
   font-weight: 700;
+}
+
+.source-chip {
+  display: inline-block;
+  margin-top: 7px;
+  color: #627085;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.result-table {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.result-table div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f3f6fa;
+}
+
+.blocker-copy,
+.action-intent {
+  margin-top: 12px;
+  font-weight: 700;
+}
+
+.blocker-card,
+.outcome-failure,
+.outcome-unavailable,
+.outcome-expired,
+.outcome-unknown {
+  border-color: rgba(141, 46, 46, 0.32);
+}
+
+.outcome-partial,
+.outcome-failure-safe,
+.outcome-redacted {
+  border-color: rgba(168, 119, 16, 0.34);
+}
+
+.outcome-success {
+  border-color: rgba(23, 103, 58, 0.3);
+}
+
+.submit-intent {
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(107, 118, 136, 0.22);
+  border-radius: 10px;
+  color: #8a95a5;
+  background: #f3f5f8;
 }
 
 .process-card ol {
@@ -388,10 +455,18 @@ h3 {
   gap: 9px;
 }
 
+.direct-session-card,
 .source-card {
   display: grid;
   gap: 8px;
   padding: 12px;
+}
+
+.direct-session-card {
+  margin-top: 8px;
+  border: 1px dashed rgba(107, 118, 136, 0.32);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.52);
 }
 
 .source-card div:first-child {
@@ -399,9 +474,16 @@ h3 {
   gap: 3px;
 }
 
+.direct-session-card span,
 .source-card span {
   color: #687586;
   font-size: 12px;
+}
+
+.direct-session-card p {
+  color: #546173;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .status-pill {

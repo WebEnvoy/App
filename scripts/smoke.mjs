@@ -47,7 +47,23 @@ for (const expectedText of [
   "Task Thread",
   "Source health fixture",
   "Settings local boundary",
+  "GH-105 read-only task batch",
+  "只读任务创建入口",
+  "Missing Core source blocks real submission",
+  "Core-owned run navigation",
+  "outcome:",
+  "success",
+  "empty",
+  "partial",
+  "failure-safe",
+  "failure",
+  "unavailable",
+  "expired",
+  "redacted",
+  "unknown",
+  "Owner-supported action intent",
   "direct Identity Runtime Session",
+  "not Core Task/Run/Result",
 ]) {
   if (!rendererAssets.includes(expectedText)) {
     throw new Error(`Renderer smoke failed: ${expectedText} is missing.`);
