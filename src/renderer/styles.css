@@ -151,7 +151,16 @@ h3 {
   z-index: 42;
   min-height: 0;
   pointer-events: auto;
-  animation: floating-left-panel-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition:
+    opacity 500ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.floating-left-panel[data-visible="true"] {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .floating-left-panel-frame {
@@ -192,17 +201,6 @@ h3 {
 
 .floating-left-panel .sidebar {
   padding-top: 14px;
-}
-
-@keyframes floating-left-panel-in {
-  from {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 .right-panel {
@@ -290,6 +288,7 @@ h3 {
   min-width: 28px;
   width: 28px;
   min-height: 28px;
+  height: 28px;
   place-items: center;
   padding: 0;
   border: 1px solid transparent;
@@ -323,7 +322,7 @@ h3 {
     max(var(--header-right-slot-width), 150px);
   height: var(--toolbar-height);
   min-height: var(--toolbar-height);
-  align-items: center;
+  align-items: stretch;
   background: transparent;
   -webkit-app-region: drag;
 }
@@ -337,12 +336,14 @@ h3 {
 }
 
 .topbar-left-slot {
+  height: 100%;
   min-width: 0;
   gap: 6px;
   padding-left: 84px;
 }
 
 .topbar-center-surface {
+  height: 100%;
   min-width: 0;
   gap: 7px;
   padding: 0 10px 0 14px;
@@ -352,6 +353,7 @@ h3 {
 }
 
 .topbar-right-slot {
+  height: 100%;
   gap: 6px;
   justify-content: flex-end;
   min-width: 0;
@@ -390,7 +392,8 @@ h3 {
 
 .topbar-open-button {
   display: inline-flex;
-  min-height: 30px;
+  height: 28px;
+  min-height: 28px;
   align-items: center;
   gap: 6px;
   padding: 0 10px;
@@ -459,21 +462,6 @@ h3 {
 .source-card div:first-child {
   display: flex;
   align-items: center;
-}
-
-.new-task-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  width: 100%;
-  min-height: 38px;
-  margin-bottom: 12px;
-  padding: 0 14px;
-  border-radius: 8px;
-  color: #ffffff;
-  background: #0969ff;
-  font-weight: 700;
 }
 
 .eyebrow {
@@ -1229,7 +1217,10 @@ h3 {
 
   .content-region,
   .main-surface,
-  .shell-topbar,
+  .topbar-center-surface,
+  .topbar-right-slot,
+  .floating-left-panel-frame,
+  .floating-left-panel-header,
   .thread-workspace,
   .right-panel,
   .thread-composer,
@@ -1241,7 +1232,9 @@ h3 {
   .source-card,
   .settings-panel,
   .context-card,
+  .direct-session-card,
   .panel-button,
+  .topbar-open-button,
   .connection-field input {
     color: #e5e7eb;
     background: #1d2633;
@@ -1258,7 +1251,8 @@ h3 {
 
   .left-panel,
   .right-panel,
-  .shell-topbar,
+  .topbar-center-surface,
+  .topbar-right-slot,
   .main-content-viewport,
   .thread-composer,
   .run-summary-card,
@@ -1268,8 +1262,10 @@ h3 {
   .source-card,
   .settings-panel,
   .context-card,
+  .direct-session-card,
   .panel-tabs,
   .panel-button,
+  .topbar-open-button,
   .connection-field input,
   .input-grid,
   .input-grid div,
@@ -1283,12 +1279,17 @@ h3 {
   .panel-tab-trigger,
   .thread-context-strip span,
   .shell-topbar h2,
-  .thread-state {
+  .thread-state,
+  .shell-panel-toggle[aria-pressed="true"],
+  .topbar-open-button,
+  .shell-panel-toggle,
+  .topbar-icon-button {
     color: #e5e7eb;
   }
 
   .nav-item-active,
   .tree-task.selected,
+  .shell-panel-toggle[aria-pressed="true"],
   .input-grid div,
   .result-table div,
   .context-facts div,

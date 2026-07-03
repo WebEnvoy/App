@@ -1,5 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
 import {
+  Maximize2,
+  Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -17,17 +19,19 @@ export type FocusAreaName = "left-panel" | "thread-workspace" | "right-panel" | 
 type ResizeEdge = "top" | "right" | "bottom" | "left";
 type PointerPoint = { x: number; y: number };
 type ResizeDragState = { didMove: boolean; startPosition: number; startSize: number };
-type ShellPanelControls = { left: ReactNode; right: ReactNode };
+type ShellPanelControls = { left: ReactNode; right: ReactNode; rightFullscreen: ReactNode };
 
 const LEFT_PANEL_DEFAULT_WIDTH = 300;
 const LEFT_PANEL_MIN_WIDTH = 240;
 const LEFT_PANEL_MAX_WIDTH = 520;
-const LEFT_PANEL_COLLAPSE_WIDTH = 240;
+const FLOATING_LEFT_PANEL_EXIT_MS = 500;
+const PANEL_COLLAPSE_SCALE = 0.5;
+const LEFT_PANEL_COLLAPSE_WIDTH = LEFT_PANEL_MIN_WIDTH * PANEL_COLLAPSE_SCALE;
 const LEFT_PANEL_WIDTH_KEY = "webenvoy.shell.v3.left-panel-width";
 const RIGHT_PANEL_DEFAULT_WIDTH = 600;
 const RIGHT_PANEL_MIN_WIDTH = 320;
 const RIGHT_PANEL_RESERVED_WIDTH = 352;
-const RIGHT_PANEL_COLLAPSE_WIDTH = 320;
+const RIGHT_PANEL_COLLAPSE_WIDTH = RIGHT_PANEL_MIN_WIDTH * PANEL_COLLAPSE_SCALE;
 const RIGHT_PANEL_WIDTH_KEY = "webenvoy.shell.v3.right-panel-width";
 const RIGHT_PANEL_RATIO_KEY = "webenvoy.shell.v3.right-panel-ratio";
 
@@ -42,6 +46,8 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
   const [isLeftOpen, setLeftOpen] = useState(true);
   const [isRightOpen, setRightOpen] = useState(true);
   const [isLeftPreviewOpen, setLeftPreviewOpen] = useState(false);
+  const [isLeftPreviewRendered, setLeftPreviewRendered] = useState(false);
+  const [isRightFullscreen, setRightFullscreen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(() =>
     readStoredPanelWidth(
       LEFT_PANEL_WIDTH_KEY,
@@ -65,13 +71,16 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
   const [activeFocusArea, setActiveFocusArea] = useState<FocusAreaName>("thread-workspace");
   const [hoveredFocusArea, setHoveredFocusArea] = useState<FocusAreaName>("thread-workspace");
   const contentRegionBodyRef = useRef<HTMLDivElement | null>(null);
-  const rightPanelMaxWidth = getAvailableRightPanelWidth(contentRegionWidth);
+  const leftPreviewExitTimerRef = useRef<number | null>(null);
+  const rightPanelMaxWidth = getAvailableRightPanelWidth(contentRegionWidth, isRightFullscreen);
   const resolvedRightPanelRatio =
     rightWidthRatio ?? widthToRightPanelWidthRatio(RIGHT_PANEL_DEFAULT_WIDTH, contentRegionWidth);
   const effectiveRightWidth =
     contentRegionWidth > 0
       ? rightPanelWidthRatioToPixels(resolvedRightPanelRatio, contentRegionWidth)
       : rightWidth;
+  const fullscreenRightWidth = getAvailableRightPanelWidth(contentRegionWidth, true);
+  const visibleRightWidth = isRightFullscreen ? fullscreenRightWidth : effectiveRightWidth;
 
   useEffect(() => {
     const element = contentRegionBodyRef.current;
@@ -95,9 +104,48 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
 
   useEffect(() => {
     if (isLeftOpen) {
+      if (leftPreviewExitTimerRef.current != null) {
+        window.clearTimeout(leftPreviewExitTimerRef.current);
+        leftPreviewExitTimerRef.current = null;
+      }
       setLeftPreviewOpen(false);
+      setLeftPreviewRendered(false);
     }
   }, [isLeftOpen]);
+
+  useEffect(() => {
+    if (!isRightOpen) {
+      setRightFullscreen(false);
+    }
+  }, [isRightOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (leftPreviewExitTimerRef.current != null) {
+        window.clearTimeout(leftPreviewExitTimerRef.current);
+      }
+    };
+  }, []);
+
+  function showLeftPreview() {
+    if (leftPreviewExitTimerRef.current != null) {
+      window.clearTimeout(leftPreviewExitTimerRef.current);
+      leftPreviewExitTimerRef.current = null;
+    }
+    setLeftPreviewRendered(true);
+    setLeftPreviewOpen(true);
+  }
+
+  function hideLeftPreview() {
+    setLeftPreviewOpen(false);
+    if (leftPreviewExitTimerRef.current != null) {
+      window.clearTimeout(leftPreviewExitTimerRef.current);
+    }
+    leftPreviewExitTimerRef.current = window.setTimeout(() => {
+      setLeftPreviewRendered(false);
+      leftPreviewExitTimerRef.current = null;
+    }, FLOATING_LEFT_PANEL_EXIT_MS);
+  }
 
   function resolveFocusArea(target: EventTarget | null) {
     if (!(target instanceof Element)) {
@@ -130,9 +178,30 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
         aria-pressed={isRightOpen}
         title={isRightOpen ? "隐藏右栏" : "显示右栏"}
         data-shell-panel-toggle="right"
-        onClick={() => setRightOpen((open) => !open)}
+        onClick={() => {
+          if (isRightOpen) {
+            setRightFullscreen(false);
+          }
+          setRightOpen((open) => !open);
+        }}
       >
         {isRightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+      </button>
+    ),
+    rightFullscreen: (
+      <button
+        className="shell-panel-toggle shell-panel-toggle-right-fullscreen"
+        type="button"
+        aria-label={isRightFullscreen ? "退出右栏全屏" : "全屏展开右栏"}
+        aria-pressed={isRightFullscreen}
+        title={isRightFullscreen ? "退出右栏全屏" : "全屏展开右栏"}
+        data-shell-panel-fullscreen="right"
+        onClick={() => {
+          setRightOpen(true);
+          setRightFullscreen((fullscreen) => !fullscreen);
+        }}
+      >
+        {isRightFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
       </button>
     ),
   };
@@ -145,12 +214,13 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       data-left-panel-open={isLeftOpen}
       data-left-panel-width={isLeftOpen ? leftWidth : 0}
       data-right-panel-open={isRightOpen}
-      data-right-panel-width={isRightOpen ? effectiveRightWidth : 0}
+      data-right-panel-fullscreen={isRightFullscreen}
+      data-right-panel-width={isRightOpen ? visibleRightWidth : 0}
       style={
         {
           "--header-left-slot-width": `${isLeftOpen ? leftWidth : 0}px`,
-          "--header-right-slot-width": `${isRightOpen ? effectiveRightWidth : 0}px`,
-          "--right-panel-width": `${isRightOpen ? rightWidth : 34}px`,
+          "--header-right-slot-width": `${isRightOpen ? visibleRightWidth : 0}px`,
+          "--right-panel-width": `${isRightOpen ? visibleRightWidth : 34}px`,
         } as CSSProperties
       }
       onFocusCapture={(event) => setActiveFocusArea(resolveFocusArea(event.target))}
@@ -161,15 +231,17 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
         <div
           className="left-panel-reveal-zone"
           aria-hidden="true"
-          onPointerEnter={() => setLeftPreviewOpen(true)}
+          onPointerEnter={showLeftPreview}
         />
       ) : null}
-      {!isLeftOpen && isLeftPreviewOpen ? (
+      {!isLeftOpen && isLeftPreviewRendered ? (
         <div
           className="floating-left-panel"
           data-floating-left-panel=""
+          data-visible={isLeftPreviewOpen ? "true" : "false"}
           style={{ width: Math.max(0, leftWidth - 16) }}
-          onPointerLeave={() => setLeftPreviewOpen(false)}
+          onPointerEnter={showLeftPreview}
+          onPointerLeave={hideLeftPreview}
         >
           <aside className="floating-left-panel-frame">
             <div className="floating-left-panel-header">{panelControls.left}</div>
@@ -182,7 +254,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
             onResizeEnd={(width) => writeStoredPanelWidth(LEFT_PANEL_WIDTH_KEY, width)}
             onResizingChange={(resizing) => {
               if (resizing) {
-                setLeftPreviewOpen(true);
+                showLeftPreview();
               }
             }}
             setSize={(size) =>
@@ -218,10 +290,11 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
               defaultWidth={RIGHT_PANEL_DEFAULT_WIDTH}
               isOpen={isRightOpen}
               side="left"
-              width={effectiveRightWidth}
+              width={visibleRightWidth}
               minWidth={RIGHT_PANEL_MIN_WIDTH}
               maxWidth={rightPanelMaxWidth}
               collapseBelow={RIGHT_PANEL_COLLAPSE_WIDTH}
+              resizable={!isRightFullscreen}
               onCollapse={() => setRightOpen(false)}
               onOpen={() => setRightOpen(true)}
               onResize={(width) => {
@@ -345,6 +418,7 @@ export function ResizablePanel({
   onOpen,
   onResizeEnd,
   className = "",
+  resizable = true,
   children,
 }: {
   side: "left" | "right";
@@ -359,6 +433,7 @@ export function ResizablePanel({
   onOpen: () => void;
   onResizeEnd?: (width: number) => void;
   className?: string;
+  resizable?: boolean;
   children: ReactNode;
 }) {
   const [isResizing, setIsResizing] = useState(false);
@@ -424,7 +499,7 @@ export function ResizablePanel({
         } as CSSProperties
       }
     >
-      {side === "left" && (isOpen || isResizing) ? (
+      {resizable && side === "left" && (isOpen || isResizing) ? (
         <ResizeHandle
           defaultSize={defaultWidth}
           edge="left"
@@ -435,7 +510,7 @@ export function ResizablePanel({
         />
       ) : null}
       <div className="resizable-panel-content">{children}</div>
-      {side === "right" && (isOpen || isResizing) ? (
+      {resizable && side === "right" && (isOpen || isResizing) ? (
         <ResizeHandle
           defaultSize={defaultWidth}
           edge="right"
@@ -788,9 +863,12 @@ function getRightPanelWidthRange(mainContentWidth: number) {
   };
 }
 
-function getAvailableRightPanelWidth(mainContentWidth: number) {
+function getAvailableRightPanelWidth(mainContentWidth: number, isFullWidth = false) {
   return mainContentWidth > 0
-    ? Math.max(RIGHT_PANEL_MIN_WIDTH, mainContentWidth - RIGHT_PANEL_RESERVED_WIDTH)
+    ? Math.max(
+        RIGHT_PANEL_MIN_WIDTH,
+        isFullWidth ? mainContentWidth : mainContentWidth - RIGHT_PANEL_RESERVED_WIDTH,
+      )
     : RIGHT_PANEL_DEFAULT_WIDTH;
 }
 

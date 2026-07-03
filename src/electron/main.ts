@@ -54,12 +54,14 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const appShell = document.querySelector(".app-shell");
         const leftPanelButton = document.querySelector('[data-shell-panel-toggle="left"]');
         const rightPanelButton = document.querySelector('[data-shell-panel-toggle="right"]');
+        const rightFullscreenButton = document.querySelector('[data-shell-panel-fullscreen="right"]');
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
           left: appShell?.getAttribute("data-left-panel-open"),
           right: appShell?.getAttribute("data-right-panel-open"),
+          rightFullscreen: appShell?.getAttribute("data-right-panel-fullscreen"),
           leftWidth: Number(appShell?.getAttribute("data-left-panel-width") ?? 0),
           rightWidth: Number(appShell?.getAttribute("data-right-panel-width") ?? 0)
         });
@@ -97,6 +99,12 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         rightPanelButton?.click();
         await waitFrame();
         const rightRestored = readPanels();
+        rightFullscreenButton?.click();
+        await waitFrame();
+        const rightFullscreen = readPanels();
+        rightFullscreenButton?.click();
+        await waitFrame();
+        const rightFullscreenRestored = readPanels();
         leftPanelButton?.click();
         await waitFrame();
         const leftCollapsed = readPanels();
@@ -117,8 +125,16 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         composer?.focus();
         await waitFrame();
         const composerFocused = document.activeElement === composer;
+        const deviceScale = window.devicePixelRatio || 1;
         const leftHandleAfterRestore = document.querySelector(".left-panel-resizer .resize-handle-right");
-        const leftDragStarted = await dragHandle(leftHandleAfterRestore, -90);
+        const leftStayOpenDragDistance = -(leftRestored.leftWidth - 180) * deviceScale;
+        const leftStayOpenDragStarted = await dragHandle(
+          leftHandleAfterRestore,
+          leftStayOpenDragDistance
+        );
+        const leftDragStayedOpen = readPanels();
+        const leftCollapseDragDistance = -(leftDragStayedOpen.leftWidth - 96) * deviceScale;
+        const leftDragStarted = await dragHandle(leftHandleAfterRestore, leftCollapseDragDistance);
         const leftDragCollapsed = readPanels();
         if (leftDragCollapsed.left === "false") {
           leftPanelButton?.click();
@@ -126,8 +142,13 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         }
         const leftAfterDragRestore = readPanels();
         const rightHandleAfterLeftRestore = document.querySelector(".right-panel-resizer .resize-handle-left");
-        const rightCollapseDragDistance =
-          Math.max(360, leftAfterDragRestore.rightWidth - 280) * (window.devicePixelRatio || 1);
+        const rightStayOpenDragDistance = (leftAfterDragRestore.rightWidth - 220) * deviceScale;
+        const rightStayOpenDragStarted = await dragHandle(
+          rightHandleAfterLeftRestore,
+          rightStayOpenDragDistance
+        );
+        const rightDragStayedOpen = readPanels();
+        const rightCollapseDragDistance = (rightDragStayedOpen.rightWidth - 140) * deviceScale;
         const rightDragStarted = await dragHandle(
           rightHandleAfterLeftRestore,
           rightCollapseDragDistance
@@ -152,13 +173,22 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
             initialPanels.right === "true" &&
             rightCollapsed.right === "false" &&
             rightRestored.right === "true" &&
+            rightFullscreen.right === "true" &&
+            rightFullscreen.rightFullscreen === "true" &&
+            rightFullscreen.left === initialPanels.left &&
+            rightFullscreen.leftWidth === initialPanels.leftWidth &&
+            rightFullscreenRestored.rightFullscreen === "false" &&
             leftCollapsed.left === "false" &&
             leftHoverPreviewVisible &&
             leftRestored.left === "true",
           panelDragSmoke:
+            leftStayOpenDragStarted &&
             leftDragStarted &&
+            rightStayOpenDragStarted &&
             rightDragStarted &&
+            leftDragStayedOpen.left === "true" &&
             leftDragCollapsed.left === "false" &&
+            rightDragStayedOpen.right === "true" &&
             rightDragCollapsed.right === "false" &&
             leftAfterDragRestore.left === "true" &&
             dragRestored.left === "true" &&
@@ -167,11 +197,15 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
             initialPanels,
             rightCollapsed,
             rightRestored,
+            rightFullscreen,
+            rightFullscreenRestored,
             leftCollapsed,
             leftHoverPreviewVisible,
             leftRestored,
+            leftDragStayedOpen,
             leftDragCollapsed,
             leftAfterDragRestore,
+            rightDragStayedOpen,
             rightDragCollapsed,
             dragRestored
           }
@@ -211,7 +245,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
 
     if (!result.panelDragSmoke) {
       throw new Error(
-        `packaged renderer smoke failed: panel drag thresholds did not collapse. ${JSON.stringify(result.panelStateTrace)}`,
+        `packaged renderer smoke failed: panel drag thresholds did not match Codex behavior. ${JSON.stringify(result.panelStateTrace)}`,
       );
     }
 

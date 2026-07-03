@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  SquarePen,
   Target,
   Waypoints,
   Zap,
@@ -159,14 +160,9 @@ export function App() {
       left={
         <LeftPanel>
           <aside className="sidebar" aria-label="Task Thread navigation">
-            <button className="new-task-button" type="button">
-              <Plus size={16} />
-              新建任务
-            </button>
-
             <nav className="global-nav" aria-label="Global navigation">
               <a className="nav-item nav-item-active" href="#task-thread">
-                <FolderKanban size={16} />
+                <SquarePen size={16} />
                 任务
               </a>
               <a className="nav-item" href="#source-health">
@@ -187,7 +183,7 @@ export function App() {
               <div className="section-heading">
                 <span>任务</span>
                 <button type="button" aria-label="Read-only task creation entry">
-                  +
+                  <Plus size={15} />
                 </button>
               </div>
 
@@ -248,6 +244,7 @@ export function App() {
               打开
               <ChevronDown size={14} />
             </button>
+            {panelControls.rightFullscreen}
             {panelControls.right}
           </div>
         </header>
