@@ -2,22 +2,19 @@
   "schema_version": "loom-review/v1",
   "item_id": "GH-122",
   "decision": "allow",
-  "kind": "general_review",
-  "summary": "GH-122 is a control-plane-only repair that retires stale GH-111/GH-117 carrier state without expanding into App implementation.",
+  "kind": "code_review",
+  "summary": "Final governance repair review approved GH-122 stale-carrier retirement on head 6acc27717da297ae9b26669b6bed9938e3cb2880. The delta only aligns .loom bootstrap/status/progress surfaces and retires the docs-only GH-111 carrier without expanding into App implementation.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-03T02:00:00Z",
-  "reviewed_head": "5bb14ea6931237e5365009677a092f449fe52e1e",
-  "reviewed_validation_summary": "`git diff --check` passed; `loom doctor --target . --json` passed; `loom verify --target . --json` passed; `loom fact-chain --target . --json` passed; `CODEX_EXPORT_GH_TOKEN=1 loom workspace locate --target . --item GH-122 --json` passed. GH-100 setup retest no longer hits GH-111 shared-workspace conflict or GH-117 merge-ready stale carrier drift; remaining blockers are host binding gaps and current item mismatch while GH-122 is active.",
+  "authored_at": "2026-07-03T02:42:00Z",
+  "reviewed_head": "6acc27717da297ae9b26669b6bed9938e3cb2880",
+  "reviewed_validation_summary": "`git diff --check` passed; `loom doctor --target . --json` passed; `loom verify --target . --json` passed; `loom fact-chain --target . --json` passed after aligning GH-117/status surfaces and retiring the docs-only GH-111 carrier.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
-  "follow_ups": [
-    "Merge and close out GH-122 before resuming GH-100 formal workspace/carrier setup.",
-    "Create a fresh GH-100 carrier/workspace after this repair lane lands; do not reuse GH-111 docs-only carrier."
-  ],
+  "follow_ups": [],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The diff is limited to Loom carrier state and correctly reclassifies GH-117 as closed_out while retiring the docs-only GH-111 carrier without closing GitHub #111."
+    "reason": "Authored final governance review approved the GH-122 stale-carrier repair head; subsequent drift must remain limited to GH-122 Loom review carrier metadata for this repair PR."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
