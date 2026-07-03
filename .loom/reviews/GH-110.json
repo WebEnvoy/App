@@ -3,30 +3,49 @@
   "item_id": "GH-110",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual current-head review approved GH-110 content head 9cbadbeef8f2a101d0a806fa896f62f8fdc423b2. The implementation covers #110-#113 only and stays fixture/API-shaped with no live owner API calls or sensitive persistence.",
+  "summary": "Manual carrier-only closeout review approved PR #164 post-merge closeout content head 920d6b1cf3c45ce6a7dff8b918aa103d58e2f0ef. This review covers only GH-110 closeout evidence and terminal carrier sync for #110-#113/#95.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-03T07:00:00Z",
-  "reviewed_head": "9cbadbeef8f2a101d0a806fa896f62f8fdc423b2",
-  "reviewed_validation_summary": "GH-110 implementation validation passed: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-110 --json`, `loom suite carrier validate --target . --item GH-110 --json`, review read for `.loom/reviews/GH-110.json` and `.loom/reviews/GH-110.spec.json`, and PR metadata preflight/readback for PR #164. Local `loom build --target . --item GH-110 --build-evidence .loom/specs/GH-110/build-evidence.json --json` is blocked by the known repo-local `tools/loom.py` suite CLI JSON consumption surface and an `ownership_constraints` consumption false negative despite the field being present; no repo-local Loom shim was added.",
+  "authored_at": "2026-07-03T07:05:00Z",
+  "reviewed_head": "920d6b1cf3c45ce6a7dff8b918aa103d58e2f0ef",
+  "reviewed_validation_summary": "Post-merge closeout consumed implementation PR #164 (https://github.com/WebEnvoy/App/pull/164), PR head `87de107ea086a300ed40e9acd4f498ccab1f9441`, squash merge commit `08f2214f991a324512850af3761093d1e2df7ff6`, target branch `main`, hosted run https://github.com/WebEnvoy/App/actions/runs/28644223242, issue closeout evidence for #110, #111, #112, #113, and #95, and milestone #9 `open_issues=0` / `closed_issues=22`. Pre-merge validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-110 --json`, `loom suite carrier validate --target . --item GH-110 --json`, review read for `.loom/reviews/GH-110.json` and `.loom/reviews/GH-110.spec.json`, and PR metadata preflight/readback. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, `loom-check`, and `loom-pr-merge-gate` passed on run `28644223242`. Local `loom build`, `loom review run`, `loom pr gate`, and `loom merge-ready` remain blocked by Loom suite CLI JSON consumption; no repo-local Loom shim was added.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Stage 5 Library lifecycle remains out of scope.",
-    "Write-side behavior and full Browser management remain out of scope.",
-    "Fix the Loom build / suite CLI JSON consumption surface outside this App product PR."
+    "Retire GH-110 current pointer to no_active_item before marking milestone #9 complete.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App closeout PR."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Diff is limited to GH-110 renderer fixtures/UI/smoke plus GH-110 Loom carriers, including hosted-safe workspace locator normalization. Evidence cards are ref-only, Lode package attribution is metadata-only, Harbor Browser session/provider facts are references only, direct sessions are not displayed as Core task outcomes, and no sensitive owner truth is persisted."
+    "reason": "Closeout carrier consumes the merged PR, hosted run, issue closeout comments, closed issue readback, and milestone #9 open=0/closed=22. The diff is carrier-only and does not change App product/UI/docs behavior."
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Authored closeout review approved only terminal GH-110 closeout metadata and status/progress synchronization for the closeout PR."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
+    "implementation_pull_request": "https://github.com/WebEnvoy/App/pull/164",
+    "implementation_head": "87de107ea086a300ed40e9acd4f498ccab1f9441",
+    "implementation_merge_commit": "08f2214f991a324512850af3761093d1e2df7ff6",
+    "implementation_hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28644223242",
     "work_item": "GH-110",
     "covered_work_items": "#110 #111 #112 #113",
-    "parent_fr": "#95",
-    "reviewed_diff": "git diff origin/main...9cbadbeef8f2a101d0a806fa896f62f8fdc423b2",
-    "build_evidence": ".loom/specs/GH-110/build-evidence.json",
-    "scope_boundary": "Stage 4 milestone #9 #95 batch only; no Stage 5, Library lifecycle, write-side, full Browser management, workflow runtime/editor, or live Core/Harbor/Lode calls."
+    "closed_issues": "#95 #110 #111 #112 #113",
+    "milestone": "Desktop 首个只读任务体验闭环",
+    "milestone_counts": {
+      "open_issues": 0,
+      "closed_issues": 22
+    },
+    "issue_closeout_urls": [
+      "https://github.com/WebEnvoy/App/issues/110#issuecomment-4873554541",
+      "https://github.com/WebEnvoy/App/issues/111#issuecomment-4873554802",
+      "https://github.com/WebEnvoy/App/issues/112#issuecomment-4873555247",
+      "https://github.com/WebEnvoy/App/issues/113#issuecomment-4873555577",
+      "https://github.com/WebEnvoy/App/issues/95#issuecomment-4873555962"
+    ],
+    "reviewed_diff": "git diff origin/main...920d6b1cf3c45ce6a7dff8b918aa103d58e2f0ef",
+    "closeout_scope": "GH-110 closes #110-#113 and parent #95. Stage 5, Library lifecycle, write-side, full Browser management, workflow runtime/editor, and live owner API integration remain out of scope.",
+    "known_tool_blocker": "loom build / review run / pr gate / merge-ready suite CLI JSON consumption blocked locally; no repo-local tools/loom.py added"
   }
 }

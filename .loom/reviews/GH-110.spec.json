@@ -3,29 +3,32 @@
   "item_id": "GH-110",
   "decision": "allow",
   "kind": "spec_review",
-  "summary": "Manual spec review approved GH-110 content head 9cbadbeef8f2a101d0a806fa896f62f8fdc423b2 against the accepted GH-110 minimal spec and #95 issue scope.",
+  "summary": "Manual spec closeout review approved GH-110 post-merge closeout content head 920d6b1cf3c45ce6a7dff8b918aa103d58e2f0ef. The closeout evidence matches the GH-110 minimal spec path and completes #110-#113 plus parent #95 without claiming Stage 5.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-03T07:00:00Z",
-  "reviewed_head": "9cbadbeef8f2a101d0a806fa896f62f8fdc423b2",
-  "reviewed_validation_summary": "GH-110 implementation validation passed: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-110 --json`, `loom suite carrier validate --target . --item GH-110 --json`, review read for `.loom/reviews/GH-110.json` and `.loom/reviews/GH-110.spec.json`, and PR metadata preflight/readback for PR #164. Local `loom build --target . --item GH-110 --build-evidence .loom/specs/GH-110/build-evidence.json --json` is blocked by the known repo-local `tools/loom.py` suite CLI JSON consumption surface and an `ownership_constraints` consumption false negative despite the field being present; no repo-local Loom shim was added.",
+  "authored_at": "2026-07-03T07:05:00Z",
+  "reviewed_head": "920d6b1cf3c45ce6a7dff8b918aa103d58e2f0ef",
+  "reviewed_validation_summary": "Post-merge closeout consumed implementation PR #164 (https://github.com/WebEnvoy/App/pull/164), PR head `87de107ea086a300ed40e9acd4f498ccab1f9441`, squash merge commit `08f2214f991a324512850af3761093d1e2df7ff6`, target branch `main`, hosted run https://github.com/WebEnvoy/App/actions/runs/28644223242, issue closeout evidence for #110, #111, #112, #113, and #95, and milestone #9 `open_issues=0` / `closed_issues=22`. Pre-merge validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-110 --json`, `loom suite carrier validate --target . --item GH-110 --json`, review read for `.loom/reviews/GH-110.json` and `.loom/reviews/GH-110.spec.json`, and PR metadata preflight/readback. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, `loom-check`, and `loom-pr-merge-gate` passed on run `28644223242`. Local `loom build`, `loom review run`, `loom pr gate`, and `loom merge-ready` remain blocked by Loom suite CLI JSON consumption; no repo-local Loom shim was added.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "#95 closeout must wait until PR merge and #110-#113 closeout evidence.",
-    "Stage 5 Library lifecycle and full Browser management require future carriers."
+    "Retire GH-110 current pointer to no_active_item before marking milestone #9 complete.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App closeout PR."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The implementation satisfies GH-110 spec required behavior for evidence cards, package attribution, Browser session/provider references, vertical smoke, and hosted-safe workspace locator normalization without expanding beyond #95."
+    "reason": "The GH-110 spec path covers #110-#113 and parent #95 only. Post-merge closeout evidence closes those Work Items and parent FR, while Stage 5 remains outside this scope."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
+    "implementation_pull_request": "https://github.com/WebEnvoy/App/pull/164",
+    "implementation_merge_commit": "08f2214f991a324512850af3761093d1e2df7ff6",
     "work_item": "GH-110",
     "spec": ".loom/specs/GH-110/spec.md",
     "plan": ".loom/specs/GH-110/plan.md",
     "task_carrier": ".loom/specs/GH-110/task-carrier.md",
     "suite_path": "minimal",
-    "scope_boundary": "GH-110 closes #110-#113 and parent #95 only after post-merge closeout; it does not claim Stage 5."
+    "suite_validation": "loom suite validate --target . --item GH-110 --json; loom suite carrier validate --target . --item GH-110 --json",
+    "closeout_scope": "GH-110 closes #110-#113 and parent #95 only; Stage 5, Library lifecycle, write-side, full Browser management, workflow runtime/editor, and live owner API integration remain out of scope."
   }
 }
