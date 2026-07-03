@@ -1,0 +1,52 @@
+{
+  "schema": "loom-build-evidence/v1",
+  "item_id": "GH-122",
+  "generated_at": "2026-07-03T01:57:54Z",
+  "branch": "work/loom-retire-stale-carriers-before-gh100",
+  "scope": "control-plane repair for stale Loom carriers before GH-100",
+  "commands": [
+    {
+      "command": "git diff --check",
+      "result": "pass",
+      "generated_at": "2026-07-03T01:57:54Z"
+    },
+    {
+      "command": "loom doctor --target . --json",
+      "result": "pass",
+      "generated_at": "2026-07-03T01:57:33Z"
+    },
+    {
+      "command": "loom verify --target . --json",
+      "result": "pass",
+      "generated_at": "2026-07-03T01:57:34Z"
+    },
+    {
+      "command": "loom fact-chain --target . --json",
+      "result": "pass",
+      "generated_at": "2026-07-03T01:57:35Z"
+    },
+    {
+      "command": "CODEX_EXPORT_GH_TOKEN=1 loom workspace locate --target . --item GH-122 --json",
+      "result": "pass",
+      "generated_at": "2026-07-03T01:57:36Z"
+    },
+    {
+      "command": "CODEX_EXPORT_GH_TOKEN=1 loom issue bind 100 --work-item GH-100 --json",
+      "result": "block",
+      "generated_at": "2026-07-03T01:57:37Z",
+      "note": "No stale-carrier blocker remains; only host binding gaps and dependency-edge reconciliation remain."
+    },
+    {
+      "command": "CODEX_EXPORT_GH_TOKEN=1 loom workspace create --target . --item GH-100 --branch work/GH-100-vite-electron-react-ts-skeleton --path /Volumes/2T/.codex/worktrees/3c80-gh100-test --start-point origin/main --json",
+      "result": "block",
+      "generated_at": "2026-07-03T01:57:36Z",
+      "note": "Blocked only by current item mismatch `expected GH-100, got GH-122`; GH-111 and GH-117 stale-carrier blockers are gone."
+    }
+  ],
+  "non_goals": [
+    "no App shell or UI implementation",
+    "no product documentation edits",
+    "no Core/Harbor/Lode changes",
+    "do not close GitHub #111"
+  ]
+}

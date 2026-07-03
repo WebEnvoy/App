@@ -1,0 +1,25 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-122",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Final governance repair review approved GH-122 merge-ready carrier state on head 3ce6d827773d866013867bb6cd1d6007fd4e594f. The delta only aligns .loom bootstrap/status/progress/review surfaces and retires the docs-only GH-111 carrier without expanding into App implementation.",
+  "reviewer": "codex-coordinator",
+  "authored_at": "2026-07-03T02:16:00Z",
+  "reviewed_head": "3ce6d827773d866013867bb6cd1d6007fd4e594f",
+  "reviewed_validation_summary": "`git diff --check` passed; `loom doctor --target . --json` passed; `loom verify --target . --json` passed; `loom fact-chain --target . --json` passed after aligning GH-117/status surfaces and retiring the docs-only GH-111 carrier.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Authored final governance review approved the GH-122 merge-ready carrier head; subsequent drift must remain limited to GH-122 Loom review carrier metadata for this repair PR."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/123",
+    "work_item": "GH-122",
+    "validation": "git diff --check; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; CODEX_EXPORT_GH_TOKEN=1 loom workspace locate --target . --item GH-122 --json; CODEX_EXPORT_GH_TOKEN=1 loom issue bind 100 --work-item GH-100 --json; CODEX_EXPORT_GH_TOKEN=1 loom workspace create --target . --item GH-100 --branch work/GH-100-vite-electron-react-ts-skeleton --path /Volumes/2T/.codex/worktrees/3c80-gh100-test --start-point origin/main --json"
+  }
+}
