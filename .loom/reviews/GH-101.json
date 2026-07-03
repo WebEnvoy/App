@@ -3,30 +3,39 @@
   "item_id": "GH-101",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual current-head implementation review approved GH-101 checkpoint sync head f50f5ee5892ea57ad52b0efe82f3f427fa49c952. The product/content implementation remains bounded to the reviewed #101-#104 shell batch: Radix/lucide shell primitives, Core/Harbor/Lode source health fixture, Settings local endpoint boundary, and Task Thread first base layout. It does not implement #105-#113, real Core/Harbor/Lode calls, task submission, run/result/evidence behavior, write-side behavior, full Library/Browser management, or workflow runtime/editor UI.",
+  "summary": "Manual carrier-only closeout review approved PR #136 closeout carrier content head a08abd79fa5f30ed76348b7ee7ad98f1180986c6. This review covers only GH-101 terminal closeout carrier metadata after implementation PR #129 was merged; it does not approve new product behavior.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-03T05:09:29Z",
-  "reviewed_head": "f50f5ee5892ea57ad52b0efe82f3f427fa49c952",
-  "reviewed_validation_summary": "2026-07-03 local and hosted-equivalent validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-101 --json`, `loom suite carrier validate --target . --item GH-101 --json`, and `loom pr metadata-preflight --body-file .loom/tmp/gh101-pr-body-update.md --compare-body-file .loom/tmp/gh101-pr-body-readback.md --json`. Review artifacts `.loom/reviews/GH-101.json` and `.loom/reviews/GH-101.spec.json` are `decision=allow` with `semantic_review_disposition.status=passed`; PR #129 body/head readback is kept aligned after each carrier push by updating the PR metadata machine `head_sha` and rerunning metadata preflight. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check` passed on run `28639585201`; hosted `loom-pr-merge-gate` previously fell back to `build` because the recovery checkpoint still reported `build`. `loom build --target . --item GH-101 --build-evidence .loom/specs/GH-101/build-evidence.json --json` and `loom review record` remain blocked by Loom suite CLI JSON consumption (`suite validate CLI JSON unavailable` / repo-local `tools/loom.py` lookup); no repo-local Loom shim was added.",
+  "authored_at": "2026-07-03T05:29:36Z",
+  "reviewed_head": "a08abd79fa5f30ed76348b7ee7ad98f1180986c6",
+  "reviewed_validation_summary": "Post-merge closeout consumed implementation PR #129 (https://github.com/WebEnvoy/App/pull/129), PR head `5e720b85b30dc262ad33bb07b24f3a27883f8f1e`, squash merge commit `b8064281695d4ba13a25a97fdfc8173b31e65fd5`, target branch `main`, hosted run https://github.com/WebEnvoy/App/actions/runs/28639874616, and issue closeout evidence for #101, #102, #103, #104, and #93. Pre-merge validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-101 --json`, `loom suite carrier validate --target . --item GH-101 --json`, and PR metadata preflight. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, `loom-check`, and `loom-pr-merge-gate` passed on run `28639874616`. `loom build` and `loom review record` remained blocked by Loom suite CLI JSON consumption; no repo-local Loom shim was added.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
     "#105-#109 remain for the #94 Core task path / read-only run view batch; GH-101 does not complete #94.",
     "#110-#113 remain for the #95 evidence, package source, and execution-site reference batch; GH-101 does not complete #95.",
-    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App product PR so authored review records can be created by the tool again."
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App closeout PR so authored review records can be created by the tool again."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Manual review of `git diff origin/main...HEAD` found the GH-101 implementation within the approved #101-#104 shell batch scope. Electron main/preload only expose OS/local shell context, Settings persists endpoint choices only after validation, source health remains fixture-only, and no credential/cookie/profile/raw evidence/run truth/session truth/package truth persistence was introduced."
+    "reason": "The underlying GH-101 implementation was already reviewed and merged in PR #129. PR #136 changes only GH-101 closeout carrier metadata and does not add product/UI/docs behavior."
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Authored closeout review approved only terminal GH-101 carrier metadata consumption for PR #136; it does not approve product implementation behavior."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
-    "pull_request": "https://github.com/WebEnvoy/App/pull/129",
+    "closeout_pull_request": "https://github.com/WebEnvoy/App/pull/136",
+    "implementation_pull_request": "https://github.com/WebEnvoy/App/pull/129",
+    "implementation_merge_commit": "b8064281695d4ba13a25a97fdfc8173b31e65fd5",
+    "implementation_hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28639874616",
     "work_item": "GH-101",
     "covered_work_items": "#101 #102 #103 #104",
-    "reviewed_diff": "git diff origin/main...HEAD at f50f5ee5892ea57ad52b0efe82f3f427fa49c952",
-    "validation": "npm run smoke; npm audit --audit-level=high; git diff --check; loom fact-chain --target . --json; loom doctor --target . --json; loom verify --target . --json; loom suite validate --target . --item GH-101 --json; loom suite carrier validate --target . --item GH-101 --json",
+    "closed_issues": "#93 #101 #102 #103 #104",
+    "closeout_scope": "PR #136 only records GH-101 terminal closeout carrier state and keeps #94, #95, and #105-#113 incomplete.",
+    "reviewed_diff": "git diff origin/main...HEAD at a08abd79fa5f30ed76348b7ee7ad98f1180986c6",
+    "validation": "git diff --check; jq empty .loom/bootstrap/init-result.json; loom fact-chain --target . --json; loom doctor --target . --json; loom verify --target . --json; loom suite validate --target . --item GH-101 --json; loom suite carrier validate --target . --item GH-101 --json; loom pr metadata-preflight --surface closeout",
     "known_tool_blocker": "loom build / review record suite CLI JSON consumption blocked; no repo-local tools/loom.py added"
   }
 }
