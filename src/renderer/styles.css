@@ -1409,7 +1409,7 @@ h3 {
   order: 0;
   overflow: hidden;
   border-bottom: 1px solid #dfe4ea;
-  background: #fbfcfe;
+  background: #ffffff;
 }
 
 .panel-tab-strip {
@@ -1421,7 +1421,7 @@ h3 {
   min-width: 0;
   align-items: center;
   padding: 0 8px;
-  background: #fbfcfe;
+  background: #ffffff;
 }
 
 .panel-tab-scroll {
@@ -1430,7 +1430,7 @@ h3 {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 40px), transparent 100%);
 }
 
 .panel-tab-scroll::-webkit-scrollbar {
@@ -1440,7 +1440,6 @@ h3 {
 .panel-tab-list {
   display: flex;
   width: max-content;
-  min-width: 100%;
   align-items: center;
   gap: 3px;
   overflow: visible;
@@ -1453,7 +1452,7 @@ h3 {
   height: 28px;
   min-width: 0;
   max-width: 156px;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   align-items: center;
   overflow: hidden;
   padding: 0 8px;
@@ -1467,12 +1466,14 @@ h3 {
 }
 
 .panel-tab-trigger:hover {
-  background: color-mix(in srgb, #111827 5%, transparent);
+  color: #151b24;
+  background: #f2f5f8;
 }
 
 .panel-tab-trigger[data-state="active"] {
-  color: #151b24;
-  background: color-mix(in srgb, #111827 7%, transparent);
+  color: #0f2f5f;
+  background: #eaf2ff;
+  box-shadow: inset 0 0 0 1px rgba(9, 105, 255, 0.22);
 }
 
 .panel-tab-label {
@@ -1489,13 +1490,20 @@ h3 {
 }
 
 .context-copy {
-  padding: 12px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.context-copy .card-title {
+  margin-bottom: 0;
 }
 
 .context-card {
   display: grid;
-  gap: 6px;
-  padding: 10px 0;
+  gap: 5px;
+  padding: 12px 0;
   border: 0;
   border-bottom: 1px solid #dfe4ea;
   border-radius: 0;
@@ -2126,13 +2134,14 @@ h3 {
 .source-health {
   order: 1;
   gap: 0;
-  padding: 0 16px 8px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid #dfe4ea;
 }
 
 .source-card {
   display: grid;
   gap: 4px;
-  padding: 9px 0;
+  padding: 11px 0;
   border: 0;
   border-bottom: 1px solid #dfe4ea;
   border-radius: 0;
@@ -2435,14 +2444,24 @@ h3 {
     background: #1d2633;
   }
 
-  .panel-tab-trigger:hover,
+  .panel-tab-trigger:hover {
+    color: #f8fafc;
+    background: rgba(148, 163, 184, 0.16);
+  }
+
   .panel-tab-trigger[data-state="active"] {
-    background: color-mix(in srgb, #ffffff 9%, transparent);
+    color: #f8fafc;
+    background: rgba(96, 165, 250, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.28);
   }
 
   .right-panel .context-card,
   .right-panel .source-card {
     border-color: #344154;
     background: transparent;
+  }
+
+  .right-panel .source-health {
+    border-color: #344154;
   }
 }
