@@ -79,6 +79,27 @@
       "command": "git diff --check",
       "result": "pass",
       "recorded_at": "2026-07-03T06:04:02Z"
+    },
+    {
+      "command": "loom fact-chain --target . --json",
+      "result": "pass",
+      "recorded_at": "2026-07-03T06:10:10Z"
+    },
+    {
+      "command": "loom suite validate --target . --item GH-105 --json",
+      "result": "pass",
+      "recorded_at": "2026-07-03T06:08:35Z"
+    },
+    {
+      "command": "loom suite carrier validate --target . --item GH-105 --json",
+      "result": "pass",
+      "recorded_at": "2026-07-03T06:08:35Z"
+    },
+    {
+      "command": "loom build --target . --item GH-105 --build-evidence .loom/specs/GH-105/build-evidence.json --json",
+      "result": "blocked_by_loom_suite_cli_json_consumption",
+      "recorded_at": "2026-07-03T06:10:50Z",
+      "summary": "Global suite validate/carrier validate passed, but loom build could not consume repo-local tools/loom.py suite JSON surface. No repo-local Loom shim was added."
     }
   ],
   "ownership": {
