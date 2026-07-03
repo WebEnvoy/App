@@ -3,48 +3,46 @@
   "item_id": "GH-105",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual current-head code review approved PR #161 GH-105 read-only task batch content head 95de53b4241f7a68cd45eca9d7ae1840b9c314e7. The implementation is bounded to #105-#109 and does not implement #110-#113 or #95.",
+  "summary": "Manual carrier-only closeout review approved PR #161 post-merge closeout content head e3e834a94837bc359cc3d126949941ca5a706fcd. This review covers only GH-105 closeout evidence and terminal carrier sync; it does not approve #110-#113 or #95 work.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-03T06:16:00Z",
-  "reviewed_head": "95de53b4241f7a68cd45eca9d7ae1840b9c314e7",
-  "reviewed_validation_summary": "PR #161 validation as of 2026-07-03T06:16Z: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-105 --json`, `loom suite carrier validate --target . --item GH-105 --json`, and `loom pr metadata-preflight --surface merge_ready` passed. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check` passed on run `28642190625`; hosted `loom-pr-merge-gate` failed only because GH-105 review artifacts were scaffold/stale before this carrier refresh. `loom build --target . --item GH-105 --build-evidence .loom/specs/GH-105/build-evidence.json --json` and `loom review run --target . --item GH-105 --json` are blocked by suite CLI JSON consumption / repo-local `tools/loom.py` surface; global suite commands passed, and no repo-local Loom shim was added. Manual review found no blocking product findings for the GH-105 #105-#109 scope.",
+  "authored_at": "2026-07-03T06:26:00Z",
+  "reviewed_head": "e3e834a94837bc359cc3d126949941ca5a706fcd",
+  "reviewed_validation_summary": "Post-merge closeout consumed implementation PR #161 (https://github.com/WebEnvoy/App/pull/161), PR head `00ce8908aca27fe628b62b4c62fd4b4e86900076`, squash merge commit `c72e38619416454926fcc21380025d9c5edf7416`, target branch `main`, hosted run https://github.com/WebEnvoy/App/actions/runs/28642506523, and issue closeout evidence for #105, #106, #107, #108, #109, and #94. Pre-merge validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-105 --json`, `loom suite carrier validate --target . --item GH-105 --json`, review read for `.loom/reviews/GH-105.json` and `.loom/reviews/GH-105.spec.json`, and PR metadata preflight. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, `loom-check`, and `loom-pr-merge-gate` passed on run `28642506523`. Local `loom build`, `loom review run`, `loom pr gate`, and `loom merge-ready` remain blocked by Loom suite CLI JSON consumption; no repo-local Loom shim was added.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "#110-#113 remain for the #95 evidence/source/session reference batch; GH-105 does not complete #95.",
-    "#94 can only close after PR #161 merges and closeout evidence is written for #105, #106, #107, #108, and #109.",
-    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App PR so authored review records can be created by the tool again."
+    "#110-#113 remain for #95; GH-105 closeout does not start or complete #95.",
+    "Retire GH-105 current pointer to no_active_item before admitting the next Work Item.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App closeout PR."
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Static diff review and independent read-only review found no blocking product issues. The renderer remains fixture-only, Task Thread first, read-only, and bounded to #105-#109. Direct Identity Runtime Session stays Browser/Harbor-only and is not presented as Core Task/Run/Result success."
+    "reason": "Closeout carrier consumes the merged PR, hosted run, issue closeout comments, and closed issue readback for #105-#109/#94. The diff is carrier-only and does not change App product/UI/docs behavior."
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Authored closeout review approved only terminal GH-105 closeout metadata and status/progress synchronization for the closeout PR."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
-    "pull_request": "https://github.com/WebEnvoy/App/pull/161",
+    "implementation_pull_request": "https://github.com/WebEnvoy/App/pull/161",
+    "implementation_head": "00ce8908aca27fe628b62b4c62fd4b4e86900076",
+    "implementation_merge_commit": "c72e38619416454926fcc21380025d9c5edf7416",
+    "implementation_hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28642506523",
     "work_item": "GH-105",
     "covered_work_items": "#105 #106 #107 #108 #109",
-    "parent_fr": "#94",
-    "reviewed_diff": "git diff origin/main...95de53b4241f7a68cd45eca9d7ae1840b9c314e7",
-    "reviewed_files": [
-      "src/renderer/App.tsx",
-      "src/renderer/taskThreadFixtures.ts",
-      "src/renderer/sourceHealthFixture.ts",
-      "src/renderer/styles.css",
-      "scripts/smoke.mjs",
-      ".loom/work-items/GH-105.md",
-      ".loom/progress/GH-105.md",
-      ".loom/specs/GH-105/**",
-      ".loom/status/current.md"
+    "closed_issues": "#94 #105 #106 #107 #108 #109",
+    "issue_closeout_urls": [
+      "https://github.com/WebEnvoy/App/issues/105#issuecomment-4873153947",
+      "https://github.com/WebEnvoy/App/issues/106#issuecomment-4873154278",
+      "https://github.com/WebEnvoy/App/issues/107#issuecomment-4873154696",
+      "https://github.com/WebEnvoy/App/issues/108#issuecomment-4873155000",
+      "https://github.com/WebEnvoy/App/issues/109#issuecomment-4873155322",
+      "https://github.com/WebEnvoy/App/issues/94#issuecomment-4873156045"
     ],
-    "scope_checks": [
-      "No package, docs, Electron main, or preload product diff was introduced.",
-      "#110-#113/#95 surfaces remain placeholder/entry text only.",
-      "Settings local persistence remains endpoint-choice only and rejects sensitive endpoint fragments.",
-      "No credential, cookie, token, profile storage, raw evidence, Core Run Record truth, Harbor session truth, or Lode package truth persistence was added."
-    ],
-    "independent_review": "subagent 019f269d-2944-7100-a730-72453eaed3fa reported no product blocker; its carrier findings were the stale review artifact and PR-created status drift fixed by this carrier refresh.",
-    "known_tool_blocker": "loom build / review run suite CLI JSON consumption blocked; no repo-local tools/loom.py added"
+    "reviewed_diff": "git diff origin/main...e3e834a94837bc359cc3d126949941ca5a706fcd",
+    "closeout_scope": "GH-105 closeout only; #110-#113, #95, and milestone #9 remain open.",
+    "known_tool_blocker": "loom build / review run / pr gate / merge-ready suite CLI JSON consumption blocked locally; no repo-local tools/loom.py added"
   }
 }
