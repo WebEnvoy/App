@@ -392,13 +392,22 @@ export function PanelTabs({
 }) {
   return (
     <Tabs.Root className="panel-tabs" defaultValue={defaultValue}>
-      <Tabs.List className="panel-tab-list" aria-label={ariaLabel}>
-        {tabs.map((tab) => (
-          <Tabs.Trigger className="panel-tab-trigger" value={tab.id} key={tab.id}>
-            {tab.label}
-          </Tabs.Trigger>
-        ))}
-      </Tabs.List>
+      <div className="panel-tab-strip">
+        <div className="panel-tab-scroll">
+          <Tabs.List className="panel-tab-list" aria-label={ariaLabel}>
+            {tabs.map((tab) => (
+              <Tabs.Trigger
+                className="panel-tab-trigger"
+                title={tab.label}
+                value={tab.id}
+                key={tab.id}
+              >
+                <span className="panel-tab-label">{tab.label}</span>
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </div>
+      </div>
       {tabs.map((tab) => (
         <Tabs.Content className="panel-tab-content" value={tab.id} key={tab.id}>
           {tab.content}
