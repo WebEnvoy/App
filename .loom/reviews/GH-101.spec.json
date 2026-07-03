@@ -7,7 +7,7 @@
   "reviewer": "codex-main",
   "authored_at": "2026-07-03T04:55:54Z",
   "reviewed_head": "306ef287536e1c06c7ab4af026714f9e3ffc093f",
-  "reviewed_validation_summary": "`npm run smoke` passed; `npm audit --audit-level=high` passed; `git diff --check` passed; `loom fact-chain --target . --json` passed; `loom doctor --target . --json` passed; `loom verify --target . --json` passed; `loom suite validate --target . --item GH-101 --json` passed; `loom suite carrier validate --target . --item GH-101 --json` passed. `loom build` and `loom review record` remain blocked by Loom suite CLI JSON consumption (`suite validate CLI JSON unavailable` / repo-local `tools/loom.py` lookup); no repo-local Loom shim was added.",
+  "reviewed_validation_summary": "2026-07-03 final local validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-101 --json`, and `loom suite carrier validate --target . --item GH-101 --json`. Worker review findings for 960px layout, Settings endpoint validation, and smoke coverage were fixed and revalidated. `loom build --target . --item GH-101 --build-evidence .loom/specs/GH-101/build-evidence.json --json` remains blocked by Loom build surface suite CLI JSON consumption (`suite validate CLI JSON unavailable` / repo-local `tools/loom.py` lookup); total dispatch allowed PR creation without adding a repo-local Loom shim.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
