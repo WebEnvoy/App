@@ -1,4 +1,3 @@
-import * as Tabs from "@radix-ui/react-tabs";
 import {
   Activity,
   AlertTriangle,
@@ -11,6 +10,7 @@ import {
   FolderKanban,
   Globe2,
   HardDrive,
+  Plus,
   PanelRightOpen,
   Search,
   Settings,
@@ -28,12 +28,18 @@ import {
 } from "./localConnectionConfig";
 import { sourceHealthFixture, type SourceHealth } from "./sourceHealthFixture";
 import {
-  creationEntryFixture,
   directSessionFixture,
   taskThreadFixtures,
   type RunProjection,
   type TaskProjection,
 } from "./taskThreadFixtures";
+import {
+  AppShell,
+  LeftPanel,
+  PanelTabs,
+  RightPanel,
+  ThreadWorkspace,
+} from "./shellPrimitives";
 
 type ShellContext = {
   platform: string;
@@ -121,15 +127,25 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar" aria-label="Task Thread navigation">
+    <AppShell
+      left={
+        <LeftPanel>
+          <aside className="sidebar" aria-label="Task Thread navigation">
         <div className="brand-lockup">
-          <div className="brand-mark">WE</div>
+          <div className="window-lights" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
           <div>
-            <p className="eyebrow">WebEnvoy App</p>
-            <h1>Task Thread</h1>
+            <h1>WebEnvoy App</h1>
           </div>
         </div>
+
+        <button className="new-task-button" type="button">
+          <Plus size={16} />
+          新建任务
+        </button>
 
         <nav className="global-nav" aria-label="Global navigation">
           <a className="nav-item nav-item-active" href="#task-thread">
@@ -184,26 +200,47 @@ export function App() {
             <p>{directSessionFixture.summary}</p>
           </article>
         </section>
-      </aside>
-
-      <section className="thread-column" id="task-thread" aria-labelledby="thread-title">
-        <header className="thread-header">
-          <div>
-            <p className="eyebrow">GH-105 read-only task batch</p>
-            <h2 id="thread-title">{selectedTask.title}</h2>
-            <div className="thread-meta">
-              <span>{selectedTask.accountIdentity}</span>
-              <span>{selectedTask.siteSkill}</span>
-              <span>{selectedTask.businessInput}</span>
-              <span>{selectedTask.source}</span>
-            </div>
-          </div>
-          <button className="panel-button" type="button">
-            <PanelRightOpen size={16} />
-            打开上下文
-          </button>
-        </header>
-
+          </aside>
+        </LeftPanel>
+      }
+      workspace={
+        <ThreadWorkspace
+          header={
+            <header className="thread-header">
+              <div className="thread-title-block">
+                <div className="thread-title-row">
+                  <div className="thread-icon">
+                    <Box size={22} />
+                  </div>
+                  <h2 id="thread-title">{selectedTask.title}</h2>
+                  <span className="thread-state">已完成未读</span>
+                  <CircleDot className="thread-state-dot" size={12} />
+                </div>
+                <div className="thread-meta">
+                  <span>站点技能 · {selectedTask.siteSkill}</span>
+                  <span>账号身份 · {selectedTask.accountIdentity}</span>
+                  <span>业务输入 · {selectedTask.businessInput}</span>
+                </div>
+              </div>
+              <button className="panel-button" type="button">
+                <PanelRightOpen size={16} />
+                打开
+              </button>
+            </header>
+          }
+          bottom={
+            <footer className="thread-actions" aria-label="Task actions">
+              <button type="button" disabled>
+                修改输入
+              </button>
+              <button type="button" disabled>
+                再次执行
+              </button>
+              <button type="button">查看结果依据</button>
+              <button type="button">打开执行现场</button>
+            </footer>
+          }
+        >
         <div className="thread-body">
           <nav className="run-rail" aria-label="Core-owned run navigation">
             {selectedTask.runs.map((run) => (
@@ -218,21 +255,13 @@ export function App() {
           </nav>
 
           <div className="thread-content">
-            <section className="creation-card">
+            <section className="run-summary-card">
               <div className="card-title">
-                <Box size={18} />
-                <h3>只读任务创建入口</h3>
+                <span className="disclosure">›</span>
+                <h3>已处理 1m 27s</h3>
+                <span>打开页面、完成登录、采集字段...</span>
               </div>
-              <dl className="input-grid">
-                <SourceField label="站点技能" value={creationEntryFixture.siteSkill.label} source={creationEntryFixture.siteSkill.source} />
-                <SourceField label="账号身份" value={creationEntryFixture.accountIdentity.label} source={creationEntryFixture.accountIdentity.source} />
-                <SourceField label="业务输入" value={creationEntryFixture.businessInput.label} source={creationEntryFixture.businessInput.source} />
-                <SourceField label="Core source" value={creationEntryFixture.coreSource.label} source={creationEntryFixture.coreSource.source} />
-              </dl>
-              <p className="blocker-copy">{creationEntryFixture.coreSource.blocker}</p>
-              <button className="submit-intent" type="button" disabled>
-                提交 task intent read-only scope
-              </button>
+              <button type="button">点击展开查看详情</button>
             </section>
 
             {selectedTask.blocker ? (
@@ -252,6 +281,18 @@ export function App() {
                 <span className="badge">{outcomeLabel(selectedRun.outcome)}</span>
               </div>
               <p>{selectedRun.summary}</p>
+              <h3 className="subsection-title">提取结果</h3>
+              <dl className="input-grid">
+                {selectedRun.resultRows.slice(0, 4).map((row) => (
+                  <SourceField
+                    label={row.label}
+                    value={row.value}
+                    source={row.source}
+                    key={`${selectedRun.id}-${row.label}`}
+                  />
+                ))}
+              </dl>
+              <h3 className="subsection-title">运行边界</h3>
               <dl className="input-grid">
                 <SourceField label="Run" value={selectedRun.label} source={selectedRun.source} />
                 <SourceField label="Lifecycle" value={selectedRun.lifecycle} source={selectedRun.source} />
@@ -260,17 +301,17 @@ export function App() {
             </section>
 
             <section className="process-card">
-              <div className="card-title">
+              <div className="card-title compact-title">
                 <Braces size={18} />
-                <h3>结构化结果视图</h3>
+                <h3>证据预览</h3>
               </div>
               <dl className="result-table">
-                {selectedRun.resultRows.map((row) => (
+                {selectedRun.evidenceCards.map((row) => (
                   <SourceField
-                    label={row.label}
-                    value={row.value}
+                    label={row.title}
+                    value={row.summary}
                     source={row.source}
-                    key={`${selectedRun.id}-${row.label}`}
+                    key={row.id}
                   />
                 ))}
               </dl>
@@ -289,128 +330,122 @@ export function App() {
             </section>
           </div>
         </div>
+        </ThreadWorkspace>
+      }
+      right={
+        <RightPanel>
+          <aside className="context-panel" aria-label="Task context">
+        <PanelTabs
+          ariaLabel="Task context tabs"
+          defaultValue="evidence"
+          tabs={contextTabs.map((tab) => ({
+            ...tab,
+            content:
+              tab.id === "evidence" ? (
+                <div className="context-copy">
+                  <div className="card-title">
+                    <Braces size={18} />
+                    <h3>结果依据</h3>
+                  </div>
+                  <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
+                  <div className="context-card-list">
+                    {selectedRun.evidenceCards.map((evidence) => (
+                      <article className="context-card" key={evidence.id}>
+                        <strong>{evidence.title}</strong>
+                        <p>{evidence.summary}</p>
+                        <a href={evidence.viewerHref}>
+                          <ExternalLink size={14} />
+                          {evidence.viewerLabel}
+                        </a>
+                        <span className="source-chip">{evidence.source}</span>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : tab.id === "session" ? (
+                <div className="context-copy">
+                  <div className="card-title">
+                    <Globe2 size={18} />
+                    <h3>执行现场</h3>
+                    <span className={`status-pill status-${directSessionFixture.providerStatus.status}`}>
+                      {directSessionFixture.providerStatus.status}
+                    </span>
+                  </div>
+                  <p>{directSessionFixture.summary}</p>
+                  <dl className="context-facts">
+                    {[
+                      ["Browser session", directSessionFixture.providerStatus.browserSessionRef],
+                      ["Provider", directSessionFixture.providerStatus.provider],
+                      ["Viewer ref", directSessionFixture.providerStatus.viewerRef],
+                      ["Fetched at", directSessionFixture.providerStatus.fetchedAt],
+                    ].map(([label, value]) => (
+                      <SourceField
+                        label={label}
+                        value={value}
+                        source={directSessionFixture.providerStatus.source}
+                        key={label}
+                      />
+                    ))}
+                  </dl>
+                  <p className="boundary-copy">{directSessionFixture.providerStatus.boundary}</p>
+                </div>
+              ) : tab.id === "identity" ? (
+                <ContextPanel
+                  icon={<ShieldCheck size={18} />}
+                  title="账号身份"
+                  body="账号身份来自 Harbor fixture；App 不保存 credential、cookie、token 或 profile storage。"
+                />
+              ) : tab.id === "skill" ? (
+                <div className="context-copy">
+                  <div className="card-title">
+                    <Box size={18} />
+                    <h3>站点技能</h3>
+                  </div>
+                  <p>Capability package source attribution comes from Lode metadata fixture.</p>
+                  <dl className="context-facts">
+                    {[
+                      ["Package", selectedTask.packageSource.name],
+                      ["Version", selectedTask.packageSource.version],
+                      ["Capability ref", selectedTask.packageSource.capabilityRef],
+                      ["Fetched at", selectedTask.packageSource.fetchedAt],
+                    ].map(([label, value]) => (
+                      <SourceField
+                        label={label}
+                        value={value}
+                        source={selectedTask.packageSource.source}
+                        key={label}
+                      />
+                    ))}
+                  </dl>
+                  <p className="boundary-copy">{selectedTask.packageSource.boundary}</p>
+                </div>
+              ) : (
+                <ContextPanel
+                  icon={<Activity size={18} />}
+                  title="诊断"
+                  body={`Shell context: ${shellContext?.platform ?? "loading"} / ${
+                    shellContext?.colorScheme ?? "loading"
+                  } / ${shellContext?.configScope ?? "loading"}. UI selection state is App local-only.`}
+                />
+              ),
+          }))}
+        />
 
-        <footer className="thread-actions" aria-label="Task actions">
-          <button type="button" disabled>
-            修改输入
-          </button>
-          <button type="button" disabled>
-            再次执行
-          </button>
-          <button type="button">查看结果依据</button>
-          <button type="button">打开执行现场</button>
-        </footer>
-      </section>
-
-      <aside className="context-panel" aria-label="Task context">
         <section className="source-health" id="source-health">
           <div className="section-heading">
-            <span>Source health fixture</span>
-            <span className="badge">no live calls</span>
+            <span>来源</span>
+            <span className="badge">fixture</span>
           </div>
           {sourceHealthFixture.map((source) => (
             <article className="source-card" key={source.id}>
               <div>
                 <strong>{source.name}</strong>
-                <span>{source.ownerTruth}</span>
+                <span className={`status-pill status-${source.status}`}>{statusLabel(source.status)}</span>
               </div>
-              <p>{source.summary}</p>
-              <div className={`status-pill status-${source.status}`}>{statusLabel(source.status)}</div>
+              <p>{source.ownerTruth}</p>
             </article>
           ))}
         </section>
-
-        <Tabs.Root className="context-tabs" defaultValue="evidence">
-          <Tabs.List className="tab-list" aria-label="Task context tabs">
-            {contextTabs.map((tab) => (
-              <Tabs.Trigger className="tab-trigger" value={tab.id} key={tab.id}>
-                {tab.label}
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
-
-          <Tabs.Content className="tab-panel" value="evidence">
-            <div className="context-copy">
-              <div className="card-title">
-                <Braces size={18} />
-                <h3>结果依据</h3>
-              </div>
-              <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
-              <div className="context-card-list">
-                {selectedRun.evidenceCards.map((evidence) => (
-                  <article className="context-card" key={evidence.id}>
-                    <strong>{evidence.title}</strong>
-                    <p>{evidence.summary}</p>
-                    <a href={evidence.viewerHref}>
-                      <ExternalLink size={14} />
-                      {evidence.viewerLabel}
-                    </a>
-                    <span className="source-chip">{evidence.source}</span>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </Tabs.Content>
-          <Tabs.Content className="tab-panel" value="session">
-            <div className="context-copy">
-              <div className="card-title">
-                <Globe2 size={18} />
-                <h3>执行现场</h3>
-                <span className={`status-pill status-${directSessionFixture.providerStatus.status}`}>
-                  {directSessionFixture.providerStatus.status}
-                </span>
-              </div>
-              <p>{directSessionFixture.summary}</p>
-              <dl className="context-facts">
-                {[
-                  ["Browser session", directSessionFixture.providerStatus.browserSessionRef],
-                  ["Provider", directSessionFixture.providerStatus.provider],
-                  ["Viewer ref", directSessionFixture.providerStatus.viewerRef],
-                  ["Fetched at", directSessionFixture.providerStatus.fetchedAt],
-                ].map(([label, value]) => (
-                  <SourceField label={label} value={value} source={directSessionFixture.providerStatus.source} key={label} />
-                ))}
-              </dl>
-              <p className="boundary-copy">{directSessionFixture.providerStatus.boundary}</p>
-            </div>
-          </Tabs.Content>
-          <Tabs.Content className="tab-panel" value="identity">
-            <ContextPanel
-              icon={<ShieldCheck size={18} />}
-              title="账号身份"
-              body="账号身份来自 Harbor fixture；App 不保存 credential、cookie、token 或 profile storage。"
-            />
-          </Tabs.Content>
-          <Tabs.Content className="tab-panel" value="skill">
-            <div className="context-copy">
-              <div className="card-title">
-                <Box size={18} />
-                <h3>站点技能</h3>
-              </div>
-              <p>Capability package source attribution comes from Lode metadata fixture.</p>
-              <dl className="context-facts">
-                {[
-                  ["Package", selectedTask.packageSource.name],
-                  ["Version", selectedTask.packageSource.version],
-                  ["Capability ref", selectedTask.packageSource.capabilityRef],
-                  ["Fetched at", selectedTask.packageSource.fetchedAt],
-                ].map(([label, value]) => (
-                  <SourceField label={label} value={value} source={selectedTask.packageSource.source} key={label} />
-                ))}
-              </dl>
-              <p className="boundary-copy">{selectedTask.packageSource.boundary}</p>
-            </div>
-          </Tabs.Content>
-          <Tabs.Content className="tab-panel" value="diagnostics">
-            <ContextPanel
-              icon={<Activity size={18} />}
-              title="诊断"
-              body={`Shell context: ${shellContext?.platform ?? "loading"} / ${
-                shellContext?.colorScheme ?? "loading"
-              } / ${shellContext?.configScope ?? "loading"}. UI selection state is App local-only.`}
-            />
-          </Tabs.Content>
-        </Tabs.Root>
 
         <section className="settings-panel" id="settings">
           <div className="card-title">
@@ -439,8 +474,10 @@ export function App() {
           {settingsError ? <p className="settings-error" role="alert">{settingsError}</p> : null}
           <span className="settings-saved">{settingsSaved ? "Saved locally" : "Not saved"}</span>
         </section>
-      </aside>
-    </main>
+          </aside>
+        </RightPanel>
+      }
+    />
   );
 }
 

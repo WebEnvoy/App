@@ -3,7 +3,9 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import electron from "electron";
 
-const screenshotPath = path.resolve("artifacts/gh-168-packaged-preview.png");
+const screenshotPath = path.resolve(
+  process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT ?? "artifacts/gh-168-packaged-preview.png",
+);
 await mkdir(path.dirname(screenshotPath), { recursive: true });
 
 const child = spawn(electron, ["dist-electron/main.js"], {
