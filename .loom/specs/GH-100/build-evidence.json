@@ -6,7 +6,7 @@
   "scope": "minimum runnable Electron/Vite/React/TypeScript skeleton",
   "pre_implementation": {
     "main_head": "42306c3051165cea9752e42da00688c23e7f4f95",
-    "workspace": "/Volumes/2T/.codex/worktrees/3c80-gh100",
+    "workspace": ".",
     "issue": "https://github.com/WebEnvoy/App/issues/100",
     "parent_fr": "https://github.com/WebEnvoy/App/issues/93",
     "repair_closeout": "https://github.com/WebEnvoy/App/issues/122#issuecomment-4872154021"

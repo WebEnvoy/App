@@ -6,7 +6,7 @@
 - Goal: Establish the minimum runnable Vite / Electron / React / TypeScript desktop shell skeleton for FR #93.
 - Scope: Create the Electron main/preload/renderer project skeleton, package scripts, TypeScript/Vite configuration, and minimum runnable check needed to host the ADR 0008 Task Thread first shell later.
 - Execution Path: product-implementation/desktop-shell-skeleton
-- Workspace Entry: `/Volumes/2T/.codex/worktrees/3c80-gh100`
+- Workspace Entry: .
 - Recovery Entry: `.loom/progress/GH-100.md`
 - Review Entry: not_applicable_until_review
 - Validation Entry: `.loom/specs/GH-100/build-evidence.json`
