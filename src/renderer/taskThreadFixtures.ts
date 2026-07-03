@@ -21,6 +21,14 @@ export type RunProjection = {
   owner: "Core";
   source: OwnerSource;
   resultRows: Array<{ label: string; value: string; source: OwnerSource }>;
+  evidenceCards: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    viewerLabel: string;
+    viewerHref: string;
+    source: OwnerSource;
+  }>;
   process: string[];
 };
 
@@ -31,6 +39,14 @@ export type TaskProjection = {
   siteSkill: string;
   businessInput: string;
   source: OwnerSource;
+  packageSource: {
+    name: string;
+    version: string;
+    capabilityRef: string;
+    fetchedAt: string;
+    source: OwnerSource;
+    boundary: string;
+  };
   blocker?: string;
   runs: RunProjection[];
 };
@@ -42,6 +58,15 @@ export type DirectSessionProjection = {
   sessionState: "available";
   source: OwnerSource;
   summary: string;
+  providerStatus: {
+    provider: string;
+    browserSessionRef: string;
+    status: "connected" | "degraded" | "unavailable";
+    viewerRef: string;
+    fetchedAt: string;
+    source: OwnerSource;
+    boundary: string;
+  };
 };
 
 export const creationEntryFixture = {
@@ -75,6 +100,14 @@ export const taskThreadFixtures: TaskProjection[] = [
     siteSkill: "商品详情采集",
     businessInput: "https://example.com/products/road-runner",
     source: "Core fixture",
+    packageSource: {
+      name: "@lode/example-commerce-product-detail",
+      version: "0.4.2",
+      capabilityRef: "lode://capability/example-commerce/product-detail",
+      fetchedAt: "2026-07-03T04:20:00Z",
+      source: "Lode fixture",
+      boundary: "App only displays capability package metadata; workflow runtime/editor stays out of scope.",
+    },
     runs: [
       {
         id: "run-success",
@@ -90,6 +123,16 @@ export const taskThreadFixtures: TaskProjection[] = [
           { label: "价格", value: "$129", source: "Core fixture" },
           { label: "库存", value: "In stock", source: "Core fixture" },
         ],
+        evidenceCards: [
+          {
+            id: "ev-run-004-result",
+            title: "Result evidence projection",
+            summary: "Core-owned evidence summary, no raw evidence body cached in App.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-run-004",
+            source: "Core fixture",
+          },
+        ],
         process: ["Core accepted read-only task intent.", "Lode capability metadata matched.", "Harbor identity was referenced, not stored."],
       },
       {
@@ -102,6 +145,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "结果", value: "No matching rows", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-run-003-empty",
+            title: "Empty result evidence",
+            summary: "Core says extraction completed with zero rows; App links the viewer only.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-run-003",
+            source: "Core fixture",
+          },
+        ],
         process: ["Page loaded.", "Extractor returned zero rows.", "Core closed run as empty."],
       },
       {
@@ -117,6 +170,16 @@ export const taskThreadFixtures: TaskProjection[] = [
           { label: "商品名", value: "Road Runner Keyboard", source: "Core fixture" },
           { label: "价格", value: "Unavailable", source: "Core fixture" },
         ],
+        evidenceCards: [
+          {
+            id: "ev-run-002-partial",
+            title: "Partial field evidence",
+            summary: "Core-owned projection shows required fields passed and optional price missing.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-run-002",
+            source: "Core fixture",
+          },
+        ],
         process: ["Required fields passed.", "Optional price selector was unavailable.", "Core returned partial result."],
       },
       {
@@ -129,6 +192,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "安全结果", value: "No write was attempted", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-run-001-safe",
+            title: "Failure-safe evidence",
+            summary: "Evidence projection confirms no write attempt and no raw evidence saved.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-run-001",
+            source: "Core fixture",
+          },
+        ],
         process: ["Login challenge detected.", "Core stopped before extraction.", "Failure-safe report created."],
       },
     ],
@@ -140,6 +213,14 @@ export const taskThreadFixtures: TaskProjection[] = [
     siteSkill: "商品详情采集",
     businessInput: "https://example.com/products/source-missing",
     source: "Core fixture",
+    packageSource: {
+      name: "@lode/example-commerce-product-detail",
+      version: "0.4.2",
+      capabilityRef: "lode://capability/example-commerce/product-detail",
+      fetchedAt: "2026-07-03T04:20:00Z",
+      source: "Lode fixture",
+      boundary: "Missing Core source does not change Lode package attribution.",
+    },
     blocker: "Missing owner source: Core run source is unavailable, so App must show blocker.",
     runs: [
       {
@@ -152,6 +233,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "结果", value: "Unavailable", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-unavailable",
+            title: "Unavailable evidence source",
+            summary: "Core source is unavailable, so App shows a blocker instead of a result.",
+            viewerLabel: "Evidence viewer unavailable",
+            viewerHref: "#evidence-viewer-unavailable",
+            source: "Core fixture",
+          },
+        ],
         process: ["Source health unavailable.", "Task submission remains read-only.", "No Core Run Record is created by App."],
       },
       {
@@ -164,6 +255,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "结果", value: "Expired", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-expired",
+            title: "Expired evidence reference",
+            summary: "Core projection expired; App does not keep a local raw evidence copy.",
+            viewerLabel: "Request fresh evidence viewer link",
+            viewerHref: "#evidence-viewer-expired",
+            source: "Core fixture",
+          },
+        ],
         process: ["Core reported expired result projection.", "App did not cache raw evidence."],
       },
       {
@@ -176,6 +277,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "账号字段", value: "Redacted by owner policy", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-redacted",
+            title: "Redacted evidence projection",
+            summary: "Owner policy redacted sensitive fields before App display.",
+            viewerLabel: "Open allowed evidence viewer link",
+            viewerHref: "#evidence-viewer-redacted",
+            source: "Core fixture",
+          },
+        ],
         process: ["Core returned redacted projection.", "Renderer displayed policy boundary."],
       },
       {
@@ -188,6 +299,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "结果", value: "Unknown outcome", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-unknown",
+            title: "Unknown outcome evidence",
+            summary: "Core cannot classify the run; App keeps the uncertainty visible.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-unknown",
+            source: "Core fixture",
+          },
+        ],
         process: ["Run state could not be classified.", "App keeps unknown outcome visible."],
       },
       {
@@ -200,6 +321,16 @@ export const taskThreadFixtures: TaskProjection[] = [
         owner: "Core",
         source: "Core fixture",
         resultRows: [{ label: "失败阶段", value: "Input validation", source: "Core fixture" }],
+        evidenceCards: [
+          {
+            id: "ev-failure",
+            title: "Failure stage evidence",
+            summary: "Core rejected invalid input; App does not convert this into success.",
+            viewerLabel: "Open evidence viewer link",
+            viewerHref: "#evidence-viewer-failure",
+            source: "Core fixture",
+          },
+        ],
         process: ["Core rejected invalid business input.", "No task success was shown."],
       },
     ],
@@ -214,4 +345,13 @@ export const directSessionFixture: DirectSessionProjection = {
   source: "Harbor fixture",
   summary:
     "direct Identity Runtime Session is Browser/Harbor only; it is not Core Task/Run/Result and must not display as task success.",
+  providerStatus: {
+    provider: "Harbor Browser provider fixture",
+    browserSessionRef: "browser-session://local-chrome/manual-001",
+    status: "connected",
+    viewerRef: "viewer://harbor/local-chrome/manual-001",
+    fetchedAt: "2026-07-03T04:20:00Z",
+    source: "Harbor fixture",
+    boundary: "Provider private endpoint, raw CDP, VNC, credential, cookie, and profile storage are not exposed.",
+  },
 };
