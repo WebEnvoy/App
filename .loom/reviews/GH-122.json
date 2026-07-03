@@ -1,0 +1,20 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-122",
+  "decision": "pending",
+  "kind": "general_review",
+  "summary": "Review not authored yet.",
+  "reviewer": "not_authored_yet",
+  "authored_at": null,
+  "reviewed_head": null,
+  "reviewed_validation_summary": null,
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "semantic_review_disposition": {
+    "status": "pending",
+    "reason": "Awaiting review after repair branch validation is complete."
+  },
+  "consumed_inputs": {}
+}
