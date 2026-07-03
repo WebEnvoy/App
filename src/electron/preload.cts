@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-export type WebEnvoyShellContext = {
+type WebEnvoyShellContext = {
   platform: NodeJS.Platform;
   colorScheme: "light" | "dark";
   configScope: "local-ui-only";

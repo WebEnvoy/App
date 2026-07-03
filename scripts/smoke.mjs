@@ -3,7 +3,7 @@ import ts from "typescript";
 
 const requiredFiles = [
   "dist-electron/main.js",
-  "dist-electron/preload.js",
+  "dist-electron/preload.cjs",
   "dist/renderer/index.html",
   "dist/renderer/assets",
 ];
@@ -13,7 +13,7 @@ for (const file of requiredFiles) {
 }
 
 const mainSource = await readFile("dist-electron/main.js", "utf8");
-const preloadSource = await readFile("dist-electron/preload.js", "utf8");
+const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const rendererAssets = await readFile(
@@ -37,6 +37,10 @@ if (!mainSource.includes("webenvoy:shell-context")) {
 
 if (!preloadSource.includes("webenvoyShell")) {
   throw new Error("Preload smoke failed: shell bridge is missing.");
+}
+
+if (rendererHtml.includes('src="/assets/') || rendererHtml.includes('href="/assets/')) {
+  throw new Error("Renderer smoke failed: packaged assets still use absolute paths.");
 }
 
 if (!rendererHtml.includes("WebEnvoy App")) {
