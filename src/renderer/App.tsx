@@ -39,6 +39,7 @@ import {
   SiteSkillDetailPage,
   SiteSkillDirectoryPage,
 } from "./SiteSkillPages";
+import { SettingsPage } from "./SettingsPage";
 import { siteSkillFixtures, type SiteSkill } from "./siteSkillFixtures";
 import { sourceHealthFixture, type SourceHealth } from "./sourceHealthFixture";
 import {
@@ -61,7 +62,7 @@ type ShellContext = {
   colorScheme: "light" | "dark";
   configScope: "local-ui-only";
 };
-type AppView = "task-thread" | "site-skills";
+type AppView = "task-thread" | "site-skills" | "settings";
 
 const contextTabs = [
   { id: "evidence", label: "结果依据" },
@@ -106,7 +107,11 @@ export function App() {
   const selectedSiteSkill =
     siteSkillFixtures.find((skill) => skill.id === selectedSiteSkillId) ?? siteSkillFixtures[0];
   const isSiteSkillView = activeView === "site-skills";
-  const pageTitle = isSiteSkillView
+  const isSettingsView = activeView === "settings";
+  const isAppLevelView = isSiteSkillView || isSettingsView;
+  const pageTitle = isSettingsView
+    ? "设置"
+    : isSiteSkillView
     ? isSiteSkillDetailOpen
       ? selectedSiteSkill.name
       : "站点技能"
@@ -176,6 +181,10 @@ export function App() {
     setSelectedRunId(task.runs[0].id);
   }
 
+  function openTaskThread() {
+    setActiveView("task-thread");
+  }
+
   function openSiteSkillDirectory() {
     setActiveView("site-skills");
     setSiteSkillDetailOpen(false);
@@ -191,6 +200,21 @@ export function App() {
     const task = taskThreadFixtures.find((item) => item.id === taskId);
     if (task != null) {
       selectTask(task);
+    }
+  }
+
+  function openSettings() {
+    setActiveView("settings");
+  }
+
+  function goBackFromTopbar() {
+    if (isSettingsView) {
+      openTaskThread();
+      return;
+    }
+
+    if (isSiteSkillDetailOpen) {
+      openSiteSkillDirectory();
     }
   }
 
@@ -214,6 +238,22 @@ export function App() {
     setSettingsSaved(true);
   }
 
+  if (isSettingsView) {
+    return (
+      <SettingsPage
+        colorScheme={shellContext?.colorScheme}
+        configScope={shellContext?.configScope}
+        connectionConfig={connectionConfig}
+        platform={shellContext?.platform}
+        settingsError={settingsError}
+        settingsSaved={settingsSaved}
+        onBack={openTaskThread}
+        onEndpointChange={updateEndpoint}
+        onSave={saveSettings}
+      />
+    );
+  }
+
   return (
     <AppShell
       left={
@@ -223,7 +263,7 @@ export function App() {
               <button
                 className={activeView === "task-thread" ? "nav-item nav-item-active" : "nav-item"}
                 type="button"
-                onClick={() => setActiveView("task-thread")}
+                onClick={openTaskThread}
               >
                 <SquarePen size={16} />
                 任务
@@ -283,7 +323,12 @@ export function App() {
                 <strong>Chen</strong>
                 <span>Pro</span>
               </span>
-              <button type="button" aria-label="用户设置">
+              <button
+                className={isSettingsView ? "selected" : undefined}
+                type="button"
+                aria-label="用户设置"
+                onClick={openSettings}
+              >
                 <Settings size={16} />
               </button>
             </footer>
@@ -298,8 +343,8 @@ export function App() {
               className="topbar-icon-button"
               type="button"
               aria-label="后退"
-              disabled={!isSiteSkillView || !isSiteSkillDetailOpen}
-              onClick={openSiteSkillDirectory}
+              disabled={activeView === "task-thread" || (isSiteSkillView && !isSiteSkillDetailOpen)}
+              onClick={goBackFromTopbar}
             >
               <ArrowLeft size={15} />
             </button>
@@ -309,11 +354,11 @@ export function App() {
           </div>
           <div className="topbar-center-surface">
             <span className="topbar-thread-symbol" aria-hidden="true">
-              {isSiteSkillView ? <Box size={15} /> : <FolderKanban size={15} />}
+              {isSettingsView ? <Settings size={15} /> : isSiteSkillView ? <Box size={15} /> : <FolderKanban size={15} />}
             </span>
             <h2 id="thread-title">{pageTitle}</h2>
           </div>
-          {isSiteSkillView ? null : (
+          {isAppLevelView ? null : (
             <div className="topbar-right-slot">
               <button className="topbar-open-button" type="button">
                 <PanelRightOpen size={15} />
@@ -383,7 +428,7 @@ export function App() {
           </ThreadWorkspace>
         )
       }
-      right={isSiteSkillView ? null : (
+      right={isAppLevelView ? null : (
         <RightPanel>
           <aside className="context-panel" aria-label="Task context">
             <PanelTabs
@@ -498,33 +543,6 @@ export function App() {
                   ))}
                 </section>
 
-                <section className="settings-panel" id="settings">
-                  <div className="card-title">
-                    <AlertTriangle size={18} />
-                    <h3>Settings local boundary</h3>
-                  </div>
-                  <p>仅保存本地 endpoint choice。不要输入 token、cookie、profile path 或 raw evidence。</p>
-                  <ConnectionInput
-                    label="Core endpoint"
-                    value={connectionConfig.coreEndpoint}
-                    onChange={(value) => updateEndpoint("coreEndpoint", value)}
-                  />
-                  <ConnectionInput
-                    label="Harbor endpoint"
-                    value={connectionConfig.harborEndpoint}
-                    onChange={(value) => updateEndpoint("harborEndpoint", value)}
-                  />
-                  <ConnectionInput
-                    label="Lode endpoint"
-                    value={connectionConfig.lodeEndpoint}
-                    onChange={(value) => updateEndpoint("lodeEndpoint", value)}
-                  />
-                  <button className="save-button" type="button" onClick={saveSettings}>
-                    保存本地配置
-                  </button>
-                  {settingsError ? <p className="settings-error" role="alert">{settingsError}</p> : null}
-                  <span className="settings-saved">{settingsSaved ? "Saved locally" : "Not saved"}</span>
-                </section>
           </aside>
         </RightPanel>
       )}
@@ -833,22 +851,5 @@ function ContextPanel({
       </div>
       <p>{body}</p>
     </div>
-  );
-}
-
-function ConnectionInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="connection-field">
-      <span>{label}</span>
-      <input value={value} onChange={(event) => onChange(event.currentTarget.value)} />
-    </label>
   );
 }
