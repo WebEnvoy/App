@@ -3,10 +3,10 @@
   "item_id": "GH-122",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Final closeout review approved GH-122 idle current pointer state on head b49e204c5606e113aa5c7319dc31eeeaaa5b0dda. The delta only switches the repo-level Loom current pointer to no_active_item after GH-122 terminal closeout.",
+  "summary": "Final closeout review approved GH-122 idle current pointer state on head d41aa50b54f64eabf706cf191fed2e737c882684. The delta only switches the repo-level Loom current pointer to no_active_item after GH-122 terminal closeout and aligns GH-122 recovery summary for PR #125.",
   "reviewer": "codex-coordinator",
-  "authored_at": "2026-07-03T02:42:00Z",
-  "reviewed_head": "b49e204c5606e113aa5c7319dc31eeeaaa5b0dda",
+  "authored_at": "2026-07-03T02:45:30Z",
+  "reviewed_head": "d41aa50b54f64eabf706cf191fed2e737c882684",
   "reviewed_validation_summary": "`git diff --check` passed; `loom doctor --target . --json` passed; `loom verify --target . --json` passed; `loom fact-chain --target . --json` passed. GH-100 retest no longer reports GH-111/GH-117/GH-122 stale/current mismatch; workspace lifecycle now falls back only because the repository is idle pending GH-100 admission.",
   "fallback_to": null,
   "findings": [],
@@ -14,11 +14,11 @@
   "follow_ups": [],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored final closeout review approved the GH-122 idle-current carrier head; subsequent drift must remain limited to GH-122 Loom review carrier metadata for this closeout PR."
+    "reason": "Authored final closeout review approved the GH-122 idle-current carrier and recovery-summary head; subsequent drift must remain limited to GH-122 Loom review carrier metadata for this closeout PR."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
-    "pull_request": "https://github.com/WebEnvoy/App/pull/123",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/125",
     "work_item": "GH-122",
     "validation": "git diff --check; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; CODEX_EXPORT_GH_TOKEN=1 loom workspace locate --target . --item GH-122 --json; CODEX_EXPORT_GH_TOKEN=1 loom issue bind 100 --work-item GH-100 --json; CODEX_EXPORT_GH_TOKEN=1 loom workspace create --target . --item GH-100 --branch work/GH-100-vite-electron-react-ts-skeleton --path /Volumes/2T/.codex/worktrees/3c80-gh100-test --start-point origin/main --json"
   }
