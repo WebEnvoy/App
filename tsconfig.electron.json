@@ -12,5 +12,5 @@
     "rootDir": "src/electron",
     "types": ["node"]
   },
-  "include": ["src/electron/**/*.ts"]
+  "include": ["src/electron/**/*.ts", "src/electron/**/*.cts"]
 }
