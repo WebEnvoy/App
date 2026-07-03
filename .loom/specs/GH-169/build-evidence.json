@@ -11,52 +11,54 @@
         "src/renderer/App.tsx",
         "src/renderer/shellPrimitives.tsx",
         "src/renderer/styles.css",
+        "src/renderer/uiFoundation.css",
+        "DESIGN.md",
         "src/electron/main.ts",
         "scripts/smoke-packaged.mjs",
         "artifacts/gh-169-codex-app-reference.png",
         "artifacts/gh-169-codex-like-shell.png"
       ],
-      "summary": "Added fixture-only Codex-like shell primitives, recomposed the renderer into left panel, thread workspace, right inspector, tabs, right resize, focus areas, and bottom action slot, then reworked the shell toward restored Codex AppShellLayout's flex shell/main-surface/viewport/frame/right-panel/bottom-slot structure. Absorbed restored ResizeHandle-style pointer drag, pointer cancel, double-click reset, drag-to-collapse thresholds, left/right panel collapse rails, and bottom panel resize/collapse. Captured Codex reference and packaged Electron screenshots for direction review."
+      "summary": "Added fixture-only Codex-like shell primitives, recomposed the renderer into left panel, thread workspace, right inspector, tabs, right resize, focus areas, and bottom action slot, then reworked the shell toward restored Codex AppShellLayout's flex shell/main-surface/viewport/frame/right-panel/bottom-slot structure. Absorbed restored ResizeHandle-style pointer drag, pointer cancel, double-click reset, drag-to-collapse thresholds, left/right panel collapse rails, bottom panel resize/collapse, navigation rail hover/scrub, app-level site skill/settings page strategy, and token/primitive foundation rules. Captured Codex reference and packaged Electron screenshots for direction review."
     }
   ],
   "validation": [
     {
-      "command": "npm run typecheck",
+      "command": "npm run build",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:00:00Z",
-      "summary": "Renderer and Electron TypeScript checks passed after primitive integration."
+      "recorded_at": "2026-07-03T17:43:00Z",
+      "summary": "Renderer and Electron TypeScript checks passed; Electron main build and Vite renderer build passed after DESIGN foundation update."
     },
     {
       "command": "WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:20:00Z",
-      "summary": "Build passed after Codex restored layout and panel behavior absorption; packaged smoke verified non-empty renderer, preload injection, left/right panel toggle collapse and restore, and nonblank screenshot. Screenshot: artifacts/gh-169-codex-like-shell.png"
+      "recorded_at": "2026-07-03T17:43:00Z",
+      "summary": "Build passed after Codex-style foundation documentation update; packaged smoke verified non-empty renderer, preload injection, left/right panel toggle collapse and restore, and nonblank screenshot. Screenshot: artifacts/gh-169-codex-like-shell.png"
     },
     {
       "command": "git diff --check",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:02:00Z"
+      "recorded_at": "2026-07-03T17:43:00Z"
     },
     {
       "command": "loom doctor --target . --json",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:02:34Z"
+      "recorded_at": "2026-07-03T17:43:16Z"
     },
     {
       "command": "loom verify --target . --json",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:02:34Z"
+      "recorded_at": "2026-07-03T17:43:16Z"
     },
     {
       "command": "loom fact-chain --target . --json",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:02:50Z"
+      "recorded_at": "2026-07-03T17:43:15Z"
     }
   ],
   "codegraph_references": [
     {
       "source": "/Volumes/2T/dev/codexdecode/decode-codex/restored",
-      "summary": "Explored and absorbed maintainable structure from restored `app-shell/app-shell-layout.tsx`, `app-shell/left-panel.tsx`, `app-shell/right-panel.tsx`, `app-shell/bottom-panel.tsx`, and `app-shell/resize-handle.tsx`: flex shell, main surface, main content viewport/frame, right panel slot, bottom panel slot, focus-area capture, panel resize handles, drag-to-collapse thresholds, pointer cancel, and double-click reset. Did not copy motion/signal runtime, VSCode bridge, vendor bundle, or Codex business semantics."
+      "summary": "Explored and absorbed maintainable structure from restored `app-shell/app-shell-layout.tsx`, `app-shell/left-panel.tsx`, `app-shell/right-panel.tsx`, `app-shell/bottom-panel.tsx`, `app-shell/resize-handle.tsx`, `threads/lazy-navigation-rail.tsx`, `threads/thread-user-message-navigation-rail/preview-impl.tsx`, restored plugin page primitives, and settings page structure: flex shell, main surface, main content viewport/frame, right panel slot, bottom panel slot, focus-area capture, panel resize handles, drag-to-collapse thresholds, pointer cancel, double-click reset, navigation rail hover preview/scrub, app-level pages, and dense tabs/list rows. Did not copy motion/signal runtime, VSCode bridge, vendor bundle, plugin business semantics, or Codex product semantics."
     },
     {
       "source": "/Volumes/2T/.codex/worktrees/da84/App",
