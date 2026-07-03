@@ -319,12 +319,11 @@ h3 {
   grid-template-columns:
     max(var(--header-left-slot-width), 188px)
     minmax(0, 1fr)
-    max(var(--header-right-slot-width), 150px);
+    minmax(max-content, var(--header-right-slot-width));
   height: var(--toolbar-height);
   min-height: var(--toolbar-height);
   align-items: stretch;
   background: transparent;
-  transition: grid-template-columns 500ms cubic-bezier(0.22, 1, 0.36, 1);
   -webkit-app-region: drag;
 }
 
@@ -362,9 +361,14 @@ h3 {
   gap: 6px;
   justify-content: flex-end;
   min-width: 0;
+  overflow: hidden;
   padding-right: 8px;
   border-bottom: 1px solid #e6e9ee;
   background: rgba(255, 255, 255, 0.96);
+}
+
+.app-shell[data-right-panel-open="false"] .shell-panel-toggle-right-fullscreen {
+  display: none;
 }
 
 .topbar-left-slot button,

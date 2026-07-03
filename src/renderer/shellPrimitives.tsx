@@ -81,6 +81,8 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       : rightWidth;
   const fullscreenRightWidth = getAvailableRightPanelWidth(contentRegionWidth, true);
   const visibleRightWidth = isRightFullscreen ? fullscreenRightWidth : effectiveRightWidth;
+  const rightPanelAnimation = usePanelAnimation(isRightOpen);
+  const renderedRightWidth = Math.max(0, Math.min(1, rightPanelAnimation.progress)) * visibleRightWidth;
 
   useEffect(() => {
     const element = contentRegionBodyRef.current;
@@ -215,11 +217,11 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       data-left-panel-width={isLeftOpen ? leftWidth : 0}
       data-right-panel-open={isRightOpen}
       data-right-panel-fullscreen={isRightFullscreen}
-      data-right-panel-width={isRightOpen ? visibleRightWidth : 0}
+      data-right-panel-width={isRightOpen ? renderedRightWidth : 0}
       style={
         {
           "--header-left-slot-width": `${isLeftOpen ? leftWidth : 0}px`,
-          "--header-right-slot-width": `${isRightOpen ? visibleRightWidth : 0}px`,
+          "--header-right-slot-width": `${renderedRightWidth}px`,
           "--right-panel-width": `${isRightOpen ? visibleRightWidth : 34}px`,
         } as CSSProperties
       }
@@ -295,6 +297,7 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
               maxWidth={rightPanelMaxWidth}
               collapseBelow={RIGHT_PANEL_COLLAPSE_WIDTH}
               resizable={!isRightFullscreen}
+              animationProgress={rightPanelAnimation.progress}
               onCollapse={() => setRightOpen(false)}
               onOpen={() => setRightOpen(true)}
               onResize={(width) => {
@@ -419,6 +422,7 @@ export function ResizablePanel({
   onResizeEnd,
   className = "",
   resizable = true,
+  animationProgress,
   children,
 }: {
   side: "left" | "right";
@@ -434,11 +438,13 @@ export function ResizablePanel({
   onResizeEnd?: (width: number) => void;
   className?: string;
   resizable?: boolean;
+  animationProgress?: number;
   children: ReactNode;
 }) {
   const [isResizing, setIsResizing] = useState(false);
   const panelAnimation = usePanelAnimation(isOpen);
-  const renderedWidth = Math.max(0, Math.min(1, panelAnimation.progress)) * width;
+  const progress = Math.max(0, Math.min(1, animationProgress ?? panelAnimation.progress));
+  const renderedWidth = progress * width;
 
   const setSize = useCallback((size: number) => {
     const shouldBeOpen = size >= collapseBelow;
@@ -490,7 +496,7 @@ export function ResizablePanel({
       data-resizing={isResizing ? "true" : "false"}
       style={
         {
-          opacity: panelAnimation.progress,
+          opacity: progress,
           flexBasis: renderedWidth,
           maxWidth,
           minWidth: 0,
