@@ -15,7 +15,7 @@
 - Current Stop: Implement Codex-like shell primitives spike, capture packaged Electron screenshot, open direction confirmation PR, then stop before #170.
 - Next Step: Validate packaged preview and PR metadata after implementation.
 - Blockers: none recorded.
-- Latest Validation Summary: CodeGraph exploration completed for restored Codex source and this repo; restored `AppShellLayout` flex shell/main-surface/viewport/frame/right-panel/bottom-slot structure was mapped into WebEnvoy-native primitives; `npm run typecheck` and `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged` passed. Screenshot: `artifacts/gh-169-codex-like-shell.png`.
+- Latest Validation Summary: CodeGraph exploration completed for restored Codex source and this repo; restored `AppShellLayout`, `LeftPanel`, `RightPanel`, `BottomPanel`, and `ResizeHandle` structure was mapped into WebEnvoy-native primitives; `npm run typecheck` and `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged` passed, including panel toggle smoke. Screenshot: `artifacts/gh-169-codex-like-shell.png`.
 - Recovery Boundary: GH-169 owns only shell primitives spike and fixture-based preview evidence. It does not migrate #93/#94/#95 business content and does not connect live Core/Harbor/Lode.
 - Current Lane: GH-169 implementation
 

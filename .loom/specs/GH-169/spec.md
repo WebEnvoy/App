@@ -7,7 +7,8 @@ Build a Codex-like desktop shell spike that can be reviewed in packaged Electron
 ## Required Behavior
 
 - Provide WebEnvoy-native shell primitives named `AppShell`, `LeftPanel`, `ThreadWorkspace`, `RightPanel`, `BottomPanelSlot`, `PanelTabs`, `ResizablePanel`, and `FocusArea`.
-- Present the existing fixture data inside a desktop workbench structure: left navigation, central thread workspace, right inspector, panel tabs, sticky bottom action slot, focus area markers, and resizable right panel.
+- Present the existing fixture data inside a desktop workbench structure: left navigation, central thread workspace, right inspector, panel tabs, sticky bottom action slot, focus area markers, resizable left/right panels, and resizable bottom panel slot.
+- Panel behavior must include left/right expand-collapse, drag resize, drag-to-collapse threshold, double-click resize reset, right inspector tabs, bottom slot resize/collapse, and packaged smoke coverage for panel toggle behavior.
 - Use fixture data only. Do not migrate #93/#94/#95 business content.
 - Preserve WebEnvoy semantics for Task, Run, Evidence, Identity, Site Skill, and Harbor Session labels where fixture content is shown.
 - Produce a packaged Electron screenshot for direction confirmation.
@@ -21,12 +22,12 @@ Build a Codex-like desktop shell spike that can be reviewed in packaged Electron
 ## Codex Restored Reference Requirement
 
 - PR body must include `Codex restored references`.
-- The section must list restored symbols/files explored, mechanisms absorbed, mechanisms not absorbed, and why this lowers direction mismatch risk.
+- The section must list restored symbols/files explored, mechanisms absorbed, mechanisms not absorbed, screenshot comparison against Codex/design references, and why this lowers direction mismatch risk.
 
 ## Acceptance Checks
 
 - `npm run typecheck` passes.
-- `npm run smoke:packaged` passes and captures a nonblank packaged Electron screenshot.
+- `npm run smoke:packaged` passes, verifies panel toggle behavior, and captures a nonblank packaged Electron screenshot.
 - `git diff --check` passes.
 - `loom doctor --target . --json`, `loom verify --target . --json`, and `loom fact-chain --target . --json` pass or any Loom tool-surface blocker is classified.
 

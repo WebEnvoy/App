@@ -1,25 +1,35 @@
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   AlertTriangle,
+  ArrowUp,
   BadgeCheck,
   Box,
   Braces,
+  ChevronDown,
   CircleDot,
   DatabaseZap,
   ExternalLink,
   FolderKanban,
   Globe2,
   HardDrive,
+  Mic,
+  MoreHorizontal,
+  Paperclip,
   Plus,
   PanelRightOpen,
   Search,
   Settings,
   ShieldCheck,
+  Target,
   Waypoints,
+  Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { handleTypeToComposer, registerComposerInput } from "./focusComposer";
 import {
   defaultConnectionConfig,
   loadLocalConnectionConfig,
@@ -90,11 +100,29 @@ export function App() {
 
     setConnectionConfig(loadLocalConnectionConfig());
 
-    window.webenvoyShell.getShellContext().then((context) => {
-      if (!cancelled) {
-        setShellContext(context);
-      }
-    });
+    const shellContext =
+      window.webenvoyShell?.getShellContext?.() ??
+      Promise.resolve({
+        platform: "browser",
+        colorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+        configScope: "local-ui-only" as const,
+      });
+
+    shellContext
+      .then((context) => {
+        if (!cancelled) {
+          setShellContext(context);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setShellContext({
+            platform: "browser",
+            colorScheme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+            configScope: "local-ui-only",
+          });
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -131,117 +159,104 @@ export function App() {
       left={
         <LeftPanel>
           <aside className="sidebar" aria-label="Task Thread navigation">
-        <div className="brand-lockup">
-          <div className="window-lights" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div>
-            <h1>WebEnvoy App</h1>
-          </div>
-        </div>
-
-        <button className="new-task-button" type="button">
-          <Plus size={16} />
-          新建任务
-        </button>
-
-        <nav className="global-nav" aria-label="Global navigation">
-          <a className="nav-item nav-item-active" href="#task-thread">
-            <FolderKanban size={16} />
-            任务
-          </a>
-          <a className="nav-item" href="#source-health">
-            <DatabaseZap size={16} />
-            Source health
-          </a>
-          <a className="nav-item" href="#settings">
-            <Settings size={16} />
-            Settings
-          </a>
-          <a className="nav-item" href="#search">
-            <Search size={16} />
-            Search
-          </a>
-        </nav>
-
-        <section className="task-tree" aria-label="Tasks grouped by account identity">
-          <div className="section-heading">
-            <span>任务</span>
-            <button type="button" aria-label="Read-only task creation entry">
-              +
+            <button className="new-task-button" type="button">
+              <Plus size={16} />
+              新建任务
             </button>
-          </div>
 
-          {taskThreadFixtures.map((task) => (
-            <div className="tree-account" key={task.id}>
-              <div className="tree-account-label">
-                <HardDrive size={14} />
-                {task.accountIdentity}
-              </div>
-              <div className="tree-skill">
-                <span>{task.siteSkill}</span>
-                <button
-                  className={task.id === selectedTask.id ? "tree-task selected" : "tree-task"}
-                  type="button"
-                  onClick={() => selectTask(task)}
-                >
-                  <CircleDot size={12} />
-                  {task.title}
+            <nav className="global-nav" aria-label="Global navigation">
+              <a className="nav-item nav-item-active" href="#task-thread">
+                <FolderKanban size={16} />
+                任务
+              </a>
+              <a className="nav-item" href="#source-health">
+                <DatabaseZap size={16} />
+                Source health
+              </a>
+              <a className="nav-item" href="#settings">
+                <Settings size={16} />
+                Settings
+              </a>
+              <a className="nav-item" href="#search">
+                <Search size={16} />
+                Search
+              </a>
+            </nav>
+
+            <section className="task-tree" aria-label="Tasks grouped by account identity">
+              <div className="section-heading">
+                <span>任务</span>
+                <button type="button" aria-label="Read-only task creation entry">
+                  +
                 </button>
               </div>
-            </div>
-          ))}
 
-          <article className="direct-session-card">
-            <strong>{directSessionFixture.title}</strong>
-            <span>{directSessionFixture.accountIdentity}</span>
-            <p>{directSessionFixture.summary}</p>
-          </article>
-        </section>
+              {taskThreadFixtures.map((task) => (
+                <div className="tree-account" key={task.id}>
+                  <div className="tree-account-label">
+                    <HardDrive size={14} />
+                    {task.accountIdentity}
+                  </div>
+                  <div className="tree-skill">
+                    <span>{task.siteSkill}</span>
+                    <button
+                      className={task.id === selectedTask.id ? "tree-task selected" : "tree-task"}
+                      type="button"
+                      onClick={() => selectTask(task)}
+                    >
+                      <CircleDot size={12} />
+                      {task.title}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <article className="direct-session-card">
+                <strong>{directSessionFixture.title}</strong>
+                <span>{directSessionFixture.accountIdentity}</span>
+                <p>{directSessionFixture.summary}</p>
+              </article>
+            </section>
           </aside>
         </LeftPanel>
       }
+      header={(panelControls) => (
+        <header className="shell-topbar" aria-label="Task Thread toolbar">
+          <div className="topbar-left-slot">
+            {panelControls.left}
+            <button className="topbar-icon-button" type="button" aria-label="后退" disabled>
+              <ArrowLeft size={15} />
+            </button>
+            <button className="topbar-icon-button" type="button" aria-label="前进" disabled>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+          <div className="topbar-center-surface">
+            <span className="topbar-thread-symbol" aria-hidden="true">
+              <FolderKanban size={15} />
+            </span>
+            <h2 id="thread-title">{selectedTask.title}</h2>
+            <span className="thread-state">已完成未读</span>
+            <CircleDot className="thread-state-dot" size={10} />
+            <button className="topbar-icon-button" type="button" aria-label="更多操作">
+              <MoreHorizontal size={16} />
+            </button>
+          </div>
+          <div className="topbar-right-slot">
+            <button className="topbar-open-button" type="button">
+              <PanelRightOpen size={15} />
+              打开
+              <ChevronDown size={14} />
+            </button>
+            {panelControls.right}
+          </div>
+        </header>
+      )}
       workspace={
         <ThreadWorkspace
-          header={
-            <header className="thread-header">
-              <div className="thread-title-block">
-                <div className="thread-title-row">
-                  <div className="thread-icon">
-                    <Box size={22} />
-                  </div>
-                  <h2 id="thread-title">{selectedTask.title}</h2>
-                  <span className="thread-state">已完成未读</span>
-                  <CircleDot className="thread-state-dot" size={12} />
-                </div>
-                <div className="thread-meta">
-                  <span>站点技能 · {selectedTask.siteSkill}</span>
-                  <span>账号身份 · {selectedTask.accountIdentity}</span>
-                  <span>业务输入 · {selectedTask.businessInput}</span>
-                </div>
-              </div>
-              <button className="panel-button" type="button">
-                <PanelRightOpen size={16} />
-                打开
-              </button>
-            </header>
-          }
-          bottom={
-            <footer className="thread-actions" aria-label="Task actions">
-              <button type="button" disabled>
-                修改输入
-              </button>
-              <button type="button" disabled>
-                再次执行
-              </button>
-              <button type="button">查看结果依据</button>
-              <button type="button">打开执行现场</button>
-            </footer>
-          }
+          composer={<ThreadComposer selectedRun={selectedRun} selectedTask={selectedTask} />}
         >
-        <div className="thread-body">
+          <div className="thread-body">
           <nav className="run-rail" aria-label="Core-owned run navigation">
             {selectedTask.runs.map((run) => (
               <button
@@ -255,6 +270,12 @@ export function App() {
           </nav>
 
           <div className="thread-content">
+            <div className="thread-context-strip" aria-label="Task context">
+              <span>站点技能 · {selectedTask.siteSkill}</span>
+              <span>账号身份 · {selectedTask.accountIdentity}</span>
+              <span>业务输入 · {selectedTask.businessInput}</span>
+            </div>
+
             <section className="run-summary-card">
               <div className="card-title">
                 <span className="disclosure">›</span>
@@ -329,7 +350,7 @@ export function App() {
               </ol>
             </section>
           </div>
-        </div>
+          </div>
         </ThreadWorkspace>
       }
       right={
@@ -479,6 +500,201 @@ export function App() {
       }
     />
   );
+}
+
+function ThreadComposer({
+  selectedRun,
+  selectedTask,
+}: {
+  selectedRun: RunProjection;
+  selectedTask: TaskProjection;
+}) {
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
+  const [draft, setDraft] = useState("");
+  const [footerMeasure, setFooterMeasure] = useState({
+    actionsWidth: 0,
+    columnGap: 0,
+    containerWidth: 0,
+  });
+  const availableFooterWidth = Math.max(
+    0,
+    footerMeasure.containerWidth -
+      footerMeasure.actionsWidth -
+      (footerMeasure.actionsWidth > 0 ? footerMeasure.columnGap : 0),
+  );
+  const hideRunContext = availableFooterWidth > 0 && availableFooterWidth < 128;
+  const hideSkillContext = availableFooterWidth > 0 && availableFooterWidth < 96;
+  const hideAccessControl = availableFooterWidth > 0 && availableFooterWidth < 62;
+
+  useEffect(() => {
+    const composerInput = inputRef.current;
+    if (composerInput == null) {
+      return;
+    }
+
+    return registerComposerInput(composerInput, {
+      composerId: "task-thread-primary",
+      isPrimaryComposer: true,
+    });
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const composerInput = inputRef.current;
+      if (composerInput == null) {
+        return;
+      }
+
+      handleTypeToComposer({
+        event,
+        composerController: {
+          focus: () => composerInput.focus(),
+          insertTextAtSelection: (text) =>
+            insertComposerText(composerInput, text, setDraft),
+        },
+      });
+    }
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
+
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    const actions = actionsRef.current;
+    if (
+      toolbar == null ||
+      actions == null ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      return;
+    }
+
+    let animationFrame = 0;
+    const readMeasure = () => {
+      const { columnGap, gap } = window.getComputedStyle(toolbar);
+      const nextMeasure = {
+        actionsWidth: actions.getBoundingClientRect().width,
+        columnGap: Number.parseFloat(columnGap) || Number.parseFloat(gap) || 0,
+        containerWidth: toolbar.getBoundingClientRect().width,
+      };
+
+      setFooterMeasure((currentMeasure) =>
+        Math.abs(currentMeasure.actionsWidth - nextMeasure.actionsWidth) < 0.5 &&
+        Math.abs(currentMeasure.columnGap - nextMeasure.columnGap) < 0.5 &&
+        Math.abs(currentMeasure.containerWidth - nextMeasure.containerWidth) < 0.5
+          ? currentMeasure
+          : nextMeasure,
+      );
+    };
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(readMeasure);
+    };
+
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(toolbar);
+    observer.observe(actions);
+    readMeasure();
+    window.addEventListener("resize", scheduleMeasure);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+    };
+  }, []);
+
+  return (
+    <form
+      className="thread-composer"
+      aria-label="Task thread composer"
+      onSubmit={(event) => event.preventDefault()}
+    >
+      <textarea
+        ref={inputRef}
+        data-webenvoy-composer=""
+        value={draft}
+        rows={2}
+        placeholder="要求后续变更"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="composer-toolbar" ref={toolbarRef}>
+        <div className="composer-inline-controls">
+          <button className="composer-icon-button" type="button" aria-label="添加上下文">
+            <Plus size={15} />
+          </button>
+          <button
+            className={
+              hideAccessControl
+                ? "composer-access composer-control-hidden"
+                : "composer-access"
+            }
+            type="button"
+          >
+            <ShieldCheck size={14} />
+            <span className="composer-button-label">只读边界</span>
+          </button>
+        </div>
+        <div className="composer-expanding-controls">
+          <button
+            className={
+              hideSkillContext
+                ? "composer-context-pill composer-context-skill composer-control-hidden"
+                : "composer-context-pill composer-context-skill"
+            }
+            type="button"
+          >
+            <Target size={14} />
+            <span className="composer-button-label">{selectedTask.siteSkill}</span>
+          </button>
+          <button
+            className={
+              hideRunContext
+                ? "composer-context-pill composer-context-run composer-control-hidden"
+                : "composer-context-pill composer-context-run"
+            }
+            type="button"
+          >
+            <Zap size={14} />
+            <span className="composer-button-label">{selectedRun.label}</span>
+          </button>
+        </div>
+        <div className="composer-actions" ref={actionsRef}>
+          <button className="composer-icon-button" type="button" aria-label="附件">
+            <Paperclip size={15} />
+          </button>
+          <button className="composer-icon-button" type="button" aria-label="语音输入">
+            <Mic size={15} />
+          </button>
+          <button className="composer-send" type="submit" aria-label="发送" disabled>
+            <ArrowUp size={16} />
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function insertComposerText(
+  composerInput: HTMLTextAreaElement,
+  text: string,
+  setDraft: (value: string) => void,
+) {
+  const selectionStart = composerInput.selectionStart;
+  const selectionEnd = composerInput.selectionEnd;
+  const nextValue =
+    composerInput.value.slice(0, selectionStart) +
+    text +
+    composerInput.value.slice(selectionEnd);
+
+  setDraft(nextValue);
+  requestAnimationFrame(() => {
+    const nextPosition = selectionStart + text.length;
+    composerInput.selectionStart = nextPosition;
+    composerInput.selectionEnd = nextPosition;
+  });
 }
 
 function SourceField({

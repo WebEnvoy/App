@@ -7,7 +7,7 @@ type WebEnvoyShellContext = {
 };
 
 interface Window {
-  webenvoyShell: {
+  webenvoyShell?: {
     getShellContext: () => Promise<WebEnvoyShellContext>;
   };
 }

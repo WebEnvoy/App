@@ -11,10 +11,12 @@
         "src/renderer/App.tsx",
         "src/renderer/shellPrimitives.tsx",
         "src/renderer/styles.css",
+        "src/electron/main.ts",
         "scripts/smoke-packaged.mjs",
+        "artifacts/gh-169-codex-app-reference.png",
         "artifacts/gh-169-codex-like-shell.png"
       ],
-      "summary": "Added fixture-only Codex-like shell primitives, recomposed the renderer into left panel, thread workspace, right inspector, tabs, right resize, focus areas, and bottom action slot, then reworked the shell toward restored Codex AppShellLayout's flex shell/main-surface/viewport/frame/right-panel/bottom-slot structure. Captured a packaged Electron screenshot for direction review."
+      "summary": "Added fixture-only Codex-like shell primitives, recomposed the renderer into left panel, thread workspace, right inspector, tabs, right resize, focus areas, and bottom action slot, then reworked the shell toward restored Codex AppShellLayout's flex shell/main-surface/viewport/frame/right-panel/bottom-slot structure. Absorbed restored ResizeHandle-style pointer drag, pointer cancel, double-click reset, drag-to-collapse thresholds, left/right panel collapse rails, and bottom panel resize/collapse. Captured Codex reference and packaged Electron screenshots for direction review."
     }
   ],
   "validation": [
@@ -27,8 +29,8 @@
     {
       "command": "WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged",
       "result": "pass",
-      "recorded_at": "2026-07-03T10:09:00Z",
-      "summary": "Build passed after Codex restored layout absorption; packaged smoke verified non-empty renderer and preload injection. Screenshot: artifacts/gh-169-codex-like-shell.png"
+      "recorded_at": "2026-07-03T10:20:00Z",
+      "summary": "Build passed after Codex restored layout and panel behavior absorption; packaged smoke verified non-empty renderer, preload injection, left/right panel toggle collapse and restore, and nonblank screenshot. Screenshot: artifacts/gh-169-codex-like-shell.png"
     },
     {
       "command": "git diff --check",
@@ -54,7 +56,7 @@
   "codegraph_references": [
     {
       "source": "/Volumes/2T/dev/codexdecode/decode-codex/restored",
-      "summary": "Explored and absorbed maintainable structure from restored `app-shell/app-shell-layout.tsx`: flex shell, main surface, main content viewport/frame, right panel slot, bottom panel slot, and focus-area capture. Did not copy motion/signal runtime, VSCode bridge, vendor bundle, or Codex business semantics."
+      "summary": "Explored and absorbed maintainable structure from restored `app-shell/app-shell-layout.tsx`, `app-shell/left-panel.tsx`, `app-shell/right-panel.tsx`, `app-shell/bottom-panel.tsx`, and `app-shell/resize-handle.tsx`: flex shell, main surface, main content viewport/frame, right panel slot, bottom panel slot, focus-area capture, panel resize handles, drag-to-collapse thresholds, pointer cancel, and double-click reset. Did not copy motion/signal runtime, VSCode bridge, vendor bundle, or Codex business semantics."
     },
     {
       "source": "/Volumes/2T/.codex/worktrees/da84/App",
@@ -80,6 +82,20 @@
       "Codex private runtime or business semantics"
     ]
   },
+  "screenshot_comparison": [
+    {
+      "source": "artifacts/gh-169-codex-app-reference.png",
+      "summary": "Codex app reference used for left sidebar density, no title at sidebar top, panel control icon treatment, central thread scroll, and right-side inspector placement."
+    },
+    {
+      "source": "docs/design/desktop-task-thread-direction.png",
+      "summary": "WebEnvoy design direction used for Task/Run/Evidence/Identity/Site Skill/Harbor Session semantics and task-thread information architecture."
+    },
+    {
+      "source": "artifacts/gh-169-codex-like-shell.png",
+      "summary": "Packaged Electron preview captured after each implementation pass and compared against Codex reference and WebEnvoy direction image; latest screenshot removes left-sidebar title and places icon panel controls in the header action area."
+    }
+  ],
   "notes": [
     "Subagent not used: #169 writes one shared renderer shell and one shared Loom carrier; parallel writers would increase conflict risk.",
     "The local .codegraph index is tool state and is not part of the PR.",
