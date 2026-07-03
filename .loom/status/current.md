@@ -6,7 +6,7 @@
 - Goal: Fix packaged Electron blank startup by making renderer assets and preload injection work under `file://`.
 - Scope: GitHub issue #168; parent #167 post-closeout Desktop UI quality. Out of scope: UI redesign, Task Thread migration, Stage 5, live Core/Harbor/Lode.
 - Execution Path: implementation_pr
-- Workspace Entry: /Volumes/2T/.codex/worktrees/da84/App
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-168.md
 - Review Entry: .loom/reviews/GH-168.json
 - Validation Entry: npm run build; npm run smoke:packaged; npm run smoke; npm audit --audit-level=high; git diff --check; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json
