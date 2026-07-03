@@ -2,8 +2,8 @@
   "schema_version": "loom-review/v1",
   "item_id": "GH-101",
   "decision": "allow",
-  "kind": "code_review",
-  "summary": "Manual current-head implementation review approved GH-101 product/content head 306ef287536e1c06c7ab4af026714f9e3ffc093f. The diff implements only the #101-#104 shell batch: Radix/lucide shell primitives, Core/Harbor/Lode source health fixture, Settings local endpoint boundary, and Task Thread first base layout. It does not implement #105-#113, real Core/Harbor/Lode calls, task submission, run/result/evidence behavior, write-side behavior, full Library/Browser management, or workflow runtime/editor UI.",
+  "kind": "spec_review",
+  "summary": "Manual spec review approved GH-101 product/content head 306ef287536e1c06c7ab4af026714f9e3ffc093f. The minimal spec, plan, implementation contract, task carrier, and build evidence describe a bounded #101-#104 shell batch and explicitly exclude #105-#113, real owner API calls, task/run/result/evidence behavior, write-side behavior, full Library/Browser management, and workflow runtime/editor UI.",
   "reviewer": "codex-main",
   "authored_at": "2026-07-03T04:55:54Z",
   "reviewed_head": "306ef287536e1c06c7ab4af026714f9e3ffc093f",
@@ -18,15 +18,18 @@
   ],
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Manual review of `git diff origin/main...HEAD` found the GH-101 implementation within the approved #101-#104 shell batch scope. Electron main/preload only expose OS/local shell context, Settings persists endpoint choices only after validation, source health remains fixture-only, and no credential/cookie/profile/raw evidence/run truth/session truth/package truth persistence was introduced."
+    "reason": "The GH-101 spec path is minimal and sufficient for the shell batch. It preserves Task Thread first scope, direct Identity Runtime Session boundaries, Core task path boundaries, Lode capability metadata-first semantics, and the Electron OS/local-config boundary."
   },
   "consumed_inputs": {
     "repository": "WebEnvoy/App",
     "pull_request": "https://github.com/WebEnvoy/App/pull/129",
     "work_item": "GH-101",
-    "covered_work_items": "#101 #102 #103 #104",
-    "reviewed_diff": "git diff origin/main...HEAD",
-    "validation": "npm run smoke; npm audit --audit-level=high; git diff --check; loom fact-chain --target . --json; loom doctor --target . --json; loom verify --target . --json; loom suite validate --target . --item GH-101 --json; loom suite carrier validate --target . --item GH-101 --json",
+    "spec": ".loom/specs/GH-101/spec.md",
+    "plan": ".loom/specs/GH-101/plan.md",
+    "implementation_contract": ".loom/specs/GH-101/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-101/task-carrier.md",
+    "suite_path": "minimal",
+    "suite_validation": "loom suite validate --target . --item GH-101 --json; loom suite carrier validate --target . --item GH-101 --json",
     "known_tool_blocker": "loom build / review record suite CLI JSON consumption blocked; no repo-local tools/loom.py added"
   }
 }
