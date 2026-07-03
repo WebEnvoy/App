@@ -6,7 +6,7 @@
 - Goal: Complete #95 evidence, site skill source, Browser session references, and vertical read-only demo smoke batch.
 - Scope: GH-110 batch covers #110, #111, #112, #113 for parent #95. Out of scope: Stage 5, Library lifecycle, write-side, full Browser management.
 - Execution Path: implementation_pr
-- Workspace Entry: /Volumes/2T/.codex/worktrees/3c80-gh110-evidence-context-batch
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/GH-110.md
 - Review Entry: .loom/reviews/GH-110.json
 - Validation Entry: npm run typecheck; npm run smoke; npm audit --audit-level=high; git diff --check; loom fact-chain --target . --json; loom doctor --target . --json; loom verify --target . --json
