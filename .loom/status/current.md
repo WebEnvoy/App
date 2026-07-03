@@ -2,22 +2,22 @@
 
 ## Derived Fact Chain View
 
-- Item ID: no_active_item
-- Goal: not_applicable
-- Scope: not_applicable
-- Execution Path: not_applicable
-- Workspace Entry: not_applicable
-- Recovery Entry: not_applicable
-- Review Entry: not_applicable
-- Validation Entry: not_applicable
-- Closing Condition: not_applicable
-- Current Checkpoint: not_applicable
-- Current Stop: not_applicable
-- Next Step: not_applicable
-- Blockers: not_applicable
-- Latest Validation Summary: not_applicable
-- Recovery Boundary: not_applicable
-- Current Lane: not_applicable
+- Item ID: GH-110
+- Goal: Complete #95 evidence, site skill source, Browser session references, and vertical read-only demo smoke batch.
+- Scope: GH-110 batch covers #110, #111, #112, #113 for parent #95. Out of scope: Stage 5, Library lifecycle, write-side, full Browser management.
+- Execution Path: implementation_pr
+- Workspace Entry: /Volumes/2T/.codex/worktrees/3c80-gh110-evidence-context-batch
+- Recovery Entry: .loom/progress/GH-110.md
+- Review Entry: .loom/reviews/GH-110.json
+- Validation Entry: npm run typecheck; npm run smoke; npm audit --audit-level=high; git diff --check; loom fact-chain --target . --json; loom doctor --target . --json; loom verify --target . --json
+- Closing Condition: PR merged, #110-#113 and #95 closeout evidence recorded, current pointer retired to no_active_item.
+- Current Checkpoint: admission
+- Current Stop: GH-110 batch admitted with scope for #110-#113 / parent #95 and waiting for bounded implementation.
+- Next Step: Implement #95 evidence/context UI and vertical smoke within the GH-110 batch.
+- Blockers: None recorded.
+- Latest Validation Summary: Admission validation passed: `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, and `git diff --check`.
+- Recovery Boundary: GH-110 owns `.loom/work-items/GH-110.md`, `.loom/progress/GH-110.md`, `.loom/specs/GH-110/**`, `.loom/reviews/GH-110.json`, #95 right context evidence/source/session UI, and smoke coverage. Do not expand to Stage 5, Library lifecycle, write-side, or full Browser management.
+- Current Lane: build
 
 ## Runtime Evidence
 
@@ -29,7 +29,7 @@
 
 ## Sources
 
-- Static Truth: not_applicable
-- Dynamic Truth: not_applicable
+- Static Truth: .loom/work-items/GH-110.md
+- Dynamic Truth: .loom/progress/GH-110.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
