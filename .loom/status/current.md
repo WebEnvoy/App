@@ -12,10 +12,10 @@
 - Validation Entry: npm run build; npm run smoke:packaged; npm run smoke; npm audit --audit-level=high; git diff --check; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json
 - Closing Condition: PR merged, issue #168 closeout evidence recorded, current pointer retired to no_active_item.
 - Current Checkpoint: build
-- Current Stop: packaged asset and preload repair implemented locally; PR not yet opened.
-- Next Step: finish verification, commit, push, and open GH-168 PR.
+- Current Stop: PR #172 is open; manual review artifacts have been authored for head 57c300d760d71792860441bc3ff519528c0eacf0 after hosted merge gate reported missing review records.
+- Next Step: push review artifacts and rerun/read back hosted merge gate.
 - Blockers: none recorded.
-- Latest Validation Summary: `npm run smoke:packaged` passed on 2026-07-03T09:28Z and generated nonblank screenshot `artifacts/gh-168-packaged-preview.png`; `npm run smoke`, `npm audit --audit-level=high`, and `git diff --check` passed locally.
+- Latest Validation Summary: PR #172 head 57c300d760d71792860441bc3ff519528c0eacf0 passed local `npm run smoke:packaged`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-168 --json`, and `loom suite carrier validate --target . --item GH-168 --json`. Hosted run 28651840456 passed py-compile, demo-bootstrap, repo-local-cli, and loom-check; loom-pr-merge-gate failed because review artifacts were missing before this update.
 - Recovery Boundary: GH-168 owns only packaged asset/preload startup repair and packaged smoke coverage.
 - Current Lane: GH-168 packaged preview repair
 

@@ -1,0 +1,37 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-168",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Manual spec review approved GH-168 packaged Electron startup repair at head 57c300d760d71792860441bc3ff519528c0eacf0. The spec is scoped to file:// renderer assets, packaged preload injection, and packaged renderer smoke.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-03T09:36:00Z",
+  "reviewed_head": "57c300d760d71792860441bc3ff519528c0eacf0",
+  "reviewed_validation_summary": "PR #172 head 57c300d760d71792860441bc3ff519528c0eacf0 passed local `npm run smoke:packaged`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-168 --json`, and `loom suite carrier validate --target . --item GH-168 --json`. Hosted run 28651840456 passed py-compile, demo-bootstrap, repo-local-cli, and loom-check; loom-pr-merge-gate failed because review artifacts were missing before this update.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Continue #169 only after GH-168 merge/closeout or scheduler confirmation.",
+    "Fix Loom suite CLI JSON consumption outside this App product PR; no repo-local shim was added."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The GH-168 formal spec and plan match the PR scope: packaged asset path repair, preload injection repair, and smoke evidence. The spec explicitly excludes UI redesign, Task Thread migration, Stage 5, and live Core/Harbor/Lode."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/172",
+    "work_item": "GH-168",
+    "covered_work_items": "#168",
+    "parent_issue": "#167",
+    "spec": ".loom/specs/GH-168/spec.md",
+    "plan": ".loom/specs/GH-168/plan.md",
+    "task_carrier": ".loom/specs/GH-168/task-carrier.md",
+    "build_evidence": ".loom/specs/GH-168/build-evidence.json",
+    "suite_path": "minimal",
+    "suite_validation": "loom suite validate --target . --item GH-168 --json; loom suite carrier validate --target . --item GH-168 --json",
+    "screenshot": "artifacts/gh-168-packaged-preview.png",
+    "scope_boundary": "No UI redesign, Task Thread migration, Stage 5, or live Core/Harbor/Lode."
+  }
+}
