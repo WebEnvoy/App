@@ -1,39 +1,32 @@
 {
   "schema_version": "loom-review/v1",
   "item_id": "GH-110",
-  "decision": "fallback",
-  "kind": "general_review",
-  "summary": "Formal review has not been recorded yet.",
-  "reviewer": "not yet assigned",
-  "reviewed_head": "51cb987e69771c0e15b381751b631188ee205e28",
-  "reviewed_validation_summary": "No validation recorded yet.",
-  "fallback_to": "admission",
-  "findings": [
-    {
-      "id": "scaffolded-block-1",
-      "summary": "Review artifact scaffolded but not yet concluded.",
-      "severity": "block",
-      "rebuttal": null,
-      "disposition": {
-        "status": "rejected",
-        "summary": "Scaffold placeholder must be replaced by a real formal review conclusion."
-      }
-    },
-    {
-      "id": "scaffolded-warn-1",
-      "summary": "Record a real review before asking merge checkpoint to consume it.",
-      "severity": "warn",
-      "rebuttal": null,
-      "disposition": {
-        "status": "deferred",
-        "summary": "This follow-up stays open until a real review is recorded."
-      }
-    }
-  ],
-  "blocking_issues": [
-    "Review artifact scaffolded but not yet concluded."
-  ],
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Manual current-head review approved GH-110 content head 92d3eeba1f27c86d0827923f9ea639637b01036d. The implementation covers #110-#113 only and stays fixture/API-shaped with no live owner API calls or sensitive persistence.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-03T06:50:00Z",
+  "reviewed_head": "92d3eeba1f27c86d0827923f9ea639637b01036d",
+  "reviewed_validation_summary": "GH-110 implementation validation passed: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-110 --json`, and `loom suite carrier validate --target . --item GH-110 --json`. Local `loom build --target . --item GH-110 --build-evidence .loom/specs/GH-110/build-evidence.json --json` is blocked by the known repo-local `tools/loom.py` suite CLI JSON consumption surface and an `ownership_constraints` consumption false negative despite the field being present; no repo-local Loom shim was added.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
   "follow_ups": [
-    "Record a real review before asking merge checkpoint to consume it."
-  ]
+    "Stage 5 Library lifecycle remains out of scope.",
+    "Write-side behavior and full Browser management remain out of scope.",
+    "Fix the Loom build / suite CLI JSON consumption surface outside this App product PR."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Diff is limited to GH-110 renderer fixtures/UI/smoke plus GH-110 Loom carriers. Evidence cards are ref-only, Lode package attribution is metadata-only, Harbor Browser session/provider facts are references only, direct sessions are not displayed as Core task outcomes, and no sensitive owner truth is persisted."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "work_item": "GH-110",
+    "covered_work_items": "#110 #111 #112 #113",
+    "parent_fr": "#95",
+    "reviewed_diff": "git diff origin/main...92d3eeba1f27c86d0827923f9ea639637b01036d",
+    "build_evidence": ".loom/specs/GH-110/build-evidence.json",
+    "scope_boundary": "Stage 4 milestone #9 #95 batch only; no Stage 5, Library lifecycle, write-side, full Browser management, workflow runtime/editor, or live Core/Harbor/Lode calls."
+  }
 }
