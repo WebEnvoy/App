@@ -4,6 +4,17 @@
   "generated_at": "2026-07-03T01:57:54Z",
   "branch": "work/loom-retire-stale-carriers-before-gh100",
   "scope": "control-plane repair for stale Loom carriers before GH-100",
+  "post_merge_closeout": {
+    "pr_url": "https://github.com/WebEnvoy/App/pull/123",
+    "pr_head": "738bd86d9fa7c8df4087acd35f8a4cdb2a47d3ec",
+    "merge_commit": "41c18e39ba249e03a40d842f9f72331ac2c66887",
+    "target_branch": "main",
+    "hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28634355992",
+    "issue_url": "https://github.com/WebEnvoy/App/issues/122",
+    "issue_closed_at": "2026-07-03T02:29:50Z",
+    "issue_close_comment": "https://github.com/WebEnvoy/App/issues/122#issuecomment-4872066931",
+    "scope": "post-merge carrier closeout only"
+  },
   "commands": [
     {
       "command": "git diff --check",
