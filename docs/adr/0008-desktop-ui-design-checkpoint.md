@@ -10,7 +10,7 @@ Accepted for FR #92 checkpoint，2026-07-02。
 
 本 checkpoint 初稿曾按 Work/Library/Browser/Settings 划分产品域。后续产品讨论明确：App 的首个桌面产品不应被理解成 Agent App、普通 Browser tab、任意任务启动器或技术人员控制台；同时也不能把 Library 和 Browser 管理台降级成不可见后台。
 
-App 面向人类业务用户。App 的自动任务执行入口只运行 Lode 提供的站点能力入口；当前实现先消费 capability package metadata，后续可升级为 workflow package。自动任务通过 Harbor 账号身份和浏览器环境运行，通过 Core 记录 task/run/result/evidence/failure。Agent 使用 WebEnvoy 的方式是 API、CLI、MCP、SDK 或 skills，不在 App 内运行；这些非 App 调用方产生的运行事实仍应能在 App 中观测。
+App 面向人类业务用户。App 的自动任务执行入口只选择 Lode 提供的站点能力入口；当前实现先消费 capability package metadata，后续可升级为 workflow package。自动任务通过 Harbor 账号身份和浏览器环境运行，通过 Core 记录 task/run/result/evidence/failure。Agent 使用 WebEnvoy 的方式是 API、CLI、MCP、SDK 或 skills，不在 App 内运行；这些非 App 调用方产生的运行事实仍应能在 App 中观测。
 
 ## 决策
 
@@ -21,11 +21,11 @@ Task = 站点技能 + 账号身份 + 业务输入
 Run = 同一 Task 下的一次执行记录
 ```
 
-该 Task 语义主要约束 App 自动 workflow 任务。外部 Agent/API/CLI/MCP/skills 产生的运行事实也要能在 App 中展示，但不要求它们都来自 App 的自动执行入口。
+该 Task 语义主要约束 App 自动任务入口。外部 Agent/API/CLI/MCP/skills 产生的运行事实也要能在 App 中展示，但不要求它们都来自 App 的自动执行入口。
 
 左侧任务列表默认按 `账号身份 -> 站点技能 -> Task` 组织。中间栏展示当前 Task Thread、Run navigation rail、任务结束报告和执行过程。右侧是可折叠上下文面板，用 tab 承载结果依据、执行现场、账号身份、站点技能和诊断。
 
-没有合适站点技能时，App 不能自动执行任务，但可以作为账号身份和浏览器环境的启动台，让用户手动打开受控浏览器实例、登录、观察或准备环境。手动浏览实例属于 Browser/Harbor session 管理路径，不创建 Core Task/Run，不产生 Result Envelope，也不代表 Lode capability 被执行。只有用户显式从站点技能发起自动任务时，App 才向 Core 提交 task intent。
+没有合适站点技能时，App 不能自动执行任务，但可以作为账号身份和浏览器环境的启动台，让用户、Agent、API、CLI 或 MCP 打开受控浏览器实例、登录、观察或准备环境。direct Identity Runtime Session 属于 Browser/Harbor session 管理路径，不创建 Core Task/Run/Result，不产生 Result Envelope，也不代表 Lode capability 被执行。只有用户显式从站点技能发起自动任务时，App 才向 Core 提交 task intent；只有进入 Core task path 后，Task Thread 才展示 result/evidence/failure。
 
 Task Thread first 是主体验，不取消后台能力工作台：Library 仍管理站点技能、能力包、版本、失效、fixture、更新和草稿；Browser 仍管理账号身份、浏览器环境、Runtime Session、Viewer、接管和 provider facts。
 
@@ -63,7 +63,7 @@ Task Thread first 是主体验，不取消后台能力工作台：Library 仍管
 | Task | `站点技能 + 账号身份 + 业务输入` 形成的任务线程。 | App 用它组织体验；durable truth 由 Core/Lode/Harbor 合同决定。 |
 | Run | 同一 Task 下的一次执行尝试。 | App 展示 Core run facts，不自建生命周期。 |
 | 结果依据 | 证明结果来源的 evidence refs、字段来源、页面记录、post-check 和 owner facts。 | App 不保存 raw evidence。 |
-| 执行现场 | Harbor 提供的 Runtime Session、Viewer、takeover 和 browser environment facts。 | App 不绕过 Harbor API 操作浏览器。 |
+| 执行现场 | Harbor 提供的 Identity Runtime Session、Viewer、takeover 和 browser environment facts。 | App 不绕过 Harbor API 操作浏览器。 |
 | 外部运行事实 | Agent、API、CLI、MCP、SDK、skills 或其他上层应用产生的 task/run/result/evidence/session facts。 | App 可观测和呈现，不要求外部调用方遵循 App 自动任务入口。 |
 | 手动浏览实例 | 用户通过账号身份启动的受控浏览器实例。 | 可用于登录、观察、接管和准备环境；不是自动任务执行结果。 |
 

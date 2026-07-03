@@ -1,0 +1,32 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-101",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Manual current-head implementation review approved GH-101 checkpoint sync head f50f5ee5892ea57ad52b0efe82f3f427fa49c952. The product/content implementation remains bounded to the reviewed #101-#104 shell batch: Radix/lucide shell primitives, Core/Harbor/Lode source health fixture, Settings local endpoint boundary, and Task Thread first base layout. It does not implement #105-#113, real Core/Harbor/Lode calls, task submission, run/result/evidence behavior, write-side behavior, full Library/Browser management, or workflow runtime/editor UI.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-03T05:09:29Z",
+  "reviewed_head": "f50f5ee5892ea57ad52b0efe82f3f427fa49c952",
+  "reviewed_validation_summary": "2026-07-03 local and hosted-equivalent validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-101 --json`, `loom suite carrier validate --target . --item GH-101 --json`, and `loom pr metadata-preflight --body-file .loom/tmp/gh101-pr-body-update.md --compare-body-file .loom/tmp/gh101-pr-body-readback.md --json`. Review artifacts `.loom/reviews/GH-101.json` and `.loom/reviews/GH-101.spec.json` are `decision=allow` with `semantic_review_disposition.status=passed`; PR #129 body/head readback is kept aligned after each carrier push by updating the PR metadata machine `head_sha` and rerunning metadata preflight. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check` passed on run `28639585201`; hosted `loom-pr-merge-gate` previously fell back to `build` because the recovery checkpoint still reported `build`. `loom build --target . --item GH-101 --build-evidence .loom/specs/GH-101/build-evidence.json --json` and `loom review record` remain blocked by Loom suite CLI JSON consumption (`suite validate CLI JSON unavailable` / repo-local `tools/loom.py` lookup); no repo-local Loom shim was added.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "#105-#109 remain for the #94 Core task path / read-only run view batch; GH-101 does not complete #94.",
+    "#110-#113 remain for the #95 evidence, package source, and execution-site reference batch; GH-101 does not complete #95.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App product PR so authored review records can be created by the tool again."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Manual review of `git diff origin/main...HEAD` found the GH-101 implementation within the approved #101-#104 shell batch scope. Electron main/preload only expose OS/local shell context, Settings persists endpoint choices only after validation, source health remains fixture-only, and no credential/cookie/profile/raw evidence/run truth/session truth/package truth persistence was introduced."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/129",
+    "work_item": "GH-101",
+    "covered_work_items": "#101 #102 #103 #104",
+    "reviewed_diff": "git diff origin/main...HEAD at f50f5ee5892ea57ad52b0efe82f3f427fa49c952",
+    "validation": "npm run smoke; npm audit --audit-level=high; git diff --check; loom fact-chain --target . --json; loom doctor --target . --json; loom verify --target . --json; loom suite validate --target . --item GH-101 --json; loom suite carrier validate --target . --item GH-101 --json",
+    "known_tool_blocker": "loom build / review record suite CLI JSON consumption blocked; no repo-local tools/loom.py added"
+  }
+}

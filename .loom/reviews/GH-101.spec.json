@@ -1,0 +1,35 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-101",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Manual spec review approved GH-101 checkpoint sync head f50f5ee5892ea57ad52b0efe82f3f427fa49c952. The minimal spec, plan, implementation contract, task carrier, build evidence, and merge-ready carrier sync describe a bounded #101-#104 shell batch and explicitly exclude #105-#113, real owner API calls, task/run/result/evidence behavior, write-side behavior, full Library/Browser management, and workflow runtime/editor UI.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-03T05:09:29Z",
+  "reviewed_head": "f50f5ee5892ea57ad52b0efe82f3f427fa49c952",
+  "reviewed_validation_summary": "2026-07-03 local and hosted-equivalent validation passed `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-101 --json`, `loom suite carrier validate --target . --item GH-101 --json`, and `loom pr metadata-preflight --body-file .loom/tmp/gh101-pr-body-update.md --compare-body-file .loom/tmp/gh101-pr-body-readback.md --json`. Review artifacts `.loom/reviews/GH-101.json` and `.loom/reviews/GH-101.spec.json` are `decision=allow` with `semantic_review_disposition.status=passed`; PR #129 body/head readback is kept aligned after each carrier push by updating the PR metadata machine `head_sha` and rerunning metadata preflight. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check` passed on run `28639585201`; hosted `loom-pr-merge-gate` previously fell back to `build` because the recovery checkpoint still reported `build`. `loom build --target . --item GH-101 --build-evidence .loom/specs/GH-101/build-evidence.json --json` and `loom review record` remain blocked by Loom suite CLI JSON consumption (`suite validate CLI JSON unavailable` / repo-local `tools/loom.py` lookup); no repo-local Loom shim was added.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "#105-#109 remain for the #94 Core task path / read-only run view batch; GH-101 does not complete #94.",
+    "#110-#113 remain for the #95 evidence, package source, and execution-site reference batch; GH-101 does not complete #95.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App product PR so authored review records can be created by the tool again."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The GH-101 spec path is minimal and sufficient for the shell batch. It preserves Task Thread first scope, direct Identity Runtime Session boundaries, Core task path boundaries, Lode capability metadata-first semantics, and the Electron OS/local-config boundary."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/129",
+    "work_item": "GH-101",
+    "spec": ".loom/specs/GH-101/spec.md",
+    "plan": ".loom/specs/GH-101/plan.md",
+    "implementation_contract": ".loom/specs/GH-101/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-101/task-carrier.md",
+    "suite_path": "minimal",
+    "suite_validation": "loom suite validate --target . --item GH-101 --json; loom suite carrier validate --target . --item GH-101 --json",
+    "known_tool_blocker": "loom build / review record suite CLI JSON consumption blocked; no repo-local tools/loom.py added"
+  }
+}
