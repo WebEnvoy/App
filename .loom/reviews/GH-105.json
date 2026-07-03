@@ -1,39 +1,50 @@
 {
   "schema_version": "loom-review/v1",
   "item_id": "GH-105",
-  "decision": "fallback",
-  "kind": "general_review",
-  "summary": "Formal review has not been recorded yet.",
-  "reviewer": "not yet assigned",
-  "reviewed_head": "1f46b7e4bc7f58fe960ea1c12b46389e044e920f",
-  "reviewed_validation_summary": "No validation recorded yet.",
-  "fallback_to": "admission",
-  "findings": [
-    {
-      "id": "scaffolded-block-1",
-      "summary": "Review artifact scaffolded but not yet concluded.",
-      "severity": "block",
-      "rebuttal": null,
-      "disposition": {
-        "status": "rejected",
-        "summary": "Scaffold placeholder must be replaced by a real formal review conclusion."
-      }
-    },
-    {
-      "id": "scaffolded-warn-1",
-      "summary": "Record a real review before asking merge checkpoint to consume it.",
-      "severity": "warn",
-      "rebuttal": null,
-      "disposition": {
-        "status": "deferred",
-        "summary": "This follow-up stays open until a real review is recorded."
-      }
-    }
-  ],
-  "blocking_issues": [
-    "Review artifact scaffolded but not yet concluded."
-  ],
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Manual current-head code review approved PR #161 GH-105 read-only task batch content head 95de53b4241f7a68cd45eca9d7ae1840b9c314e7. The implementation is bounded to #105-#109 and does not implement #110-#113 or #95.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-03T06:16:00Z",
+  "reviewed_head": "95de53b4241f7a68cd45eca9d7ae1840b9c314e7",
+  "reviewed_validation_summary": "PR #161 validation as of 2026-07-03T06:16Z: `npm run typecheck`, `npm run smoke`, `npm audit --audit-level=high`, `git diff --check`, `loom fact-chain --target . --json`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom suite validate --target . --item GH-105 --json`, `loom suite carrier validate --target . --item GH-105 --json`, and `loom pr metadata-preflight --surface merge_ready` passed. Hosted `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check` passed on run `28642190625`; hosted `loom-pr-merge-gate` failed only because GH-105 review artifacts were scaffold/stale before this carrier refresh. `loom build --target . --item GH-105 --build-evidence .loom/specs/GH-105/build-evidence.json --json` and `loom review run --target . --item GH-105 --json` are blocked by suite CLI JSON consumption / repo-local `tools/loom.py` surface; global suite commands passed, and no repo-local Loom shim was added. Manual review found no blocking product findings for the GH-105 #105-#109 scope.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
   "follow_ups": [
-    "Record a real review before asking merge checkpoint to consume it."
-  ]
+    "#110-#113 remain for the #95 evidence/source/session reference batch; GH-105 does not complete #95.",
+    "#94 can only close after PR #161 merges and closeout evidence is written for #105, #106, #107, #108, and #109.",
+    "Fix the Loom review-record / suite CLI JSON consumption surface outside this App PR so authored review records can be created by the tool again."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Static diff review and independent read-only review found no blocking product issues. The renderer remains fixture-only, Task Thread first, read-only, and bounded to #105-#109. Direct Identity Runtime Session stays Browser/Harbor-only and is not presented as Core Task/Run/Result success."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/161",
+    "work_item": "GH-105",
+    "covered_work_items": "#105 #106 #107 #108 #109",
+    "parent_fr": "#94",
+    "reviewed_diff": "git diff origin/main...95de53b4241f7a68cd45eca9d7ae1840b9c314e7",
+    "reviewed_files": [
+      "src/renderer/App.tsx",
+      "src/renderer/taskThreadFixtures.ts",
+      "src/renderer/sourceHealthFixture.ts",
+      "src/renderer/styles.css",
+      "scripts/smoke.mjs",
+      ".loom/work-items/GH-105.md",
+      ".loom/progress/GH-105.md",
+      ".loom/specs/GH-105/**",
+      ".loom/status/current.md"
+    ],
+    "scope_checks": [
+      "No package, docs, Electron main, or preload product diff was introduced.",
+      "#110-#113/#95 surfaces remain placeholder/entry text only.",
+      "Settings local persistence remains endpoint-choice only and rejects sensitive endpoint fragments.",
+      "No credential, cookie, token, profile storage, raw evidence, Core Run Record truth, Harbor session truth, or Lode package truth persistence was added."
+    ],
+    "independent_review": "subagent 019f269d-2944-7100-a730-72453eaed3fa reported no product blocker; its carrier findings were the stale review artifact and PR-created status drift fixed by this carrier refresh.",
+    "known_tool_blocker": "loom build / review run suite CLI JSON consumption blocked; no repo-local tools/loom.py added"
+  }
 }
