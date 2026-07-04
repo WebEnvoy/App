@@ -3,17 +3,17 @@
   "item_id": "GH-169",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual implementation review approved GH-169 PR #174 current implementation head c8923ff7fc6be9f48cf1ab94aee56452689ff885 for a fixture-only Codex-like shell direction spike. The review covers WebEnvoy-native UI foundation primitives, panel/topbar/composer/navigation-rail/site-skill/settings/right-inspector styling strategy, packaged preview evidence, evidence-map carrier, and GH-169 carrier consistency. It does not approve GH-170 migration, GH-171 fidelity QA, Stage 5, live owner-runtime integration, or final real data contracts. Post-review drift after this record must remain limited to GH-169 review carriers.",
+  "summary": "Manual carrier-only closeout review approved GH-169 PR #175 current head 2d373dca3c40347d8d6d2141f547cc0723a0983b. This review covers only terminal metadata consumption for PR #174, issue #169 closeout evidence, `.loom/status/current.md` idle pointer, and `.loom/bootstrap/init-result.json` fact-chain idle entry. It does not approve new product behavior, GH-170 migration, GH-171 fidelity QA, Stage 5, live owner-runtime integration, or final real data contracts. Post-review drift after this record must remain limited to GH-169 review carriers.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-04T02:30:00Z",
-  "reviewed_head": "c8923ff7fc6be9f48cf1ab94aee56452689ff885",
-  "reviewed_validation_summary": "CodeGraph exploration completed for restored Codex source and this repo; restored `AppShellLayout`, `LeftPanel`, `RightPanel`, `BottomPanel`, `ResizeHandle`, navigation rail, plugin page, and settings page strategies were mapped into WebEnvoy-native primitives and `DESIGN.md` foundation rules; `npm run build`, `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-169 --json`, `loom suite carrier validate --target . --item GH-169 --json`, and `loom suite evidence validate --target . --item GH-169 --json` passed. Hosted run 28675908540 passed py-compile/demo-bootstrap/repo-local-cli/loom-check and failed only at loom-pr-merge-gate because current-head review artifacts were not yet present. Screenshot: `artifacts/gh-169-codex-like-shell.png`.",
+  "authored_at": "2026-07-04T02:38:00Z",
+  "reviewed_head": "2d373dca3c40347d8d6d2141f547cc0723a0983b",
+  "reviewed_validation_summary": "GH-169 post-merge closeout consumed PR #174, head afb1a744a1fea52a4546877ee756b84cbd8b0755, merge commit 40a64329eec95cc215b19447a0117df4eef4feea, issue #169 closed at 2026-07-04T02:31:02Z, target branch main, hosted run 28692141640 with required checks passing, `loom carrier closeout-sync --target . --item GH-169 --terminal-state closed_out --issue 169 --pr 174 --merge-commit 40a64329eec95cc215b19447a0117df4eef4feea --target-branch main --closed-at 2026-07-04T02:31:02Z --evidence-locator https://github.com/WebEnvoy/App/actions/runs/28692141640 --apply --json` passing, `loom fact-chain --target . --json` passing, and `git diff --check` passing.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Update PR #174 metadata to the post-carrier head, rerun hosted checks, and require loom-pr-merge-gate to pass before merging GH-169.",
-    "Do not close #167 after GH-169; continue GH-170 and GH-171 as separate dependent work.",
+    "Merge PR #175 after hosted closeout gate passes.",
+    "Do not close #167 after GH-169; continue GH-170 and GH-171 as separate dependent work after current pointer is idle.",
     "Treat current fixture functions and data shapes as preview scaffolding only, not implementation contracts."
   ],
   "consumed_inputs": {
@@ -26,28 +26,14 @@
     "task_carrier": ".loom/specs/GH-169/task-carrier.md",
     "build_evidence": ".loom/specs/GH-169/build-evidence.json",
     "evidence_map": ".loom/specs/GH-169/evidence-map.md",
-    "primary_code": [
-      "src/renderer/App.tsx",
-      "src/renderer/shellPrimitives.tsx",
-      "src/renderer/uiFoundation.css",
-      "src/renderer/styles.css",
-      "src/renderer/ThreadNavigationRail.tsx",
-      "src/renderer/SiteSkillPages.tsx",
-      "src/renderer/SettingsPage.tsx",
-      "src/renderer/RunStatusGlyph.tsx",
-      "src/renderer/focusComposer.ts",
-      "src/renderer/taskThreadFixtures.ts",
-      "src/renderer/siteSkillFixtures.ts"
-    ],
-    "screenshots": [
-      "artifacts/gh-169-codex-app-reference.png",
-      "docs/design/desktop-task-thread-direction.png",
-      "artifacts/gh-169-codex-like-shell.png"
-    ],
+    "closeout_pr": "https://github.com/WebEnvoy/App/pull/175",
+    "implementation_pr": "https://github.com/WebEnvoy/App/pull/174",
+    "implementation_merge_commit": "40a64329eec95cc215b19447a0117df4eef4feea",
+    "issue_closeout": "https://github.com/WebEnvoy/App/issues/169",
     "build_checkpoint": "pass",
     "suite_path": "minimal",
     "hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28675908540",
-    "scope_boundary": "Fixture-only direction spike. No GH-170 content migration, no GH-171 QA completion, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval.",
+    "scope_boundary": "Carrier-only closeout for GH-169. No product behavior changes, no GH-170 content migration, no GH-171 QA completion, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval.",
     "budget_risk": {
       "schema_version": "loom-execution-budget-risk/v1",
       "status": "not_applicable",
@@ -67,10 +53,14 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The reviewed implementation matches GH-169's bounded direction-confirmation scope, uses WebEnvoy-native primitives while absorbing maintainable Codex UI structure/behavior, keeps data fixture-only, records out-of-scope boundaries, and has local plus hosted evidence up to the missing-review gate."
+    "reason": "The reviewed closeout changes are limited to GH-169 terminal carrier metadata and idle pointer restoration; implementation behavior was already reviewed and merged in PR #174."
   },
   "implementation_review_disposition": {
     "status": "passed",
-    "reason": "The reviewed implementation matches GH-169's bounded direction-confirmation scope, uses WebEnvoy-native primitives while absorbing maintainable Codex UI structure/behavior, keeps data fixture-only, records out-of-scope boundaries, and has local plus hosted evidence up to the missing-review gate."
+    "reason": "The reviewed closeout changes are limited to GH-169 terminal carrier metadata and idle pointer restoration; implementation behavior was already reviewed and merged in PR #174."
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Authored closeout review approved only terminal carrier metadata consumption; it does not approve product implementation behavior."
   }
 }
