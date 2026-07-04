@@ -3,17 +3,17 @@
   "item_id": "GH-171",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual code review approved GH-171 Desktop Task Thread fidelity QA implementation at PR head d32fd6fd4fe55e36dd56540e47b63d630265f221. The code change is limited to renderer CSS for right inspector tab density and source/content spacing, plus screenshot/metrics evidence and GH-171 Loom carriers. It does not approve new product behavior, Stage 5, live Core/Harbor/Lode calls, or final data structures. Post-review drift after this record must remain limited to review carriers or PR metadata.",
+  "summary": "Manual carrier-only closeout review approved GH-171 closeout carrier head d98f44adc014b6bf497654f439dc0405530fa918. This review covers only terminal metadata consumption for PR #178, issue #171 closeout evidence, `.loom/status/current.md` idle pointer, and `.loom/bootstrap/init-result.json` idle fact-chain entry. It does not approve new product behavior, Stage 5, live Core/Harbor/Lode calls, or final data structures. Post-review drift after this record must remain limited to GH-171 review carriers or PR metadata.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-04T03:36:00Z",
-  "reviewed_head": "d32fd6fd4fe55e36dd56540e47b63d630265f221",
+  "authored_at": "2026-07-04T03:46:00Z",
+  "reviewed_head": "d98f44adc014b6bf497654f439dc0405530fa918",
   "reviewed_validation_summary": "CodeGraph exploration completed before implementation for restored Codex row/button/tab/card density and this repo's shell primitives. Local browser screenshots/metrics captured for right inspector tabs, left/right panel collapse, app-level site skill page, and settings app-level page. `npm run build`, packaged smoke with `artifacts/gh-171-packaged-fidelity.png`, `git diff --check`, `loom doctor`, `loom verify`, `loom fact-chain`, `loom suite validate`, `loom suite carrier validate`, and `loom suite evidence validate` passed.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "Pass hosted checks before merge.",
-    "After merge, close #171 with post-merge evidence and then retire the current pointer.",
+    "Merge the GH-171 closeout PR after hosted closeout gate passes.",
+    "Close parent #167 only after this idle pointer closeout PR is merged.",
     "Do not represent current fixtures or UI data structures as final product implementation contracts."
   ],
   "consumed_inputs": {
@@ -30,7 +30,11 @@
     "screenshot_evidence": "artifacts/gh-171-fidelity-tabs-after.png; artifacts/gh-171-right-collapsed.png; artifacts/gh-171-left-collapsed.png; artifacts/gh-171-app-level-site-skill.png; artifacts/gh-171-settings-app-level.png; artifacts/gh-171-packaged-fidelity.png",
     "build_checkpoint": "pass",
     "suite_path": "minimal",
-    "scope_boundary": "Renderer fidelity QA for current fixture shell only; no new features, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval.",
+    "implementation_pr": "https://github.com/WebEnvoy/App/pull/178",
+    "implementation_merge_commit": "fac64df3e0efe9878bd77fb538cbc5228d878fc2",
+    "issue_closeout": "https://github.com/WebEnvoy/App/issues/171#issuecomment-4880525888",
+    "hosted_run": "https://github.com/WebEnvoy/App/actions/runs/28693836652",
+    "scope_boundary": "Carrier-only closeout for GH-171. No product behavior changes, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval.",
     "budget_risk": {
       "schema_version": "loom-execution-budget-risk/v1",
       "status": "not_applicable",
@@ -50,10 +54,14 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "The implementation is bounded to renderer fidelity styling and evidence carriers, and the screenshots/metrics support the acceptance matrix for this fixture-shell QA item."
+    "reason": "The reviewed closeout changes are limited to GH-171 terminal carrier metadata and idle pointer restoration; implementation behavior was already reviewed and merged in PR #178."
   },
   "implementation_review_disposition": {
     "status": "passed",
-    "reason": "No correctness, scope, data-contract, or runtime boundary regression was found in the reviewed diff. The change does not introduce live owner-runtime behavior."
+    "reason": "The reviewed closeout changes are limited to GH-171 terminal carrier metadata and idle pointer restoration; implementation behavior was already reviewed and merged in PR #178."
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Authored closeout review approved only terminal carrier metadata consumption; it does not approve product implementation behavior."
   }
 }
