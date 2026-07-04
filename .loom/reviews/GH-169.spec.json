@@ -1,0 +1,42 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-169",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Manual spec review approved GH-169 Codex-like desktop shell spike at head 51b2ce88399c12b693fc77c38ec5915a708e21d2. The spec is scoped to WebEnvoy-native shell primitives, fixture-only renderer state, Codex restored-source references, and packaged screenshot evidence for product direction confirmation. It does not approve GH-170 migration, GH-171 fidelity QA, Stage 5, live Core/Harbor/Lode behavior, or real function/data contracts. Post-review drift in this commit is limited to GH-169 evidence/progress/review carriers.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-04T02:19:00Z",
+  "reviewed_head": "51b2ce88399c12b693fc77c38ec5915a708e21d2",
+  "reviewed_validation_summary": "PR #174 head 51b2ce88399c12b693fc77c38ec5915a708e21d2 passed local `npm run build`, `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-169 --json`, `loom suite carrier validate --target . --item GH-169 --json`, and `loom suite evidence validate --target . --item GH-169 --json`. Hosted run 28675908540 passed py-compile, demo-bootstrap, repo-local-cli, and loom-check; loom-pr-merge-gate failed because current-head review artifacts were missing before this carrier update.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "After GH-169 merge/closeout, start GH-170 only from the confirmed shell foundation and migrate Task Thread content without live Core/Harbor/Lode integration.",
+    "Run GH-171 fidelity QA after GH-170; do not close parent #167 until GH-170 and GH-171 have their own evidence and closeout.",
+    "Future functional integration must still go through UI design, review, and walkthrough; GH-169 fixtures do not define real function or data contracts."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The GH-169 spec, plan, implementation contract, task carrier, build evidence, evidence map, screenshots, and PR metadata all describe the same bounded direction-confirmation spike. The spec explicitly excludes business content migration, final QA, Stage 5, and live owner-runtime contracts."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "pull_request": "https://github.com/WebEnvoy/App/pull/174",
+    "work_item": "GH-169",
+    "covered_work_items": "#169",
+    "parent_issue": "#167",
+    "direction_confirmation": "https://github.com/WebEnvoy/App/issues/169#issuecomment-4880278857",
+    "spec": ".loom/specs/GH-169/spec.md",
+    "plan": ".loom/specs/GH-169/plan.md",
+    "implementation_contract": ".loom/specs/GH-169/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-169/task-carrier.md",
+    "build_evidence": ".loom/specs/GH-169/build-evidence.json",
+    "evidence_map": ".loom/specs/GH-169/evidence-map.md",
+    "suite_path": "minimal",
+    "suite_validation": "loom suite validate --target . --item GH-169 --json; loom suite carrier validate --target . --item GH-169 --json; loom suite evidence validate --target . --item GH-169 --json",
+    "codex_restored_references": "/Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/app-shell-layout.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/left-panel.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/right-panel.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/bottom-panel.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/resize-handle.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/threads/lazy-navigation-rail.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/threads/thread-user-message-navigation-rail/preview-impl.tsx",
+    "screenshots": "artifacts/gh-169-codex-app-reference.png; docs/design/desktop-task-thread-direction.png; artifacts/gh-169-codex-like-shell.png",
+    "scope_boundary": "Direction-confirmation shell spike only; no GH-170 migration, GH-171 QA, Stage 5, live Core/Harbor/Lode, or real data contracts."
+  }
+}
