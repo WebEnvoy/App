@@ -3,11 +3,11 @@
   "item_id": "GH-169",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Manual implementation review approved GH-169 PR #174 current implementation head 51b2ce88399c12b693fc77c38ec5915a708e21d2 for a fixture-only Codex-like shell direction spike. The review covers WebEnvoy-native UI foundation primitives, panel/topbar/composer/navigation-rail/site-skill/settings/right-inspector styling strategy, packaged preview evidence, and GH-169 carrier consistency. It does not approve GH-170 migration, GH-171 fidelity QA, Stage 5, live owner-runtime integration, or final real data contracts. Post-review drift in this commit is limited to GH-169 evidence/progress/review carriers.",
+  "summary": "Manual implementation review approved GH-169 PR #174 current implementation head c8923ff7fc6be9f48cf1ab94aee56452689ff885 for a fixture-only Codex-like shell direction spike. The review covers WebEnvoy-native UI foundation primitives, panel/topbar/composer/navigation-rail/site-skill/settings/right-inspector styling strategy, packaged preview evidence, evidence-map carrier, and GH-169 carrier consistency. It does not approve GH-170 migration, GH-171 fidelity QA, Stage 5, live owner-runtime integration, or final real data contracts. Post-review drift after this record must remain limited to GH-169 review carriers.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-04T02:19:00Z",
-  "reviewed_head": "51b2ce88399c12b693fc77c38ec5915a708e21d2",
-  "reviewed_validation_summary": "PR #174 head 51b2ce88399c12b693fc77c38ec5915a708e21d2 passed local `npm run build`, `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-169 --json`, `loom suite carrier validate --target . --item GH-169 --json`, and `loom suite evidence validate --target . --item GH-169 --json`. Hosted run 28675908540 passed py-compile, demo-bootstrap, repo-local-cli, and loom-check; loom-pr-merge-gate failed because current-head review artifacts were missing before this carrier update.",
+  "authored_at": "2026-07-04T02:30:00Z",
+  "reviewed_head": "c8923ff7fc6be9f48cf1ab94aee56452689ff885",
+  "reviewed_validation_summary": "CodeGraph exploration completed for restored Codex source and this repo; restored `AppShellLayout`, `LeftPanel`, `RightPanel`, `BottomPanel`, `ResizeHandle`, navigation rail, plugin page, and settings page strategies were mapped into WebEnvoy-native primitives and `DESIGN.md` foundation rules; `npm run build`, `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-169 --json`, `loom suite carrier validate --target . --item GH-169 --json`, and `loom suite evidence validate --target . --item GH-169 --json` passed. Hosted run 28675908540 passed py-compile/demo-bootstrap/repo-local-cli/loom-check and failed only at loom-pr-merge-gate because current-head review artifacts were not yet present. Screenshot: `artifacts/gh-169-codex-like-shell.png`.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
@@ -64,6 +64,10 @@
     "engine_adapter": null,
     "engine_evidence": null,
     "normalized_findings": null
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The reviewed implementation matches GH-169's bounded direction-confirmation scope, uses WebEnvoy-native primitives while absorbing maintainable Codex UI structure/behavior, keeps data fixture-only, records out-of-scope boundaries, and has local plus hosted evidence up to the missing-review gate."
   },
   "implementation_review_disposition": {
     "status": "passed",
