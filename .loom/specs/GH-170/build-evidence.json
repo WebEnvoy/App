@@ -1,0 +1,82 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item_id": "GH-170",
+  "status": "implemented",
+  "delegations": [],
+  "integrated_outputs": [
+    {
+      "path": "src/renderer/App.tsx",
+      "summary": "Slimmed App orchestration to shell routing, app-level pages, selected task/run state, and topbar/sidebar wiring."
+    },
+    {
+      "path": "src/renderer/TaskThreadPage.tsx",
+      "summary": "Moved Task Thread content into a Codex-like thread body with run-bound navigation rail, Task intent turn, Run timeline, Evidence preview, and #93/#94/#95 semantics."
+    },
+    {
+      "path": "src/renderer/TaskThreadComposer.tsx",
+      "summary": "Extracted sticky composer behavior with type-to-composer focus and width-aware icon preservation."
+    },
+    {
+      "path": "src/renderer/TaskThreadRightPanel.tsx",
+      "summary": "Extracted right inspector tabs for Evidence, Harbor session, Identity, Site Skill, Diagnostics, and Source health fixture."
+    },
+    {
+      "path": "src/renderer/TaskThreadFields.tsx",
+      "summary": "Centralized Task Thread source field and context panel primitives."
+    },
+    {
+      "path": "artifacts/gh-170-before-task-thread.png",
+      "summary": "Packaged Electron baseline screenshot captured before #170 migration."
+    },
+    {
+      "path": "artifacts/gh-170-task-thread-migration.png",
+      "summary": "Packaged Electron screenshot captured after migrating #93/#94/#95 content into the shell."
+    }
+  ],
+  "validation": [
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "time_utc": "2026-07-04T02:51:00Z",
+      "summary": "TypeScript renderer/main checks and Vite production renderer build passed."
+    },
+    {
+      "command": "WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-170-task-thread-migration.png npm run smoke:packaged",
+      "status": "passed",
+      "time_utc": "2026-07-04T02:52:00Z",
+      "summary": "Packaged Electron preview launched non-blank; smoke screenshot written to artifacts/gh-170-task-thread-migration.png."
+    }
+  ],
+  "codegraph_references": [
+    {
+      "source": "/Volumes/2T/dev/codexdecode/decode-codex/restored",
+      "summary": "Explored restored `threads/thread-layout.tsx`, `threads/thread-scroll-layout/index.tsx`, `conversations/local-conversation-thread-parts/local-conversation-thread-frame.tsx`, and `conversations/local-conversation-thread-parts/local-conversation-thread-body-layout.tsx`. Absorb sticky header/body shell, independent scroll container, content max-width, sticky footer/fade, and content-unit navigation strategy. Do not absorb Codex composer product semantics, signal/store runtime, MCP/live PIP frame, background-agent context, or private runtime contracts."
+    },
+    {
+      "source": "/Volumes/2T/.codex/worktrees/da84/App",
+      "summary": "Explored current `ThreadWorkspace`, `BottomPanelSlot`, `ThreadNavigationRail`, Task Thread fixtures, right inspector tabs, and shell primitives before editing."
+    }
+  ],
+  "ownership": {
+    "controller_owned": [
+      ".loom/status/current.md",
+      ".loom/bootstrap/init-result.json",
+      ".loom/progress/GH-170.md",
+      ".loom/reviews/GH-170.json",
+      "PR metadata",
+      "screenshot evidence"
+    ],
+    "worker_allowed": [],
+    "out_of_scope": [
+      "#171 fidelity QA",
+      "Stage 5",
+      "live Core/Harbor/Lode calls",
+      "real function/data contracts",
+      "Codex private runtime or business semantics"
+    ]
+  },
+  "notes": [
+    "Subagent not used: GH-170 writes one shared renderer thread composition and one shared Loom carrier; parallel writers would increase conflict risk.",
+    "Current fixture functions and data structures do not define real implementation contracts."
+  ]
+}
