@@ -7,7 +7,7 @@
   "reviewer": "codex-main",
   "authored_at": "2026-07-04T02:58:00Z",
   "reviewed_head": "31ac5821631cbac2b2cfb9d2d025b33c306275d3",
-  "reviewed_validation_summary": "Reviewed renderer diff and packaged screenshot after migration. `npm run build`, `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-170-task-thread-migration.png npm run smoke:packaged`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-170 --json`, `loom suite carrier validate --target . --item GH-170 --json`, and `loom suite evidence validate --target . --item GH-170 --json` passed.",
+  "reviewed_validation_summary": "`npm run build` passed; `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-170-task-thread-migration.png npm run smoke:packaged` passed and produced a non-blank packaged screenshot. CodeGraph exploration completed before implementation for restored Codex thread layout / scroll / sticky footer and this repo's shell primitives.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
