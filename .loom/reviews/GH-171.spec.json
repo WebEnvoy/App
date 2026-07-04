@@ -3,17 +3,17 @@
   "item_id": "GH-171",
   "decision": "allow",
   "kind": "spec_review",
-  "summary": "Manual spec review approved GH-171 Desktop Task Thread fidelity QA spec at PR head d32fd6fd4fe55e36dd56540e47b63d630265f221. The spec is scoped to bounded renderer fidelity, screenshot/metrics evidence, packaged smoke, and #167 closeout readiness for the current fixture shell. It does not approve new features, Stage 5, live Core/Harbor/Lode calls, real task submission, real run record truth, or final function/data contracts. Post-review drift after this record must remain limited to review carriers or PR metadata.",
+  "summary": "Manual spec closeout refresh approved GH-171 Desktop Task Thread fidelity QA spec at closeout carrier head d98f44adc014b6bf497654f439dc0405530fa918. The spec remains scoped to bounded renderer fidelity, screenshot/metrics evidence, packaged smoke, and #167 closeout readiness for the current fixture shell. It does not approve new features, Stage 5, live Core/Harbor/Lode calls, real task submission, real run record truth, or final function/data contracts. Post-review drift after this record must remain limited to GH-171 review carriers or PR metadata.",
   "reviewer": "codex-main",
-  "authored_at": "2026-07-04T03:36:00Z",
-  "reviewed_head": "d32fd6fd4fe55e36dd56540e47b63d630265f221",
+  "authored_at": "2026-07-04T03:46:00Z",
+  "reviewed_head": "d98f44adc014b6bf497654f439dc0405530fa918",
   "reviewed_validation_summary": "CodeGraph exploration completed before implementation for restored Codex row/button/tab/card density and this repo's shell primitives. Local browser screenshots/metrics captured for right inspector tabs, left/right panel collapse, app-level site skill page, and settings app-level page. `npm run build`, packaged smoke with `artifacts/gh-171-packaged-fidelity.png`, `git diff --check`, `loom doctor`, `loom verify`, `loom fact-chain`, `loom suite validate`, `loom suite carrier validate`, and `loom suite evidence validate` passed.",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
   "follow_ups": [
-    "After GH-171 PR merge, close #171 with post-merge evidence and retire the current pointer.",
-    "Close parent #167 only after #168/#169/#170/#171 PR and issue closeout evidence are consumed.",
+    "Merge the GH-171 closeout PR after hosted closeout gate passes.",
+    "Close parent #167 only after #168/#169/#170/#171 PR and issue closeout evidence are consumed and this idle pointer PR is merged.",
     "Future feature/data integration must still go through UI design, review, and walkthrough."
   ],
   "semantic_review_disposition": {
