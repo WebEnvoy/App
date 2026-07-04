@@ -1,0 +1,58 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-170",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Manual implementation review approved GH-170 Task Thread content migration at head 31ac5821631cbac2b2cfb9d2d025b33c306275d3. The implementation extracts Task Thread page, composer, right inspector, and shared source-field primitives; App is reduced to shell orchestration; existing #93/#94/#95 fixture semantics remain visible inside the Codex-like shell. It does not approve GH-171 fidelity QA, Stage 5, live Core/Harbor/Lode calls, real task submission, real run record truth, or real function/data contracts. Post-review drift after this record must remain limited to GH-170 review carriers or PR metadata.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-04T02:58:00Z",
+  "reviewed_head": "31ac5821631cbac2b2cfb9d2d025b33c306275d3",
+  "reviewed_validation_summary": "Reviewed renderer diff and packaged screenshot after migration. `npm run build`, `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-170-task-thread-migration.png npm run smoke:packaged`, `git diff --check`, `loom doctor --target . --json`, `loom verify --target . --json`, `loom fact-chain --target . --json`, `loom suite validate --target . --item GH-170 --json`, `loom suite carrier validate --target . --item GH-170 --json`, and `loom suite evidence validate --target . --item GH-170 --json` passed.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Open PR with before/after screenshots and Codex restored references.",
+    "After GH-170 merge/closeout, continue GH-171 fidelity QA before parent #167 closeout.",
+    "Keep current fixture data and component boundaries as preview scaffolding only, not implementation contracts."
+  ],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/GH-170.md",
+    "recovery_entry": ".loom/progress/GH-170.md",
+    "status_surface": ".loom/status/current.md",
+    "spec": ".loom/specs/GH-170/spec.md",
+    "plan": ".loom/specs/GH-170/plan.md",
+    "implementation_contract": ".loom/specs/GH-170/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-170/task-carrier.md",
+    "build_evidence": ".loom/specs/GH-170/build-evidence.json",
+    "evidence_map": ".loom/specs/GH-170/evidence-map.md",
+    "renderer_files": "src/renderer/App.tsx; src/renderer/TaskThreadPage.tsx; src/renderer/TaskThreadComposer.tsx; src/renderer/TaskThreadRightPanel.tsx; src/renderer/TaskThreadFields.tsx; src/renderer/styles.css",
+    "screenshots": "artifacts/gh-170-before-task-thread.png; artifacts/gh-170-task-thread-migration.png",
+    "suite_path": "minimal",
+    "scope_boundary": "GH-170 implementation PR only. No #171 QA completion, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval.",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "local_codex"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The reviewed renderer changes implement the bounded GH-170 content migration and keep owner-runtime truth boundaries explicit. Validation and packaged screenshot evidence are present."
+  },
+  "implementation_review_disposition": {
+    "status": "passed",
+    "reason": "Implementation uses existing shell primitives and fixture data, extracts focused components under file-size limits, and preserves Task / Run / Evidence / Identity / Site Skill / Harbor Session semantics without live owner-runtime integration."
+  }
+}
