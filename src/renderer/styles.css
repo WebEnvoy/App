@@ -1037,6 +1037,98 @@ h3 {
   gap: 14px;
 }
 
+.thread-intent-turn {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  background: var(--we-surface-primary);
+}
+
+.thread-intent-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.thread-intent-title > svg {
+  margin-top: 2px;
+  color: var(--we-foreground-muted);
+}
+
+.thread-intent-title strong {
+  color: var(--we-foreground);
+  font-size: 14px;
+}
+
+.thread-intent-title p {
+  margin-top: 3px;
+  color: var(--we-foreground-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.thread-intent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+}
+
+.thread-intent-grid div {
+  min-width: 0;
+  padding: 9px 10px;
+  border-right: 1px solid var(--we-border);
+  background: var(--we-surface-secondary);
+}
+
+.thread-intent-grid div:last-child {
+  border-right: 0;
+}
+
+.thread-intent-grid dt {
+  margin-bottom: 4px;
+  color: var(--we-foreground-muted);
+  font-size: 11px;
+}
+
+.thread-intent-grid dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--we-foreground);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .thread-intent-title {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .thread-intent-title .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .thread-intent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .thread-intent-grid div {
+    border-right: 0;
+    border-bottom: 1px solid var(--we-border);
+  }
+
+  .thread-intent-grid div:last-child {
+    border-bottom: 0;
+  }
+}
+
 .run-turn-list,
 .run-turn {
   display: grid;
