@@ -1,0 +1,106 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item_id": "GH-169",
+  "status": "implemented",
+  "delegations": [],
+  "integrated_outputs": [
+    {
+      "source": "controller:019f2749-f38d-74c2-8e1a-6202426122f7",
+      "integrated_at": "2026-07-03T10:00:00Z",
+      "files": [
+        "src/renderer/App.tsx",
+        "src/renderer/shellPrimitives.tsx",
+        "src/renderer/styles.css",
+        "src/renderer/uiFoundation.css",
+        "DESIGN.md",
+        "src/electron/main.ts",
+        "scripts/smoke-packaged.mjs",
+        "artifacts/gh-169-codex-app-reference.png",
+        "artifacts/gh-169-codex-like-shell.png"
+      ],
+      "summary": "Added fixture-only Codex-like shell primitives, recomposed the renderer into left panel, thread workspace, right inspector, tabs, right resize, focus areas, and bottom action slot, then reworked the shell toward restored Codex AppShellLayout's flex shell/main-surface/viewport/frame/right-panel/bottom-slot structure. Absorbed restored ResizeHandle-style pointer drag, pointer cancel, double-click reset, drag-to-collapse thresholds, left/right panel collapse rails, bottom panel resize/collapse, navigation rail hover/scrub, app-level site skill/settings page strategy, and token/primitive foundation rules. Captured Codex reference and packaged Electron screenshots for direction review."
+    }
+  ],
+  "validation": [
+    {
+      "command": "npm run build",
+      "result": "pass",
+      "recorded_at": "2026-07-03T17:43:00Z",
+      "summary": "Renderer and Electron TypeScript checks passed; Electron main build and Vite renderer build passed after DESIGN foundation update."
+    },
+    {
+      "command": "WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-169-codex-like-shell.png npm run smoke:packaged",
+      "result": "pass",
+      "recorded_at": "2026-07-03T17:43:00Z",
+      "summary": "Build passed after Codex-style foundation documentation update; packaged smoke verified non-empty renderer, preload injection, left/right panel toggle collapse and restore, and nonblank screenshot. Screenshot: artifacts/gh-169-codex-like-shell.png"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass",
+      "recorded_at": "2026-07-03T17:43:00Z"
+    },
+    {
+      "command": "loom doctor --target . --json",
+      "result": "pass",
+      "recorded_at": "2026-07-03T17:43:16Z"
+    },
+    {
+      "command": "loom verify --target . --json",
+      "result": "pass",
+      "recorded_at": "2026-07-03T17:43:16Z"
+    },
+    {
+      "command": "loom fact-chain --target . --json",
+      "result": "pass",
+      "recorded_at": "2026-07-03T17:43:15Z"
+    }
+  ],
+  "codegraph_references": [
+    {
+      "source": "/Volumes/2T/dev/codexdecode/decode-codex/restored",
+      "summary": "Explored and absorbed maintainable structure from restored `app-shell/app-shell-layout.tsx`, `app-shell/left-panel.tsx`, `app-shell/right-panel.tsx`, `app-shell/bottom-panel.tsx`, `app-shell/resize-handle.tsx`, `threads/lazy-navigation-rail.tsx`, `threads/thread-user-message-navigation-rail/preview-impl.tsx`, restored plugin page primitives, and settings page structure: flex shell, main surface, main content viewport/frame, right panel slot, bottom panel slot, focus-area capture, panel resize handles, drag-to-collapse thresholds, pointer cancel, double-click reset, navigation rail hover preview/scrub, app-level pages, and dense tabs/list rows. Did not copy motion/signal runtime, VSCode bridge, vendor bundle, plugin business semantics, or Codex product semantics."
+    },
+    {
+      "source": "/Volumes/2T/.codex/worktrees/da84/App",
+      "summary": "Initialized local CodeGraph and explored existing renderer fixtures and monolithic Task Thread layout before editing."
+    }
+  ],
+  "ownership": {
+    "controller_owned": [
+      ".loom/status/current.md",
+      ".loom/bootstrap/init-result.json",
+      ".loom/progress/GH-169.md",
+      ".loom/reviews/GH-169.json",
+      "PR metadata",
+      "direction confirmation report"
+    ],
+    "worker_allowed": [],
+    "out_of_scope": [
+      "#93/#94/#95 content migration",
+      "#170",
+      "#171",
+      "Stage 5",
+      "live Core/Harbor/Lode calls",
+      "Codex private runtime or business semantics"
+    ]
+  },
+  "screenshot_comparison": [
+    {
+      "source": "artifacts/gh-169-codex-app-reference.png",
+      "summary": "Codex app reference used for left sidebar density, no title at sidebar top, panel control icon treatment, central thread scroll, and right-side inspector placement."
+    },
+    {
+      "source": "docs/design/desktop-task-thread-direction.png",
+      "summary": "WebEnvoy design direction used for Task/Run/Evidence/Identity/Site Skill/Harbor Session semantics and task-thread information architecture."
+    },
+    {
+      "source": "artifacts/gh-169-codex-like-shell.png",
+      "summary": "Packaged Electron preview captured after each implementation pass and compared against Codex reference and WebEnvoy direction image; latest screenshot removes left-sidebar title and places icon panel controls in the header action area."
+    }
+  ],
+  "notes": [
+    "Subagent not used: #169 writes one shared renderer shell and one shared Loom carrier; parallel writers would increase conflict risk.",
+    "The local .codegraph index is tool state and is not part of the PR.",
+    "Stop after #169 PR ready for user/scheduler direction confirmation before #170."
+  ]
+}
