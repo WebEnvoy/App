@@ -1,0 +1,42 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-171",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Manual spec review approved GH-171 Desktop Task Thread fidelity QA spec at implementation head 3ff2d92f922a9e87811504f1fa8f83f17fbf964b. The spec is scoped to bounded renderer fidelity, screenshot/metrics evidence, packaged smoke, and #167 closeout readiness for the current fixture shell. It does not approve new features, Stage 5, live Core/Harbor/Lode calls, real task submission, real run record truth, or final function/data contracts. Post-review drift after this record must remain limited to review carriers or PR metadata.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-04T03:36:00Z",
+  "reviewed_head": "3ff2d92f922a9e87811504f1fa8f83f17fbf964b",
+  "reviewed_validation_summary": "`npm run build` passed; `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-171-packaged-fidelity.png npm run smoke:packaged` passed and produced a non-blank packaged screenshot; `git diff --check`, `loom doctor`, `loom verify`, `loom fact-chain`, `loom suite validate`, `loom suite carrier validate`, and `loom suite evidence validate` passed.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "After GH-171 PR merge, close #171 with post-merge evidence and retire the current pointer.",
+    "Close parent #167 only after #168/#169/#170/#171 PR and issue closeout evidence are consumed.",
+    "Future feature/data integration must still go through UI design, review, and walkthrough."
+  ],
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The GH-171 spec, plan, implementation contract, task carrier, build evidence, evidence map, screenshots, metrics, and renderer CSS change all describe the same bounded fidelity QA item. The spec explicitly excludes new product behavior, Stage 5, live owner-runtime contracts, and final data contracts."
+  },
+  "consumed_inputs": {
+    "repository": "WebEnvoy/App",
+    "work_item": "GH-171",
+    "covered_work_items": "#171",
+    "parent_issue": "#167",
+    "user_confirmation": "User confirmed current architecture-state caveat on 2026-07-04; current feature/data structures do not represent final implementation.",
+    "spec": ".loom/specs/GH-171/spec.md",
+    "plan": ".loom/specs/GH-171/plan.md",
+    "implementation_contract": ".loom/specs/GH-171/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-171/task-carrier.md",
+    "build_evidence": ".loom/specs/GH-171/build-evidence.json",
+    "evidence_map": ".loom/specs/GH-171/evidence-map.md",
+    "suite_path": "minimal",
+    "suite_validation": "loom suite validate --target . --item GH-171 --json; loom suite carrier validate --target . --item GH-171 --json; loom suite evidence validate --target . --item GH-171 --json",
+    "codex_restored_references": "/Volumes/2T/dev/codexdecode/decode-codex/restored/ui/selectable-list-row.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/app-shell-tab.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/ui/thread-resource-card.tsx; /Volumes/2T/dev/codexdecode/decode-codex/restored/app-shell/right-panel.tsx",
+    "screenshots": "artifacts/gh-171-fidelity-tabs-after.png; artifacts/gh-171-right-collapsed.png; artifacts/gh-171-left-collapsed.png; artifacts/gh-171-app-level-site-skill.png; artifacts/gh-171-settings-app-level.png; artifacts/gh-171-packaged-fidelity.png",
+    "metrics": "artifacts/gh-171-fidelity-tabs-after-metrics.json; artifacts/gh-171-right-collapsed-metrics.json; artifacts/gh-171-left-collapsed-metrics.json; artifacts/gh-171-app-level-site-skill-metrics.json; artifacts/gh-171-settings-app-level-metrics.json",
+    "scope_boundary": "Renderer fidelity QA for current fixture shell only; no new features, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval."
+  }
+}

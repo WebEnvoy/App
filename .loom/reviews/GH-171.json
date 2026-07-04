@@ -1,0 +1,59 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "GH-171",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Manual code review approved GH-171 Desktop Task Thread fidelity QA implementation at head 3ff2d92f922a9e87811504f1fa8f83f17fbf964b. The code change is limited to renderer CSS for right inspector tab density and source/content spacing, plus screenshot/metrics evidence and GH-171 Loom carriers. It does not approve new product behavior, Stage 5, live Core/Harbor/Lode calls, or final data structures. Post-review drift after this record must remain limited to review carriers or PR metadata.",
+  "reviewer": "codex-main",
+  "authored_at": "2026-07-04T03:36:00Z",
+  "reviewed_head": "3ff2d92f922a9e87811504f1fa8f83f17fbf964b",
+  "reviewed_validation_summary": "`npm run build` passed; `WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/gh-171-packaged-fidelity.png npm run smoke:packaged` passed and produced a non-blank packaged screenshot; `git diff --check`, `loom doctor`, `loom verify`, `loom fact-chain`, `loom suite validate`, `loom suite carrier validate`, and `loom suite evidence validate` passed.",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Pass hosted checks before merge.",
+    "After merge, close #171 with post-merge evidence and then retire the current pointer.",
+    "Do not represent current fixtures or UI data structures as final product implementation contracts."
+  ],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/GH-171.md",
+    "recovery_entry": ".loom/progress/GH-171.md",
+    "status_surface": ".loom/status/current.md",
+    "spec": ".loom/specs/GH-171/spec.md",
+    "plan": ".loom/specs/GH-171/plan.md",
+    "implementation_contract": ".loom/specs/GH-171/implementation-contract.md",
+    "task_carrier": ".loom/specs/GH-171/task-carrier.md",
+    "build_evidence": ".loom/specs/GH-171/build-evidence.json",
+    "evidence_map": ".loom/specs/GH-171/evidence-map.md",
+    "renderer_change": "src/renderer/styles.css",
+    "screenshot_evidence": "artifacts/gh-171-fidelity-tabs-after.png; artifacts/gh-171-right-collapsed.png; artifacts/gh-171-left-collapsed.png; artifacts/gh-171-app-level-site-skill.png; artifacts/gh-171-settings-app-level.png; artifacts/gh-171-packaged-fidelity.png",
+    "build_checkpoint": "pass",
+    "suite_path": "minimal",
+    "scope_boundary": "Renderer fidelity QA for current fixture shell only; no new features, no Stage 5, no live Core/Harbor/Lode, and no real function/data contract approval.",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The implementation is bounded to renderer fidelity styling and evidence carriers, and the screenshots/metrics support the acceptance matrix for this fixture-shell QA item."
+  },
+  "implementation_review_disposition": {
+    "status": "passed",
+    "reason": "No correctness, scope, data-contract, or runtime boundary regression was found in the reviewed diff. The change does not introduce live owner-runtime behavior."
+  }
+}

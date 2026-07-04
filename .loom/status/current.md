@@ -12,8 +12,8 @@
 - Validation Entry: npm run build; npm run smoke:packaged; git diff --check; loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json
 - Closing Condition: PR ready with final packaged screenshot, local screenshot/metrics evidence, Codex restored references, and explicit early-architecture scope caveat.
 - Current Checkpoint: implemented
-- Current Stop: Create review carrier, commit, push, open PR, validate PR metadata, pass hosted checks, and merge/closeout.
-- Next Step: Commit, push, open PR, pass hosted checks, merge, close #171, retire pointer, then close #167.
+- Current Stop: Commit review carrier, push, open PR, validate PR metadata, pass hosted checks, and merge/closeout.
+- Next Step: Commit review carrier, push, open PR, pass hosted checks, merge, close #171, retire pointer, then close #167.
 - Blockers: none recorded.
 - Latest Validation Summary: CodeGraph exploration completed before implementation for restored Codex row/button/tab/card density and this repo's shell primitives. Local browser screenshots/metrics captured for right inspector tabs, left/right panel collapse, app-level site skill page, and settings app-level page. `npm run build`, packaged smoke with `artifacts/gh-171-packaged-fidelity.png`, `git diff --check`, `loom doctor`, `loom verify`, `loom fact-chain`, `loom suite validate`, `loom suite carrier validate`, and `loom suite evidence validate` passed.
 - Recovery Boundary: GH-171 owns fidelity QA and screenshot/metrics evidence for the fixture desktop shell only. It does not add features, enter Stage 5, connect live Core/Harbor/Lode, or approve current fixtures/data shapes as final implementation contracts.
