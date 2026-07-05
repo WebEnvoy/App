@@ -3,13 +3,16 @@ import {
   BadgeCheck,
   Box,
   DatabaseZap,
+  Download,
   ExternalLink,
   Filter,
   Globe2,
+  LockKeyhole,
+  Play,
+  RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
-  Target,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -71,8 +74,8 @@ export function SiteSkillDirectoryPage({
     <div className="site-skill-page we-sectioned-page">
       <header className="site-skill-directory-header">
         <div>
-          <h1>站点技能</h1>
-          <p>Lode capability metadata fixture；App 只展示入口和边界，不执行技能。</p>
+          <h1>Library</h1>
+          <p>只读 capability catalog；App 只保存本地 UI 意图，package truth 仍归属 Lode。</p>
         </div>
         <span className="status-pill status-fixture">fixture</span>
       </header>
@@ -147,16 +150,17 @@ export function SiteSkillDetailPage({
 }: {
   skill: SiteSkill;
   onBack: () => void;
-  onOpenTask: (taskId: string) => void;
+  onOpenTask: (skill: SiteSkill) => void;
 }) {
   const firstRelatedTaskId = skill.relatedTaskIds[0] ?? null;
+  const canLaunchTask = firstRelatedTaskId != null && skill.status !== "unavailable";
 
   return (
     <div className="site-skill-page site-skill-detail-page we-sectioned-page">
       <div className="site-skill-detail-toolbar">
         <button className="site-skill-back-button" type="button" onClick={onBack}>
           <ArrowLeft size={15} />
-          站点技能
+          Library
         </button>
         <StatusPill status={skill.status} />
       </div>
@@ -173,14 +177,26 @@ export function SiteSkillDetailPage({
           </div>
         </div>
         <div className="site-skill-detail-actions">
+          <button className="site-skill-secondary-action" type="button">
+            <Download size={15} />
+            {installActionText(skill.installState)}
+          </button>
+          <button className="site-skill-secondary-action" type="button">
+            <LockKeyhole size={15} />
+            {skill.lockRef == null ? "锁定版本" : "已锁定"}
+          </button>
+          <button className="site-skill-secondary-action" type="button" disabled={skill.updateState !== "update-available"}>
+            <RefreshCw size={15} />
+            {updateActionText(skill.updateState)}
+          </button>
           <button
             className="site-skill-primary-action"
             type="button"
-            disabled={firstRelatedTaskId == null}
-            onClick={() => firstRelatedTaskId != null && onOpenTask(firstRelatedTaskId)}
+            disabled={!canLaunchTask}
+            onClick={() => canLaunchTask && onOpenTask(skill)}
           >
-            <Target size={15} />
-            {firstRelatedTaskId == null ? "暂无任务" : "打开任务"}
+            <Play size={15} />
+            {canLaunchTask ? "启动只读任务" : "暂无任务"}
           </button>
         </div>
       </section>
@@ -218,11 +234,28 @@ export function SiteSkillDetailPage({
           </div>
           <dl className="site-skill-facts">
             <SkillFact label="Package" value={skill.packageName} />
-            <SkillFact label="Version" value={skill.version} />
+            <SkillFact label="Installed" value={skill.version} />
+            <SkillFact label="Latest" value={skill.latestVersion} />
             <SkillFact label="Source" value={skill.source} />
+            <SkillFact label="Package ref" value={skill.packageRef} />
             <SkillFact label="Capability ref" value={skill.capabilityRef} />
+            {skill.lockRef == null ? null : <SkillFact label="Lock ref" value={skill.lockRef} />}
             <SkillFact label="Fetched at" value={skill.fetchedAt} />
           </dl>
+        </section>
+
+        <section className="site-skill-detail-card">
+          <div className="card-title">
+            <ShieldCheck size={18} />
+            <h3>本地状态</h3>
+          </div>
+          <dl className="site-skill-facts">
+            <SkillFact label="Install" value={installStateText(skill.installState)} />
+            <SkillFact label="Update" value={updateStateText(skill.updateState)} />
+            <SkillFact label="Risk" value={riskText(skill.risk)} />
+            <SkillFact label="Source health" value={skill.sourceHealth.label} status={skill.sourceHealth.status} />
+          </dl>
+          <p className="site-skill-state-detail">{skill.sourceHealth.detail}</p>
         </section>
       </div>
 
@@ -268,6 +301,9 @@ function SiteSkillCard({
           <StatusPill status={skill.status} />
           <span>{skill.category}</span>
           <span>{skill.source}</span>
+          <span>{skill.version === skill.latestVersion ? skill.version : `${skill.version} -> ${skill.latestVersion}`}</span>
+          <span>{installStateText(skill.installState)}</span>
+          <span>{riskText(skill.risk)}</span>
         </span>
       </span>
       <span className="site-skill-card-action">
@@ -319,12 +355,62 @@ function statusText(status: SiteSkillStatus) {
   return "fixture";
 }
 
-function SkillFact({ label, value }: { label: string; value: string }) {
+function installActionText(state: SiteSkill["installState"]) {
+  if (state === "not-installed") {
+    return "安装";
+  }
+  if (state === "locked") {
+    return "已安装";
+  }
+  return "安装偏好";
+}
+
+function updateActionText(state: SiteSkill["updateState"]) {
+  if (state === "update-available") {
+    return "更新";
+  }
+  if (state === "blocked") {
+    return "更新阻塞";
+  }
+  return "已最新";
+}
+
+function installStateText(state: SiteSkill["installState"]) {
+  if (state === "not-installed") {
+    return "未安装";
+  }
+  if (state === "locked") {
+    return "已锁定";
+  }
+  return "已安装";
+}
+
+function updateStateText(state: SiteSkill["updateState"]) {
+  if (state === "update-available") {
+    return "有更新";
+  }
+  if (state === "blocked") {
+    return "不可更新";
+  }
+  return "latest";
+}
+
+function riskText(risk: SiteSkill["risk"]) {
+  if (risk === "blocked") {
+    return "blocked";
+  }
+  if (risk === "medium") {
+    return "medium";
+  }
+  return "low";
+}
+
+function SkillFact({ label, value, status = "fixture" }: { label: string; value: string; status?: SiteSkillStatus }) {
   return (
     <div>
       <dt>{label}</dt>
       <dd>{value}</dd>
-      <span className="source-chip">fixture</span>
+      <StatusPill status={status} />
     </div>
   );
 }

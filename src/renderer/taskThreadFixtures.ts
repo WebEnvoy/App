@@ -43,6 +43,8 @@ export type TaskProjection = {
     name: string;
     version: string;
     capabilityRef: string;
+    sourceRef: string;
+    lockRef?: string;
     fetchedAt: string;
     source: OwnerSource;
     boundary: string;
@@ -104,6 +106,8 @@ export const taskThreadFixtures: TaskProjection[] = [
       name: "@lode/example-commerce-product-detail",
       version: "0.4.2",
       capabilityRef: "lode://capability/example-commerce/product-detail",
+      sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+      lockRef: "lode://lock/example-commerce-product-detail/2026-07-03",
       fetchedAt: "2026-07-03T04:20:00Z",
       source: "Lode fixture",
       boundary: "App only displays capability package metadata; workflow runtime/editor stays out of scope.",
@@ -268,6 +272,8 @@ export const taskThreadFixtures: TaskProjection[] = [
       name: "@lode/example-commerce-product-detail",
       version: "0.4.2",
       capabilityRef: "lode://capability/example-commerce/product-detail",
+      sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+      lockRef: "lode://lock/example-commerce-product-detail/2026-07-03",
       fetchedAt: "2026-07-03T04:20:00Z",
       source: "Lode fixture",
       boundary: "Missing Core source does not change Lode package attribution.",

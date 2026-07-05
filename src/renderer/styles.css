@@ -1760,6 +1760,7 @@ h3 {
 .site-skill-filter-button,
 .site-skill-back-button,
 .site-skill-primary-action,
+.site-skill-secondary-action,
 .site-skill-icon-action {
   display: inline-flex;
   height: 30px;
@@ -1980,7 +1981,15 @@ h3 {
   background: var(--we-status-info);
 }
 
-.site-skill-primary-action:disabled {
+.site-skill-secondary-action {
+  padding: 0 10px;
+  border: 1px solid var(--we-border);
+  color: var(--we-foreground);
+  background: var(--we-surface-secondary);
+}
+
+.site-skill-primary-action:disabled,
+.site-skill-secondary-action:disabled {
   color: var(--we-foreground-muted);
   background: var(--we-surface-tertiary);
 }
@@ -2094,6 +2103,13 @@ h3 {
   gap: 8px;
   margin: 0;
   padding-left: 18px;
+}
+
+.site-skill-state-detail {
+  margin: 10px 0 0;
+  color: var(--we-foreground-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .site-skill-empty {

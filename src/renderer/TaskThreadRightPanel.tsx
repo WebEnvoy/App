@@ -153,6 +153,8 @@ function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
           ["Package", selectedTask.packageSource.name],
           ["Version", selectedTask.packageSource.version],
           ["Capability ref", selectedTask.packageSource.capabilityRef],
+          ["Source ref", selectedTask.packageSource.sourceRef],
+          ["Lock ref", selectedTask.packageSource.lockRef ?? "unlocked"],
           ["Fetched at", selectedTask.packageSource.fetchedAt],
         ].map(([label, value]) => (
           <SourceField
