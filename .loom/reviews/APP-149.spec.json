@@ -1,0 +1,28 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-149",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Spec review allows APP-149 story-readiness-only minimal suite for App #133/#134/#135. The spec keeps implementation, owner API, and upstream truth changes out of scope.",
+  "reviewer": "Codex thread 019f31a5-212e-7952-a56a-bba7ffe9b1b9",
+  "authored_at": "2026-07-05T15:40:30Z",
+  "reviewed_head": "59a89b1b778a2149358df7acb9ebca9ad93c5b51",
+  "reviewed_validation_summary": "git diff --check, loom story --target . --json, loom suite validate --target . --item APP-149 --json, loom suite carrier validate --target . --item APP-149 --json, loom fact-chain --target . --json, and loom verify --target . --json passed for story-readiness-only scope.",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-149.md",
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-149.md",
+    "story": ".loom/stories/APP-FR133-135-stage5-test-failure-repair-evidence.md",
+    "spec": ".loom/specs/APP-149/spec.md",
+    "plan": ".loom/specs/APP-149/plan.md",
+    "suite_validation": "loom suite validate --target . --item APP-149 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target . --item APP-149 --json"
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The story, spec, and plan define product semantics, failure states, sensitive boundaries, non-goals, and upstream owner facts without adding implementation scope."
+  }
+}
