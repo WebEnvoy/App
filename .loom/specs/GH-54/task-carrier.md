@@ -1,6 +1,0 @@
-# Task Carrier
-
-| carrier_type | carrier_locator | source_value | normalized_status | relationship | work_item_locator | breakdown_unit_locator | spec_scenario_locator | plan_phase_locator | validation_strategy_locator | provenance | freshness_rule |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| github_issue | https://github.com/WebEnvoy/App/issues/54 | Work Item open / docs-only contract in progress | in_progress | primary | .loom/work-items/GH-54.md | .loom/specs/GH-54/plan.md#implementation | .loom/specs/GH-54/spec.md#required-behavior | .loom/specs/GH-54/plan.md#implementation | .loom/specs/GH-54/plan.md#validation | Codex thread 019f1825-795c-7b50-9edb-2650270e75a2 created on 2026-06-30 from scheduler delegation | Recheck after every commit, push, PR metadata update, hosted check, review finding, or issue/PR state change. |
-| github_issue | https://github.com/WebEnvoy/App/issues/58 | Parent FR open / consumes GH-54 contract | pending | mirror | .loom/work-items/GH-54.md | .loom/specs/GH-54/plan.md#implementation | .loom/specs/GH-54/spec.md#required-behavior | .loom/specs/GH-54/plan.md#implementation | .loom/specs/GH-54/plan.md#validation | GitHub issue body read on 2026-06-30 | Parent closeout remains coordinator-owned after merge; this PR must not close the issue. |

@@ -1,9 +1,0 @@
-{
-  "result": "pass",
-  "source_files": [
-    ".loom/status/current.md"
-  ],
-  "source_sha256": {
-    ".loom/status/current.md": "22a7e99e937464a612b950c06959ec81f2306b0c40c5d17e6a5f3cd996617c70"
-  }
-}
