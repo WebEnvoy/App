@@ -27,5 +27,5 @@
 
 ## Host Binding
 
-- Pull Request: pending
-- Reviewed Head: pending
+- Pull Request: https://github.com/WebEnvoy/App/pull/184
+- Reviewed Head: pending current-head review
