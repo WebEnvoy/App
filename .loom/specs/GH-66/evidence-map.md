@@ -1,7 +1,0 @@
-# Evidence Map
-
-| evidence_id | evidence_type | source_locator | consumes | binding | freshness | consumer_boundary | remediation_direction |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| EV-001 | behavior_evidence | `docs/draft/README.md`, `docs/contracts/README.md`, `docs/draft/architecture.md`, `docs/draft/product-surface.md`, `docs/draft/library-workbench.md`, `docs/draft/local-runtime.md` | `.loom/specs/GH-66/spec.md#required-behavior` | GH-66 / docs-only draft closeout / current PR head / PR #69 | present | Review and merge-ready evidence for docs-only content judgment; no code, schema, API, runtime, generated facts, fixtures, storage, or UI behavior. | Re-read draft files and accepted ADRs if docs content changes. |
-| EV-002 | test_evidence | `.loom/progress/GH-66.md` | `.loom/specs/GH-66/plan.md#validation` | GH-66 / validation summary / current PR head / PR #69 | present | Review and merge-ready evidence for local validation commands and hosted check classification. | Rerun validation and update progress/status summaries after any head change. |
-| EV-003 | fresh_verification_input | `.loom/progress/GH-66.md` | EV-001 EV-002 | GH-66 / latest validation summary / current PR head / PR #69 | present | Review and merge-ready evidence proving behavior and validation inputs are fresh for the current PR head. | Refresh evidence rows, progress/status summaries, and PR body after any commit or PR metadata change. |
