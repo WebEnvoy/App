@@ -1,0 +1,36 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-149",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Story-readiness-only review allows APP-149 carriers for App #133/#134/#135. No product code, owner API, package/run/session/evidence truth, credential, raw DOM, HAR, raw network, or profile material is changed.",
+  "reviewer": "Codex thread 019f31a5-212e-7952-a56a-bba7ffe9b1b9",
+  "authored_at": "2026-07-05T15:42:40Z",
+  "reviewed_head": "840f301d1bbbe99831d3711c3da9c683cf42ca8b",
+  "reviewed_validation_summary": "git diff --check, loom story --target . --json, loom suite validate --target . --item APP-149 --json, loom suite carrier validate --target . --item APP-149 --json, loom fact-chain --target . --json, and loom verify --target . --json passed for story-readiness-only scope.",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-149.md",
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "Run owner-specific implementation tests and packaged App smoke in later implementation PRs that change UI or fixtures."
+  ],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-149.md",
+    "recovery_entry": ".loom/progress/APP-149.md",
+    "status_surface": ".loom/status/current.md",
+    "spec_review": ".loom/reviews/APP-149.spec.json",
+    "suite_validation": "loom suite validate --target . --item APP-149 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target . --item APP-149 --json",
+    "fact_chain": "loom fact-chain --target . --json",
+    "verify": "loom verify --target . --json"
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The story readiness captures user value, success paths, failure/unavailable states, sensitive-data boundary, non-goals, and owner truth boundaries for App #133/#134/#135."
+  },
+  "implementation_review_disposition": {
+    "status": "passed",
+    "reason": "The PR only adds story readiness and Loom carriers; no product behavior or owner truth changes are implemented."
+  }
+}
