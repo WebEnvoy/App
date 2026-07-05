@@ -6,7 +6,7 @@
   "summary": "Story-readiness-only review allows APP-149 carriers for App #133/#134/#135. No product code, owner API, package/run/session/evidence truth, credential, raw DOM, HAR, raw network, or profile material is changed.",
   "reviewer": "Codex thread 019f31a5-212e-7952-a56a-bba7ffe9b1b9",
   "authored_at": "2026-07-05T15:42:40Z",
-  "reviewed_head": "606ce6e1fb41da68d9ce9ded831c59b80789f2e6",
+  "reviewed_head": "840f301d1bbbe99831d3711c3da9c683cf42ca8b",
   "reviewed_validation_summary": "git diff --check, loom story --target . --json, loom suite validate --target . --item APP-149 --json, loom suite carrier validate --target . --item APP-149 --json, loom fact-chain --target . --json, and loom verify --target . --json passed for story-readiness-only scope.",
   "validation_summary_source": "recovery.latest_validation_summary",
   "validation_summary_locator": ".loom/progress/APP-149.md",
