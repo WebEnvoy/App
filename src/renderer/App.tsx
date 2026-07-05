@@ -94,7 +94,7 @@ export function App() {
     : isSiteSkillView
     ? isSiteSkillDetailOpen
       ? selectedSiteSkill.name
-      : "站点技能"
+      : "Library"
     : selectedTask.title;
   const threadNavigationItems = useMemo<ThreadNavigationItem[]>(
     () =>
@@ -194,8 +194,8 @@ export function App() {
     setSiteSkillDetailOpen(true);
   }
 
-  function openRelatedTask(taskId: string) {
-    const task = taskThreadFixtures.find((item) => item.id === taskId);
+  function startReadTask(skill: SiteSkill) {
+    const task = taskThreadFixtures.find((item) => item.id === skill.relatedTaskIds[0]);
     if (task != null) {
       selectTask(task);
     }
@@ -280,7 +280,7 @@ export function App() {
                 onClick={openSiteSkillDirectory}
               >
                 <Box size={16} />
-                站点技能
+                Library
               </button>
               <button className="nav-item we-list-row cursor-interaction" type="button">
                 <Search size={16} />
@@ -388,7 +388,7 @@ export function App() {
               <SiteSkillDetailPage
                 skill={selectedSiteSkill}
                 onBack={openSiteSkillDirectory}
-                onOpenTask={openRelatedTask}
+                onOpenTask={startReadTask}
               />
             ) : (
               <SiteSkillDirectoryPage

@@ -11,8 +11,15 @@ export type SiteSkill = {
   source: OwnerSource;
   packageName: string;
   version: string;
+  latestVersion: string;
+  installState: "not-installed" | "installed" | "locked";
+  updateState: "latest" | "update-available" | "blocked";
+  risk: "low" | "medium" | "blocked";
   capabilityRef: string;
+  packageRef: string;
+  lockRef?: string;
   fetchedAt: string;
+  sourceHealth: { label: string; status: SiteSkillStatus; detail: string };
   tags: string[];
   inputTemplates: string[];
   readiness: Array<{ label: string; status: SiteSkillStatus; detail: string }>;
@@ -30,8 +37,15 @@ export const siteSkillFixtures: SiteSkill[] = [
     source: "Lode fixture",
     packageName: "@lode/example-commerce-product-detail",
     version: "0.4.2",
+    latestVersion: "0.4.2",
+    installState: "locked",
+    updateState: "latest",
+    risk: "low",
     capabilityRef: "lode://capability/example-commerce/product-detail",
+    packageRef: "lode://package/example-commerce-product-detail@0.4.2",
+    lockRef: "lode://lock/example-commerce-product-detail/2026-07-03",
     fetchedAt: "2026-07-03T04:20:00Z",
+    sourceHealth: { label: "source ready", status: "ready", detail: "Core、Harbor、Lode fixture 均可消费。" },
     tags: ["淘宝", "商品页", "只读"],
     inputTemplates: ["商品详情 URL", "账号身份", "字段清单"],
     readiness: [
@@ -54,8 +68,14 @@ export const siteSkillFixtures: SiteSkill[] = [
     source: "Lode fixture",
     packageName: "@lode/example-commerce-storefront-list",
     version: "0.2.0",
+    latestVersion: "0.2.1",
+    installState: "installed",
+    updateState: "update-available",
+    risk: "medium",
     capabilityRef: "lode://capability/example-commerce/storefront-list",
+    packageRef: "lode://package/example-commerce-storefront-list@0.2.0",
     fetchedAt: "2026-07-03T04:21:00Z",
+    sourceHealth: { label: "update available", status: "fixture", detail: "Lode 提供 0.2.1；App 只记录更新意图。" },
     tags: ["店铺", "分页", "商品卡片"],
     inputTemplates: ["店铺首页 URL", "采集页数", "字段清单"],
     readiness: [
@@ -74,8 +94,14 @@ export const siteSkillFixtures: SiteSkill[] = [
     source: "Lode fixture",
     packageName: "@lode/example-social-review-guard",
     version: "0.1.5",
+    latestVersion: "0.1.5",
+    installState: "not-installed",
+    updateState: "blocked",
+    risk: "blocked",
     capabilityRef: "lode://capability/example-social/review-guard",
+    packageRef: "lode://package/example-social-review-guard@0.1.5",
     fetchedAt: "2026-07-03T04:22:00Z",
+    sourceHealth: { label: "identity required", status: "needs-identity", detail: "缺少 Harbor identity，不能提交只读任务。" },
     tags: ["评论", "写入前检查", "安全暂停"],
     inputTemplates: ["评论文本", "目标 URL", "账号身份"],
     readiness: [
@@ -94,8 +120,14 @@ export const siteSkillFixtures: SiteSkill[] = [
     source: "App local-only",
     packageName: "@webenvoy/app-source-health-fixture",
     version: "0.0.0",
+    latestVersion: "0.0.0",
+    installState: "installed",
+    updateState: "blocked",
+    risk: "blocked",
     capabilityRef: "app://fixture/source-health",
+    packageRef: "app://fixture/source-health@0.0.0",
     fetchedAt: "2026-07-03T04:23:00Z",
+    sourceHealth: { label: "Core source blocked", status: "unavailable", detail: "缺少 Core source；只能展示 blocking state。" },
     tags: ["诊断", "边界", "只读"],
     inputTemplates: ["Core endpoint", "Harbor endpoint", "Lode endpoint"],
     readiness: [
@@ -103,7 +135,7 @@ export const siteSkillFixtures: SiteSkill[] = [
       { label: "Runtime truth", status: "fixture", detail: "not connected to live owners" },
     ],
     boundaries: ["不保存 token、cookie、profile path 或 raw evidence。"],
-    relatedTaskIds: ["task-missing-source"],
+    relatedTaskIds: ["task-source-blocked"],
   },
   {
     id: "identity-session",
@@ -114,8 +146,14 @@ export const siteSkillFixtures: SiteSkill[] = [
     source: "Harbor fixture",
     packageName: "@harbor/browser-session-projection",
     version: "0.3.1",
+    latestVersion: "0.3.1",
+    installState: "installed",
+    updateState: "latest",
+    risk: "medium",
     capabilityRef: "harbor://fixture/runtime-session",
+    packageRef: "harbor://fixture/runtime-session@0.3.1",
     fetchedAt: "2026-07-03T04:24:00Z",
+    sourceHealth: { label: "Harbor fixture", status: "fixture", detail: "只消费 runtime/session refs，不创建 Core task。" },
     tags: ["Browser", "Harbor", "Session"],
     inputTemplates: ["账号身份", "站点域名"],
     readiness: [
@@ -134,8 +172,14 @@ export const siteSkillFixtures: SiteSkill[] = [
     source: "Lode fixture",
     packageName: "@lode/example-commerce-price-compare",
     version: "0.0.4",
+    latestVersion: "0.0.4",
+    installState: "not-installed",
+    updateState: "blocked",
+    risk: "blocked",
     capabilityRef: "lode://capability/example-commerce/price-compare",
+    packageRef: "lode://package/example-commerce-price-compare@0.0.4",
     fetchedAt: "2026-07-03T04:25:00Z",
+    sourceHealth: { label: "contract missing", status: "unavailable", detail: "批量聚合合同不在第一批范围内。" },
     tags: ["多站点", "对比", "待接入"],
     inputTemplates: ["商品 URL 列表", "对比字段"],
     readiness: [

@@ -1,0 +1,60 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-137",
+  "decision": "allow",
+  "kind": "general_review",
+  "summary": "Implementation review accepts the current App Library read-capability fixture, install/lock/update intent UI, packaged preview evidence, and Library-to-Task projection for PR #184.",
+  "reviewer": "Codex thread 019f31a5-212e-7952-a56a-bba7ffe9b1b9",
+  "authored_at": "2026-07-05T11:12:06Z",
+  "reviewed_head": "e28b419c77298a4d22be6b03a0862ebb7dd9e03b",
+  "reviewed_validation_summary": "npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/stage5-library-read-capabilities-preview.png npm run smoke:packaged, git diff --check, suite validate, suite evidence validate, suite carrier validate, Loom fact-chain, and Loom verify passed on APP-137.",
+  "reviewed_validation_summary_hash": "8b8d9ac1c890a23e574f73349c5511c93c210753dd839342736ca7631ba03ec0",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-137.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-137.md",
+    "recovery_entry": ".loom/progress/APP-137.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null,
+    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App --item APP-137 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App --item APP-137 --json",
+    "suite_evidence_map": ".loom/specs/APP-137/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-137/task-carrier.md"
+    ],
+    "suite_evidence_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/evidence-map.md"
+    ],
+    "suite_carrier_consumed_contracts": [
+      "docs/methodology/harness/task-carrier-contract.md",
+      "docs/methodology/templates/execution-breakdown.md",
+      "docs/methodology/harness/full-spec-suite-cli-surface.md"
+    ]
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Authored implementation review approved the current head for merge checkpoint consumption."
+  }
+}
