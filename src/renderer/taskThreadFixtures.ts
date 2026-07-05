@@ -28,7 +28,17 @@ export type RunProjection = {
     viewerLabel: string;
     viewerHref: string;
     source: OwnerSource;
+    status?: "available" | "redacted" | "expired" | "stale" | "private" | "unavailable";
+    freshness?: string;
+    provenance?: string;
   }>;
+  capabilityAttribution?: {
+    capabilityRef: string;
+    version: string;
+    sourceRef: string;
+    failureClass: "capability" | "input" | "runtime" | "site_changed" | "evidence_expired" | "none";
+    summary: string;
+  };
   process: string[];
 };
 
@@ -135,8 +145,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-run-006",
             source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core run record + Harbor viewer ref",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "none",
+          summary: "Core attributes this run to the locked Lode capability ref.",
+        },
         process: ["Core accepted task intent.", "Harbor identity attached.", "Variant price extraction is still running."],
       },
       {
@@ -160,8 +180,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-run-005",
             source: "Core fixture",
+            status: "private",
+            freshness: "fresh",
+            provenance: "Harbor private capture redacted to viewer ref",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "runtime",
+          summary: "Failure attribution: runtime needs user action, not package repair.",
+        },
         process: ["Product page loaded.", "Site modal blocked automation.", "Core paused before write-capable action."],
       },
       {
@@ -186,8 +216,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-run-004",
             source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core result envelope evidence ref",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "none",
+          summary: "Capability attribution retained on the run record.",
+        },
         process: ["Core accepted read-only task intent.", "Lode capability metadata matched.", "Harbor identity was referenced, not stored."],
       },
       {
@@ -208,8 +248,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-run-003",
             source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core empty result envelope",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "input",
+          summary: "Empty result is attributed to input content, not capability failure.",
+        },
         process: ["Page loaded.", "Extractor returned zero rows.", "Core closed run as empty."],
       },
       {
@@ -233,8 +283,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-run-002",
             source: "Core fixture",
+            status: "stale",
+            freshness: "stale",
+            provenance: "Harbor evidence ref marked stale",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "site_changed",
+          summary: "Failure attribution: optional selector drift suggests site_changed repair draft.",
+        },
         process: ["Required fields passed.", "Optional price selector was unavailable.", "Core returned partial result."],
       },
       {
@@ -255,8 +315,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-run-001",
             source: "Core fixture",
+            status: "private",
+            freshness: "fresh",
+            provenance: "Harbor private runtime ref",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "runtime",
+          summary: "Failure attribution: runtime/login challenge blocked the run.",
+        },
         process: ["Login challenge detected.", "Core stopped before extraction.", "Failure-safe report created."],
       },
     ],
@@ -298,8 +368,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Evidence viewer unavailable",
             viewerHref: "#evidence-viewer-unavailable",
             source: "Core fixture",
+            status: "unavailable",
+            freshness: "unavailable",
+            provenance: "Core source health blocker",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "runtime",
+          summary: "Failure attribution: Core source health is blocking evidence lookup.",
+        },
         process: ["Source health unavailable.", "Task submission remains read-only.", "No Core Run Record is created by App."],
       },
       {
@@ -320,8 +400,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Request fresh evidence viewer link",
             viewerHref: "#evidence-viewer-expired",
             source: "Core fixture",
+            status: "expired",
+            freshness: "expired",
+            provenance: "Harbor evidence lifecycle",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "evidence_expired",
+          summary: "Failure attribution: evidence refs expired; request fresh evidence before repair.",
+        },
         process: ["Core reported expired result projection.", "App did not cache raw evidence."],
       },
       {
@@ -342,8 +432,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open allowed evidence viewer link",
             viewerHref: "#evidence-viewer-redacted",
             source: "Core fixture",
+            status: "redacted",
+            freshness: "fresh",
+            provenance: "Harbor redacted fixture",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "none",
+          summary: "Redaction is policy state, not capability failure.",
+        },
         process: ["Core returned redacted projection.", "Renderer displayed policy boundary."],
       },
       {
@@ -364,8 +464,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-unknown",
             source: "Core fixture",
+            status: "stale",
+            freshness: "unknown",
+            provenance: "Core unknown result fixture",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "site_changed",
+          summary: "Failure attribution remains unresolved and links back to capability health.",
+        },
         process: ["Run state could not be classified.", "App keeps unknown outcome visible."],
       },
       {
@@ -386,8 +496,18 @@ export const taskThreadFixtures: TaskProjection[] = [
             viewerLabel: "Open evidence viewer link",
             viewerHref: "#evidence-viewer-failure",
             source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core admission failure fixture",
           },
         ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/example-commerce/product-detail",
+          version: "0.4.2",
+          sourceRef: "lode://package/example-commerce-product-detail@0.4.2",
+          failureClass: "input",
+          summary: "Failure attribution: input validation, not Lode package repair.",
+        },
         process: ["Core rejected invalid business input.", "No task success was shown."],
       },
     ],

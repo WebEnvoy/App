@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   BadgeCheck,
   Box,
@@ -259,6 +260,97 @@ export function SiteSkillDetailPage({
         </section>
       </div>
 
+      <div className="site-skill-detail-grid">
+        <section className="site-skill-detail-card">
+          <div className="card-title">
+            <BadgeCheck size={18} />
+            <h3>Tests</h3>
+          </div>
+          {skill.recentTest ? (
+            <dl className="site-skill-facts">
+              <SkillFact
+                label="Latest run"
+                value={skill.recentTest.label}
+                status={testStatusToSkillStatus(skill.recentTest.status)}
+              />
+              <SkillFact
+                label="Post-check"
+                value={skill.recentTest.postCheck}
+                status={testStatusToSkillStatus(skill.recentTest.status)}
+              />
+              <SkillFact
+                label="Failure reason"
+                value={skill.recentTest.failureReason}
+                status={testStatusToSkillStatus(skill.recentTest.status)}
+              />
+              <SkillFact label="Ran at" value={skill.recentTest.ranAt} status="fixture" />
+            </dl>
+          ) : (
+            <p className="site-skill-state-detail">No recent test fixture is available.</p>
+          )}
+        </section>
+
+        <section className="site-skill-detail-card">
+          <div className="card-title">
+            <AlertTriangle size={18} />
+            <h3>Report</h3>
+          </div>
+          {skill.reportIntent ? (
+            <>
+              <button
+                className="site-skill-secondary-action"
+                type="button"
+                disabled={skill.reportIntent.state === "unavailable"}
+              >
+                <AlertTriangle size={15} />
+                {skill.reportIntent.label}
+              </button>
+              <p className="site-skill-state-detail">{skill.reportIntent.detail}</p>
+            </>
+          ) : (
+            <p className="site-skill-state-detail">No report intent is available for this fixture.</p>
+          )}
+        </section>
+
+        <section className="site-skill-detail-card">
+          <div className="card-title">
+            <RefreshCw size={18} />
+            <h3>Repair drafts</h3>
+          </div>
+          <div className="site-skill-readiness-list">
+            {(skill.repairDrafts ?? []).map((draft) => (
+              <div className="site-skill-readiness-row" key={draft.ref}>
+                <span>{draft.state}</span>
+                <StatusPill status={repairStateToSkillStatus(draft.state)} />
+                <p>{draft.reason} · {draft.provenance} · {draft.ref}</p>
+              </div>
+            ))}
+            {skill.repairDrafts == null || skill.repairDrafts.length === 0 ? (
+              <p className="site-skill-state-detail">No repair draft fixture is available.</p>
+            ) : null}
+          </div>
+        </section>
+      </div>
+
+      {skill.overlayBoundary ? (
+        <section className="site-skill-detail-card">
+          <div className="card-title">
+            <ShieldCheck size={18} />
+            <h3>Overlay and platform fix boundary</h3>
+          </div>
+          <dl className="site-skill-facts">
+            {skill.overlayBoundary.map((item) => (
+              <SkillFact
+                label={item.label}
+                value={`${item.detail} · ${item.source}`}
+                status="fixture"
+                key={item.label}
+              />
+            ))}
+          </dl>
+        </section>
+      ) : null}
+
       <section className="site-skill-detail-card">
         <div className="card-title">
           <ShieldCheck size={18} />
@@ -403,6 +495,26 @@ function riskText(risk: SiteSkill["risk"]) {
     return "medium";
   }
   return "low";
+}
+
+function testStatusToSkillStatus(status: NonNullable<SiteSkill["recentTest"]>["status"]): SiteSkillStatus {
+  if (status === "passed") {
+    return "ready";
+  }
+  if (status === "failed" || status === "blocked") {
+    return "unavailable";
+  }
+  return "fixture";
+}
+
+function repairStateToSkillStatus(state: NonNullable<SiteSkill["repairDrafts"]>[number]["state"]): SiteSkillStatus {
+  if (state === "validated" || state === "promoted") {
+    return "ready";
+  }
+  if (state === "rejected" || state === "unavailable") {
+    return "unavailable";
+  }
+  return "fixture";
 }
 
 function SkillFact({ label, value, status = "fixture" }: { label: string; value: string; status?: SiteSkillStatus }) {

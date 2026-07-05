@@ -132,6 +132,18 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           <SourceField label="Run" value={run.label} source={run.source} />
           <SourceField label="Lifecycle" value={run.lifecycle} source={run.source} />
         </dl>
+        {run.capabilityAttribution ? (
+          <>
+            <h3 className="subsection-title">Capability attribution</h3>
+            <dl className="input-grid">
+              <SourceField label="Capability" value={run.capabilityAttribution.capabilityRef} source="Lode fixture" />
+              <SourceField label="Version" value={run.capabilityAttribution.version} source="Lode fixture" />
+              <SourceField label="Failure class" value={run.capabilityAttribution.failureClass} source="Core fixture" />
+              <SourceField label="Source ref" value={run.capabilityAttribution.sourceRef} source="Lode fixture" />
+            </dl>
+            <p className="action-intent">{run.capabilityAttribution.summary}</p>
+          </>
+        ) : null}
         <p className="action-intent">{run.actionIntent}</p>
       </section>
 
@@ -144,7 +156,9 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           {run.evidenceCards.map((row) => (
             <SourceField
               label={row.title}
-              value={row.summary}
+              value={`${row.summary} Status: ${row.status ?? "available"}; freshness: ${row.freshness ?? "fresh"}; provenance: ${
+                row.provenance ?? "owner viewer ref"
+              }.`}
               source={row.source}
               key={row.id}
             />

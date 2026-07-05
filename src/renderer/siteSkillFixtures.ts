@@ -25,6 +25,27 @@ export type SiteSkill = {
   readiness: Array<{ label: string; status: SiteSkillStatus; detail: string }>;
   boundaries: string[];
   relatedTaskIds: string[];
+  recentTest?: {
+    label: string;
+    status: "passed" | "failed" | "blocked" | "stale";
+    ranAt: string;
+    postCheck: string;
+    failureReason: string;
+    source: OwnerSource;
+  };
+  reportIntent?: {
+    state: "available" | "pending" | "unavailable";
+    label: string;
+    detail: string;
+  };
+  repairDrafts?: Array<{
+    ref: string;
+    state: "candidate" | "validated" | "promoted" | "rejected" | "unavailable";
+    source: OwnerSource;
+    reason: string;
+    provenance: string;
+  }>;
+  overlayBoundary?: Array<{ label: string; detail: string; source: OwnerSource }>;
 };
 
 export const siteSkillFixtures: SiteSkill[] = [
@@ -58,6 +79,40 @@ export const siteSkillFixtures: SiteSkill[] = [
       "证据正文仍由 owner viewer 提供，App 只保存 viewer ref。",
     ],
     relatedTaskIds: ["task-product-page"],
+    recentTest: {
+      label: "Latest capability test",
+      status: "failed",
+      ranAt: "2026-07-05T16:40:00Z",
+      postCheck: "post_check_failed",
+      failureReason: "site_changed",
+      source: "Core fixture",
+    },
+    reportIntent: {
+      state: "available",
+      label: "Report broken",
+      detail: "Creates App local-only suspected-broken intent; Lode/Core remain truth owners.",
+    },
+    repairDrafts: [
+      {
+        ref: "lode://repair-draft/site-capability/example/read-public-page/site-change@0.1.1-draft",
+        state: "candidate",
+        source: "Lode fixture",
+        reason: "site_changed",
+        provenance: "Lode repair draft fixture from PR #172",
+      },
+      {
+        ref: "lode://repair-draft/site-capability/example/read-public-page/post-check@0.1.1-draft",
+        state: "validated",
+        source: "Lode fixture",
+        reason: "post_check_failed",
+        provenance: "Validator and post-check fixture passed",
+      },
+    ],
+    overlayBoundary: [
+      { label: "Local report", detail: "local_signal_only; App stores UI intent only", source: "App local-only" },
+      { label: "Platform fix", detail: "lode_public_fix_candidate; no private browser material", source: "Lode fixture" },
+      { label: "User overlay", detail: "refs-only overlay/fork metadata; no raw evidence body", source: "Lode fixture" },
+    ],
   },
   {
     id: "storefront-list",
