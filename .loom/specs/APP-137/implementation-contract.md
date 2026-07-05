@@ -28,4 +28,4 @@
 ## Host Binding
 
 - Pull Request: https://github.com/WebEnvoy/App/pull/184
-- Reviewed Head: pending current-head review after build checkpoint commit
+- Reviewed Head: .loom/reviews/APP-137.json
