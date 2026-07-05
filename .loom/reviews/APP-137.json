@@ -2,11 +2,11 @@
   "schema_version": "loom-review/v1",
   "item_id": "APP-137",
   "decision": "allow",
-  "kind": "general_review",
-  "summary": "Implementation review accepts the current App Library read-capability fixture, install/lock/update intent UI, packaged preview evidence, and Library-to-Task projection for PR #184.",
+  "kind": "code_review",
+  "summary": "Carrier-only closeout review accepts APP-137 terminal metadata and idle pointer sync after implementation PR #184 merged and issue #137 closed.",
   "reviewer": "Codex thread 019f31a5-212e-7952-a56a-bba7ffe9b1b9",
-  "authored_at": "2026-07-05T11:12:06Z",
-  "reviewed_head": "e28b419c77298a4d22be6b03a0862ebb7dd9e03b",
+  "authored_at": "2026-07-05T11:26:00Z",
+  "reviewed_head": "7056058ece6f0b6cfa69d40908292fb28c48f0f7",
   "reviewed_validation_summary": "npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/stage5-library-read-capabilities-preview.png npm run smoke:packaged, git diff --check, suite validate, suite evidence validate, suite carrier validate, Loom fact-chain, and Loom verify passed on APP-137.",
   "reviewed_validation_summary_hash": "8b8d9ac1c890a23e574f73349c5511c93c210753dd839342736ca7631ba03ec0",
   "validation_summary_source": "recovery.latest_validation_summary",
@@ -55,6 +55,14 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored implementation review approved the current head for merge checkpoint consumption."
+    "reason": "Authored closeout review approved only APP-137 terminal carrier metadata and idle pointer restoration; implementation behavior was already reviewed and merged in PR #184."
+  },
+  "implementation_review_disposition": {
+    "status": "passed",
+    "reason": "Implementation behavior was reviewed and merged in PR #184; this carrier-only review covers only post-merge closeout metadata."
+  },
+  "carrier_only_closeout_review": {
+    "status": "passed",
+    "reason": "Closeout changes are limited to APP-137 terminal metadata, issue/PR/merge evidence, and no_active_item pointer restoration."
   }
 }
