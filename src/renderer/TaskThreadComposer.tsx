@@ -144,7 +144,7 @@ export function TaskThreadComposer({
             type="button"
           >
             <ShieldCheck size={14} />
-            <span className="composer-button-label">只读边界</span>
+            <span className="composer-button-label">{selectedRun.writePrecheck ? "No-submit 边界" : "只读边界"}</span>
           </button>
         </div>
         <div className="composer-expanding-controls">

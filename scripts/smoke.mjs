@@ -100,6 +100,21 @@ for (const expectedText of [
   "Provider private endpoint",
   "direct Identity Runtime Session",
   "not Core Task/Run/Result",
+  "Write-pre preview",
+  "validate_only_preview",
+  "Validate contact form target and prepare a local preview without submitting.",
+  "No-submit guard",
+  "page_changed",
+  "Open preview evidence viewer link",
+  "Risk and approval",
+  "action-request:fixture/preview-contact-form",
+  "pending",
+  "expired",
+  "blocked",
+  "user_cancelled",
+  "Submitted",
+  "false",
+  "No-submit 边界",
 ]) {
   if (!rendererAssets.includes(expectedText)) {
     throw new Error(`Renderer smoke failed: ${expectedText} is missing.`);

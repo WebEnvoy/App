@@ -92,6 +92,12 @@ function EvidenceTab({ selectedRun }: { selectedRun: RunProjection }) {
         <h3>结果依据</h3>
       </div>
       <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
+      {selectedRun.writePrecheck ? (
+        <dl className="context-facts compact">
+          <SourceField label="Preview state" value={selectedRun.writePrecheck.state} source="Core fixture" />
+          <SourceField label="No-submit guard" value={selectedRun.writePrecheck.noSubmitGuard} source="Core fixture" />
+        </dl>
+      ) : null}
       <div className="context-card-list">
         {selectedRun.evidenceCards.map((evidence) => (
           <article className="context-card" key={evidence.id}>
