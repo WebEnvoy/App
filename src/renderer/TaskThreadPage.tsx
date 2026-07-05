@@ -1,4 +1,5 @@
-import { AlertTriangle, Braces, HardDrive, Waypoints } from "lucide-react";
+import { AlertTriangle, Ban, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
+import { useState } from "react";
 
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
@@ -116,6 +117,8 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           <span className="badge">{outcomeLabel(run.outcome)}</span>
         </div>
         <p>{run.summary}</p>
+        {run.writePrecheck ? <WritePrecheckPreview run={run} /> : null}
+        {run.approval ? <ApprovalPreview run={run} /> : null}
         <h3 className="subsection-title">提取结果</h3>
         <dl className="input-grid">
           {run.resultRows.slice(0, 4).map((row) => (
@@ -175,5 +178,84 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
         </ol>
       </section>
     </article>
+  );
+}
+
+function WritePrecheckPreview({ run }: { run: RunProjection }) {
+  const preview = run.writePrecheck;
+  if (!preview) {
+    return null;
+  }
+
+  return (
+    <section className="write-precheck-panel" aria-label="Write-pre preview">
+      <div className="card-title compact-title">
+        <FileDiff size={18} />
+        <h3>Write-pre preview</h3>
+        <span className="badge">{preview.modeLabel}</span>
+      </div>
+      <p>{preview.expectedChangeSummary}</p>
+      <dl className="input-grid">
+        <SourceField label="Preview state" value={preview.state} source="Core fixture" />
+        <SourceField label="No-submit guard" value={preview.noSubmitGuard} source="Core fixture" />
+        {run.approval ? <SourceField label="Risk" value={run.approval.riskLabel} source="Core fixture" /> : null}
+        {run.approval ? (
+          <SourceField
+            label="Approval states"
+            value={run.approval.statuses.map((item) => item.status).join(" / ")}
+            source="Core fixture"
+          />
+        ) : null}
+        <SourceField label="Before" value={preview.beforeLabel} source="Harbor fixture" />
+        <SourceField label="After" value={preview.afterLabel} source="Lode fixture" />
+      </dl>
+      <div className="diff-preview" aria-label="Diff-like preview">
+        {preview.diffRows.map((row) => (
+          <div className="diff-preview-row" key={`${run.id}-${row.label}`}>
+            <strong>{row.label}</strong>
+            <span>{row.before}</span>
+            <span>{row.after}</span>
+            <span className="source-chip">{row.source}</span>
+          </div>
+        ))}
+      </div>
+      <p className="boundary-copy">{preview.stateNote}</p>
+    </section>
+  );
+}
+
+function ApprovalPreview({ run }: { run: RunProjection }) {
+  const approval = run.approval;
+  const [cancelRequested, setCancelRequested] = useState(false);
+  if (!approval) {
+    return null;
+  }
+
+  return (
+    <section className="approval-panel" aria-label="Risk and approval request">
+      <div className="card-title compact-title">
+        <ShieldAlert size={18} />
+        <h3>Risk and approval</h3>
+        <span className={`status-pill status-${approval.riskLevel}`}>{approval.riskLabel}</span>
+      </div>
+      <dl className="input-grid">
+        <SourceField label="Action request" value={approval.actionRequestId} source="Core fixture" />
+        <SourceField label="Cancel intent" value={approval.cancelIntent} source="App local-only" />
+      </dl>
+      <div className="approval-state-list">
+        {approval.statuses.map((item) => (
+          <div className="approval-state-row" key={`${run.id}-${item.label}`}>
+            <span>{item.label}</span>
+            <span className={`status-pill status-${item.status}`}>{item.status}</span>
+            <p>{item.detail}</p>
+          </div>
+        ))}
+      </div>
+      <button className="cancel-intent-button" type="button" onClick={() => setCancelRequested(true)}>
+        <Ban size={15} />
+        {cancelRequested ? "取消意图已暂存" : "发送取消意图"}
+      </button>
+      <p className="boundary-copy">{approval.boundary}</p>
+    </section>
   );
 }

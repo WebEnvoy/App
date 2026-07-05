@@ -39,6 +39,28 @@ export type RunProjection = {
     failureClass: "capability" | "input" | "runtime" | "site_changed" | "evidence_expired" | "none";
     summary: string;
   };
+  writePrecheck?: {
+    state: "available" | "preview_unavailable" | "page_changed" | "user_cancelled";
+    modeLabel: string;
+    expectedChangeSummary: string;
+    beforeLabel: string;
+    afterLabel: string;
+    diffRows: Array<{ label: string; before: string; after: string; source: OwnerSource }>;
+    noSubmitGuard: "active";
+    stateNote: string;
+  };
+  approval?: {
+    actionRequestId: string;
+    riskLabel: string;
+    riskLevel: "low" | "blocked";
+    statuses: Array<{
+      label: string;
+      status: "pending" | "expired" | "blocked" | "cancelled";
+      detail: string;
+    }>;
+    cancelIntent: string;
+    boundary: string;
+  };
   process: string[];
 };
 
@@ -105,6 +127,214 @@ export const creationEntryFixture = {
 };
 
 export const taskThreadFixtures: TaskProjection[] = [
+  {
+    id: "task-contact-form-preview",
+    title: "预览联系表单草稿",
+    accountIdentity: "本机 Chrome",
+    siteSkill: "联系表单写前预览",
+    businessInput: "https://example.org/contact",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/example-preview-contact-form",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/preview-contact-form",
+      sourceRef: "lode://site-capability/example/preview-contact-form@0.1.0",
+      lockRef: "lode://lock/site-capability/example/preview-contact-form@0.1.0",
+      fetchedAt: "2026-07-06T00:00:00Z",
+      source: "Lode fixture",
+      boundary: "App displays write-pre package refs and expected-change summaries only; Lode keeps package truth.",
+    },
+    runs: [
+      {
+        id: "run-preview-available",
+        label: "Preview 003",
+        lifecycle: "needs-action",
+        outcome: "partial",
+        summary: "Validate-only preview ready. Nothing has been submitted.",
+        actionIntent: "Owner-supported cancel intent: request Core to record user_cancelled without executing submit.",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "Result kind", value: "validate_only_preview", source: "Core fixture" },
+          { label: "Submitted", value: "false", source: "Core fixture" },
+          { label: "Draft state", value: "preview available", source: "Core fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-preview-before",
+            title: "Before-preview Snapshot/RefMap refs",
+            summary: "Harbor fixture exposes refs, provenance, and freshness only; raw page material stays private.",
+            viewerLabel: "Open preview evidence viewer link",
+            viewerHref: "#evidence-viewer-preview-before",
+            source: "Harbor fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "harbor-preview-evidence-status-fixture/v0",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode:capability/preview-contact-form",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/example/preview-contact-form@0.1.0",
+          failureClass: "none",
+          summary: "Core preview Result Envelope links the action, evidence refs, and locked Lode capability version.",
+        },
+        writePrecheck: {
+          state: "available",
+          modeLabel: "validate-only preview / draft",
+          expectedChangeSummary: "Validate contact form target and prepare a local preview without submitting.",
+          beforeLabel: "Message field unchanged on page",
+          afterLabel: "Local draft value prepared for review only",
+          diffRows: [
+            {
+              label: "contact.message",
+              before: "empty",
+              after: "local preview value",
+              source: "Lode fixture",
+            },
+            {
+              label: "external_submit",
+              before: "not requested",
+              after: "false",
+              source: "Core fixture",
+            },
+          ],
+          noSubmitGuard: "active",
+          stateNote: "Preview is available; this is not a submitted result.",
+        },
+        approval: {
+          actionRequestId: "action-request:fixture/preview-contact-form",
+          riskLabel: "write / low / validate_only",
+          riskLevel: "low",
+          statuses: [
+            {
+              label: "Approval request",
+              status: "pending",
+              detail: "Pending user review before any future submit-capable stage.",
+            },
+            {
+              label: "Expired approval",
+              status: "expired",
+              detail: "Expired requests remain non-executable.",
+            },
+            {
+              label: "Blocked approval",
+              status: "blocked",
+              detail: "Policy blocks execution; App shows state only.",
+            },
+            {
+              label: "Cancellation record",
+              status: "cancelled",
+              detail: "Core cancellation summary uses user_cancelled and is not submitted.",
+            },
+          ],
+          cancelIntent: "Cancel intent is local UI intent until Core records cancellation; no submit is sent.",
+          boundary: "Core owns action request, approval, cancellation, and no-submit guard truth.",
+        },
+        process: [
+          "Core returned action request risk classification with no-submit guard active.",
+          "Lode supplied expected_change and risk_hints from write-pre fixture.",
+          "Harbor supplied before-preview refs and freshness without raw material.",
+        ],
+      },
+      {
+        id: "run-preview-page-changed",
+        label: "Preview 002",
+        lifecycle: "blocked",
+        outcome: "unavailable",
+        summary: "Preview blocked because the page changed after refs were captured.",
+        actionIntent: "Owner-supported action intent: refresh preview evidence before approval.",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "Preview state", value: "page_changed", source: "Core fixture" },
+          { label: "Submitted", value: "false", source: "Core fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-preview-page-changed",
+            title: "Stale RefMap preview evidence",
+            summary: "Harbor freshness reports page_changed; App blocks the preview instead of showing success.",
+            viewerLabel: "Open stale preview evidence link",
+            viewerHref: "#evidence-viewer-preview-page-changed",
+            source: "Harbor fixture",
+            status: "stale",
+            freshness: "page_changed",
+            provenance: "harbor-preview-evidence-status-fixture/v0",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode:capability/preview-contact-form",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/example/preview-contact-form@0.1.0",
+          failureClass: "site_changed",
+          summary: "Core classifies page_changed as preview failure, not submitted result.",
+        },
+        writePrecheck: {
+          state: "page_changed",
+          modeLabel: "validate-only preview",
+          expectedChangeSummary: "Expected change is withheld until fresh evidence is available.",
+          beforeLabel: "Captured RefMap is stale",
+          afterLabel: "No draft can be trusted",
+          diffRows: [
+            { label: "freshness", before: "fresh", after: "page_changed", source: "Harbor fixture" },
+            { label: "submitted", before: "false", after: "false", source: "Core fixture" },
+          ],
+          noSubmitGuard: "active",
+          stateNote: "Preview unavailable because the page changed; refresh evidence first.",
+        },
+        process: ["Harbor detected page_changed.", "Core returned preview failure.", "App kept submitted=false visible."],
+      },
+      {
+        id: "run-preview-cancelled",
+        label: "Preview 001",
+        lifecycle: "needs-action",
+        outcome: "failure-safe",
+        summary: "User cancelled the write-pre flow; no external submit was attempted.",
+        actionIntent: "Owner-supported action intent: start a new validate-only preview.",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "Preview state", value: "user_cancelled", source: "Core fixture" },
+          { label: "Submitted", value: "false", source: "Core fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-preview-cancelled",
+            title: "Cancellation evidence refs",
+            summary: "Cancellation links action refs and evidence refs only.",
+            viewerLabel: "Open cancellation evidence link",
+            viewerHref: "#evidence-viewer-preview-cancelled",
+            source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "approval-cancellation-query.fixture.json",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode:capability/preview-contact-form",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/example/preview-contact-form@0.1.0",
+          failureClass: "none",
+          summary: "Cancelled preview is preserved as write-pre history without submitted success.",
+        },
+        writePrecheck: {
+          state: "user_cancelled",
+          modeLabel: "draft cancelled",
+          expectedChangeSummary: "No expected change is active after cancellation.",
+          beforeLabel: "Draft pending user review",
+          afterLabel: "Cancelled before submit-capable stage",
+          diffRows: [
+            { label: "approval", before: "pending", after: "cancelled", source: "Core fixture" },
+            { label: "submitted", before: "false", after: "false", source: "Core fixture" },
+          ],
+          noSubmitGuard: "active",
+          stateNote: "Cancellation is a terminal write-pre state, not submitted success.",
+        },
+        process: ["User cancellation recorded.", "Core preserved no-submit boundary.", "Run history displays cancelled as write-pre state."],
+      },
+    ],
+  },
   {
     id: "task-product-page",
     title: "采集商品详情页",

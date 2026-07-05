@@ -1303,6 +1303,58 @@ h3 {
   font-weight: 700;
 }
 
+.write-precheck-panel,
+.approval-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--we-border);
+}
+
+.diff-preview,
+.approval-state-list {
+  display: grid;
+  gap: 8px;
+}
+
+.diff-preview-row,
+.approval-state-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  background: var(--we-surface-secondary);
+  font-size: 12px;
+}
+
+.approval-state-row {
+  grid-template-columns: minmax(120px, 0.8fr) auto minmax(0, 1.4fr);
+}
+
+.approval-state-row p {
+  margin: 0;
+}
+
+.cancel-intent-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--we-status-warning-border);
+  border-radius: 8px;
+  color: var(--we-foreground);
+  background: var(--we-status-warning-background);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .blocker-card,
 .outcome-failure,
 .outcome-unavailable,
@@ -2321,7 +2373,12 @@ h3 {
 }
 
 .status-fixture,
-.status-degraded {
+.status-degraded,
+.status-pending,
+.status-expired,
+.status-blocked,
+.status-cancelled,
+.status-low {
   color: var(--we-status-warning);
   background: var(--we-status-warning-background);
 }
