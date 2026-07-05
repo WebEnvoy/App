@@ -97,6 +97,15 @@ function EvidenceTab({ selectedRun }: { selectedRun: RunProjection }) {
           <article className="context-card" key={evidence.id}>
             <strong>{evidence.title}</strong>
             <p>{evidence.summary}</p>
+            <dl className="context-facts compact">
+              <SourceField label="Status" value={evidence.status ?? "available"} source={evidence.source} />
+              <SourceField label="Freshness" value={evidence.freshness ?? "fresh"} source={evidence.source} />
+              <SourceField
+                label="Provenance"
+                value={evidence.provenance ?? "owner viewer ref"}
+                source={evidence.source}
+              />
+            </dl>
             <a href={evidence.viewerHref}>
               <ExternalLink size={14} />
               {evidence.viewerLabel}
@@ -165,6 +174,10 @@ function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
           />
         ))}
       </dl>
+      <p className="boundary-copy">
+        Work failure links back to capability health through Core run attribution; App keeps only the selected ref
+        and local navigation state.
+      </p>
       <p className="boundary-copy">{selectedTask.packageSource.boundary}</p>
     </div>
   );
