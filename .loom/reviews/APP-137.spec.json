@@ -1,0 +1,54 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-137",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Spec review accepts the App Library read-capability fixture slice and minimal suite boundary for APP-137.",
+  "reviewer": "Codex thread 019f31a5-212e-7952-a56a-bba7ffe9b1b9",
+  "authored_at": "2026-07-05T11:10:07Z",
+  "reviewed_head": "1f16c9c36578787e0a38cc3ca68aec26f0ee4bd1",
+  "reviewed_validation_summary": "head 374ee062af0048e96395573e939e7fe09181a839 passed npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/stage5-library-read-capabilities-preview.png npm run smoke:packaged, git diff --check, suite validate, suite evidence validate, suite carrier validate, Loom fact-chain, and Loom verify on 2026-07-05 UTC.",
+  "reviewed_validation_summary_hash": "332f07459c45cd23c61de181d08ae1bb66de76a62cc7f72b60453b3dcdf267b2",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-137.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-137.md",
+    "recovery_entry": ".loom/progress/APP-137.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null,
+    "suite_validation": "suite validate",
+    "suite_validator": "loom",
+    "suite_validator_mode": "global-cli",
+    "suite_spec": ".loom/specs/APP-137/spec.md",
+    "suite_plan": ".loom/specs/APP-137/plan.md",
+    "suite_evidence_map": ".loom/specs/APP-137/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-137/task-carrier.md"
+    ],
+    "suite_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/spec-suite.md"
+    ]
+  }
+}
