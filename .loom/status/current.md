@@ -2,22 +2,22 @@
 
 ## Derived Fact Chain View
 
-- Item ID: INIT-0001
-- Goal: Bootstrap the first executable Loom path for this repository
-- Scope: Establish rule entry, first work item, progress carrier, spec/plan, and verification entry
-- Execution Path: bootstrap/root
+- Item ID: APP-137
+- Goal: Complete the first App Library read-capability batch without making App the package, run, session, or evidence truth owner.
+- Scope: Catalog display, install/lock/update UI intent, locked/latest status, and Library-to-Work read task launch over local fixtures.
+- Execution Path: stage5/app-library-read-capabilities
 - Workspace Entry: .
-- Recovery Entry: .loom/progress/INIT-0001.md
-- Review Entry: .loom/reviews/INIT-0001.json
-- Validation Entry: loom verify --target . --json
-- Closing Condition: The generated entry, work item, recovery entry, and templates are readable and verified
-- Current Checkpoint: merge
-- Current Stop: Bootstrap PR #182 has current-head review, suite validation, evidence map, task carrier, and PR metadata readback ready for hosted gate consumption.
-- Next Step: Run hosted loom-pr-merge-gate for PR #182, then controlled merge and post-merge closeout if it passes.
+- Recovery Entry: .loom/progress/APP-137.md
+- Review Entry: .loom/reviews/APP-137.json
+- Validation Entry: npm run smoke; npm run smoke:packaged; loom fact-chain --target . --json; loom verify --target . --json
+- Closing Condition: The App fixture UI shows catalog state and starts the read task projection while preserving owner boundaries.
+- Current Checkpoint: build
+- Current Stop: App #137-#148 Library fixture implementation is complete on the retargeted main-based PR branch with refreshed packaged preview evidence.
+- Next Step: Record current-head review, update PR metadata, then run hosted merge gate.
 - Blockers: None recorded.
-- Latest Validation Summary: Bootstrap manifest exists; init-result JSON can be read mechanically; the first work item, status surface, and spec/plan artifacts exist.
-- Recovery Boundary: Bootstrap result at `.loom/bootstrap/init-result.json`; bootstrap manifest at `.loom/bootstrap/manifest.json`.
-- Current Lane: bootstrap merge-ready verification
+- Latest Validation Summary: head 374ee062af0048e96395573e939e7fe09181a839 passed npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/stage5-library-read-capabilities-preview.png npm run smoke:packaged, git diff --check, suite validate, suite evidence validate, suite carrier validate, Loom fact-chain, and Loom verify on 2026-07-05 UTC.
+- Recovery Boundary: Revert this PR to return App to the bootstrap-only main state; no external state, credential, package truth, run truth, session truth, or raw evidence is modified.
+- Current Lane: Stage 5 first-batch App Library implementation
 
 ## Runtime Evidence
 
@@ -29,7 +29,7 @@
 
 ## Sources
 
-- Static Truth: .loom/work-items/INIT-0001.md
-- Dynamic Truth: .loom/progress/INIT-0001.md
+- Static Truth: .loom/work-items/APP-137.md
+- Dynamic Truth: .loom/progress/APP-137.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json

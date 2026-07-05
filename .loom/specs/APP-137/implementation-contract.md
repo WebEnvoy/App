@@ -8,7 +8,7 @@
 ## Approved Spec
 
 - Spec Path: .loom/specs/APP-137/spec.md
-- Spec Review Entry: blocked until bootstrap merge gate accepts the repository carrier
+- Spec Review Entry: .loom/reviews/APP-137.spec.json
 
 ## Implementation Scope
 
@@ -22,10 +22,10 @@
 
 ## Risks And Rollback
 
-- Risks: hosted loom-pr-merge-gate still blocks stacked product PRs because bootstrap carrier metadata is incomplete.
+- Risks: hosted merge gate can still fail if PR metadata, current-head review, or carrier-only drift are not refreshed after the final head SHA changes.
 - Rollback Boundary: revert this PR; no external state or live owner truth is modified.
 
 ## Host Binding
 
 - Pull Request: https://github.com/WebEnvoy/App/pull/184
-- Reviewed Head: pending current-head review
+- Reviewed Head: pending current-head review after build checkpoint commit
