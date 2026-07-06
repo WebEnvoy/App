@@ -6,7 +6,7 @@
 - Goal: Connect App Browser/identity surface to real Harbor provider, local identity environment, manual authentication, and runtime session facts for App milestone #14 FR #233.
 - Scope: App-side Harbor connection layer, safe local identity environment config/import/selection, provider detection display, manual authentication entry, real session start/lock/release/stop intents, smoke checks, and packaged/browser screenshots.
 - Execution Path: milestone14/app-real-harbor-identity
-- Workspace Entry: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-234-real-harbor-identity
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/APP-234.md
 - Review Entry: .loom/reviews/APP-234.json
 - Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged; git diff --check; loom fact-chain --target . --json; loom verify --target . --json
