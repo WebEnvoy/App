@@ -1,3 +1,5 @@
+import { realWritePreviewTaskFixtures } from "./realWritePreviewFixtures";
+
 export type OwnerSource = "Core fixture" | "Harbor fixture" | "Lode fixture" | "App local-only";
 
 export type OutcomeKind =
@@ -62,7 +64,7 @@ export type RunProjection = {
     source: OwnerSource;
   };
   writePrecheck?: {
-    state: "available" | "preview_unavailable" | "page_changed" | "user_cancelled";
+    state: "available" | "preview_unavailable" | "page_changed" | "user_cancelled" | "expired";
     modeLabel: string;
     expectedChangeSummary: string;
     beforeLabel: string;
@@ -149,6 +151,7 @@ export const creationEntryFixture = {
 };
 
 export const taskThreadFixtures: TaskProjection[] = [
+  ...realWritePreviewTaskFixtures,
   {
     id: "task-xhs-real-read",
     title: "小红书搜索与笔记读取",
