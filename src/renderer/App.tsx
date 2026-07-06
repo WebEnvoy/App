@@ -10,6 +10,7 @@ import {
   Search,
   Settings,
   SquarePen,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -23,6 +24,7 @@ import {
   SiteSkillDetailPage,
   SiteSkillDirectoryPage,
 } from "./SiteSkillPages";
+import { IdentityEnvironmentsPage } from "./IdentityEnvironmentsPage";
 import { SettingsPage } from "./SettingsPage";
 import { siteSkillFixtures, type SiteSkill } from "./siteSkillFixtures";
 import {
@@ -48,7 +50,7 @@ type ShellContext = {
   colorScheme: "light" | "dark";
   configScope: "local-ui-only";
 };
-type AppView = "task-thread" | "site-skills" | "settings";
+type AppView = "task-thread" | "site-skills" | "identity-environments" | "settings";
 
 function getBrowserColorScheme(): ShellContext["colorScheme"] {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -87,10 +89,13 @@ export function App() {
   const selectedSiteSkill =
     siteSkillFixtures.find((skill) => skill.id === selectedSiteSkillId) ?? siteSkillFixtures[0];
   const isSiteSkillView = activeView === "site-skills";
+  const isIdentityEnvironmentsView = activeView === "identity-environments";
   const isSettingsView = activeView === "settings";
-  const isAppLevelView = isSiteSkillView || isSettingsView;
+  const isAppLevelView = isSiteSkillView || isIdentityEnvironmentsView || isSettingsView;
   const pageTitle = isSettingsView
     ? "设置"
+    : isIdentityEnvironmentsView
+    ? "账号身份"
     : isSiteSkillView
     ? isSiteSkillDetailOpen
       ? selectedSiteSkill.name
@@ -188,6 +193,10 @@ export function App() {
     setSiteSkillDetailOpen(false);
   }
 
+  function openIdentityEnvironments() {
+    setActiveView("identity-environments");
+  }
+
   function openSiteSkillDetail(skill: SiteSkill) {
     setActiveView("site-skills");
     setSelectedSiteSkillId(skill.id);
@@ -207,6 +216,11 @@ export function App() {
 
   function goBackFromTopbar() {
     if (isSettingsView) {
+      openTaskThread();
+      return;
+    }
+
+    if (isIdentityEnvironmentsView) {
       openTaskThread();
       return;
     }
@@ -281,6 +295,18 @@ export function App() {
               >
                 <Box size={16} />
                 Library
+              </button>
+              <button
+                className={
+                  activeView === "identity-environments"
+                    ? "nav-item we-list-row cursor-interaction nav-item-active"
+                    : "nav-item we-list-row cursor-interaction"
+                }
+                type="button"
+                onClick={openIdentityEnvironments}
+              >
+                <UserRound size={16} />
+                账号身份
               </button>
               <button className="nav-item we-list-row cursor-interaction" type="button">
                 <Search size={16} />
@@ -364,7 +390,15 @@ export function App() {
           </div>
           <div className="topbar-center-surface">
             <span className="topbar-thread-symbol" aria-hidden="true">
-              {isSettingsView ? <Settings size={15} /> : isSiteSkillView ? <Box size={15} /> : <FolderKanban size={15} />}
+              {isSettingsView ? (
+                <Settings size={15} />
+              ) : isIdentityEnvironmentsView ? (
+                <UserRound size={15} />
+              ) : isSiteSkillView ? (
+                <Box size={15} />
+              ) : (
+                <FolderKanban size={15} />
+              )}
             </span>
             <h2 id="thread-title">{pageTitle}</h2>
           </div>
@@ -382,7 +416,11 @@ export function App() {
         </header>
       )}
       workspace={
-        isSiteSkillView ? (
+        isIdentityEnvironmentsView ? (
+          <ThreadWorkspace>
+            <IdentityEnvironmentsPage />
+          </ThreadWorkspace>
+        ) : isSiteSkillView ? (
           <ThreadWorkspace>
             {isSiteSkillDetailOpen ? (
               <SiteSkillDetailPage

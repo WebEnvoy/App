@@ -115,6 +115,22 @@ for (const expectedText of [
   "Submitted",
   "false",
   "No-submit 边界",
+  "账号身份",
+  "Harbor identity environment public summary",
+  "身份环境、登录态、provider 和一致性事实归属 Harbor",
+  "CloakBrowser",
+  "官方 Chrome",
+  "Chromium / Donut Browser 不进入用户 provider 管理",
+  "小红书运营号 A",
+  "BOSS 招聘号",
+  "代理",
+  "地区 / 语言",
+  "时区",
+  "指纹摘要",
+  "敏感材料状态",
+  "Cookie/session",
+  "打开认证现场",
+  "不展示密码、验证码、Cookie、令牌",
 ]) {
   if (!rendererAssets.includes(expectedText)) {
     throw new Error(`Renderer smoke failed: ${expectedText} is missing.`);
