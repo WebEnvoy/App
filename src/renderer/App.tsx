@@ -425,7 +425,7 @@ export function App() {
       workspace={
         isIdentityEnvironmentsView ? (
           <ThreadWorkspace>
-            <IdentityEnvironmentsPage onOpenTask={openTaskById} />
+            <IdentityEnvironmentsPage harborEndpoint={connectionConfig.harborEndpoint} onOpenTask={openTaskById} />
           </ThreadWorkspace>
         ) : isSiteSkillView ? (
           <ThreadWorkspace>

@@ -16,6 +16,8 @@ const mainSource = await readFile("dist-electron/main.js", "utf8");
 const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
+const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
+const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
 const rendererAssets = await readFile(
   "dist/renderer/assets/index.js",
   "utf8",
@@ -119,6 +121,14 @@ for (const expectedText of [
   "No-submit 边界",
   "账号身份",
   "Harbor identity environment public summary",
+  "Harbor live",
+  "Harbor offline",
+  "Harbor endpoint 未返回可消费的 provider/identity JSON",
+  "创建本地身份环境配置",
+  "导入 Harbor public summary",
+  "保存本地允许配置",
+  "不保存账号密码、Cookie、token、profile 原始内容",
+  "真实任务运行由 #238 后续接入",
   "身份环境、登录态、provider 和一致性事实归属 Harbor",
   "CloakBrowser",
   "官方 Chrome",
@@ -185,6 +195,27 @@ const { outputText: connectionConfigModuleSource } = ts.transpileModule(connecti
 const connectionConfigModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(connectionConfigModuleSource)}`
 );
+const { outputText: harborIdentityTypesModuleSource } = ts.transpileModule(harborIdentityTypesSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const harborIdentityTypesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(harborIdentityTypesModuleSource)}`;
+const { outputText: localIdentityStoreModuleSource } = ts.transpileModule(localIdentityStoreSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const localIdentityStoreModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(
+    localIdentityStoreModuleSource.replace(
+      'from "./harborIdentityTypes";',
+      `from "${harborIdentityTypesModuleUrl}";`,
+    ),
+  )}`
+);
 
 function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
@@ -230,6 +261,94 @@ const sensitiveSave = connectionConfigModule.saveLocalConnectionConfig({
 
 if (sensitiveSave.ok || sensitiveStore.has(connectionConfigModule.localConnectionStorageKey)) {
   throw new Error("Connection config smoke failed: sensitive endpoint was saved.");
+}
+
+const safeIdentityStore = installLocalStorage();
+const localDraft = localIdentityStoreModule.createLocalIdentityEnvironmentDraft({
+  siteId: "xiaohongshu",
+  accountLabel: "运营号 A",
+  identityEnvironmentRef: "identity-env_smoke",
+  profileRef: "profile_smoke",
+  requestedProviderId: "cloakbrowser",
+  loginState: "manual_auth_required",
+});
+localIdentityStoreModule.upsertLocalIdentityEnvironmentDraft(localDraft);
+const savedIdentities = safeIdentityStore.get(localIdentityStoreModule.localIdentityEnvironmentStorageKey) ?? "";
+
+if (!savedIdentities.includes("identity-env_smoke") || savedIdentities.includes("password") || savedIdentities.includes("cookie_value")) {
+  throw new Error("Identity store smoke failed: safe identity draft was not saved correctly.");
+}
+
+const sensitiveImport = localIdentityStoreModule.parseImportedIdentityEnvironment(JSON.stringify({
+  siteId: "boss",
+  accountLabel: "招聘号",
+  cookie_value: "do-not-store",
+}));
+
+if (sensitiveImport.ok) {
+  throw new Error("Identity store smoke failed: sensitive import was accepted.");
+}
+
+const ambiguousCookieStateImport = localIdentityStoreModule.parseImportedIdentityEnvironment(JSON.stringify({
+  siteId: "boss",
+  accountLabel: "招聘号",
+  cookie_state: "raw-or-ambiguous",
+}));
+
+if (ambiguousCookieStateImport.ok) {
+  throw new Error("Identity store smoke failed: ambiguous cookie state import was accepted.");
+}
+
+const safeHarborImport = localIdentityStoreModule.parseImportedIdentityEnvironment(JSON.stringify({
+  schema_version: "harbor-local-identity-environment/v0",
+  identity_environment_ref: "identity-env_imported",
+  execution_identity_ref: "execution-imported",
+  profile_ref: "profile-imported",
+  site_binding: {
+    site_id: "boss",
+    origin: "https://www.zhipin.com",
+    display_name: "BOSS",
+    account_label: "招聘号"
+  },
+  login_state: {
+    state: "manual_auth_required",
+    reason: "manual login required",
+    recovery_required: true,
+    manual_authentication_state: "required",
+    human_verification: ["qr_scan"]
+  },
+  browser_storage: {
+    profile_storage_ref: "profile-storage-ref",
+    state: "present",
+    cookies_session_state: "unknown"
+  },
+  environment: {
+    proxy: { state: "configured", proxy_ref: "proxy-ref", label: "proxy summary" },
+    region: "CN-SH",
+    language: "zh-CN",
+    timezone: "Asia/Shanghai",
+    browser_family: "cloakbrowser",
+    user_agent_summary: "Chrome family",
+    viewport: "1440 x 900",
+    fingerprint_summary: "provider_claim"
+  },
+  provider_binding: {
+    selected_provider_id: "cloakbrowser",
+    selection_reason: "cloakbrowser_default",
+    requires_user_notice: false,
+    selected_provider: null,
+    warnings: [],
+    unavailable_reason: null
+  },
+  credential_recovery: {
+    credential_ref: "credential-ref",
+    recovery_actions: ["manual_login"]
+  },
+  diagnostics: []
+}));
+
+if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
+  throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
 }
 
 console.log("WebEnvoy desktop shell smoke passed.");
