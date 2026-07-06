@@ -1,6 +1,39 @@
 import type { OwnerSource } from "./taskThreadFixtures";
 
 export type IdentityStatus = "ready" | "needs-auth" | "warning" | "blocked" | "unknown";
+export type BrowserProviderState = "available" | "missing" | "restricted";
+export type BrowserSessionState = "idle" | "running" | "takeover" | "stopped" | "failed";
+export type BrowserController = "手动浏览" | "用户接管" | "智能体直接浏览" | "Core 任务运行" | "空闲";
+
+export type BrowserTargetProjection = {
+  id: "xiaohongshu" | "boss";
+  label: "小红书" | "BOSS";
+  defaultUrl: string;
+  defaultTitle: string;
+  readiness: string;
+};
+
+export type BrowserProviderProjection = {
+  name: "CloakBrowser" | "官方 Chrome";
+  role: "推荐主力" | "受限后备";
+  state: BrowserProviderState;
+  statusLabel: string;
+  summary: string;
+  installHint?: string;
+};
+
+export type BrowserSessionProjection = {
+  provider: BrowserProviderProjection["name"];
+  state: BrowserSessionState;
+  statusLabel: string;
+  controller: BrowserController;
+  browserSessionRef: string;
+  viewerRef: string;
+  currentUrl: string;
+  title: string;
+  startedAt: string;
+  message: string;
+};
 
 export type IdentityEnvironmentProjection = {
   id: string;
@@ -48,6 +81,55 @@ export type IdentityEnvironmentProjection = {
     reasons: string[];
   };
   siteBindings: string[];
+  browser: {
+    providers: BrowserProviderProjection[];
+    defaultProvider: BrowserProviderProjection["name"];
+    targets: BrowserTargetProjection[];
+    session: BrowserSessionProjection;
+    boundary: string;
+  };
+};
+
+export const manualBrowserTargets: BrowserTargetProjection[] = [
+  {
+    id: "xiaohongshu",
+    label: "小红书",
+    defaultUrl: "https://www.xiaohongshu.com/explore",
+    defaultTitle: "小红书 - 发现",
+    readiness: "默认打开首页/发现页；不自动登录、不执行站点技能。",
+  },
+  {
+    id: "boss",
+    label: "BOSS",
+    defaultUrl: "https://www.zhipin.com/web/geek/job",
+    defaultTitle: "BOSS直聘 - 职位",
+    readiness: "默认打开职位入口；登录恢复仍由 Harbor 现场处理。",
+  },
+];
+
+const primaryProvider: BrowserProviderProjection = {
+  name: "CloakBrowser",
+  role: "推荐主力",
+  state: "available",
+  statusLabel: "可用",
+  summary: "完整身份环境优先使用 CloakBrowser；Harbor 拥有检测、启动和能力矩阵事实。",
+};
+
+const restrictedChromeProvider: BrowserProviderProjection = {
+  name: "官方 Chrome",
+  role: "受限后备",
+  state: "restricted",
+  statusLabel: "受限",
+  summary: "仅用于 fallback/dev/manual，不声明完整身份一致性或原生指纹能力。",
+};
+
+const missingCloakProvider: BrowserProviderProjection = {
+  name: "CloakBrowser",
+  role: "推荐主力",
+  state: "missing",
+  statusLabel: "未安装",
+  summary: "缺少 CloakBrowser 会影响身份一致性和真实任务运行。",
+  installHint: "按 Harbor 下载引导安装 CloakBrowser 后刷新状态。",
 };
 
 export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
@@ -97,6 +179,25 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       reasons: ["provider、代理、地区、语言、时区和登录态均有 Harbor 摘要。"],
     },
     siteBindings: ["小红书搜索和笔记读取", "小红书发布草稿写前预览"],
+    browser: {
+      providers: [primaryProvider, restrictedChromeProvider],
+      defaultProvider: "CloakBrowser",
+      targets: manualBrowserTargets,
+      session: {
+        provider: "CloakBrowser",
+        state: "running",
+        statusLabel: "已启动",
+        controller: "手动浏览",
+        browserSessionRef: "browser-session://cloak/xhs-ops-a/manual-014",
+        viewerRef: "viewer://harbor/cloak/xhs-ops-a/manual-014",
+        currentUrl: "https://www.xiaohongshu.com/explore",
+        title: "小红书 - 发现",
+        startedAt: "2026-07-06T08:52:00Z",
+        message: "手动身份浏览会话运行中；不是 Core Task/Run/Result。",
+      },
+      boundary:
+        "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
+    },
   },
   {
     id: "identity-boss-recruiter",
@@ -144,6 +245,25 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       reasons: ["登录态过期", "需要扫码或二次验证", "任务运行前必须刷新 Harbor 状态。"],
     },
     siteBindings: ["BOSS 搜索和职位详情读取", "BOSS 打招呼写前预览"],
+    browser: {
+      providers: [primaryProvider, restrictedChromeProvider],
+      defaultProvider: "CloakBrowser",
+      targets: manualBrowserTargets,
+      session: {
+        provider: "CloakBrowser",
+        state: "idle",
+        statusLabel: "空闲",
+        controller: "空闲",
+        browserSessionRef: "browser-session://cloak/boss-recruiter/manual-next",
+        viewerRef: "viewer://harbor/cloak/boss-recruiter/manual-next",
+        currentUrl: "未打开",
+        title: "无活动页面",
+        startedAt: "未启动",
+        message: "可启动到 BOSS 默认页面；可能需要扫码或二次验证。",
+      },
+      boundary:
+        "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
+    },
   },
   {
     id: "identity-local-chrome-dev",
@@ -191,6 +311,25 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       reasons: ["缺少代理", "缺少指纹摘要", "官方 Chrome 只作为 fallback/dev/manual。"],
     },
     siteBindings: ["开发调试", "人工登录准备"],
+    browser: {
+      providers: [missingCloakProvider, restrictedChromeProvider],
+      defaultProvider: "官方 Chrome",
+      targets: manualBrowserTargets,
+      session: {
+        provider: "官方 Chrome",
+        state: "failed",
+        statusLabel: "CloakBrowser 缺失",
+        controller: "空闲",
+        browserSessionRef: "browser-session://chrome/local-dev/manual-next",
+        viewerRef: "viewer://harbor/chrome/local-dev/manual-next",
+        currentUrl: "未打开",
+        title: "无活动页面",
+        startedAt: "未启动",
+        message: "可用官方 Chrome 受限后备打开手动浏览，但不具备完整身份环境能力。",
+      },
+      boundary:
+        "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
+    },
   },
 ];
 

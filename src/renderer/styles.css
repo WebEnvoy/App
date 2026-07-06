@@ -2182,6 +2182,8 @@ h3 {
 .identity-detail-header,
 .identity-action-row,
 .identity-boundary-card,
+.identity-browser-heading,
+.identity-provider-row,
 .identity-status {
   display: flex;
   align-items: center;
@@ -2203,6 +2205,7 @@ h3 {
 .identity-boundary-strip span,
 .identity-detail-header p,
 .identity-recovery-panel p,
+.identity-browser-panel p,
 .identity-boundary-card p {
   color: var(--we-foreground-muted);
   font-size: 13px;
@@ -2336,6 +2339,7 @@ h3 {
 }
 
 .identity-card,
+.identity-browser-panel,
 .identity-recovery-panel,
 .identity-boundary-card {
   min-width: 0;
@@ -2378,6 +2382,154 @@ h3 {
   gap: 10px;
 }
 
+.identity-browser-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.identity-browser-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.identity-browser-heading p,
+.identity-session-actions p,
+.identity-browser-boundary {
+  margin: 0;
+}
+
+.identity-provider-grid,
+.identity-browser-targets,
+.identity-session-grid,
+.identity-controller-modes {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.identity-provider-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.identity-provider-row {
+  flex-wrap: wrap;
+  gap: 7px 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  background: var(--we-surface-secondary);
+}
+
+.identity-provider-row > div {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 160px;
+  gap: 3px;
+}
+
+.identity-provider-row strong,
+.identity-controller-modes strong {
+  color: var(--we-foreground);
+  font-size: 13px;
+}
+
+.identity-provider-row span,
+.identity-provider-row p,
+.identity-provider-row small,
+.identity-controller-modes span {
+  color: var(--we-foreground-muted);
+  font-size: 12px;
+  line-height: 1.38;
+}
+
+.identity-provider-row p,
+.identity-provider-row small {
+  width: 100%;
+  margin: 0;
+}
+
+.provider-missing {
+  border-color: var(--we-status-warning-border);
+  background: var(--we-status-warning-background);
+}
+
+.identity-browser-targets {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.identity-browser-targets button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+  gap: 4px 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  color: var(--we-foreground);
+  background: var(--we-surface-secondary);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.identity-browser-targets button span {
+  grid-column: 2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--we-foreground-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.identity-browser-targets svg {
+  grid-row: span 2;
+}
+
+.identity-session-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
+  align-items: start;
+}
+
+.identity-session-facts {
+  padding: 0 12px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+}
+
+.identity-session-actions {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.identity-controller-modes {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.identity-controller-modes div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  background: var(--we-surface-secondary);
+}
+
+.identity-controller-modes div.active {
+  border-color: var(--we-status-info-border);
+  background: var(--we-status-info-background);
+}
+
+.identity-browser-boundary {
+  padding-top: 10px;
+  border-top: 1px solid var(--we-border);
+}
+
 .identity-action-row {
   flex-wrap: wrap;
   gap: 8px;
@@ -2412,15 +2564,28 @@ h3 {
   border-color: var(--we-status-success-border);
 }
 
+.provider-status-available,
+.session-status-running {
+  color: var(--we-status-success);
+  background: var(--we-status-success-background);
+  border-color: var(--we-status-success-border);
+}
+
 .identity-status-needs-auth,
 .identity-status-warning,
-.identity-status-unknown {
+.identity-status-unknown,
+.provider-status-restricted,
+.session-status-idle,
+.session-status-takeover {
   color: var(--we-status-warning);
   background: var(--we-status-warning-background);
   border-color: var(--we-status-warning-border);
 }
 
-.identity-status-blocked {
+.identity-status-blocked,
+.provider-status-missing,
+.session-status-stopped,
+.session-status-failed {
   color: var(--we-status-error);
   background: var(--we-status-error-background);
   border-color: var(--we-status-error-border);
@@ -2428,7 +2593,11 @@ h3 {
 
 @media (max-width: 1120px) {
   .identity-layout,
-  .identity-detail-grid {
+  .identity-detail-grid,
+  .identity-provider-grid,
+  .identity-browser-targets,
+  .identity-session-grid,
+  .identity-controller-modes {
     grid-template-columns: 1fr;
   }
 }
