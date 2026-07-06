@@ -1,0 +1,15 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-234",
+  "kind": "spec_review",
+  "decision": "allow",
+  "reviewed_head": "6466fc601ef3fc855076a0d720c7ced5e657208f",
+  "reviewed_at": "2026-07-06T17:40:00Z",
+  "reviewer": "controller-authored",
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The APP-234 story/spec/plan matches App milestone #14 identity browser scope and does not expand into Core real task runtime or write-pre preview work."
+  },
+  "findings": [],
+  "blocking_issues": []
+}

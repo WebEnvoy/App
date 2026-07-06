@@ -1,0 +1,16 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-234",
+  "kind": "code_review",
+  "decision": "allow",
+  "reviewed_head": "6466fc601ef3fc855076a0d720c7ced5e657208f",
+  "reviewed_at": "2026-07-06T17:40:00Z",
+  "reviewer": "controller-authored",
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "App #233/#234-#237 connects the desktop identity browser surface to Harbor-owned provider, identity environment, and session public facts while preserving App local-only boundaries and avoiding credential, cookie, token, profile, raw evidence, real write, hosted browser, marketplace, bulk collection, and risk-control bypass scope."
+  },
+  "findings": [],
+  "blocking_issues": [],
+  "validation_summary": "npm run typecheck; npm run smoke; packaged smoke; git diff --check; loom fact-chain; loom verify; suite validate/carrier/evidence passed locally."
+}
