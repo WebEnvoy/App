@@ -35,6 +35,15 @@ export type BrowserSessionProjection = {
   message: string;
 };
 
+export type IdentityTaskEntryProjection = {
+  id: string;
+  label: string;
+  taskId: string;
+  inputSummary: string;
+  readiness: string;
+  source: OwnerSource;
+};
+
 export type IdentityEnvironmentProjection = {
   id: string;
   name: string;
@@ -88,6 +97,7 @@ export type IdentityEnvironmentProjection = {
     session: BrowserSessionProjection;
     boundary: string;
   };
+  taskEntries: IdentityTaskEntryProjection[];
 };
 
 export const manualBrowserTargets: BrowserTargetProjection[] = [
@@ -198,6 +208,16 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       boundary:
         "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
     },
+    taskEntries: [
+      {
+        id: "task-entry-xhs-real-read",
+        label: "启动小红书搜索/笔记读取",
+        taskId: "task-xhs-real-read",
+        inputSummary: "关键词：AI 工具；可继续读取指定笔记 URL。",
+        readiness: "Core/Lode/Harbor fixture 均可投影；真实提交仍由 Core owner API 承接。",
+        source: "Core fixture",
+      },
+    ],
   },
   {
     id: "identity-boss-recruiter",
@@ -264,6 +284,16 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       boundary:
         "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
     },
+    taskEntries: [
+      {
+        id: "task-entry-boss-real-read",
+        label: "启动 BOSS 搜索/职位详情读取",
+        taskId: "task-boss-real-read",
+        inputSummary: "职位：前端工程师；城市：上海；筛选：近三天。",
+        readiness: "登录态需要人工认证时，Task Thread 显示未登录可恢复失败。",
+        source: "Core fixture",
+      },
+    ],
   },
   {
     id: "identity-local-chrome-dev",
@@ -330,6 +360,16 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       boundary:
         "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
     },
+    taskEntries: [
+      {
+        id: "task-entry-local-xhs-read-blocked",
+        label: "查看小红书只读任务失败状态",
+        taskId: "task-xhs-real-read",
+        inputSummary: "本机 Chrome 只作为 fallback/dev/manual，不建议真实站点任务。",
+        readiness: "缺少完整身份环境时只能查看 fixture projection，不能声明 live-ready。",
+        source: "App local-only",
+      },
+    ],
   },
 ];
 

@@ -184,6 +184,13 @@ export function App() {
     setSelectedRunId(task.runs[0].id);
   }
 
+  function openTaskById(taskId: string) {
+    const task = taskThreadFixtures.find((item) => item.id === taskId);
+    if (task != null) {
+      selectTask(task);
+    }
+  }
+
   function openTaskThread() {
     setActiveView("task-thread");
   }
@@ -204,9 +211,9 @@ export function App() {
   }
 
   function startReadTask(skill: SiteSkill) {
-    const task = taskThreadFixtures.find((item) => item.id === skill.relatedTaskIds[0]);
-    if (task != null) {
-      selectTask(task);
+    const taskId = skill.relatedTaskIds[0];
+    if (taskId != null) {
+      openTaskById(taskId);
     }
   }
 
@@ -418,7 +425,7 @@ export function App() {
       workspace={
         isIdentityEnvironmentsView ? (
           <ThreadWorkspace>
-            <IdentityEnvironmentsPage />
+            <IdentityEnvironmentsPage onOpenTask={openTaskById} />
           </ThreadWorkspace>
         ) : isSiteSkillView ? (
           <ThreadWorkspace>

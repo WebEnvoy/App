@@ -19,7 +19,7 @@ import { useMemo, useState } from "react";
 
 import { type SiteSkill, type SiteSkillStatus, siteSkillFixtures } from "./siteSkillFixtures";
 
-const directoryTabs = ["全部", "电商", "内容发布", "账号身份", "诊断"] as const;
+const directoryTabs = ["全部", "电商", "内容平台", "招聘", "内容发布", "账号身份", "诊断"] as const;
 type DirectoryTab = (typeof directoryTabs)[number];
 
 export function SiteSkillDirectoryPage({
@@ -410,6 +410,8 @@ function SkillIcon({ skill, size = "normal" }: { skill: SiteSkill; size?: "norma
     <span className={size === "large" ? "site-skill-icon large" : "site-skill-icon"} aria-hidden="true">
       {skill.category === "电商" ? (
         <Box size={size === "large" ? 28 : 18} />
+      ) : skill.category === "内容平台" || skill.category === "招聘" ? (
+        <Globe2 size={size === "large" ? 28 : 18} />
       ) : skill.category === "账号身份" ? (
         <ShieldCheck size={size === "large" ? 28 : 18} />
       ) : skill.category === "诊断" ? (

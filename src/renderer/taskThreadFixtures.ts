@@ -21,6 +21,13 @@ export type RunProjection = {
   owner: "Core";
   source: OwnerSource;
   resultRows: Array<{ label: string; value: string; source: OwnerSource }>;
+  fieldSources?: Array<{
+    field: string;
+    value: string;
+    locator: string;
+    evidenceRef: string;
+    source: OwnerSource;
+  }>;
   evidenceCards: Array<{
     id: string;
     title: string;
@@ -36,8 +43,23 @@ export type RunProjection = {
     capabilityRef: string;
     version: string;
     sourceRef: string;
-    failureClass: "capability" | "input" | "runtime" | "site_changed" | "evidence_expired" | "none";
+    failureClass:
+      | "capability"
+      | "captcha"
+      | "evidence_expired"
+      | "field_missing"
+      | "input"
+      | "login_required"
+      | "runtime"
+      | "site_changed"
+      | "none";
     summary: string;
+  };
+  failureRecovery?: {
+    state: string;
+    reason: string;
+    nextActions: string[];
+    source: OwnerSource;
   };
   writePrecheck?: {
     state: "available" | "preview_unavailable" | "page_changed" | "user_cancelled";
@@ -127,6 +149,451 @@ export const creationEntryFixture = {
 };
 
 export const taskThreadFixtures: TaskProjection[] = [
+  {
+    id: "task-xhs-real-read",
+    title: "小红书搜索与笔记读取",
+    accountIdentity: "小红书运营号 A",
+    siteSkill: "小红书搜索和笔记读取",
+    businessInput: "关键词：AI 工具；笔记：https://www.xiaohongshu.com/explore/real-note-2026",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/xiaohongshu-read-only",
+      version: "0.3.0",
+      capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
+      sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+      lockRef: "lode://lock/xiaohongshu-read-only/2026-07-06",
+      fetchedAt: "2026-07-06T09:20:00Z",
+      source: "Lode fixture",
+      boundary: "App 只展示小红书只读 capability metadata、Core run projection 和 Harbor viewer refs；不缓存原始页面材料。",
+    },
+    runs: [
+      {
+        id: "run-xhs-search-live",
+        label: "小红书 Run 018",
+        lifecycle: "running",
+        outcome: "partial",
+        summary: "Core 已受理小红书搜索真实只读任务；Harbor 会话在发现页读取搜索结果，不做点赞、收藏、评论或发布。",
+        actionIntent: "Owner-supported action intent: 打开小红书身份浏览器现场或等待 Core 回读。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "搜索词", value: "AI 工具", source: "Core fixture" },
+          { label: "结果数", value: "12 条候选笔记，前 3 条已回读", source: "Core fixture" },
+          { label: "执行现场", value: "viewer://harbor/cloak/xhs-ops-a/xhs-search-018", source: "Harbor fixture" },
+        ],
+        fieldSources: [
+          {
+            field: "首条笔记标题",
+            value: "AI 自动化运营工具清单",
+            locator: "page-ref:xhs-search-result-card-1 / element-ref:note-title",
+            evidenceRef: "evidence://core/xhs-search-018/result-card-1",
+            source: "Core fixture",
+          },
+          {
+            field: "作者昵称",
+            value: "增长实验室",
+            locator: "page-ref:xhs-search-result-card-1 / element-ref:author-name",
+            evidenceRef: "screenshot://harbor/xhs-search-018/viewport-1",
+            source: "Harbor fixture",
+          },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-xhs-search-refmap",
+            title: "小红书搜索结果 RefMap",
+            summary: "Harbor 只暴露搜索结果卡片 ref、截图 ref 和字段 locator；App 不读取 DOM 或图片正文。",
+            viewerLabel: "打开小红书搜索证据",
+            viewerHref: "#evidence-viewer-xhs-search-018",
+            source: "Harbor fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core run xhs-search-018 + Harbor viewer ref",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
+          version: "0.3.0",
+          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          failureClass: "none",
+          summary: "Core run 绑定小红书只读能力和小红书运营号 A 身份环境。",
+        },
+        process: ["Core accepted read-only task intent.", "Harbor attached xhs-ops-a identity session.", "Search result cards are being read from owner refs."],
+      },
+      {
+        id: "run-xhs-note-success",
+        label: "小红书 Run 017",
+        lifecycle: "completed",
+        outcome: "success",
+        summary: "笔记读取完成，标题、作者、正文摘要和互动指标均带字段来源。",
+        actionIntent: "Owner-supported action intent: 查看结果依据或再次执行同一输入。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "笔记标题", value: "AI 自动化运营工具清单", source: "Core fixture" },
+          { label: "作者", value: "增长实验室", source: "Core fixture" },
+          { label: "正文摘要", value: "列出选题、搜索、表格整理和复盘工具。", source: "Core fixture" },
+          { label: "互动指标", value: "点赞 1.2k / 收藏 842 / 评论 76", source: "Core fixture" },
+        ],
+        fieldSources: [
+          {
+            field: "笔记标题",
+            value: "AI 自动化运营工具清单",
+            locator: "page-ref:xhs-note-page / element-ref:note-title",
+            evidenceRef: "evidence://core/xhs-note-017/title",
+            source: "Core fixture",
+          },
+          {
+            field: "正文摘要",
+            value: "正文区域前 240 字摘要",
+            locator: "page-ref:xhs-note-page / element-ref:note-body",
+            evidenceRef: "screenshot://harbor/xhs-note-017/body-fold-1",
+            source: "Harbor fixture",
+          },
+          {
+            field: "互动指标",
+            value: "点赞、收藏、评论",
+            locator: "page-ref:xhs-note-page / element-ref:engagement-bar",
+            evidenceRef: "evidence://core/xhs-note-017/engagement",
+            source: "Core fixture",
+          },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-xhs-note-result",
+            title: "小红书笔记读取证据入口",
+            summary: "字段来源来自 Core Result Envelope，截图和元素引用来自 Harbor viewer；敏感页面材料保持 owner 私有。",
+            viewerLabel: "打开小红书笔记证据",
+            viewerHref: "#evidence-viewer-xhs-note-017",
+            source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core result envelope evidence refs",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
+          version: "0.3.0",
+          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          failureClass: "none",
+          summary: "Result Envelope 保留 Lode capability ref、Harbor viewer ref 和字段来源。",
+        },
+        process: ["Note page loaded through Harbor session.", "Core extracted structured fields.", "Result source refs were attached without raw evidence storage."],
+      },
+      {
+        id: "run-xhs-captcha",
+        label: "小红书 Run 016",
+        lifecycle: "needs-action",
+        outcome: "failure-safe",
+        summary: "验证码/滑块校验阻止继续读取；Core 安全暂停，App 不尝试自动绕过。",
+        actionIntent: "Owner-supported action intent: 打开执行现场，人工完成认证后从同一 Task 再次执行。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "失败状态", value: "验证码", source: "Core fixture" },
+          { label: "失败阶段", value: "search_result_read", source: "Core fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-xhs-captcha",
+            title: "验证码状态证据",
+            summary: "Harbor 只提供 viewer ref 和人工认证入口；App 不读取验证码内容。",
+            viewerLabel: "打开验证码现场",
+            viewerHref: "#evidence-viewer-xhs-captcha-016",
+            source: "Harbor fixture",
+            status: "private",
+            freshness: "fresh",
+            provenance: "Harbor manual authentication ref",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
+          version: "0.3.0",
+          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          failureClass: "captcha",
+          summary: "验证码是身份现场恢复问题，不是 App 本地可修复字段。",
+        },
+        failureRecovery: {
+          state: "验证码",
+          reason: "站点要求人工校验，自动任务已安全暂停。",
+          nextActions: ["打开执行现场", "人工完成认证", "认证后再次执行同一输入"],
+          source: "Core fixture",
+        },
+        process: ["Captcha challenge detected.", "Core paused before additional page reads.", "Harbor viewer ref is available for manual authentication."],
+      },
+      {
+        id: "run-xhs-page-changed",
+        label: "小红书 Run 015",
+        lifecycle: "blocked",
+        outcome: "unavailable",
+        summary: "页面结构变化导致搜索结果字段无法稳定定位；App 显示页面变化而不是成功。",
+        actionIntent: "Owner-supported action intent: 等待 Lode capability 修复或选择新的笔记 URL。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "失败状态", value: "页面变化", source: "Core fixture" },
+          { label: "缺失字段", value: "note_card.title selector changed", source: "Lode fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-xhs-page-changed",
+            title: "页面变化证据",
+            summary: "Core 标记 site_changed，Lode repair draft 可后续跟进；App 不内置 selector 修复。",
+            viewerLabel: "打开页面变化证据",
+            viewerHref: "#evidence-viewer-xhs-page-changed-015",
+            source: "Core fixture",
+            status: "stale",
+            freshness: "page_changed",
+            provenance: "Core site_changed failure + Lode repair candidate",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
+          version: "0.3.0",
+          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          failureClass: "site_changed",
+          summary: "页面变化归因到 Lode 能力修复，用户可稍后重试或调整输入。",
+        },
+        failureRecovery: {
+          state: "页面变化",
+          reason: "搜索页结构与锁定 capability 的字段定位不一致。",
+          nextActions: ["稍后重试", "换用明确笔记 URL", "等待 Lode 修复后再执行"],
+          source: "Core fixture",
+        },
+        process: ["Search page loaded.", "Expected note title locator was missing.", "Core returned site_changed with owner evidence refs."],
+      },
+    ],
+  },
+  {
+    id: "task-boss-real-read",
+    title: "BOSS 搜索与职位详情读取",
+    accountIdentity: "BOSS 招聘号",
+    siteSkill: "BOSS 搜索和职位详情读取",
+    businessInput: "职位：前端工程师；城市：上海；筛选：近三天",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/boss-read-only",
+      version: "0.2.0",
+      capabilityRef: "lode://capability/boss/search-and-job-detail-read",
+      sourceRef: "lode://package/boss-read-only@0.2.0",
+      lockRef: "lode://lock/boss-read-only/2026-07-06",
+      fetchedAt: "2026-07-06T09:22:00Z",
+      source: "Lode fixture",
+      boundary: "App 只展示 BOSS 只读搜索和职位详情 projection；不打招呼、不投递、不保存聊天或简历材料。",
+    },
+    runs: [
+      {
+        id: "run-boss-search-live",
+        label: "BOSS Run 012",
+        lifecycle: "running",
+        outcome: "partial",
+        summary: "Core 已受理 BOSS 职位搜索真实只读任务；当前正在读取职位列表和详情页来源。",
+        actionIntent: "Owner-supported action intent: 打开 BOSS 身份浏览器现场或等待 Core 回读。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "搜索条件", value: "前端工程师 / 上海 / 近三天", source: "Core fixture" },
+          { label: "列表结果", value: "8 个职位候选，2 个详情已回读", source: "Core fixture" },
+          { label: "执行现场", value: "viewer://harbor/cloak/boss-recruiter/boss-search-012", source: "Harbor fixture" },
+        ],
+        fieldSources: [
+          {
+            field: "职位名称",
+            value: "高级前端工程师",
+            locator: "page-ref:boss-job-list / element-ref:job-card-title",
+            evidenceRef: "evidence://core/boss-search-012/job-card-1",
+            source: "Core fixture",
+          },
+          {
+            field: "薪资范围",
+            value: "25-40K",
+            locator: "page-ref:boss-job-list / element-ref:salary",
+            evidenceRef: "screenshot://harbor/boss-search-012/list-viewport-1",
+            source: "Harbor fixture",
+          },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-boss-search-refmap",
+            title: "BOSS 搜索结果 RefMap",
+            summary: "字段来源来自职位卡片 ref 和详情页 viewer ref；App 不读取原始页面正文。",
+            viewerLabel: "打开 BOSS 搜索证据",
+            viewerHref: "#evidence-viewer-boss-search-012",
+            source: "Harbor fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core run boss-search-012 + Harbor viewer ref",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
+          version: "0.2.0",
+          sourceRef: "lode://package/boss-read-only@0.2.0",
+          failureClass: "none",
+          summary: "Core run 绑定 BOSS 只读能力和 BOSS 招聘号身份环境。",
+        },
+        process: ["Core accepted read-only task intent.", "Harbor attached boss-recruiter identity session.", "Job cards and detail links are being read from owner refs."],
+      },
+      {
+        id: "run-boss-detail-success",
+        label: "BOSS Run 011",
+        lifecycle: "completed",
+        outcome: "success",
+        summary: "职位详情读取完成，职位、公司、薪资、地点和经验要求均带来源。",
+        actionIntent: "Owner-supported action intent: 查看职位详情证据或修改搜索条件。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "职位", value: "高级前端工程师", source: "Core fixture" },
+          { label: "公司", value: "上海某 SaaS 公司", source: "Core fixture" },
+          { label: "薪资", value: "25-40K · 14 薪", source: "Core fixture" },
+          { label: "要求", value: "5-10 年 · React / TypeScript", source: "Core fixture" },
+        ],
+        fieldSources: [
+          {
+            field: "职位",
+            value: "高级前端工程师",
+            locator: "page-ref:boss-job-detail / element-ref:job-title",
+            evidenceRef: "evidence://core/boss-detail-011/job-title",
+            source: "Core fixture",
+          },
+          {
+            field: "公司",
+            value: "上海某 SaaS 公司",
+            locator: "page-ref:boss-job-detail / element-ref:company-name",
+            evidenceRef: "screenshot://harbor/boss-detail-011/header",
+            source: "Harbor fixture",
+          },
+          {
+            field: "经验要求",
+            value: "5-10 年 · React / TypeScript",
+            locator: "page-ref:boss-job-detail / element-ref:job-requirements",
+            evidenceRef: "evidence://core/boss-detail-011/requirements",
+            source: "Core fixture",
+          },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-boss-detail-result",
+            title: "BOSS 职位详情证据入口",
+            summary: "Core Result Envelope 只保存 evidence refs；详情页截图和元素引用留在 Harbor viewer。",
+            viewerLabel: "打开 BOSS 职位详情证据",
+            viewerHref: "#evidence-viewer-boss-detail-011",
+            source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core result envelope evidence refs",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
+          version: "0.2.0",
+          sourceRef: "lode://package/boss-read-only@0.2.0",
+          failureClass: "none",
+          summary: "Result Envelope 保留 Lode capability ref、Harbor viewer ref 和字段来源。",
+        },
+        process: ["Job detail opened through Harbor session.", "Core extracted structured job fields.", "Field source refs were attached without raw evidence storage."],
+      },
+      {
+        id: "run-boss-login-required",
+        label: "BOSS Run 010",
+        lifecycle: "needs-action",
+        outcome: "failure-safe",
+        summary: "BOSS 登录态过期，详情页需要扫码或二次验证；任务安全暂停。",
+        actionIntent: "Owner-supported action intent: 打开认证现场，重新登录后重试。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "失败状态", value: "未登录", source: "Core fixture" },
+          { label: "恢复动作", value: "扫码 / 二次验证 / 刷新 Harbor 状态", source: "Harbor fixture" },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-boss-login-required",
+            title: "未登录状态证据",
+            summary: "Harbor public summary 显示登录态过期；App 只提供认证现场入口。",
+            viewerLabel: "打开 BOSS 认证现场",
+            viewerHref: "#evidence-viewer-boss-login-required-010",
+            source: "Harbor fixture",
+            status: "private",
+            freshness: "fresh",
+            provenance: "Harbor login recovery public summary",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
+          version: "0.2.0",
+          sourceRef: "lode://package/boss-read-only@0.2.0",
+          failureClass: "login_required",
+          summary: "未登录是身份环境恢复问题，不是职位读取能力成功。",
+        },
+        failureRecovery: {
+          state: "未登录",
+          reason: "招聘号登录态过期，详情页读取前需要人工认证。",
+          nextActions: ["打开认证现场", "扫码或完成二次验证", "刷新身份环境后再次执行"],
+          source: "Core fixture",
+        },
+        process: ["Harbor reported expired cookies.", "Core paused before job detail read.", "App kept failure-safe state visible."],
+      },
+      {
+        id: "run-boss-field-missing",
+        label: "BOSS Run 009",
+        lifecycle: "completed",
+        outcome: "partial",
+        summary: "职位详情返回成功但公司规模字段缺失；App 展示字段缺失和可追踪来源。",
+        actionIntent: "Owner-supported action intent: 调整搜索条件、刷新页面或等待能力修复。",
+        owner: "Core",
+        source: "Core fixture",
+        resultRows: [
+          { label: "职位", value: "前端开发工程师", source: "Core fixture" },
+          { label: "公司规模", value: "字段缺失", source: "Core fixture" },
+          { label: "原因", value: "company_size element missing", source: "Lode fixture" },
+        ],
+        fieldSources: [
+          {
+            field: "职位",
+            value: "前端开发工程师",
+            locator: "page-ref:boss-job-detail / element-ref:job-title",
+            evidenceRef: "evidence://core/boss-field-missing-009/title",
+            source: "Core fixture",
+          },
+          {
+            field: "公司规模",
+            value: "不可追：目标元素缺失",
+            locator: "page-ref:boss-company-card / element-ref:company-size missing",
+            evidenceRef: "evidence://core/boss-field-missing-009/missing-field",
+            source: "Core fixture",
+          },
+        ],
+        evidenceCards: [
+          {
+            id: "ev-boss-field-missing",
+            title: "字段缺失证据",
+            summary: "Core 保留 missing-field record，说明关键字段不可追而不是静默留空。",
+            viewerLabel: "打开字段缺失证据",
+            viewerHref: "#evidence-viewer-boss-field-missing-009",
+            source: "Core fixture",
+            status: "available",
+            freshness: "fresh",
+            provenance: "Core missing field record",
+          },
+        ],
+        capabilityAttribution: {
+          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
+          version: "0.2.0",
+          sourceRef: "lode://package/boss-read-only@0.2.0",
+          failureClass: "field_missing",
+          summary: "字段缺失归因到页面字段不可见或 selector 漂移；结果保持 partial。",
+        },
+        failureRecovery: {
+          state: "字段缺失",
+          reason: "公司规模字段在当前详情页不可见，不能伪造值。",
+          nextActions: ["刷新页面后重试", "换一个职位详情", "等待 Lode selector 修复"],
+          source: "Core fixture",
+        },
+        process: ["Required job fields passed.", "Company size field was not visible.", "Core returned partial result with missing-field evidence."],
+      },
+    ],
+  },
   {
     id: "task-contact-form-preview",
     title: "预览联系表单草稿",

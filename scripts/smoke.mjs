@@ -147,6 +147,17 @@ for (const expectedText of [
   "Cookie/session",
   "打开认证现场",
   "不展示密码、验证码、Cookie、令牌",
+  "小红书搜索和笔记读取",
+  "BOSS 搜索和职位详情读取",
+  "从身份浏览器会话启动真实只读任务",
+  "字段来源",
+  "小红书笔记读取证据入口",
+  "BOSS 职位详情证据入口",
+  "未登录",
+  "验证码",
+  "页面变化",
+  "字段缺失",
+  "不打招呼、不投递、不发送消息",
 ]) {
   if (!rendererAssets.includes(expectedText)) {
     throw new Error(`Renderer smoke failed: ${expectedText} is missing.`);

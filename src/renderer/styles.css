@@ -1304,7 +1304,8 @@ h3 {
 }
 
 .write-precheck-panel,
-.approval-panel {
+.approval-panel,
+.failure-recovery-panel {
   display: grid;
   gap: 10px;
   margin-top: 18px;
@@ -1313,9 +1314,15 @@ h3 {
 }
 
 .diff-preview,
-.approval-state-list {
+.approval-state-list,
+.failure-recovery-list {
   display: grid;
   gap: 8px;
+}
+
+.failure-recovery-list {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .diff-preview-row,
@@ -2400,6 +2407,7 @@ h3 {
 
 .identity-provider-grid,
 .identity-browser-targets,
+.identity-read-task-panel,
 .identity-session-grid,
 .identity-controller-modes {
   display: grid;
@@ -2487,6 +2495,56 @@ h3 {
 
 .identity-browser-targets svg {
   grid-row: span 2;
+}
+
+.identity-read-task-panel {
+  padding: 10px;
+  border: 1px solid var(--we-status-info-border);
+  border-radius: 8px;
+  background: var(--we-status-info-background);
+}
+
+.identity-read-task-panel > div {
+  display: grid;
+  gap: 3px;
+}
+
+.identity-read-task-panel strong {
+  color: var(--we-foreground);
+  font-size: 13px;
+}
+
+.identity-read-task-panel span,
+.identity-read-task-panel small {
+  color: var(--we-foreground-muted);
+  font-size: 12px;
+  line-height: 1.36;
+}
+
+.identity-read-task-panel button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  color: var(--we-foreground);
+  background: var(--we-surface-primary);
+  text-align: left;
+}
+
+.identity-read-task-panel button > span {
+  display: grid;
+  gap: 3px;
+}
+
+.identity-read-task-panel em {
+  color: var(--we-foreground-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .identity-session-grid {
