@@ -234,12 +234,13 @@ function WritePrecheckPreview({ run }: { run: RunProjection }) {
     <section className="write-precheck-panel" aria-label="Write-pre preview">
       <div className="card-title compact-title">
         <FileDiff size={18} />
-        <h3>Write-pre preview</h3>
+        <h3>真实页面写前验证 (Write-pre preview)</h3>
         <span className="badge">{preview.modeLabel}</span>
       </div>
       <p>{preview.expectedChangeSummary}</p>
       <dl className="input-grid">
         <SourceField label="Preview state" value={preview.state} source="Core fixture" />
+        <SourceField label="Submitted" value="false / 未提交" source="Core fixture" />
         <SourceField label="No-submit guard" value={preview.noSubmitGuard} source="Core fixture" />
         {run.approval ? <SourceField label="Risk" value={run.approval.riskLabel} source="Core fixture" /> : null}
         {run.approval ? (
@@ -278,7 +279,7 @@ function ApprovalPreview({ run }: { run: RunProjection }) {
     <section className="approval-panel" aria-label="Risk and approval request">
       <div className="card-title compact-title">
         <ShieldAlert size={18} />
-        <h3>Risk and approval</h3>
+        <h3>风险与审批请求 (Risk and approval)</h3>
         <span className={`status-pill status-${approval.riskLevel}`}>{approval.riskLabel}</span>
       </div>
       <dl className="input-grid">
@@ -296,7 +297,7 @@ function ApprovalPreview({ run }: { run: RunProjection }) {
       </div>
       <button className="cancel-intent-button" type="button" onClick={() => setCancelRequested(true)}>
         <Ban size={15} />
-        {cancelRequested ? "取消意图已暂存" : "发送取消意图"}
+        {cancelRequested ? "取消意图已暂存" : "记录取消意图"}
       </button>
       <p className="boundary-copy">{approval.boundary}</p>
     </section>

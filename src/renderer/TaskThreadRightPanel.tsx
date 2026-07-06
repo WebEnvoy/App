@@ -95,7 +95,9 @@ function EvidenceTab({ selectedRun }: { selectedRun: RunProjection }) {
       {selectedRun.writePrecheck ? (
         <dl className="context-facts compact">
           <SourceField label="Preview state" value={selectedRun.writePrecheck.state} source="Core fixture" />
+          <SourceField label="Submitted" value="false / 未提交" source="Core fixture" />
           <SourceField label="No-submit guard" value={selectedRun.writePrecheck.noSubmitGuard} source="Core fixture" />
+          <SourceField label="State note" value={selectedRun.writePrecheck.stateNote} source="Core fixture" />
         </dl>
       ) : null}
       {selectedRun.fieldSources ? (
