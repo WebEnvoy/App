@@ -1,0 +1,21 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-234",
+  "kind": "code_review",
+  "decision": "allow",
+  "reviewed_head": "6466fc601ef3fc855076a0d720c7ced5e657208f",
+  "reviewed_at": "2026-07-06T17:40:00Z",
+  "reviewer": "controller-authored",
+  "summary": "Approved for the APP-234 identity browser batch: the desktop surface consumes Harbor-owned provider, identity environment, and session public facts without owning credentials, cookies, tokens, browser profile truth, raw evidence, or task/run/session truth.",
+  "reviewed_validation_summary": "2026-07-06T17:34Z local checks passed: npm run typecheck, npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/app-234-real-harbor-identity-packaged.png npm run smoke:packaged, git diff --check, loom fact-chain --target . --json, loom verify --target . --json, loom suite validate/carrier/evidence validate --target . --item APP-234 --json.",
+  "reviewed_validation_summary_hash": "124e4046113a1c1ee317c7d75c3bd8868052618941b7049b30d98f80e7b12713",
+  "validation_summary_source": "recovery",
+  "validation_summary_locator": ".loom/progress/APP-234.md",
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "App #233/#234-#237 connects the desktop identity browser surface to Harbor-owned provider, identity environment, and session public facts while preserving App local-only boundaries and avoiding credential, cookie, token, profile, raw evidence, real write, hosted browser, marketplace, bulk collection, and risk-control bypass scope."
+  },
+  "findings": [],
+  "blocking_issues": [],
+  "validation_summary": "npm run typecheck; npm run smoke; packaged smoke; git diff --check; loom fact-chain; loom verify; suite validate/carrier/evidence passed locally."
+}

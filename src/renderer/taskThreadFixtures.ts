@@ -1,6 +1,11 @@
 import { realWritePreviewTaskFixtures } from "./realWritePreviewFixtures";
 
-export type OwnerSource = "Core fixture" | "Harbor fixture" | "Lode fixture" | "App local-only";
+export type OwnerSource =
+  | "Core fixture"
+  | "Harbor fixture"
+  | "Harbor live"
+  | "Lode fixture"
+  | "App local-only";
 
 export type OutcomeKind =
   | "success"

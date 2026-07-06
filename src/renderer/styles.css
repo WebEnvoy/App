@@ -2256,6 +2256,123 @@ h3 {
   background: var(--we-surface-secondary);
 }
 
+.identity-connection-strip,
+.identity-management-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--we-border);
+  border-radius: 10px;
+  background: var(--we-surface-primary);
+}
+
+.identity-connection-strip {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.identity-connection-ready {
+  border-color: var(--we-status-success-border);
+  background: var(--we-status-success-background);
+}
+
+.identity-connection-offline {
+  border-color: var(--we-status-warning-border);
+  background: var(--we-status-warning-background);
+}
+
+.identity-connection-strip div,
+.identity-management-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.identity-connection-strip div {
+  display: grid;
+  gap: 2px;
+}
+
+.identity-connection-strip strong,
+.identity-management-heading strong {
+  color: var(--we-foreground);
+  font-size: 13px;
+}
+
+.identity-connection-strip span,
+.identity-connection-strip p,
+.identity-management-heading span,
+.identity-management-message {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--we-foreground-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.identity-connection-strip button,
+.identity-management-actions button {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  color: var(--we-foreground);
+  background: var(--we-surface-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.identity-management-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.identity-management-form label,
+.identity-management-import {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--we-foreground-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.identity-management-form input,
+.identity-management-form select,
+.identity-management-import textarea {
+  min-width: 0;
+  border: 1px solid var(--we-border);
+  border-radius: 8px;
+  color: var(--we-foreground);
+  background: var(--we-surface-secondary);
+  font: inherit;
+}
+
+.identity-management-form input,
+.identity-management-form select {
+  height: 32px;
+  padding: 0 9px;
+}
+
+.identity-management-import textarea {
+  min-height: 112px;
+  padding: 9px;
+  resize: vertical;
+}
+
+.identity-management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .identity-layout {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
@@ -2483,6 +2600,11 @@ h3 {
   text-align: left;
 }
 
+.identity-browser-targets button:disabled {
+  color: var(--we-foreground-muted);
+  background: var(--we-surface-tertiary);
+}
+
 .identity-browser-targets button span {
   grid-column: 2;
   min-width: 0;
@@ -2655,7 +2777,9 @@ h3 {
   .identity-provider-grid,
   .identity-browser-targets,
   .identity-session-grid,
-  .identity-controller-modes {
+  .identity-controller-modes,
+  .identity-connection-strip,
+  .identity-management-form {
     grid-template-columns: 1fr;
   }
 }

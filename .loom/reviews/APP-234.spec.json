@@ -1,0 +1,20 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-234",
+  "kind": "spec_review",
+  "decision": "allow",
+  "reviewed_head": "6466fc601ef3fc855076a0d720c7ced5e657208f",
+  "reviewed_at": "2026-07-06T17:40:00Z",
+  "reviewer": "controller-authored",
+  "summary": "Approved for APP-234 story/spec scope: identity browser management and Harbor public fact consumption are in scope; Core real task runtime, write-pre preview, true write, hosted browser, marketplace, and raw/private material ownership remain out of scope.",
+  "reviewed_validation_summary": "2026-07-06T17:34Z local checks passed: npm run typecheck, npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/app-234-real-harbor-identity-packaged.png npm run smoke:packaged, git diff --check, loom fact-chain --target . --json, loom verify --target . --json, loom suite validate/carrier/evidence validate --target . --item APP-234 --json.",
+  "reviewed_validation_summary_hash": "124e4046113a1c1ee317c7d75c3bd8868052618941b7049b30d98f80e7b12713",
+  "validation_summary_source": "recovery",
+  "validation_summary_locator": ".loom/progress/APP-234.md",
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "The APP-234 story/spec/plan matches App milestone #14 identity browser scope and does not expand into Core real task runtime or write-pre preview work."
+  },
+  "findings": [],
+  "blocking_issues": []
+}
