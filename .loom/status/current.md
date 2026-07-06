@@ -11,9 +11,9 @@
 - Review Entry: .loom/reviews/APP-234.json
 - Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged; git diff --check; loom fact-chain --target . --json; loom verify --target . --json
 - Closing Condition: PR is ready for #233/#234/#235/#236/#237 without merge or issue closeout.
-- Current Checkpoint: merge
-- Current Stop: PR #248 has current-head review, validation summary, PR metadata, and hosted gate inputs ready for merge.
-- Next Step: Merge PR #248 after hosted checks pass, then create closeout/retire lane and close #234-#237 plus parent #233 with post-merge evidence.
+- Current Checkpoint: closed_out
+- Current Stop: PR #248 is merged and terminal closeout metadata is recorded for APP-234.
+- Next Step: Merge this closeout carrier PR, write post-merge issue evidence for #234-#237 and parent #233, then retire current pointer to no_active_item.
 - Blockers: None
 - Latest Validation Summary: 2026-07-06T17:34Z local checks passed: npm run typecheck, npm run smoke, WEBENVOY_PACKAGED_SMOKE_SCREENSHOT=artifacts/app-234-real-harbor-identity-packaged.png npm run smoke:packaged, git diff --check, loom fact-chain --target . --json, loom verify --target . --json, loom suite validate/carrier/evidence validate --target . --item APP-234 --json.
 - Recovery Boundary: Revert this PR; no external state, real account action, credential/cookie/token/profile/raw evidence storage, or Harbor/Core/Lode repo change is introduced.
