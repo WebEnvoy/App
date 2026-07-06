@@ -98,6 +98,21 @@ function EvidenceTab({ selectedRun }: { selectedRun: RunProjection }) {
           <SourceField label="No-submit guard" value={selectedRun.writePrecheck.noSubmitGuard} source="Core fixture" />
         </dl>
       ) : null}
+      {selectedRun.fieldSources ? (
+        <>
+          <h3 className="subsection-title">字段来源</h3>
+          <dl className="context-facts compact">
+            {selectedRun.fieldSources.map((field) => (
+              <SourceField
+                label={field.field}
+                value={`${field.locator} · ${field.evidenceRef}`}
+                source={field.source}
+                key={`${selectedRun.id}-${field.field}`}
+              />
+            ))}
+          </dl>
+        </>
+      ) : null}
       <div className="context-card-list">
         {selectedRun.evidenceCards.map((evidence) => (
           <article className="context-card" key={evidence.id}>

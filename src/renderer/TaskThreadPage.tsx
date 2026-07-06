@@ -130,6 +130,8 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
             />
           ))}
         </dl>
+        {run.fieldSources ? <FieldSources run={run} /> : null}
+        {run.failureRecovery ? <FailureRecovery run={run} /> : null}
         <h3 className="subsection-title">运行边界</h3>
         <dl className="input-grid">
           <SourceField label="Run" value={run.label} source={run.source} />
@@ -178,6 +180,47 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
         </ol>
       </section>
     </article>
+  );
+}
+
+function FieldSources({ run }: { run: RunProjection }) {
+  return (
+    <>
+      <h3 className="subsection-title">字段来源</h3>
+      <dl className="input-grid">
+        {run.fieldSources?.map((row) => (
+          <SourceField
+            label={row.field}
+            value={`${row.value} · ${row.locator} · ${row.evidenceRef}`}
+            source={row.source}
+            key={`${run.id}-${row.field}`}
+          />
+        ))}
+      </dl>
+    </>
+  );
+}
+
+function FailureRecovery({ run }: { run: RunProjection }) {
+  const recovery = run.failureRecovery;
+  if (!recovery) {
+    return null;
+  }
+
+  return (
+    <section className="failure-recovery-panel" aria-label="可恢复失败">
+      <div className="card-title compact-title">
+        <AlertTriangle size={18} />
+        <h3>{recovery.state}</h3>
+        <span className="source-chip">{recovery.source}</span>
+      </div>
+      <p>{recovery.reason}</p>
+      <ol className="failure-recovery-list">
+        {recovery.nextActions.map((action) => (
+          <li key={action}>{action}</li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

@@ -5,7 +5,7 @@ export type SiteSkillStatus = "ready" | "fixture" | "needs-identity" | "unavaila
 export type SiteSkill = {
   id: string;
   name: string;
-  category: "电商" | "内容发布" | "账号身份" | "诊断";
+  category: "电商" | "内容平台" | "招聘" | "内容发布" | "账号身份" | "诊断";
   description: string;
   status: SiteSkillStatus;
   source: OwnerSource;
@@ -49,6 +49,84 @@ export type SiteSkill = {
 };
 
 export const siteSkillFixtures: SiteSkill[] = [
+  {
+    id: "xiaohongshu-read",
+    name: "小红书搜索和笔记读取",
+    category: "内容平台",
+    description: "从小红书身份环境提交搜索或笔记读取只读任务，展示结果、来源和可恢复失败。",
+    status: "ready",
+    source: "Lode fixture",
+    packageName: "@lode/xiaohongshu-read-only",
+    version: "0.3.0",
+    latestVersion: "0.3.0",
+    installState: "locked",
+    updateState: "latest",
+    risk: "low",
+    capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
+    packageRef: "lode://package/xiaohongshu-read-only@0.3.0",
+    lockRef: "lode://lock/xiaohongshu-read-only/2026-07-06",
+    fetchedAt: "2026-07-06T09:20:00Z",
+    sourceHealth: { label: "source ready", status: "ready", detail: "Core、Harbor、Lode fixture 可投影小红书真实只读任务。" },
+    tags: ["小红书", "搜索", "笔记读取", "只读"],
+    inputTemplates: ["搜索词", "笔记 URL/ID", "小红书身份环境"],
+    readiness: [
+      { label: "Lode metadata", status: "ready", detail: "小红书只读 capability metadata fixture available" },
+      { label: "Harbor identity", status: "ready", detail: "小红书运营号 A fixture" },
+      { label: "Core run", status: "fixture", detail: "使用本地 fixture projection 表达真实站点任务回读" },
+    ],
+    boundaries: [
+      "只读搜索和笔记读取；不点赞、不收藏、不评论、不发布。",
+      "App 只保存 viewer ref 和字段来源，不保存 raw evidence、Cookie、token 或 profile storage。",
+    ],
+    relatedTaskIds: ["task-xhs-real-read"],
+    recentTest: {
+      label: "XHS read-only fixture test",
+      status: "passed",
+      ranAt: "2026-07-06T09:20:00Z",
+      postCheck: "field_sources_present",
+      failureReason: "none",
+      source: "Core fixture",
+    },
+  },
+  {
+    id: "boss-read",
+    name: "BOSS 搜索和职位详情读取",
+    category: "招聘",
+    description: "从 BOSS 身份环境提交职位搜索和详情读取只读任务，展示职位结果、证据和登录恢复状态。",
+    status: "needs-identity",
+    source: "Lode fixture",
+    packageName: "@lode/boss-read-only",
+    version: "0.2.0",
+    latestVersion: "0.2.0",
+    installState: "locked",
+    updateState: "latest",
+    risk: "low",
+    capabilityRef: "lode://capability/boss/search-and-job-detail-read",
+    packageRef: "lode://package/boss-read-only@0.2.0",
+    lockRef: "lode://lock/boss-read-only/2026-07-06",
+    fetchedAt: "2026-07-06T09:22:00Z",
+    sourceHealth: { label: "identity needs auth", status: "needs-identity", detail: "BOSS 招聘号需要人工认证时，Task Thread 显示未登录失败。" },
+    tags: ["BOSS", "招聘", "职位搜索", "职位详情", "只读"],
+    inputTemplates: ["职位关键词", "城市", "BOSS 身份环境"],
+    readiness: [
+      { label: "Lode metadata", status: "ready", detail: "BOSS 只读 capability metadata fixture available" },
+      { label: "Harbor identity", status: "needs-identity", detail: "招聘号 fixture 可能需要扫码或二次验证" },
+      { label: "Core run", status: "fixture", detail: "使用本地 fixture projection 表达真实站点任务回读" },
+    ],
+    boundaries: [
+      "只读搜索和职位详情读取；不打招呼、不投递、不发送消息。",
+      "App 不保存简历、聊天、raw evidence、Cookie、token 或 profile storage。",
+    ],
+    relatedTaskIds: ["task-boss-real-read"],
+    recentTest: {
+      label: "BOSS read-only fixture test",
+      status: "blocked",
+      ranAt: "2026-07-06T09:22:00Z",
+      postCheck: "login_recovery_required",
+      failureReason: "login_required",
+      source: "Core fixture",
+    },
+  },
   {
     id: "product-detail",
     name: "商品详情采集",

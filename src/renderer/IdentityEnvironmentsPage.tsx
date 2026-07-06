@@ -26,6 +26,7 @@ import {
   type BrowserTargetProjection,
   type IdentityEnvironmentProjection,
   type IdentityStatus,
+  type IdentityTaskEntryProjection,
 } from "./identityEnvironmentFixtures";
 
 const controllerModes = [
@@ -35,7 +36,7 @@ const controllerModes = [
   ["空闲", "没有活动控制者或会话已释放。"],
 ] as const;
 
-export function IdentityEnvironmentsPage() {
+export function IdentityEnvironmentsPage({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const [selectedId, setSelectedId] = useState(identityEnvironmentFixtures[0].id);
   const [sessionOverrides, setSessionOverrides] = useState<Record<string, BrowserSessionProjection>>({});
   const selected =
@@ -147,6 +148,7 @@ export function IdentityEnvironmentsPage() {
           <BrowserLaunchPanel
             identity={selected}
             session={session}
+            onOpenTask={onOpenTask}
             onReleaseSession={releaseSession}
             onStartTarget={startManualBrowser}
             onStopSession={stopSession}
@@ -164,6 +166,7 @@ export function IdentityEnvironmentsPage() {
 function BrowserLaunchPanel({
   identity,
   session,
+  onOpenTask,
   onReleaseSession,
   onStartTarget,
   onStopSession,
@@ -172,6 +175,7 @@ function BrowserLaunchPanel({
 }: {
   identity: IdentityEnvironmentProjection;
   session: BrowserSessionProjection;
+  onOpenTask: (taskId: string) => void;
   onReleaseSession: () => void;
   onStartTarget: (target: BrowserTargetProjection) => void;
   onStopSession: () => void;
@@ -194,6 +198,7 @@ function BrowserLaunchPanel({
 
       <ProviderStatusList providers={identity.browser.providers} />
       <BrowserTargetButtons targets={identity.browser.targets} onStartTarget={onStartTarget} />
+      <ReadTaskEntryPanel entries={identity.taskEntries} onOpenTask={onOpenTask} />
       <SessionControlPanel
         canControl={canControl}
         canView={canView}
@@ -246,6 +251,34 @@ function BrowserTargetButtons({
           <Play size={15} />
           打开{target.label}
           <span>{target.readiness}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReadTaskEntryPanel({
+  entries,
+  onOpenTask,
+}: {
+  entries: IdentityTaskEntryProjection[];
+  onOpenTask: (taskId: string) => void;
+}) {
+  return (
+    <div className="identity-read-task-panel" aria-label="真实只读任务入口">
+      <div>
+        <strong>从身份浏览器会话启动真实只读任务</strong>
+        <span>Core task path 才产生 Run / Result / Evidence；这里使用本地 fixture projection 表达上游回读。</span>
+      </div>
+      {entries.map((entry) => (
+        <button type="button" onClick={() => onOpenTask(entry.taskId)} key={entry.id}>
+          <Play size={15} />
+          <span>
+            {entry.label}
+            <small>{entry.inputSummary}</small>
+            <small>{entry.readiness}</small>
+          </span>
+          <em>{entry.source}</em>
         </button>
       ))}
     </div>
