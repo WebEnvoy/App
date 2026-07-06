@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   Fingerprint,
   Globe2,
   KeyRound,
@@ -8,6 +9,7 @@ import {
   MapPin,
   MonitorCog,
   Plus,
+  Play,
   RefreshCw,
   ShieldCheck,
   Trash2,
@@ -19,15 +21,84 @@ import { useState } from "react";
 import {
   identityEnvironmentBoundaries,
   identityEnvironmentFixtures,
+  type BrowserSessionProjection,
+  type BrowserSessionState,
+  type BrowserTargetProjection,
   type IdentityEnvironmentProjection,
   type IdentityStatus,
 } from "./identityEnvironmentFixtures";
 
+const controllerModes = [
+  ["手动浏览", "用户从身份环境直接打开浏览器，不创建 Core Task/Run/Result。"],
+  ["智能体直接浏览", "Agent/API/CLI 可占用现场，但不等同于 App 自动任务。"],
+  ["Core 任务运行", "只有 Core task path 才产生任务运行、结果和 evidence。"],
+  ["空闲", "没有活动控制者或会话已释放。"],
+] as const;
+
 export function IdentityEnvironmentsPage() {
   const [selectedId, setSelectedId] = useState(identityEnvironmentFixtures[0].id);
+  const [sessionOverrides, setSessionOverrides] = useState<Record<string, BrowserSessionProjection>>({});
   const selected =
     identityEnvironmentFixtures.find((identity) => identity.id === selectedId) ??
     identityEnvironmentFixtures[0];
+  const session = sessionOverrides[selected.id] ?? selected.browser.session;
+
+  function updateSelectedSession(nextSession: BrowserSessionProjection) {
+    setSessionOverrides((current) => ({ ...current, [selected.id]: nextSession }));
+  }
+
+  function startManualBrowser(target: BrowserTargetProjection) {
+    updateSelectedSession({
+      ...selected.browser.session,
+      provider: selected.browser.defaultProvider,
+      state: "running",
+      statusLabel: "已启动",
+      controller: "手动浏览",
+      currentUrl: target.defaultUrl,
+      title: target.defaultTitle,
+      startedAt: "本地意图待 Harbor 回读",
+      message: `已请求 Harbor 用 ${selected.browser.defaultProvider} 打开${target.label}默认页面；这是手动身份浏览，不创建 Core 任务。`,
+    });
+  }
+
+  function viewSession() {
+    updateSelectedSession({
+      ...session,
+      message: `查看会话入口指向 ${session.viewerRef}；App 不暴露 raw CDP/VNC endpoint。`,
+    });
+  }
+
+  function takeoverSession() {
+    updateSelectedSession({
+      ...session,
+      state: "takeover",
+      statusLabel: "用户接管",
+      controller: "用户接管",
+      message: "已发送用户接管意图；冲突和失败原因应由 Harbor 回读展示。",
+    });
+  }
+
+  function releaseSession() {
+    updateSelectedSession({
+      ...session,
+      state: "running",
+      statusLabel: "已释放",
+      controller: "空闲",
+      message: "已发送释放意图；会话可回到 Harbor 或后续任务控制。",
+    });
+  }
+
+  function stopSession() {
+    updateSelectedSession({
+      ...session,
+      state: "stopped",
+      statusLabel: "已停止",
+      controller: "空闲",
+      currentUrl: "已停止",
+      title: "无活动页面",
+      message: "已发送停止意图；不会强杀用户未确认的关键操作。",
+    });
+  }
 
   return (
     <div className="identity-page we-sectioned-page">
@@ -73,10 +144,179 @@ export function IdentityEnvironmentsPage() {
         <section className="identity-detail" aria-label="身份环境详情">
           <DetailHeader identity={selected} />
           <DetailGrid identity={selected} />
+          <BrowserLaunchPanel
+            identity={selected}
+            session={session}
+            onReleaseSession={releaseSession}
+            onStartTarget={startManualBrowser}
+            onStopSession={stopSession}
+            onTakeoverSession={takeoverSession}
+            onViewSession={viewSession}
+          />
           <RecoveryPanel identity={selected} />
           <BoundaryPanel identity={selected} />
         </section>
       </div>
+    </div>
+  );
+}
+
+function BrowserLaunchPanel({
+  identity,
+  session,
+  onReleaseSession,
+  onStartTarget,
+  onStopSession,
+  onTakeoverSession,
+  onViewSession,
+}: {
+  identity: IdentityEnvironmentProjection;
+  session: BrowserSessionProjection;
+  onReleaseSession: () => void;
+  onStartTarget: (target: BrowserTargetProjection) => void;
+  onStopSession: () => void;
+  onTakeoverSession: () => void;
+  onViewSession: () => void;
+}) {
+  const canControl = session.state === "running" || session.state === "takeover";
+  const canView = session.state !== "idle" && session.state !== "stopped";
+
+  return (
+    <section className="identity-browser-panel" aria-label="身份浏览器会话">
+      <div className="identity-browser-heading">
+        <div className="card-title">
+          <MonitorCog size={18} />
+          <h3>身份浏览器</h3>
+          <SessionStatusPill state={session.state} label={session.statusLabel} />
+        </div>
+        <p>手动身份浏览是 Browser/Harbor session，不是 Core 任务运行。</p>
+      </div>
+
+      <ProviderStatusList providers={identity.browser.providers} />
+      <BrowserTargetButtons targets={identity.browser.targets} onStartTarget={onStartTarget} />
+      <SessionControlPanel
+        canControl={canControl}
+        canView={canView}
+        session={session}
+        onReleaseSession={onReleaseSession}
+        onStopSession={onStopSession}
+        onTakeoverSession={onTakeoverSession}
+        onViewSession={onViewSession}
+      />
+      <ControllerModeList activeController={session.controller} />
+
+      <p className="identity-browser-boundary">{identity.browser.boundary}</p>
+    </section>
+  );
+}
+
+function ProviderStatusList({
+  providers,
+}: {
+  providers: IdentityEnvironmentProjection["browser"]["providers"];
+}) {
+  return (
+    <div className="identity-provider-grid" aria-label="Provider 可用状态">
+      {providers.map((provider) => (
+        <article className={`identity-provider-row provider-${provider.state}`} key={provider.name}>
+          <div>
+            <strong>{provider.name}</strong>
+            <span>{provider.role}</span>
+          </div>
+          <ProviderPill state={provider.state} label={provider.statusLabel} />
+          <p>{provider.summary}</p>
+          {provider.installHint != null ? <small>{provider.installHint}</small> : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function BrowserTargetButtons({
+  targets,
+  onStartTarget,
+}: {
+  targets: BrowserTargetProjection[];
+  onStartTarget: (target: BrowserTargetProjection) => void;
+}) {
+  return (
+    <div className="identity-browser-targets" aria-label="打开默认页面">
+      {targets.map((target) => (
+        <button type="button" onClick={() => onStartTarget(target)} key={target.id}>
+          <Play size={15} />
+          打开{target.label}
+          <span>{target.readiness}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SessionControlPanel({
+  canControl,
+  canView,
+  session,
+  onReleaseSession,
+  onStopSession,
+  onTakeoverSession,
+  onViewSession,
+}: {
+  canControl: boolean;
+  canView: boolean;
+  session: BrowserSessionProjection;
+  onReleaseSession: () => void;
+  onStopSession: () => void;
+  onTakeoverSession: () => void;
+  onViewSession: () => void;
+}) {
+  return (
+    <div className="identity-session-grid">
+      <dl className="identity-facts identity-session-facts">
+        <Fact label="会话状态" value={`${session.statusLabel} · ${session.provider}`} />
+        <Fact label="控制者" value={session.controller} />
+        <Fact label="当前网址" value={session.currentUrl} />
+        <Fact label="标题" value={session.title} />
+        <Fact label="Session ref" value={session.browserSessionRef} />
+        <Fact label="Viewer ref" value={session.viewerRef} />
+      </dl>
+      <div className="identity-session-actions">
+        <p>{session.message}</p>
+        <div className="identity-action-row">
+          <button type="button" disabled={!canView} onClick={onViewSession}>
+            <ExternalLink size={15} />
+            查看会话
+          </button>
+          <button
+            type="button"
+            disabled={!canControl || session.controller === "用户接管"}
+            onClick={onTakeoverSession}
+          >
+            <KeyRound size={15} />
+            接管
+          </button>
+          <button type="button" disabled={!canControl} onClick={onReleaseSession}>
+            <ShieldCheck size={15} />
+            释放
+          </button>
+          <button type="button" disabled={!canView} onClick={onStopSession}>
+            <AlertTriangle size={15} />
+            停止
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ControllerModeList({ activeController }: { activeController: BrowserSessionProjection["controller"] }) {
+  return (
+    <div className="identity-controller-modes" aria-label="控制者状态说明">
+      {controllerModes.map(([mode, detail]) => (
+        <div className={activeController === mode ? "active" : undefined} key={mode}>
+          <strong>{mode}</strong>
+          <span>{detail}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -240,4 +480,12 @@ function StatusPill({ status, label }: { status: IdentityStatus; label: string }
       {label}
     </span>
   );
+}
+
+function ProviderPill({ state, label }: { state: "available" | "missing" | "restricted"; label: string }) {
+  return <span className={`identity-status provider-status-${state}`}>{label}</span>;
+}
+
+function SessionStatusPill({ state, label }: { state: BrowserSessionState; label: string }) {
+  return <span className={`identity-status session-status-${state}`}>{label}</span>;
 }
