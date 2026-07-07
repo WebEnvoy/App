@@ -167,6 +167,15 @@ for (const expectedText of [
   "BOSS 打招呼写前验证",
   "小红书发布草稿写前预览",
   "BOSS 打招呼写前预览",
+  "真实页面写前验证 / draft-only",
+  "真实页面写前验证 / message draft",
+  "真实页面写前验证已过期",
+  "真实页面写前验证已取消",
+  "action-request:fixture/xhs-publish-draft-preview-006",
+  "action-request:fixture/boss-greeting-preview-004",
+  "审批请求",
+  "过期请求",
+  "取消记录",
   "未发布",
   "未发送",
   "页面状态已过期",
@@ -781,6 +790,377 @@ globalThis.fetch = originalFetch;
 
 if (mixedDetailState.status !== "offline" || mixedDetailState.liveTaskIds.length !== 0) {
   throw new Error("Core read task smoke failed: mixed run detail failure was hidden by an older run.");
+}
+
+const writePreviewRuns = [
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_real_site_xiaohongshu_write_preview_001",
+    status: "succeeded",
+    timeline: { updated_at: "2026-07-06T11:00:04.000Z", terminal_at: "2026-07-06T11:00:04.000Z" },
+    task: {
+      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+    runtime_refs: {
+      session_binding: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/write-precheck" },
+    },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_real_site_write_preview_cancelled_001",
+    status: "cancelled",
+    timeline: { updated_at: "2026-07-06T11:03:02.000Z", terminal_at: "2026-07-06T11:03:02.000Z" },
+    task: {
+      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_real_site_write_preview_expired_001",
+    status: "expired",
+    timeline: { updated_at: "2026-07-06T11:14:01.000Z", terminal_at: "2026-07-06T11:14:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+];
+const bossWritePreviewRuns = [
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_preview_unavailable_001",
+    status: "succeeded",
+    timeline: { updated_at: "2026-07-06T11:20:01.000Z", terminal_at: "2026-07-06T11:20:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_available_unknown_submitted_001",
+    status: "succeeded",
+    timeline: { updated_at: "2026-07-06T11:19:01.000Z", terminal_at: "2026-07-06T11:19:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_available_true_submitted_001",
+    status: "succeeded",
+    timeline: { updated_at: "2026-07-06T11:18:01.000Z", terminal_at: "2026-07-06T11:18:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_generic_blocked_001",
+    status: "blocked",
+    timeline: { updated_at: "2026-07-06T11:17:01.000Z", terminal_at: "2026-07-06T11:17:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_generic_failed_001",
+    status: "failed",
+    timeline: { updated_at: "2026-07-06T11:16:01.000Z", terminal_at: "2026-07-06T11:16:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+];
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const runId = decodeURIComponent(pathname.match(/\/runs\/([^/]+)/)?.[1] ?? "");
+  const json = pathname.includes("/capability-runs") && pathname.includes("xiaohongshu-draft-precheck")
+    ? { ok: true, capability_runs: { runs: writePreviewRuns } }
+    : pathname.includes("/capability-runs") && pathname.includes("boss-greeting-precheck")
+    ? { ok: true, capability_runs: { runs: bossWritePreviewRuns } }
+    : pathname.endsWith("/result") && runId.includes("expired")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "expired",
+          terminal: true,
+          result: { envelope_state: "available", payload_state: "expired" },
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/result") && runId.includes("boss_preview_unavailable")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "preview_unavailable",
+                submitted: false,
+                expected_change: {
+                  summary: "BOSS 打招呼写前验证不可用，不发送消息。",
+                  target_ref: "harbor:writable-target/boss/greeting-box",
+                  external_submit: false,
+                },
+                action_refs: { action_request_id: "action-request:intent_real_site_boss_greeting_preview_unavailable" },
+                capability: {
+                  capability_ref: "lode:capability/boss-greeting-precheck",
+                  capability_version: "0.1.0",
+                  capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+                },
+                evidence_refs: ["harbor:evidence/boss/greeting/preview-result-only"],
+                consumer_boundary: "Core blocked this preview before approval; it is not submitted.",
+              },
+            },
+          },
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/result") && runId.includes("boss_available_unknown_submitted")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "available",
+                expected_change: { summary: "BOSS message preview missing submitted owner truth." },
+                action_refs: { action_request_id: "action-request:intent_real_site_boss_greeting_unknown_submitted" },
+              },
+            },
+          },
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/result") && runId.includes("boss_available_true_submitted")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "available",
+                submitted: true,
+                expected_change: { summary: "BOSS message preview reported submitted true." },
+                action_refs: { action_request_id: "action-request:intent_real_site_boss_greeting_true_submitted" },
+              },
+            },
+          },
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/result") && runId.includes("boss_generic_")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: runId.includes("failed") ? "failed" : "blocked",
+          terminal: true,
+          result: { envelope_state: "unavailable", payload_state: "not_reported" },
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/result")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: runId.includes("cancelled") ? "cancelled" : "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: runId.includes("cancelled") ? "user_cancelled" : "available",
+                submitted: false,
+                expected_change: {
+                  summary: "预览小红书草稿编辑器可写字段和预期草稿变化，不保存、不发布。",
+                  target_ref: "harbor:writable-target/xiaohongshu/draft-editor",
+                  external_submit: false,
+                },
+                action_refs: { action_request_id: "action-request:intent_real_site_xiaohongshu_draft_preview" },
+                capability: {
+                  capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+                  capability_version: "0.1.0",
+                  capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+                },
+                evidence_refs: [
+                  "harbor:evidence/xiaohongshu/draft-editor/precheck",
+                  "harbor:evidence/xiaohongshu/draft-editor/preview-result-only",
+                ],
+                consumer_boundary: "Core preview result is validate-only/draft/preview projection; it is not submitted result.",
+              },
+            },
+          },
+          evidence_refs: [
+            {
+              ref: "harbor:evidence/xiaohongshu/draft-editor/precheck",
+              source: "terminal",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T11:00:04.000Z",
+              runtime_session_ref: "harbor:runtime-session/xiaohongshu/write-precheck",
+            },
+          ],
+        },
+      }
+    : pathname.endsWith("/evidence-refs")
+    ? { ok: true, evidence: { evidence_refs: [] } }
+    : pathname.endsWith("/failure")
+    ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
+    : pathname.endsWith("/session-refs")
+    ? { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/write-precheck" } } }
+    : { ok: true, capability_runs: { runs: [] } };
+  return { ok: true, json: async () => json };
+};
+const writePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
+  {
+    id: "task-xhs-publish-write-preview",
+    title: "小红书发布草稿写前验证",
+    accountIdentity: "小红书运营号 A",
+    siteSkill: "小红书发布草稿写前预览",
+    businessInput: "笔记标题：AI 工具清单",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/xiaohongshu-write-pre-preview",
+      version: "0.1.0",
+      capabilityRef: "lode://capability/xiaohongshu/publish-draft-write-preview",
+      sourceRef: "lode://package/xiaohongshu-write-pre-preview@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+  {
+    id: "task-boss-greeting-write-preview",
+    title: "BOSS 打招呼写前验证",
+    accountIdentity: "BOSS 招聘号",
+    siteSkill: "BOSS 打招呼写前预览",
+    businessInput: "候选人：前端工程师",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/boss-greeting-write-pre-preview",
+      version: "0.1.0",
+      capabilityRef: "lode://capability/boss/greeting-write-preview",
+      sourceRef: "lode://package/boss-greeting-write-pre-preview@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+]);
+globalThis.fetch = originalFetch;
+
+const writePreviewTask = writePreviewState.tasks.find((task) => task.id === "task-xhs-publish-write-preview");
+const bossWritePreviewTask = writePreviewState.tasks.find((task) => task.id === "task-boss-greeting-write-preview");
+
+if (!writePreviewTask || !bossWritePreviewTask) {
+  throw new Error("Core write-precheck smoke failed: expected live write-precheck tasks are missing.");
+}
+
+const writePreviewStates = writePreviewTask.runs.map((run) => run.writePrecheck?.state);
+
+if (writePreviewState.status !== "ready" || writePreviewTask.source !== "Core live" || bossWritePreviewTask.source !== "Core live") {
+  throw new Error("Core write-precheck smoke failed: live Core projection was not applied.");
+}
+
+for (const expectedState of ["available", "user_cancelled", "expired"]) {
+  if (!writePreviewStates.includes(expectedState)) {
+    throw new Error(`Core write-precheck smoke failed: ${expectedState} state was not projected.`);
+  }
+}
+
+if (!writePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label === "Submitted" && row.value === "false / 未提交"))) {
+  throw new Error("Core write-precheck smoke failed: submitted=false boundary is missing when Core reports submitted=false.");
+}
+
+if (!writePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/xiaohongshu/draft-editor/preview-result-only"))) {
+  throw new Error("Core write-precheck smoke failed: preview_result evidence_refs were dropped.");
+}
+
+if (!writePreviewTask.runs.some((run) => run.approval?.statuses.some((status) => status.status === "pending"))) {
+  throw new Error("Core write-precheck smoke failed: pending approval state is missing.");
+}
+
+if (bossWritePreviewTask.runs.some((run) => run.lifecycle !== "blocked" || run.approval?.statuses.some((status) => status.status === "pending"))) {
+  throw new Error("Core BOSS write-precheck smoke failed: unsafe previews were not blocked.");
+}
+
+if (!bossWritePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label === "Submitted" && row.value === "unknown / blocked"))) {
+  throw new Error("Core BOSS write-precheck smoke failed: unknown submitted state was not shown.");
+}
+
+if (!bossWritePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label === "Submitted" && row.value === "true / blocked"))) {
+  throw new Error("Core BOSS write-precheck smoke failed: submitted=true state was not blocked.");
+}
+
+if (!bossWritePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/boss/greeting/preview-result-only"))) {
+  throw new Error("Core BOSS write-precheck smoke failed: preview_result evidence refs were not projected.");
 }
 
 console.log("WebEnvoy desktop shell smoke passed.");

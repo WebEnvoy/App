@@ -75,6 +75,7 @@ export type RunProjection = {
     expectedChangeSummary: string;
     beforeLabel: string;
     afterLabel: string;
+    submittedLabel?: string;
     diffRows: Array<{ label: string; before: string; after: string; source: OwnerSource }>;
     noSubmitGuard: "active";
     stateNote: string;

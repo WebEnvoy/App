@@ -56,8 +56,13 @@ type ShellContext = {
   configScope: "local-ui-only";
 };
 type AppView = "task-thread" | "site-skills" | "identity-environments" | "settings";
-const readOnlyTaskIds = new Set(["task-xhs-real-read", "task-boss-real-read"]);
-const readOnlyTaskThreadFixtures = taskThreadFixtures.filter((task) => readOnlyTaskIds.has(task.id));
+const milestone14TaskIds = new Set([
+  "task-xhs-publish-write-preview",
+  "task-boss-greeting-write-preview",
+  "task-xhs-real-read",
+  "task-boss-real-read",
+]);
+const milestone14TaskThreadFixtures = taskThreadFixtures.filter((task) => milestone14TaskIds.has(task.id));
 
 function getBrowserColorScheme(): ShellContext["colorScheme"] {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -77,8 +82,8 @@ function applyDocumentTheme(colorScheme: ShellContext["colorScheme"]) {
 }
 
 const defaultTaskThread =
-  readOnlyTaskThreadFixtures.find((task) => task.id === "task-xhs-real-read") ??
-  readOnlyTaskThreadFixtures[0] ??
+  milestone14TaskThreadFixtures.find((task) => task.id === "task-xhs-publish-write-preview") ??
+  milestone14TaskThreadFixtures[0] ??
   taskThreadFixtures[0];
 
 export function App() {
@@ -87,7 +92,7 @@ export function App() {
     defaultConnectionConfig,
   );
   const [coreReadState, setCoreReadState] = useState<CoreReadTaskLoadState>(() =>
-    coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, readOnlyTaskThreadFixtures),
+    coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
   );
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
@@ -196,8 +201,8 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    setCoreReadState(coreReadTaskStateFromFallback(connectionConfig.coreEndpoint, readOnlyTaskThreadFixtures));
-    fetchCoreReadTaskState(connectionConfig.coreEndpoint, readOnlyTaskThreadFixtures).then((state) => {
+    setCoreReadState(coreReadTaskStateFromFallback(connectionConfig.coreEndpoint, milestone14TaskThreadFixtures));
+    fetchCoreReadTaskState(connectionConfig.coreEndpoint, milestone14TaskThreadFixtures).then((state) => {
       if (!cancelled) setCoreReadState(state);
     });
     return () => {
@@ -373,7 +378,7 @@ export function App() {
                   type="button"
                   aria-label="Read-only task creation entry"
                   disabled
-                  title="新建任务不属于 APP-239；本批次只展示已有小红书/BOSS 只读任务。"
+                  title="新建任务不属于 APP-244；本批次只展示已有小红书/BOSS 只读任务和写前验证。"
                 >
                   <Plus size={15} />
                 </button>
