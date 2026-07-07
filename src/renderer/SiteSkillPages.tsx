@@ -21,6 +21,7 @@ import { type SiteSkill, type SiteSkillStatus, siteSkillFixtures } from "./siteS
 
 const directoryTabs = ["全部", "电商", "内容平台", "招聘", "内容发布", "账号身份", "诊断"] as const;
 type DirectoryTab = (typeof directoryTabs)[number];
+const app239ReadOnlyTaskIds = new Set<string>(["task-xhs-real-read", "task-boss-real-read"]);
 
 export function SiteSkillDirectoryPage({
   selectedSkillId,
@@ -154,7 +155,7 @@ export function SiteSkillDetailPage({
   onOpenTask: (skill: SiteSkill) => void;
 }) {
   const firstRelatedTaskId = skill.relatedTaskIds[0] ?? null;
-  const canLaunchTask = firstRelatedTaskId != null && skill.status !== "unavailable";
+  const canLaunchTask = firstRelatedTaskId != null && app239ReadOnlyTaskIds.has(firstRelatedTaskId) && skill.status !== "unavailable";
 
   return (
     <div className="site-skill-page site-skill-detail-page we-sectioned-page">
@@ -194,10 +195,10 @@ export function SiteSkillDetailPage({
             className="site-skill-primary-action"
             type="button"
             disabled={!canLaunchTask}
-            onClick={() => canLaunchTask && onOpenTask(skill)}
+            onClick={canLaunchTask ? () => onOpenTask(skill) : undefined}
           >
             <Play size={15} />
-            {canLaunchTask ? "启动只读任务" : "暂无任务"}
+            {readOnlyTaskActionText(skill, canLaunchTask)}
           </button>
         </div>
       </section>
@@ -364,6 +365,13 @@ export function SiteSkillDetailPage({
       </section>
     </div>
   );
+}
+
+function readOnlyTaskActionText(skill: SiteSkill, canLaunchTask: boolean) {
+  if (canLaunchTask) return "启动只读任务";
+  if (skill.relatedTaskIds.some((taskId) => taskId.includes("write-preview"))) return "等写前验证";
+  if (skill.relatedTaskIds.length > 0) return "非只读任务";
+  return "暂无任务";
 }
 
 function SiteSkillCard({

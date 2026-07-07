@@ -9,8 +9,9 @@ import {
 
 import { ContextPanel, SourceField } from "./TaskThreadFields";
 import { PanelTabs } from "./shellPrimitives";
-import { directSessionFixture, type RunProjection, type TaskProjection } from "./taskThreadFixtures";
-import { sourceHealthFixture, type SourceHealth } from "./sourceHealthFixture";
+import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
+import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
+import { sourceHealthFixture, type SourceHealth, type SourceHealthStatus } from "./sourceHealthFixture";
 
 type ShellDiagnostics = {
   colorScheme?: string;
@@ -39,10 +40,12 @@ function statusLabel(status: SourceHealth["status"]) {
 }
 
 export function TaskThreadRightPanel({
+  coreReadState,
   selectedRun,
   selectedTask,
   shellDiagnostics,
 }: {
+  coreReadState: CoreReadTaskLoadState;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   shellDiagnostics: ShellDiagnostics;
@@ -58,7 +61,7 @@ export function TaskThreadRightPanel({
             tab.id === "evidence" ? (
               <EvidenceTab selectedRun={selectedRun} />
             ) : tab.id === "session" ? (
-              <SessionTab />
+              <SessionTab selectedRun={selectedRun} selectedTask={selectedTask} />
             ) : tab.id === "identity" ? (
               <ContextPanel
                 icon={<ShieldCheck size={18} />}
@@ -79,7 +82,7 @@ export function TaskThreadRightPanel({
         }))}
       />
 
-      <SourceHealthSection />
+      <SourceHealthSection coreReadState={coreReadState} />
     </aside>
   );
 }
@@ -141,35 +144,62 @@ function EvidenceTab({ selectedRun }: { selectedRun: RunProjection }) {
   );
 }
 
-function SessionTab() {
+function SessionTab({
+  selectedRun,
+  selectedTask,
+}: {
+  selectedRun: RunProjection;
+  selectedTask: TaskProjection;
+}) {
+  const { runtimeSessionRef, viewerRef } = sessionRefsForRun(selectedRun);
+  const status = runtimeSessionRef == null ? "unavailable" : "ready";
+
   return (
     <div className="context-copy">
       <div className="card-title">
         <Globe2 size={18} />
         <h3>执行现场</h3>
-        <span className={`status-pill status-${directSessionFixture.providerStatus.status}`}>
-          {directSessionFixture.providerStatus.status}
-        </span>
+        <span className={`status-pill status-${status}`}>{status}</span>
       </div>
-      <p>{directSessionFixture.summary}</p>
+      <p>
+        {runtimeSessionRef == null
+          ? "当前 Run 没有暴露可打开的 Harbor runtime session ref；App 不使用无关本机浏览器现场代替任务现场。"
+          : "执行现场来自当前 Run 的 Core/Harbor owner refs；App 只展示引用，不读取 profile、Cookie、token、CDP 或 raw evidence。"}
+      </p>
       <dl className="context-facts">
-        {[
-          ["Browser session", directSessionFixture.providerStatus.browserSessionRef],
-          ["Provider", directSessionFixture.providerStatus.provider],
-          ["Viewer ref", directSessionFixture.providerStatus.viewerRef],
-          ["Fetched at", directSessionFixture.providerStatus.fetchedAt],
-        ].map(([label, value]) => (
-          <SourceField
-            label={label}
-            value={value}
-            source={directSessionFixture.providerStatus.source}
-            key={label}
-          />
-        ))}
+        <SourceField label="Task" value={selectedTask.title} source={selectedTask.source} />
+        <SourceField label="Run" value={selectedRun.label} source={selectedRun.source} />
+        <SourceField
+          label="Runtime session"
+          value={runtimeSessionRef ?? "not exposed for this run"}
+          source={selectedRun.source}
+        />
+        <SourceField
+          label="Viewer ref"
+          value={viewerRef ?? "not exposed for this run"}
+          source={selectedRun.source}
+        />
       </dl>
-      <p className="boundary-copy">{directSessionFixture.providerStatus.boundary}</p>
+      <p className="boundary-copy">
+        Execution-site facts must be selected-run owner refs; App does not store browser profile
+        storage or raw runtime material.
+      </p>
     </div>
   );
+}
+
+function sessionRefsForRun(run: RunProjection) {
+  const rowRefs = run.resultRows
+    .filter((row) => row.label === "执行现场" || row.label === "Runtime session" || row.label === "Viewer ref")
+    .map((row) => row.value);
+  const fieldRef = run.fieldSources?.find((field) => field.locator.startsWith("harbor:runtime-session/"))?.locator;
+  const evidenceRuntimeRef = run.evidenceCards
+    .map((card) => /harbor:runtime-session\/[^;.)\s]+/.exec(card.summary)?.[0])
+    .find((ref): ref is string => Boolean(ref));
+  const runtimeSessionRef =
+    rowRefs.find((ref) => ref.startsWith("harbor:runtime-session/")) ?? fieldRef ?? evidenceRuntimeRef;
+  const viewerRef = rowRefs.find((ref) => ref.startsWith("viewer://"));
+  return { runtimeSessionRef, viewerRef };
 }
 
 function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
@@ -206,14 +236,31 @@ function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
   );
 }
 
-function SourceHealthSection() {
+function SourceHealthSection({ coreReadState }: { coreReadState: CoreReadTaskLoadState }) {
+  const coreStatus: SourceHealthStatus =
+    coreReadState.status === "ready"
+      ? "ready"
+      : coreReadState.status === "offline"
+      ? "unavailable"
+      : "fixture";
+  const sources = sourceHealthFixture.map((source) =>
+    source.id === "core"
+      ? {
+          ...source,
+          status: coreStatus,
+          summary: coreReadState.summary,
+          fetchedAt: coreReadState.fetchedAt,
+        }
+      : source,
+  );
+
   return (
     <section className="source-health" id="source-health">
       <div className="section-heading">
         <span>来源</span>
-        <span className="badge">fixture</span>
+        <span className="badge">{coreReadState.status}</span>
       </div>
-      {sourceHealthFixture.map((source) => (
+      {sources.map((source) => (
         <article className="source-card" key={source.id}>
           <div>
             <strong>{source.name}</strong>

@@ -140,7 +140,7 @@ function ReadTaskEntryPanel({
     <div className="identity-read-task-panel" aria-label="真实只读任务入口">
       <div>
         <strong>从身份浏览器会话启动真实只读任务</strong>
-        <span>Core task path 才产生 Run / Result / Evidence；真实任务运行由 #238 后续接入。</span>
+        <span>Core task path 才产生 Run / Result / Evidence；App 只读取 Core owner API projection。</span>
       </div>
       {entries.map((entry) => (
         <button type="button" onClick={() => onOpenTask(entry.taskId)} key={entry.id}>

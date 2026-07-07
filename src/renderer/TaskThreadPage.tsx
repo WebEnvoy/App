@@ -4,14 +4,17 @@ import { useState } from "react";
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
+import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
 export function TaskThreadPage({
+  coreReadState,
   navigationItems,
   selectedRun,
   selectedTask,
   onActiveRunChange,
 }: {
+  coreReadState: CoreReadTaskLoadState;
   navigationItems: ThreadNavigationItem[];
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
@@ -20,6 +23,7 @@ export function TaskThreadPage({
   return (
     <div className="thread-body">
       <ThreadNavigationRail
+        activeItemId={selectedRun.id}
         items={navigationItems}
         onActiveItemChange={onActiveRunChange}
       />
@@ -31,6 +35,7 @@ export function TaskThreadPage({
           <span>业务输入 · {selectedTask.businessInput}</span>
         </div>
 
+        <CoreReadSourceStrip selectedTask={selectedTask} state={coreReadState} />
         <TaskIntentTurn selectedTask={selectedTask} />
 
         {selectedTask.blocker ? (
@@ -57,6 +62,44 @@ export function TaskThreadPage({
   );
 }
 
+function CoreReadSourceStrip({
+  selectedTask,
+  state,
+}: {
+  selectedTask: TaskProjection;
+  state: CoreReadTaskLoadState;
+}) {
+  const isLiveTask = state.liveTaskIds.includes(selectedTask.id);
+  const status = state.status === "ready" && !isLiveTask ? "fallback" : state.status;
+  const label =
+    status === "ready"
+      ? "实时结果"
+      : status === "fallback"
+      ? "本地展示"
+      : status === "loading"
+      ? "正在检查"
+      : "本地展示";
+  const summary =
+    status === "ready"
+      ? "已读取 owner 返回的只读运行结果引用；页面只展示结果、证据引用和恢复状态。"
+      : status === "loading"
+      ? "正在检查是否有可用的只读运行结果；检查期间保留本地展示。"
+      : status === "fallback"
+      ? "当前任务没有可用的实时结果，继续显示明确标记的本地展示。"
+      : "暂未读取到可用实时结果，继续显示明确标记的本地展示。";
+
+  return (
+    <section className={`core-read-source-strip core-read-source-${status}`} aria-label="Core read task status">
+      <div>
+        <strong>{label}</strong>
+        <span>只读任务结果</span>
+      </div>
+      <p>{summary}</p>
+      <span className="badge">{status === "ready" ? "owner refs" : "fallback"}</span>
+    </section>
+  );
+}
+
 function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
   return (
     <section className="thread-intent-turn" aria-label="Task thread intent">
@@ -66,7 +109,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
           <strong>Task = 站点技能 + 账号身份 + 业务输入</strong>
           <p>App 只组织用户意图；Core、Harbor、Lode 仍拥有各自事实来源。</p>
         </div>
-        <span className="badge">fixture projection</span>
+        <span className="badge">{selectedTask.source === "Core live" ? "Core live projection" : "fallback projection"}</span>
       </div>
       <dl className="thread-intent-grid">
         <SourceField
@@ -107,9 +150,11 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           <h3>{run.label}</h3>
           <span>{run.process[0] ?? run.lifecycle}</span>
         </div>
-        <button type="button">查看详情</button>
+        {isSelected ? <span className="badge">当前 Run</span> : null}
       </section>
 
+      {!isSelected ? null : (
+        <>
       <section className={`report-card outcome-${run.outcome} lifecycle-${run.lifecycle}`}>
         <div className="card-title">
           <RunStatusGlyph run={run} />
@@ -141,10 +186,10 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           <>
             <h3 className="subsection-title">Capability attribution</h3>
             <dl className="input-grid">
-              <SourceField label="Capability" value={run.capabilityAttribution.capabilityRef} source="Lode fixture" />
-              <SourceField label="Version" value={run.capabilityAttribution.version} source="Lode fixture" />
-              <SourceField label="Failure class" value={run.capabilityAttribution.failureClass} source="Core fixture" />
-              <SourceField label="Source ref" value={run.capabilityAttribution.sourceRef} source="Lode fixture" />
+              <SourceField label="Capability" value={run.capabilityAttribution.capabilityRef} source={run.source} />
+              <SourceField label="Version" value={run.capabilityAttribution.version} source={run.source} />
+              <SourceField label="Failure class" value={run.capabilityAttribution.failureClass} source={run.source} />
+              <SourceField label="Source ref" value={run.capabilityAttribution.sourceRef} source={run.source} />
             </dl>
             <p className="action-intent">{run.capabilityAttribution.summary}</p>
           </>
@@ -179,6 +224,8 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           ))}
         </ol>
       </section>
+        </>
+      )}
     </article>
   );
 }

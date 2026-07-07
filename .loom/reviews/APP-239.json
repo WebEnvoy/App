@@ -1,0 +1,60 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-239",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "APP-239 current-head implementation review allow: PR #251 at 993b0a7761a2ecbfab67c1e9660f19d72f5e0bd7 remains App-only read-result display for issues #238-#242; progress/current carriers now accurately advertise merge checkpoint for an open PR with no host merge or issue closeout yet. PR metadata readback/preflight, local typecheck/smoke/diff, suite evidence/carrier validation, and prior hosted non-merge-gate checks passed; no real account/profile/Cookie use, raw evidence body storage, true writes, hosted browser, marketplace, bulk collection, risk bypass, Core/Harbor/Lode changes, or App #243-#247 write-precheck display are included.",
+  "reviewer": "controller-authored",
+  "authored_at": "2026-07-07T06:46:57Z",
+  "reviewed_head": "993b0a7761a2ecbfab67c1e9660f19d72f5e0bd7",
+  "reviewed_validation_summary": "2026-07-07T06:42:46Z App PR #251 delivery dry-run consumed PR metadata readback/preflight for APP-239, current-head spec and implementation review records, suite evidence/carrier validation, and local checks (`npm run typecheck`, `npm run smoke`, `git diff --check`). Hosted run 28846787015 passed `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check`; `loom-pr-merge-gate` fell back only because this carrier still advertised the build checkpoint before this sync. Smoke covers XHS Core live projection, BOSS Core live projection, raw evidence boundary, non-none failure recovery, app_action none suppression, mixed run detail failure fallback, and read-only-only Library task launch CTA.",
+  "reviewed_validation_summary_hash": "9c2d422a99a529723d143a2df07df446dce1b5fc08338169fdef2610c6962f77",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-239.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-239.md",
+    "recovery_entry": ".loom/progress/APP-239.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null,
+    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results --item APP-239 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results --item APP-239 --json",
+    "suite_evidence_map": ".loom/specs/APP-239/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-239/task-carrier.md"
+    ],
+    "suite_evidence_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/evidence-map.md"
+    ],
+    "suite_carrier_consumed_contracts": [
+      "docs/methodology/harness/task-carrier-contract.md",
+      "docs/methodology/templates/execution-breakdown.md",
+      "docs/methodology/harness/full-spec-suite-cli-surface.md"
+    ]
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Authored implementation review approved the current head for merge checkpoint consumption."
+  }
+}
