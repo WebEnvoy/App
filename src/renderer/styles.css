@@ -2257,6 +2257,7 @@ h3 {
 }
 
 .identity-connection-strip,
+.core-read-source-strip,
 .identity-management-panel {
   display: grid;
   gap: 10px;
@@ -2266,22 +2267,32 @@ h3 {
   background: var(--we-surface-primary);
 }
 
-.identity-connection-strip {
+.identity-connection-strip,
+.core-read-source-strip {
   grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1fr) auto;
   align-items: center;
 }
 
-.identity-connection-ready {
+.identity-connection-ready,
+.core-read-source-ready {
   border-color: var(--we-status-success-border);
   background: var(--we-status-success-background);
 }
 
-.identity-connection-offline {
+.identity-connection-offline,
+.core-read-source-offline,
+.core-read-source-fallback {
   border-color: var(--we-status-warning-border);
   background: var(--we-status-warning-background);
 }
 
+.core-read-source-loading {
+  border-color: var(--we-border);
+  background: var(--we-surface-secondary);
+}
+
 .identity-connection-strip div,
+.core-read-source-strip div,
 .identity-management-heading {
   display: flex;
   min-width: 0;
@@ -2289,12 +2300,14 @@ h3 {
   gap: 8px;
 }
 
-.identity-connection-strip div {
+.identity-connection-strip div,
+.core-read-source-strip div {
   display: grid;
   gap: 2px;
 }
 
 .identity-connection-strip strong,
+.core-read-source-strip strong,
 .identity-management-heading strong {
   color: var(--we-foreground);
   font-size: 13px;
@@ -2302,6 +2315,8 @@ h3 {
 
 .identity-connection-strip span,
 .identity-connection-strip p,
+.core-read-source-strip span,
+.core-read-source-strip p,
 .identity-management-heading span,
 .identity-management-message {
   margin: 0;

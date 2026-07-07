@@ -21,6 +21,11 @@ import {
   type LocalConnectionConfig,
 } from "./localConnectionConfig";
 import {
+  coreReadTaskStateFromFallback,
+  fetchCoreReadTaskState,
+  type CoreReadTaskLoadState,
+} from "./coreReadTaskClient";
+import {
   SiteSkillDetailPage,
   SiteSkillDirectoryPage,
 } from "./SiteSkillPages";
@@ -51,6 +56,8 @@ type ShellContext = {
   configScope: "local-ui-only";
 };
 type AppView = "task-thread" | "site-skills" | "identity-environments" | "settings";
+const readOnlyTaskIds = new Set(["task-xhs-real-read", "task-boss-real-read"]);
+const readOnlyTaskThreadFixtures = taskThreadFixtures.filter((task) => readOnlyTaskIds.has(task.id));
 
 function getBrowserColorScheme(): ShellContext["colorScheme"] {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -69,21 +76,30 @@ function applyDocumentTheme(colorScheme: ShellContext["colorScheme"]) {
   document.documentElement.dataset.weTheme = colorScheme;
 }
 
+const defaultTaskThread =
+  readOnlyTaskThreadFixtures.find((task) => task.id === "task-xhs-real-read") ??
+  readOnlyTaskThreadFixtures[0] ??
+  taskThreadFixtures[0];
+
 export function App() {
   const [shellContext, setShellContext] = useState<ShellContext | null>(null);
   const [connectionConfig, setConnectionConfig] = useState<LocalConnectionConfig>(
     defaultConnectionConfig,
   );
+  const [coreReadState, setCoreReadState] = useState<CoreReadTaskLoadState>(() =>
+    coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, readOnlyTaskThreadFixtures),
+  );
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [activeView, setActiveView] = useState<AppView>("task-thread");
-  const [selectedTaskId, setSelectedTaskId] = useState(taskThreadFixtures[0].id);
-  const [selectedRunId, setSelectedRunId] = useState(taskThreadFixtures[0].runs[0].id);
+  const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskThread.id);
+  const [selectedRunId, setSelectedRunId] = useState(defaultTaskThread.runs[0]?.id ?? "");
   const [selectedSiteSkillId, setSelectedSiteSkillId] = useState(siteSkillFixtures[0].id);
   const [isSiteSkillDetailOpen, setSiteSkillDetailOpen] = useState(false);
 
+  const taskThreads = coreReadState.tasks;
   const selectedTask =
-    taskThreadFixtures.find((task) => task.id === selectedTaskId) ?? taskThreadFixtures[0];
+    taskThreads.find((task) => task.id === selectedTaskId) ?? taskThreads[0] ?? defaultTaskThread;
   const selectedRun =
     selectedTask.runs.find((run) => run.id === selectedRunId) ?? selectedTask.runs[0];
   const selectedSiteSkill =
@@ -178,6 +194,30 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    setCoreReadState(coreReadTaskStateFromFallback(connectionConfig.coreEndpoint, readOnlyTaskThreadFixtures));
+    fetchCoreReadTaskState(connectionConfig.coreEndpoint, readOnlyTaskThreadFixtures).then((state) => {
+      if (!cancelled) setCoreReadState(state);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionConfig.coreEndpoint]);
+
+  useEffect(() => {
+    const task = taskThreads.find((item) => item.id === selectedTaskId) ?? taskThreads[0];
+    if (!task) return;
+    if (task.id !== selectedTaskId) {
+      setSelectedTaskId(task.id);
+      setSelectedRunId(task.runs[0]?.id ?? "");
+      return;
+    }
+    if (!task.runs.some((run) => run.id === selectedRunId)) {
+      setSelectedRunId(task.runs[0]?.id ?? "");
+    }
+  }, [selectedRunId, selectedTaskId, taskThreads]);
+
   function selectTask(task: TaskProjection) {
     setActiveView("task-thread");
     setSelectedTaskId(task.id);
@@ -185,7 +225,7 @@ export function App() {
   }
 
   function openTaskById(taskId: string) {
-    const task = taskThreadFixtures.find((item) => item.id === taskId);
+    const task = taskThreads.find((item) => item.id === taskId);
     if (task != null) {
       selectTask(task);
     }
@@ -315,7 +355,12 @@ export function App() {
                 <UserRound size={16} />
                 账号身份
               </button>
-              <button className="nav-item we-list-row cursor-interaction" type="button">
+              <button
+                className="nav-item we-list-row cursor-interaction"
+                type="button"
+                disabled
+                title="搜索不属于 APP-239 真实只读结果展示批次。"
+              >
                 <Search size={16} />
                 Search
               </button>
@@ -324,12 +369,17 @@ export function App() {
             <section className="task-tree codex-scrollbar" aria-label="Tasks grouped by account identity">
               <div className="section-heading">
                 <span>任务</span>
-                <button type="button" aria-label="Read-only task creation entry">
+                <button
+                  type="button"
+                  aria-label="Read-only task creation entry"
+                  disabled
+                  title="新建任务不属于 APP-239；本批次只展示已有小红书/BOSS 只读任务。"
+                >
                   <Plus size={15} />
                 </button>
               </div>
 
-              {taskThreadFixtures.map((task) => (
+              {taskThreads.map((task) => (
                 <div className="tree-account" key={task.id}>
                   <div className="tree-account-label">
                     <HardDrive size={14} />
@@ -411,7 +461,7 @@ export function App() {
           </div>
           {isAppLevelView ? null : (
             <div className="topbar-right-slot">
-              <button className="topbar-open-button" type="button">
+              <button className="topbar-open-button" type="button" disabled title="使用右侧图标显示或隐藏上下文面板。">
                 <PanelRightOpen size={15} />
                 <span>打开</span>
                 <ChevronDown size={14} />
@@ -447,6 +497,7 @@ export function App() {
             composer={<TaskThreadComposer selectedRun={selectedRun} selectedTask={selectedTask} />}
           >
             <TaskThreadPage
+              coreReadState={coreReadState}
               navigationItems={threadNavigationItems}
               selectedRun={selectedRun}
               selectedTask={selectedTask}
@@ -458,6 +509,7 @@ export function App() {
       right={isAppLevelView ? null : (
         <RightPanel>
           <TaskThreadRightPanel
+            coreReadState={coreReadState}
             selectedRun={selectedRun}
             selectedTask={selectedTask}
             shellDiagnostics={{

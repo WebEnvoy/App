@@ -1,0 +1,10 @@
+# Evidence Map
+
+| Evidence id | Type | Source locator | Consumes | Binding | Freshness | Consumer boundary | Remediation direction |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| EV-001 | issue_tree_evidence | https://github.com/WebEnvoy/App/issues/238 https://github.com/WebEnvoy/App/issues/239 https://github.com/WebEnvoy/App/issues/240 https://github.com/WebEnvoy/App/issues/241 https://github.com/WebEnvoy/App/issues/242 | App milestone #14 FR and Work Items read back on 2026-07-07 UTC | APP-239 scope | present | planning/readiness evidence only | Re-read before PR metadata if issue bodies or dependencies change. |
+| EV-002 | upstream_fact_evidence | https://github.com/WebEnvoy/WebEnvoy/issues/225 and closed children #226/#227/#228/#229 | Core read-only run/result/evidence/failure query facts | APP-239 dependency | present | read-only refs/status facts only; Core #230/PR #240 write-precheck not consumed | Stop and re-plan if APP-239 starts depending on Core #230/PR #240. |
+| EV-003 | behavior_evidence | src/renderer/coreReadTaskClient.ts; src/renderer/App.tsx; src/renderer/TaskThreadPage.tsx; src/renderer/TaskThreadRightPanel.tsx | Core owner API query mapping and App display state | APP-239 behavior | present | App display only; no owner truth writes | Rerun typecheck/smoke after code changes. |
+| EV-004 | test_evidence | scripts/smoke.mjs | Core live projection smoke and raw evidence boundary | APP-239 validation | present | local smoke only; no real Core endpoint or browser required | Expand if owner API contract changes. |
+| EV-005 | validation_evidence | .loom/progress/APP-239.md | npm run typecheck; npm run smoke; git diff --check | APP-239 latest validation | present | local branch readiness only | Refresh after any diff or head change. |
+| EV-006 | fresh_verification_input | .loom/progress/APP-239.md | EV-001 EV-002 EV-003 EV-004 EV-005 | APP-239 current verification input | present | review and merge-ready evidence only; no live site, profile, Cookie, submit, publish, send, or owner truth write | Refresh after any code, fixture, carrier, validation, head SHA, or PR metadata change. |

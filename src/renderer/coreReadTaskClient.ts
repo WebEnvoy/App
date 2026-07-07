@@ -1,0 +1,618 @@
+import type { OutcomeKind, OwnerSource, RunProjection, TaskProjection } from "./taskThreadFixtures";
+
+type CoreReadStatus = "loading" | "ready" | "offline";
+type JsonRecord = Record<string, unknown>;
+
+type CoreReadCapability = {
+  capabilityRef: string;
+  capabilityVersion: string;
+  packageRef: string;
+};
+
+type CoreReadTaskSpec = {
+  taskId: string;
+  packageName: string;
+  packageVersion: string;
+  capabilities: CoreReadCapability[];
+  boundary: string;
+};
+
+type CoreRunStatus =
+  | "pending"
+  | "admitted"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "blocked"
+  | "requires_user_action"
+  | "manual_recovery_required"
+  | "unknown_outcome"
+  | "cancelled"
+  | "expired";
+
+type CoreRunSummary = {
+  run_id: string;
+  status: CoreRunStatus;
+  timeline?: { updated_at?: string; terminal_at?: string };
+  task?: {
+    capability_ref?: string;
+    capability_version?: string;
+    capability_source_ref?: string;
+    capability_lock_ref?: string;
+    package_ref?: string;
+  };
+  runtime_refs?: {
+    session_binding?: {
+      runtime_session_ref?: string;
+      identity_environment_ref?: string;
+      control_owner?: string;
+      lifecycle_state?: string;
+      session_use?: string;
+    };
+  };
+  terminal_summary?: {
+    result_ref?: string;
+    post_check?: { status?: string; summary?: string };
+    failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
+  };
+};
+
+type CoreEvidenceRef = {
+  ref: string;
+  source?: string;
+  state?: string;
+  raw_access?: string;
+  recorded_at?: string;
+  runtime_session_ref?: string;
+  consumer_boundary?: string;
+};
+
+type CoreResultEnvelope = {
+  result?: {
+    envelope_state?: string;
+    payload_state?: string;
+    unavailable_reason?: string;
+    result_ref?: string;
+    result_envelope?: {
+      result_kind?: string;
+      result_ref?: string;
+      package_ref?: string;
+      source_refs?: string[];
+      evidence_refs?: string[];
+      post_check?: { status?: string; summary?: string };
+      failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
+    };
+  };
+  failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
+  evidence_refs?: CoreEvidenceRef[];
+};
+
+type CoreFailureEnvelope = {
+  reason_class?: string;
+  app_action?: string;
+  retryable?: boolean;
+  failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
+};
+
+type CoreSessionRefsEnvelope = {
+  session_refs?: {
+    runtime_session_ref?: string;
+    identity_environment_ref?: string;
+    control_owner?: string;
+    lifecycle_state?: string;
+    session_use?: string;
+  };
+};
+
+export type CoreReadTaskLoadState = {
+  status: CoreReadStatus;
+  endpoint: string;
+  fetchedAt: string;
+  summary: string;
+  tasks: TaskProjection[];
+  liveTaskIds: string[];
+};
+
+const coreLiveSource: OwnerSource = "Core live";
+
+const coreReadTaskSpecs: CoreReadTaskSpec[] = [
+  {
+    taskId: "task-xhs-real-read",
+    packageName: "@lode/xiaohongshu-read-only",
+    packageVersion: "0.1.0",
+    capabilities: [
+      {
+        capabilityRef: "lode:capability/search-notes",
+        capabilityVersion: "0.1.0",
+        packageRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+      },
+      {
+        capabilityRef: "lode:capability/read-note-detail",
+        capabilityVersion: "0.1.0",
+        packageRef: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+      },
+    ],
+    boundary: "Core owner API 返回 run/result/evidence refs；App 不读取 raw evidence、DOM、截图正文、Cookie、token 或 profile storage。",
+  },
+  {
+    taskId: "task-boss-real-read",
+    packageName: "@lode/boss-read-only",
+    packageVersion: "0.1.0",
+    capabilities: [
+      {
+        capabilityRef: "lode:capability/job-search",
+        capabilityVersion: "0.1.0",
+        packageRef: "lode://site-capability/boss/job-search@0.1.0",
+      },
+      {
+        capabilityRef: "lode:capability/read-job-detail",
+        capabilityVersion: "0.1.0",
+        packageRef: "lode://site-capability/boss/read-job-detail@0.1.0",
+      },
+    ],
+    boundary: "Core owner API 只暴露 BOSS 只读 run/result/evidence refs；App 不打招呼、不投递、不保存聊天或简历材料。",
+  },
+];
+
+export function coreReadTaskStateFromFallback(endpoint: string, tasks: TaskProjection[]): CoreReadTaskLoadState {
+  return {
+    status: "loading",
+    endpoint,
+    fetchedAt: "pending",
+    summary: "正在读取 Core capability-runs、run result、evidence refs 和 failure refs。",
+    tasks,
+    liveTaskIds: [],
+  };
+}
+
+export async function fetchCoreReadTaskState(
+  endpoint: string,
+  fallbackTasks: TaskProjection[],
+): Promise<CoreReadTaskLoadState> {
+  const fetchedAt = new Date().toISOString();
+  const projectedTasks: TaskProjection[] = [];
+  const errors: string[] = [];
+
+  for (const spec of coreReadTaskSpecs) {
+    const fallbackTask = fallbackTasks.find((task) => task.id === spec.taskId);
+    if (!fallbackTask) continue;
+    const projected = await fetchCoreReadTask(endpoint, spec, fallbackTask, fetchedAt);
+    if (projected.ok) {
+      projectedTasks.push(projected.task);
+    } else {
+      errors.push(projected.error);
+    }
+  }
+
+  if (projectedTasks.length === 0) {
+    return {
+      status: "offline",
+      endpoint,
+      fetchedAt,
+      summary: `Core endpoint 未返回可消费的真实只读 run projection；继续显示本地 fallback。${errors[0] ? ` ${errors[0]}` : ""}`,
+      tasks: fallbackTasks,
+      liveTaskIds: [],
+    };
+  }
+
+  const liveById = new Map(projectedTasks.map((task) => [task.id, task]));
+  return {
+    status: "ready",
+    endpoint,
+    fetchedAt,
+    summary: `已读取 ${projectedTasks.length} 个 Core 真实只读任务 projection；结果正文仍由 owner refs 承接。`,
+    tasks: fallbackTasks.map((task) => liveById.get(task.id) ?? task),
+    liveTaskIds: projectedTasks.map((task) => task.id),
+  };
+}
+
+async function fetchCoreReadTask(
+  endpoint: string,
+  spec: CoreReadTaskSpec,
+  fallbackTask: TaskProjection,
+  fetchedAt: string,
+): Promise<{ ok: true; task: TaskProjection } | { ok: false; error: string }> {
+  const projectedRuns: Array<{ run: RunProjection; updatedAt: string }> = [];
+  const errors: string[] = [];
+
+  for (const capability of spec.capabilities) {
+    const result = await fetchCapabilityRuns(endpoint, capability);
+    if (result.ok) {
+      projectedRuns.push(...result.runs);
+    } else {
+      errors.push(result.error);
+    }
+  }
+
+  if (projectedRuns.length === 0) {
+    return { ok: false, error: errors[0] ?? `${spec.taskId} returned no runs` };
+  }
+
+  const seen = new Set<string>();
+  const runs = projectedRuns
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .flatMap(({ run }) => {
+      if (seen.has(run.id)) return [];
+      seen.add(run.id);
+      return [run];
+    });
+
+  return {
+    ok: true,
+    task: {
+      ...fallbackTask,
+      source: coreLiveSource,
+      packageSource: {
+        ...fallbackTask.packageSource,
+        name: spec.packageName,
+        version: spec.packageVersion,
+        capabilityRef: spec.capabilities.map((capability) => capability.capabilityRef).join(" + "),
+        sourceRef: spec.capabilities.map((capability) => capability.packageRef).join(" + "),
+        lockRef: fallbackTask.packageSource.lockRef?.replace(/0\.[23]\.0/g, spec.packageVersion),
+        fetchedAt,
+        source: coreLiveSource,
+        boundary: spec.boundary,
+      },
+      runs,
+    },
+  };
+}
+
+async function fetchCapabilityRuns(
+  endpoint: string,
+  capability: CoreReadCapability,
+): Promise<{ ok: true; runs: Array<{ run: RunProjection; updatedAt: string }> } | { ok: false; error: string }> {
+  const params = new URLSearchParams({
+    capability_ref: capability.capabilityRef,
+    capability_version: capability.capabilityVersion,
+    package_ref: capability.packageRef,
+    limit: "8",
+  });
+  const response = await requestJson(endpoint, `/capability-runs?${params.toString()}`);
+  const body = okPayload(response, "capability_runs");
+  const runsValue = body == null ? [] : arrayValue(body.runs);
+  const latestRun = body == null ? null : recordValue(body.latest_run);
+  const runSummaries = runsValue.length > 0 ? runsValue : latestRun == null ? [] : [latestRun];
+
+  if (runSummaries.length === 0) {
+    return { ok: false, error: `${capability.capabilityRef} has no runs` };
+  }
+
+  const projections = await Promise.all(
+    runSummaries.map((item, index) => {
+      const run = coreRunSummary(item);
+      return run == null
+        ? ({ ok: false, error: `${capability.capabilityRef} run ${index + 1} returned invalid summary` } as const)
+        : fetchRunProjection(endpoint, run);
+    }),
+  );
+  const failures = projections.flatMap((projection) => (projection.ok ? [] : [projection.error]));
+  const runs = projections.flatMap((projection) => (projection.ok ? [projection.projection] : []));
+
+  if (failures.length > 0) {
+    return { ok: false, error: failures[0] };
+  }
+
+  if (runs.length === 0) {
+    return { ok: false, error: `${capability.capabilityRef} has no readable run details` };
+  }
+
+  return { ok: true, runs };
+}
+
+async function fetchRunProjection(
+  endpoint: string,
+  run: CoreRunSummary,
+): Promise<{ ok: true; projection: { run: RunProjection; updatedAt: string } } | { ok: false; error: string }> {
+  const runId = encodeURIComponent(run.run_id);
+  const [resultResponse, evidenceResponse, failureResponse, sessionResponse] = await Promise.all([
+    requestJson(endpoint, `/runs/${runId}/result`),
+    requestJson(endpoint, `/runs/${runId}/evidence-refs`),
+    requestJson(endpoint, `/runs/${runId}/failure`),
+    requestJson(endpoint, `/runs/${runId}/session-refs`),
+  ]);
+  const resultPayload = requiredOkPayload(resultResponse, "result", `/runs/${runId}/result`);
+  const evidencePayload = requiredOkPayload(evidenceResponse, "evidence", `/runs/${runId}/evidence-refs`);
+  const failurePayload = requiredOkPayload(failureResponse, "failure_reason", `/runs/${runId}/failure`);
+  const sessionPayload = requiredOkPayload(sessionResponse, "session_refs", `/runs/${runId}/session-refs`);
+  if (!resultPayload.ok) return { ok: false, error: resultPayload.error };
+  if (!evidencePayload.ok) return { ok: false, error: evidencePayload.error };
+  if (!failurePayload.ok) return { ok: false, error: failurePayload.error };
+  if (!sessionPayload.ok) return { ok: false, error: sessionPayload.error };
+
+  const result = resultPayload.payload as CoreResultEnvelope;
+  const evidence = evidencePayload.payload;
+  const failure = failurePayload.payload as CoreFailureEnvelope;
+  const session = sessionPayload.payload as CoreSessionRefsEnvelope;
+  const envelope = result?.result?.result_envelope;
+  const postCheck = run.terminal_summary?.post_check ?? envelope?.post_check;
+  const runtimeSessionRefFromSession =
+    session?.session_refs?.runtime_session_ref ??
+    run.runtime_refs?.session_binding?.runtime_session_ref;
+  const objectEvidenceRefs = coreEvidenceRefs(evidence?.evidence_refs).length > 0
+    ? coreEvidenceRefs(evidence?.evidence_refs)
+    : coreEvidenceRefs(result?.evidence_refs);
+  const evidenceRefs = objectEvidenceRefs.length > 0
+    ? objectEvidenceRefs
+    : envelopeEvidenceRefs(envelope?.evidence_refs, run, runtimeSessionRefFromSession);
+  const runtimeSessionRef =
+    runtimeSessionRefFromSession ??
+    evidenceRefs.find((ref) => ref.runtime_session_ref)?.runtime_session_ref;
+  const failureRecord = failure?.failure ?? result?.failure ?? envelope?.failure ?? run.terminal_summary?.failure;
+  const hasFailureRecovery = Boolean(failureRecord || (failure?.reason_class && failure.reason_class !== "none"));
+  const resultKind = envelope?.result_kind ?? result?.result?.unavailable_reason ?? "not_available";
+  const payloadState = result?.result?.payload_state ?? "not_reported";
+  const lifecycle = lifecycleFromStatus(run.status);
+  const outcome = outcomeFromStatus(run.status);
+
+  return {
+    ok: true,
+    projection: {
+      updatedAt: run.timeline?.updated_at ?? run.timeline?.terminal_at ?? "",
+      run: {
+        id: run.run_id,
+        label: `${siteRunLabel(run)} ${run.run_id.replace(/^run_/, "").slice(0, 24)}`,
+        lifecycle,
+        outcome,
+        summary: summaryFromCoreRun(run, resultKind, evidenceRefs.length, failureRecord),
+        actionIntent: actionIntentFromCoreRun(run, failure),
+        owner: "Core",
+        source: coreLiveSource,
+        resultRows: [
+          { label: "Run status", value: run.status, source: coreLiveSource },
+          { label: "Result kind", value: resultKind, source: coreLiveSource },
+          { label: "Payload state", value: payloadState, source: coreLiveSource },
+          { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
+          ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
+        ],
+        fieldSources: evidenceRefs.map((entry, index) => ({
+          field: `证据引用 ${index + 1}`,
+          value: entry.ref,
+          locator: entry.runtime_session_ref ?? runtimeSessionRef ?? "Core evidence refs query",
+          evidenceRef: entry.ref,
+          source: coreLiveSource,
+        })),
+        evidenceCards: evidenceRefs.map((entry, index) => ({
+          id: `ev-${run.run_id}-${index}`,
+          title: `Core evidence ref ${index + 1}`,
+          summary: `${entry.ref}; raw_access=${entry.raw_access ?? "not_available_from_core"}; recorded_at=${entry.recorded_at ?? "unknown"}.`,
+          viewerLabel: "打开 owner evidence ref",
+          viewerHref: `#${encodeURIComponent(entry.ref)}`,
+          source: coreLiveSource,
+          status: evidenceStatus(entry.state),
+          freshness: entry.recorded_at ?? "unknown",
+          provenance: entry.source ?? "Core evidence refs query",
+        })),
+        capabilityAttribution: {
+          capabilityRef: run.task?.capability_ref ?? "unknown",
+          version: run.task?.capability_version ?? "unknown",
+          sourceRef: run.task?.capability_source_ref ?? run.task?.package_ref ?? "unknown",
+          failureClass: failureClass(failure?.reason_class, failureRecord?.code),
+          summary: "Core 查询返回 capability、package、runtime session 和 evidence refs；App 只展示引用。",
+        },
+        ...(hasFailureRecovery
+          ? {
+              failureRecovery: {
+                state: failureStateLabel(failure?.reason_class, failureRecord?.code),
+                reason: failureRecord?.code ?? failure?.reason_class ?? "Core returned recoverable state",
+                nextActions: failureNextActions(failure),
+                source: coreLiveSource,
+              },
+            }
+          : {}),
+        process: [
+          "Core capability-runs query returned owner run summary.",
+          "Core run result/evidence/session/failure refs were read without raw evidence.",
+          runtimeSessionRef ? `Harbor runtime session ref: ${runtimeSessionRef}.` : "No runtime session ref was exposed.",
+        ],
+      },
+    },
+  };
+}
+
+async function requestJson(base: string, path: string): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 2500);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      credentials: "omit",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) return { ok: false, error: `${path} returned ${response.status}` };
+    return response.json();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+function okPayload(value: unknown, key: string): JsonRecord | null {
+  if (!isRecord(value) || value.ok !== true) return null;
+  return recordValue(value[key]);
+}
+
+function requiredOkPayload(
+  value: unknown,
+  key: string,
+  path: string,
+): { ok: true; payload: JsonRecord } | { ok: false; error: string } {
+  if (!isRecord(value)) {
+    return { ok: false, error: `${path} returned invalid JSON` };
+  }
+
+  if (value.ok !== true) {
+    const failure = recordValue(value.error) ?? recordValue(value.failure);
+    const code = stringValue(failure?.code) ?? stringValue(failure?.reason_class) ?? "owner_read_failed";
+    return { ok: false, error: `${path} failed: ${code}` };
+  }
+
+  const payload = recordValue(value[key]);
+  return payload == null
+    ? { ok: false, error: `${path} missing ${key}` }
+    : { ok: true, payload };
+}
+
+function envelopeEvidenceRefs(
+  value: unknown,
+  run: CoreRunSummary,
+  runtimeSessionRef: string | undefined,
+): CoreEvidenceRef[] {
+  return arrayValue(value).flatMap((item) => {
+    const ref = stringValue(item);
+    return ref
+      ? [
+          {
+            ref,
+            source: "result_envelope",
+            state: "available",
+            raw_access: "not_available_from_core",
+            recorded_at: run.timeline?.terminal_at ?? run.timeline?.updated_at ?? "unknown",
+            ...(runtimeSessionRef === undefined ? {} : { runtime_session_ref: runtimeSessionRef }),
+          },
+        ]
+      : [];
+  });
+}
+
+function coreRunSummary(value: unknown): CoreRunSummary | null {
+  if (!isRecord(value)) return null;
+  const runId = stringValue(value.run_id);
+  const status = stringValue(value.status);
+  if (!runId || !isCoreRunStatus(status)) return null;
+  return {
+    run_id: runId,
+    status,
+    timeline: recordValue(value.timeline) as CoreRunSummary["timeline"],
+    task: recordValue(value.task) as CoreRunSummary["task"],
+    runtime_refs: recordValue(value.runtime_refs) as CoreRunSummary["runtime_refs"],
+    terminal_summary: recordValue(value.terminal_summary) as CoreRunSummary["terminal_summary"],
+  };
+}
+
+function coreEvidenceRefs(value: unknown): CoreEvidenceRef[] {
+  return arrayValue(value).flatMap((item) => {
+    const record = recordValue(item);
+    const ref = stringValue(record?.ref);
+    return ref ? [{ ...record, ref } as CoreEvidenceRef] : [];
+  });
+}
+
+function lifecycleFromStatus(status: CoreRunStatus): RunProjection["lifecycle"] {
+  if (status === "pending") return "queued";
+  if (status === "admitted" || status === "running") return "running";
+  if (status === "requires_user_action" || status === "manual_recovery_required") return "needs-action";
+  if (status === "failed" || status === "blocked" || status === "expired") return "blocked";
+  return "completed";
+}
+
+function outcomeFromStatus(status: CoreRunStatus): OutcomeKind {
+  if (status === "succeeded") return "success";
+  if (status === "cancelled" || status === "manual_recovery_required" || status === "requires_user_action") return "failure-safe";
+  if (status === "expired") return "expired";
+  if (status === "unknown_outcome") return "unknown";
+  if (status === "failed" || status === "blocked") return "failure";
+  return "partial";
+}
+
+function evidenceStatus(status: string | undefined): RunProjection["evidenceCards"][number]["status"] {
+  if (status === "expired") return "expired";
+  if (status === "redacted") return "redacted";
+  if (status === "access_denied" || status === "deleted_by_policy" || status === "missing") return "unavailable";
+  return "available";
+}
+
+function failureClass(
+  reasonClass: string | undefined,
+  code: string | undefined,
+): NonNullable<RunProjection["capabilityAttribution"]>["failureClass"] {
+  if (!reasonClass || reasonClass === "none") return "none";
+  if (reasonClass === "login_required") return "login_required";
+  if (reasonClass === "page_changed") return "site_changed";
+  if (reasonClass === "field_unavailable" || code === "field_missing") return "field_missing";
+  if (reasonClass === "risk_prompt") return "captcha";
+  if (reasonClass === "evidence_unavailable") return "evidence_expired";
+  if (reasonClass === "capability_failure") return "capability";
+  return "runtime";
+}
+
+function failureStateLabel(reasonClass: string | undefined, code: string | undefined) {
+  if (reasonClass === "login_required") return "未登录";
+  if (reasonClass === "risk_prompt") return "验证码";
+  if (reasonClass === "page_changed") return "页面变化";
+  if (reasonClass === "field_unavailable" || code === "field_missing") return "字段缺失";
+  return code ?? reasonClass ?? "Core failure";
+}
+
+function failureNextActions(failure: CoreFailureEnvelope | null): string[] {
+  const action = failure?.app_action && failure.app_action !== "none"
+    ? failure.app_action
+    : failure?.failure?.recovery_hint;
+  return [
+    action ? `执行 owner-supported action: ${action}` : "查看 Core failure reason",
+    failure?.retryable ? "修复身份环境或页面状态后再次执行" : "等待 owner 修复或人工处理",
+  ];
+}
+
+function summaryFromCoreRun(
+  run: CoreRunSummary,
+  resultKind: string,
+  evidenceCount: number,
+  failure: CoreResultEnvelope["failure"] | undefined,
+) {
+  if (failure) {
+    return `Core 返回 ${run.status}：${failure.code ?? "failure"}；App 展示恢复动作和 evidence refs。`;
+  }
+  if (run.status === "succeeded") {
+    return `Core 返回真实只读结果 envelope（${resultKind}），包含 ${evidenceCount} 个 evidence ref；App 不保存原始证据正文。`;
+  }
+  return `Core 返回 ${run.status} run projection，当前可查看 ${evidenceCount} 个 evidence ref。`;
+}
+
+function actionIntentFromCoreRun(run: CoreRunSummary, failure: CoreFailureEnvelope | null) {
+  if (failure?.app_action && failure.app_action !== "none") {
+    return `Owner-supported action intent: ${failure.app_action}.`;
+  }
+  if (run.status === "succeeded") return "Owner-supported action intent: 查看结果依据或再次执行同一输入。";
+  return "Owner-supported action intent: 打开执行现场或等待 Core 回读。";
+}
+
+function siteRunLabel(run: CoreRunSummary) {
+  const packageRef = run.task?.package_ref ?? run.task?.capability_source_ref ?? "";
+  if (packageRef.includes("xiaohongshu")) return "小红书 Run";
+  if (packageRef.includes("boss")) return "BOSS Run";
+  return "Core Run";
+}
+
+function isCoreRunStatus(value: string | undefined): value is CoreRunStatus {
+  return (
+    value === "pending" ||
+    value === "admitted" ||
+    value === "running" ||
+    value === "succeeded" ||
+    value === "failed" ||
+    value === "blocked" ||
+    value === "requires_user_action" ||
+    value === "manual_recovery_required" ||
+    value === "unknown_outcome" ||
+    value === "cancelled" ||
+    value === "expired"
+  );
+}
+
+function recordValue(value: unknown): JsonRecord | null {
+  return isRecord(value) ? value : null;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

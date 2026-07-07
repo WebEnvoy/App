@@ -263,11 +263,11 @@ function emptySession(provider: BrowserSessionProjection["provider"], identityRe
 function taskEntries(siteId: SiteId) {
   return siteId === "boss"
     ? [
-        { id: "task-entry-boss-real-read", label: "启动 BOSS 搜索/职位详情读取", taskId: "task-boss-real-read", inputSummary: "职位：前端工程师；城市：上海；筛选：近三天。", readiness: "真实 Core 任务运行属于 #238 后续；当前只打开现有 projection。", source: "Core fixture" as const },
+        { id: "task-entry-boss-real-read", label: "启动 BOSS 搜索/职位详情读取", taskId: "task-boss-real-read", inputSummary: "职位：前端工程师；城市：上海；筛选：近三天。", readiness: "真实任务结果来自 Core owner API；离线时显示 fallback projection。", source: "Core fixture" as const },
         { id: "task-entry-boss-write-preview", label: "查看 BOSS 打招呼写前验证", taskId: "task-boss-greeting-write-preview", inputSummary: "目标职位、候选人消息框和打招呼文案的真实页面写前验证。", readiness: "只展示 submitted=false / 未发送 的写前投影；不发送消息。", source: "Core fixture" as const },
       ]
     : [
-        { id: "task-entry-xhs-real-read", label: "启动小红书搜索/笔记读取", taskId: "task-xhs-real-read", inputSummary: "关键词：AI 工具；可继续读取指定笔记 URL。", readiness: "真实 Core 任务运行属于 #238 后续；当前只打开现有 projection。", source: "Core fixture" as const },
+        { id: "task-entry-xhs-real-read", label: "启动小红书搜索/笔记读取", taskId: "task-xhs-real-read", inputSummary: "关键词：AI 工具；可继续读取指定笔记 URL。", readiness: "真实任务结果来自 Core owner API；离线时显示 fallback projection。", source: "Core fixture" as const },
         { id: "task-entry-xhs-write-preview", label: "查看小红书发布草稿写前验证", taskId: "task-xhs-publish-write-preview", inputSummary: "草稿标题、正文、话题和发布器字段的真实页面写前验证。", readiness: "只展示 submitted=false / 未发布 的写前投影；不点击发布。", source: "Core fixture" as const },
       ];
 }

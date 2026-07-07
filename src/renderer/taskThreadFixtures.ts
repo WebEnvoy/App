@@ -1,6 +1,7 @@
 import { realWritePreviewTaskFixtures } from "./realWritePreviewFixtures";
 
 export type OwnerSource =
+  | "Core live"
   | "Core fixture"
   | "Harbor fixture"
   | "Harbor live"
@@ -166,10 +167,10 @@ export const taskThreadFixtures: TaskProjection[] = [
     source: "Core fixture",
     packageSource: {
       name: "@lode/xiaohongshu-read-only",
-      version: "0.3.0",
-      capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
-      sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
-      lockRef: "lode://lock/xiaohongshu-read-only/2026-07-06",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/search-notes + lode:capability/read-note-detail",
+      sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0 + lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+      lockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
       fetchedAt: "2026-07-06T09:20:00Z",
       source: "Lode fixture",
       boundary: "App 只展示小红书只读 capability metadata、Core run projection 和 Harbor viewer refs；不缓存原始页面材料。",
@@ -219,9 +220,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
-          version: "0.3.0",
-          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          capabilityRef: "lode:capability/search-notes",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
           failureClass: "none",
           summary: "Core run 绑定小红书只读能力和小红书运营号 A 身份环境。",
         },
@@ -279,9 +280,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
-          version: "0.3.0",
-          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          capabilityRef: "lode:capability/read-note-detail",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
           failureClass: "none",
           summary: "Result Envelope 保留 Lode capability ref、Harbor viewer ref 和字段来源。",
         },
@@ -314,9 +315,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
-          version: "0.3.0",
-          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          capabilityRef: "lode:capability/search-notes",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
           failureClass: "captcha",
           summary: "验证码是身份现场恢复问题，不是 App 本地可修复字段。",
         },
@@ -355,9 +356,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/xiaohongshu/search-and-note-read",
-          version: "0.3.0",
-          sourceRef: "lode://package/xiaohongshu-read-only@0.3.0",
+          capabilityRef: "lode:capability/search-notes",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
           failureClass: "site_changed",
           summary: "页面变化归因到 Lode 能力修复，用户可稍后重试或调整输入。",
         },
@@ -380,10 +381,10 @@ export const taskThreadFixtures: TaskProjection[] = [
     source: "Core fixture",
     packageSource: {
       name: "@lode/boss-read-only",
-      version: "0.2.0",
-      capabilityRef: "lode://capability/boss/search-and-job-detail-read",
-      sourceRef: "lode://package/boss-read-only@0.2.0",
-      lockRef: "lode://lock/boss-read-only/2026-07-06",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/job-search + lode:capability/read-job-detail",
+      sourceRef: "lode://site-capability/boss/job-search@0.1.0 + lode://site-capability/boss/read-job-detail@0.1.0",
+      lockRef: "lode://lock/site-capability/boss/job-search@0.1.0",
       fetchedAt: "2026-07-06T09:22:00Z",
       source: "Lode fixture",
       boundary: "App 只展示 BOSS 只读搜索和职位详情 projection；不打招呼、不投递、不保存聊天或简历材料。",
@@ -433,9 +434,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
-          version: "0.2.0",
-          sourceRef: "lode://package/boss-read-only@0.2.0",
+          capabilityRef: "lode:capability/job-search",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/boss/job-search@0.1.0",
           failureClass: "none",
           summary: "Core run 绑定 BOSS 只读能力和 BOSS 招聘号身份环境。",
         },
@@ -493,9 +494,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
-          version: "0.2.0",
-          sourceRef: "lode://package/boss-read-only@0.2.0",
+          capabilityRef: "lode:capability/read-job-detail",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/boss/read-job-detail@0.1.0",
           failureClass: "none",
           summary: "Result Envelope 保留 Lode capability ref、Harbor viewer ref 和字段来源。",
         },
@@ -528,9 +529,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
-          version: "0.2.0",
-          sourceRef: "lode://package/boss-read-only@0.2.0",
+          capabilityRef: "lode:capability/read-job-detail",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/boss/read-job-detail@0.1.0",
           failureClass: "login_required",
           summary: "未登录是身份环境恢复问题，不是职位读取能力成功。",
         },
@@ -586,9 +587,9 @@ export const taskThreadFixtures: TaskProjection[] = [
           },
         ],
         capabilityAttribution: {
-          capabilityRef: "lode://capability/boss/search-and-job-detail-read",
-          version: "0.2.0",
-          sourceRef: "lode://package/boss-read-only@0.2.0",
+          capabilityRef: "lode:capability/read-job-detail",
+          version: "0.1.0",
+          sourceRef: "lode://site-capability/boss/read-job-detail@0.1.0",
           failureClass: "field_missing",
           summary: "字段缺失归因到页面字段不可见或 selector 漂移；结果保持 partial。",
         },

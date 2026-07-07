@@ -29,9 +29,11 @@ type PointerRailTarget = {
 };
 
 export function ThreadNavigationRail({
+  activeItemId,
   items,
   onActiveItemChange,
 }: {
+  activeItemId?: string;
   items: ThreadNavigationItem[];
   onActiveItemChange?: (itemId: string) => void;
 }) {
@@ -39,19 +41,28 @@ export function ThreadNavigationRail({
     return null;
   }
 
-  return <ThreadNavigationRailBody items={items} onActiveItemChange={onActiveItemChange} />;
+  return (
+    <ThreadNavigationRailBody
+      activeItemId={activeItemId}
+      items={items}
+      onActiveItemChange={onActiveItemChange}
+    />
+  );
 }
 
 function ThreadNavigationRailBody({
+  activeItemId: controlledActiveItemId,
   items,
   onActiveItemChange,
 }: {
+  activeItemId?: string;
   items: ThreadNavigationItem[];
   onActiveItemChange?: (itemId: string) => void;
 }) {
   const lastItemId = items.at(-1)?.id ?? null;
-  const [visibleItemIds, setVisibleItemIds] = useState<Set<string>>(
-    () => new Set(lastItemId == null ? [] : [lastItemId]),
+  const initialActiveItemId = controlledActiveItemId ?? lastItemId;
+  const [visibleItemIds, setVisibleItemIds] = useState<Set<string>>(() =>
+    new Set(initialActiveItemId == null ? [] : [initialActiveItemId]),
   );
   const [isPointerInsideRail, setIsPointerInsideRail] = useState(false);
   const [scrubbedItemId, setScrubbedItemId] = useState<string | null>(null);
@@ -62,7 +73,12 @@ function ThreadNavigationRailBody({
   const suppressClickAfterScrubRef = useRef(false);
   const tooltipId = useId();
   const itemIdsSignature = items.map(getNavigationItemId).join("\0");
-  const activeItemId = items.find((item) => visibleItemIds.has(item.id))?.id ?? lastItemId;
+  const controlledItemExists =
+    controlledActiveItemId != null && items.some((item) => item.id === controlledActiveItemId);
+  const activeItemId =
+    items.find((item) => visibleItemIds.has(item.id))?.id ??
+    (controlledItemExists ? controlledActiveItemId : null) ??
+    lastItemId;
   const tooltipTop =
     hoverTarget == null
       ? "50%"
@@ -192,10 +208,15 @@ function ThreadNavigationRailBody({
   }, [activeItemId, scrubbedItemId]);
 
   useEffect(() => {
-    if (activeItemId != null) {
-      onActiveItemChange?.(activeItemId);
+    if (!controlledItemExists || controlledActiveItemId == null) {
+      return;
     }
-  }, [activeItemId, onActiveItemChange]);
+    setVisibleItemIds((previousVisibleItemIds) =>
+      previousVisibleItemIds.has(controlledActiveItemId)
+        ? previousVisibleItemIds
+        : new Set([controlledActiveItemId]),
+    );
+  }, [controlledActiveItemId, controlledItemExists, itemIdsSignature]);
 
   function scrollToNavigationItem(item: ThreadNavigationItem, scrollBehavior: ScrollBehavior) {
     const scrollElement = document.querySelector(".main-content-frame");

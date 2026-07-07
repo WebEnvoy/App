@@ -16,6 +16,7 @@ const mainSource = await readFile("dist-electron/main.js", "utf8");
 const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
+const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
 const rendererAssets = await readFile(
@@ -95,11 +96,8 @@ for (const expectedText of [
   "已锁定",
   "@lode/example-commerce-product-detail",
   "lode://capability/example-commerce/product-detail",
-  "Browser session",
-  "Harbor Browser provider fixture",
-  "browser-session://local-chrome/manual-001",
-  "viewer://harbor/local-chrome/manual-001",
-  "Provider private endpoint",
+  "Runtime session",
+  "App 不使用无关本机浏览器现场代替任务现场",
   "direct Identity Runtime Session",
   "not Core Task/Run/Result",
   "Write-pre preview",
@@ -124,11 +122,15 @@ for (const expectedText of [
   "Harbor live",
   "Harbor offline",
   "Harbor endpoint 未返回可消费的 provider/identity JSON",
+  "Core read task status",
+  "Core owner API projection",
+  "实时结果",
+  "本地展示",
   "创建本地身份环境配置",
   "导入 Harbor public summary",
   "保存本地允许配置",
   "不保存账号密码、Cookie、token、profile 原始内容",
-  "真实任务运行由 #238 后续接入",
+  "真实任务结果来自 Core owner API",
   "身份环境、登录态、provider 和一致性事实归属 Harbor",
   "CloakBrowser",
   "官方 Chrome",
@@ -215,6 +217,15 @@ const localIdentityStoreModule = await import(
       `from "${harborIdentityTypesModuleUrl}";`,
     ),
   )}`
+);
+const { outputText: coreReadTaskClientModuleSource } = ts.transpileModule(coreReadTaskClientSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const coreReadTaskClientModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleSource)}`
 );
 
 function installLocalStorage(entries = {}) {
@@ -349,6 +360,427 @@ const safeHarborImport = localIdentityStoreModule.parseImportedIdentityEnvironme
 
 if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
   throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
+}
+
+const originalFetch = globalThis.fetch;
+const fakeRun = {
+  schema_version: "webenvoy.run-query.v0",
+  run_id: "run_smoke_real_site_xhs_001",
+  status: "succeeded",
+  timeline: {
+    created_at: "2026-07-06T10:00:00.000Z",
+    updated_at: "2026-07-06T10:00:03.000Z",
+    terminal_at: "2026-07-06T10:00:03.000Z",
+  },
+  task: {
+    capability_ref: "lode:capability/search-notes",
+    capability_version: "0.1.0",
+    capability_source_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+    capability_lock_ref: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+    package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+  },
+  admission: {
+    decision: "accepted",
+    action_risk: "read",
+  },
+  runtime_refs: {
+    session_binding: {
+      runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+      control_owner: "core_task",
+      lifecycle_state: "active",
+      session_use: "core_task_run",
+    },
+  },
+  terminal_summary: {
+    terminal: true,
+    status: "succeeded",
+    result_ref: "result:core/xiaohongshu/search-notes/smoke",
+    post_check: {
+      schema_version: "webenvoy.post-check-result.v0",
+      status: "passed",
+      summary: "Smoke result refs are queryable.",
+    },
+  },
+};
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
+    ? { ok: true, capability_runs: { runs: [fakeRun], latest_run: fakeRun } }
+    : pathname.includes("/capability-runs")
+    ? { ok: true, capability_runs: { runs: [] } }
+    : pathname.endsWith("/result")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: fakeRun.run_id,
+          status: "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_ref: "result:core/xiaohongshu/search-notes/smoke",
+            result_envelope: {
+              result_kind: "xhs_note_search",
+              result_ref: "result:core/xiaohongshu/search-notes/smoke",
+              package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/snapshot"],
+            },
+          },
+          evidence_refs: [
+            {
+              ref: "harbor:evidence/xiaohongshu/search-notes/snapshot",
+              source: "admission_and_terminal",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:00:03.000Z",
+              runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+            },
+          ],
+        },
+      }
+    : pathname.endsWith("/evidence-refs")
+    ? {
+        ok: true,
+        evidence: {
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/failure")
+    ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
+    : { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly" } } };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const coreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
+  {
+    id: "task-xhs-real-read",
+    title: "小红书搜索与笔记读取",
+    accountIdentity: "小红书运营号 A",
+    siteSkill: "小红书搜索和笔记读取",
+    businessInput: "关键词：AI 工具",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/xiaohongshu-read-only",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/search-notes",
+      sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+]);
+globalThis.fetch = originalFetch;
+
+if (coreReadState.status !== "ready" || coreReadState.tasks[0].runs[0]?.source !== "Core live") {
+  throw new Error("Core read task smoke failed: live Core projection was not applied.");
+}
+
+if (!coreReadState.tasks[0].runs[0].evidenceCards[0]?.summary.includes("not_available_from_core")) {
+  throw new Error("Core read task smoke failed: raw evidence boundary is missing.");
+}
+
+if (coreReadState.tasks[0].runs[0].failureRecovery) {
+  throw new Error("Core read task smoke failed: reason_class none rendered as recoverable failure.");
+}
+
+if (coreReadState.tasks[0].runs[0].actionIntent.includes("none")) {
+  throw new Error("Core read task smoke failed: app_action none rendered as an action intent.");
+}
+
+const bossFakeRun = {
+  schema_version: "webenvoy.run-query.v0",
+  run_id: "run_smoke_real_site_boss_001",
+  status: "manual_recovery_required",
+  timeline: {
+    created_at: "2026-07-06T10:20:00.000Z",
+    updated_at: "2026-07-06T10:20:03.000Z",
+    terminal_at: "2026-07-06T10:20:03.000Z",
+  },
+  task: {
+    capability_ref: "lode:capability/job-search",
+    capability_version: "0.1.0",
+    capability_source_ref: "lode://site-capability/boss/job-search@0.1.0",
+    capability_lock_ref: "lode://lock/site-capability/boss/job-search@0.1.0",
+    package_ref: "lode://site-capability/boss/job-search@0.1.0",
+  },
+  admission: {
+    decision: "accepted",
+    action_risk: "read",
+  },
+  runtime_refs: {
+    session_binding: {
+      runtime_session_ref: "harbor:runtime-session/boss/readonly",
+      control_owner: "core_task",
+      lifecycle_state: "active",
+      session_use: "core_task_run",
+    },
+  },
+  terminal_summary: {
+    terminal: true,
+    status: "manual_recovery_required",
+    result_ref: "result:core/boss/job-search/smoke",
+    post_check: {
+      schema_version: "webenvoy.post-check-result.v0",
+      status: "failed",
+      summary: "Login recovery required before reading BOSS job cards.",
+    },
+    failure: {
+      code: "login_required",
+      category: "identity",
+      phase: "admission",
+      recovery_hint: "open_identity_session",
+    },
+  },
+};
+const bossFetchCalls = new Set();
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.includes("/capability-runs")
+    ? (bossFetchCalls.add("capability-runs"),
+      pathname.includes("job-search")
+        ? { ok: true, capability_runs: { runs: [bossFakeRun], latest_run: bossFakeRun } }
+        : { ok: true, capability_runs: { runs: [] } })
+    : pathname.endsWith("/result")
+    ? (bossFetchCalls.add("result"),
+      {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: bossFakeRun.run_id,
+          status: "manual_recovery_required",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_ref: "result:core/boss/job-search/smoke",
+            result_envelope: {
+              result_kind: "boss_job_search",
+              result_ref: "result:core/boss/job-search/smoke",
+              package_ref: "lode://site-capability/boss/job-search@0.1.0",
+              evidence_refs: ["harbor:evidence/boss/job-search/login-required"],
+            },
+          },
+        },
+      })
+    : pathname.endsWith("/evidence-refs")
+    ? (bossFetchCalls.add("evidence"),
+      {
+        ok: true,
+        evidence: {
+          evidence_refs: [
+            {
+              ref: "harbor:evidence/boss/job-search/login-required",
+              source: "core_failure",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:20:03.000Z",
+              runtime_session_ref: "harbor:runtime-session/boss/readonly",
+            },
+          ],
+        },
+      })
+    : pathname.endsWith("/failure")
+    ? (bossFetchCalls.add("failure"),
+      {
+        ok: true,
+        failure_reason: {
+          reason_class: "login_required",
+          app_action: "open_identity_session",
+          retryable: true,
+          failure: {
+            code: "login_required",
+            category: "identity",
+            phase: "admission",
+            recovery_hint: "open_identity_session",
+          },
+        },
+      })
+    : pathname.endsWith("/session-refs")
+    ? (bossFetchCalls.add("session"),
+      {
+        ok: true,
+        session_refs: {
+          session_refs: {
+            runtime_session_ref: "harbor:runtime-session/boss/readonly",
+            control_owner: "core_task",
+            lifecycle_state: "active",
+            session_use: "core_task_run",
+          },
+        },
+      })
+    : { ok: true };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const bossCoreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
+  {
+    id: "task-boss-real-read",
+    title: "BOSS 搜索与职位详情读取",
+    accountIdentity: "BOSS 招聘号",
+    siteSkill: "BOSS 搜索和职位详情读取",
+    businessInput: "职位：前端工程师；城市：上海",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/boss-read-only",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/job-search + lode:capability/read-job-detail",
+      sourceRef: "lode://site-capability/boss/job-search@0.1.0 + lode://site-capability/boss/read-job-detail@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+]);
+globalThis.fetch = originalFetch;
+
+const bossLiveRun = bossCoreReadState.tasks.find((task) => task.id === "task-boss-real-read")?.runs[0];
+
+for (const expectedCall of ["capability-runs", "result", "evidence", "session"]) {
+  if (!bossFetchCalls.has(expectedCall)) {
+    throw new Error(`Core read task smoke failed: BOSS ${expectedCall} mock was not consumed.`);
+  }
+}
+
+if (bossCoreReadState.status !== "ready" || bossLiveRun?.source !== "Core live") {
+  throw new Error("Core read task smoke failed: BOSS live Core projection was not applied.");
+}
+
+if (bossLiveRun.capabilityAttribution?.failureClass !== "login_required") {
+  throw new Error("Core read task smoke failed: BOSS failure class was swallowed.");
+}
+
+if (bossLiveRun.failureRecovery?.state !== "未登录" || !bossLiveRun.failureRecovery.nextActions[0]?.includes("open_identity_session")) {
+  throw new Error("Core read task smoke failed: BOSS failure recovery action was swallowed.");
+}
+
+if (!bossLiveRun.actionIntent.includes("open_identity_session")) {
+  throw new Error("Core read task smoke failed: BOSS action label was swallowed.");
+}
+
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.includes("/capability-runs")
+    ? { ok: true, capability_runs: { runs: [fakeRun] } }
+    : pathname.endsWith("/result")
+    ? { ok: false, error: { code: "result_query_unavailable" } }
+    : { ok: true, evidence: { evidence_refs: [] } };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const failedDetailState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
+  {
+    id: "task-xhs-real-read",
+    title: "小红书搜索与笔记读取",
+    accountIdentity: "小红书运营号 A",
+    siteSkill: "小红书搜索和笔记读取",
+    businessInput: "关键词：AI 工具",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/xiaohongshu-read-only",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/search-notes",
+      sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+]);
+globalThis.fetch = originalFetch;
+
+if (failedDetailState.status !== "offline" || failedDetailState.liveTaskIds.length !== 0) {
+  throw new Error("Core read task smoke failed: per-run detail failure was treated as live projection.");
+}
+
+const olderRun = {
+  ...fakeRun,
+  run_id: "run_older_ok",
+  timeline: {
+    created_at: "2026-07-06T09:50:00.000Z",
+    updated_at: "2026-07-06T09:50:03.000Z",
+    terminal_at: "2026-07-06T09:50:03.000Z",
+  },
+};
+const latestRunWithFailedDetail = {
+  ...fakeRun,
+  run_id: "run_latest_failed",
+  timeline: {
+    created_at: "2026-07-06T10:10:00.000Z",
+    updated_at: "2026-07-06T10:10:03.000Z",
+    terminal_at: "2026-07-06T10:10:03.000Z",
+  },
+};
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
+    ? { ok: true, capability_runs: { runs: [latestRunWithFailedDetail, olderRun] } }
+    : pathname.includes("/capability-runs")
+    ? { ok: true, capability_runs: { runs: [] } }
+    : pathname.includes("/runs/run_latest_failed/result")
+    ? { ok: false, error: { code: "latest_result_unavailable" } }
+    : pathname.endsWith("/result")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: olderRun.run_id,
+          status: "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "xhs_note_search",
+              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/older"],
+            },
+          },
+        },
+      }
+    : pathname.endsWith("/evidence-refs")
+    ? { ok: true, evidence: { evidence_refs: [] } }
+    : pathname.endsWith("/failure")
+    ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
+    : { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly" } } };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const mixedDetailState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
+  {
+    id: "task-xhs-real-read",
+    title: "小红书搜索与笔记读取",
+    accountIdentity: "小红书运营号 A",
+    siteSkill: "小红书搜索和笔记读取",
+    businessInput: "关键词：AI 工具",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/xiaohongshu-read-only",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/search-notes",
+      sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+]);
+globalThis.fetch = originalFetch;
+
+if (mixedDetailState.status !== "offline" || mixedDetailState.liveTaskIds.length !== 0) {
+  throw new Error("Core read task smoke failed: mixed run detail failure was hidden by an older run.");
 }
 
 console.log("WebEnvoy desktop shell smoke passed.");
