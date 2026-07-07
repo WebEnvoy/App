@@ -852,6 +852,19 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_blocked_available_missing_action_request_001",
+    status: "blocked",
+    timeline: { updated_at: "2026-07-06T11:19:30.000Z", terminal_at: "2026-07-06T11:19:30.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
     run_id: "run_fixture_boss_available_unknown_submitted_001",
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:19:01.000Z", terminal_at: "2026-07-06T11:19:01.000Z" },
@@ -952,6 +965,30 @@ globalThis.fetch = async (url) => {
                 },
                 evidence_refs: ["harbor:evidence/boss/greeting/preview-result-only"],
                 consumer_boundary: "Core blocked this preview before approval; it is not submitted.",
+              },
+            },
+          },
+          evidence_refs: [],
+        },
+      }
+    : pathname.endsWith("/result") && runId.includes("boss_blocked_available_missing_action_request")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "blocked",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "available",
+                submitted: false,
+                expected_change: { summary: "BOSS message preview conflicts with a blocked owner run." },
               },
             },
           },
@@ -1157,6 +1194,25 @@ if (!bossWritePreviewTask.runs.some((run) => run.resultRows.some((row) => row.la
 
 if (!bossWritePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label === "Submitted" && row.value === "true / blocked"))) {
   throw new Error("Core BOSS write-precheck smoke failed: submitted=true state was not blocked.");
+}
+
+const blockedAvailableRun = bossWritePreviewTask.runs.find((run) => run.id.includes("boss_blocked_available_missing_action_request"));
+
+if (!blockedAvailableRun) {
+  throw new Error("Core BOSS write-precheck smoke failed: blocked available conflict fixture is missing.");
+}
+
+if (
+  blockedAvailableRun.writePrecheck?.state === "available" ||
+  blockedAvailableRun.lifecycle !== "blocked" ||
+  blockedAvailableRun.approval?.riskLevel === "low" ||
+  blockedAvailableRun.approval?.statuses.some((status) => status.status === "pending")
+) {
+  throw new Error("Core BOSS write-precheck smoke failed: blocked owner state displayed as pending/low approval.");
+}
+
+if (blockedAvailableRun.approval?.actionRequestId.startsWith("action-request:")) {
+  throw new Error("Core BOSS write-precheck smoke failed: missing action_request_id was synthesized from run_id.");
 }
 
 if (!bossWritePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/boss/greeting/preview-result-only"))) {

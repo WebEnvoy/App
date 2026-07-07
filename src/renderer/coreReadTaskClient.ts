@@ -413,7 +413,7 @@ async function fetchRunProjection(
   const resultKind = envelope?.result_kind ?? (isWritePrecheck ? "real_page_write_precheck_projection" : result?.result?.unavailable_reason ?? "not_available");
   const payloadState = result?.result?.payload_state ?? "not_reported";
   const writeState = isWritePrecheck
-    ? writePrecheckState(run, result, previewResult, failureRecord)
+    ? writePrecheckState(run, result, previewResult, failureRecord, failure?.reason_class)
     : null;
   const lifecycle = isWritePrecheck && writeState != null
     ? lifecycleFromWritePrecheck(run.status, writeState)
@@ -624,15 +624,16 @@ function writePrecheckState(
   result: CoreResultEnvelope,
   preview: CorePreviewResult | undefined,
   failure: CoreResultEnvelope["failure"] | undefined,
+  failureReasonClass: string | undefined,
 ): CorePreviewState {
-  if (run.status === "expired" || result.result?.payload_state === "expired") return "expired";
+  if (run.status === "expired" || result.result?.payload_state === "expired" || failureReasonClass === "expired") return "expired";
+  if (run.status === "cancelled" || failure?.code === "user_cancelled" || failureReasonClass === "user_cancelled") return "user_cancelled";
+  if (failure?.code === "page_changed" || failureReasonClass === "page_changed") return "page_changed";
+  if (failure?.code === "preview_unavailable" || failureReasonClass === "preview_unavailable" || result.result?.unavailable_reason) return "preview_unavailable";
+  if (run.status === "failed" || run.status === "blocked") return "preview_unavailable";
   const state = previewStateValue(preview?.state);
   if (state === "available") return preview?.submitted === false ? "available" : "preview_unavailable";
   if (state) return state;
-  if (run.status === "cancelled" || failure?.code === "user_cancelled") return "user_cancelled";
-  if (failure?.code === "page_changed") return "page_changed";
-  if (failure?.code === "preview_unavailable" || result.result?.unavailable_reason) return "preview_unavailable";
-  if (run.status === "failed" || run.status === "blocked") return "preview_unavailable";
   return "preview_unavailable";
 }
 
@@ -741,7 +742,7 @@ function coreApprovalPreview(
   preview: CorePreviewResult | undefined,
   state: CorePreviewState,
 ): NonNullable<RunProjection["approval"]> {
-  const actionRequestId = preview?.action_refs?.action_request_id ?? `action-request:${run.run_id}`;
+  const actionRequestId = preview?.action_refs?.action_request_id ?? "not exposed";
   const statuses: NonNullable<RunProjection["approval"]>["statuses"] = [];
   const canApprove = state === "available" && preview?.submitted === false;
   if (canApprove) {
