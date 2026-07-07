@@ -835,6 +835,19 @@ const writePreviewRuns = [
     },
     admission: { action_risk: "write" },
   },
+  {
+    schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_real_site_write_preview_page_changed_001",
+    status: "failed",
+    timeline: { updated_at: "2026-07-06T11:15:01.000Z", terminal_at: "2026-07-06T11:15:01.000Z" },
+    task: {
+      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
 ];
 const bossWritePreviewRuns = [
   {
@@ -904,6 +917,19 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
+    run_id: "run_fixture_boss_failed_available_false_submitted_001",
+    status: "failed",
+    timeline: { updated_at: "2026-07-06T11:16:30.000Z", terminal_at: "2026-07-06T11:16:30.000Z" },
+    task: {
+      capability_ref: "lode:capability/boss-greeting-precheck",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      package_ref: "lode://site-capability/boss/greeting-precheck@0.1.0",
+    },
+    admission: { action_risk: "write" },
+  },
+  {
+    schema_version: "webenvoy.run-query.v0",
     run_id: "run_fixture_boss_generic_failed_001",
     status: "failed",
     timeline: { updated_at: "2026-07-06T11:16:01.000Z", terminal_at: "2026-07-06T11:16:01.000Z" },
@@ -923,6 +949,33 @@ globalThis.fetch = async (url) => {
     ? { ok: true, capability_runs: { runs: writePreviewRuns } }
     : pathname.includes("/capability-runs") && pathname.includes("boss-greeting-precheck")
     ? { ok: true, capability_runs: { runs: bossWritePreviewRuns } }
+    : pathname.endsWith("/result") && runId.includes("page_changed")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "failed",
+          terminal: true,
+          failure: { code: "page_changed", category: "page_state", phase: "precheck" },
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "available",
+                submitted: false,
+                expected_change: { summary: "Page changed after the write-precheck preview was captured." },
+                action_refs: { action_request_id: "action-request:intent_real_site_xiaohongshu_page_changed" },
+              },
+              failure: { code: "page_changed", category: "page_state", phase: "precheck" },
+            },
+          },
+          evidence_refs: [],
+        },
+      }
     : pathname.endsWith("/result") && runId.includes("expired")
     ? {
         ok: true,
@@ -931,7 +984,20 @@ globalThis.fetch = async (url) => {
           run_id: runId,
           status: "expired",
           terminal: true,
-          result: { envelope_state: "available", payload_state: "expired" },
+          result: {
+            envelope_state: "available",
+            payload_state: "expired",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "available",
+                submitted: false,
+                expected_change: { summary: "Expired owner run still returned a stale preview." },
+                action_refs: { action_request_id: "action-request:intent_real_site_xiaohongshu_expired" },
+              },
+            },
+          },
           evidence_refs: [],
         },
       }
@@ -1044,6 +1110,31 @@ globalThis.fetch = async (url) => {
           evidence_refs: [],
         },
       }
+    : pathname.endsWith("/result") && runId.includes("boss_failed_available_false_submitted")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: runId,
+          status: "failed",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "real_page_write_precheck_projection",
+              preview_result: {
+                schema_version: "webenvoy.preview-result.v0",
+                state: "available",
+                submitted: false,
+                expected_change: { summary: "BOSS failed owner run still returned preview.available + submitted=false." },
+                action_refs: { action_request_id: "action-request:intent_real_site_boss_failed_available_false" },
+              },
+            },
+          },
+          evidence_refs: [],
+        },
+      }
     : pathname.endsWith("/result") && runId.includes("boss_generic_")
     ? {
         ok: true,
@@ -1071,7 +1162,7 @@ globalThis.fetch = async (url) => {
               result_kind: "real_page_write_precheck_projection",
               preview_result: {
                 schema_version: "webenvoy.preview-result.v0",
-                state: runId.includes("cancelled") ? "user_cancelled" : "available",
+                state: "available",
                 submitted: false,
                 expected_change: {
                   summary: "预览小红书草稿编辑器可写字段和预期草稿变化，不保存、不发布。",
@@ -1166,7 +1257,7 @@ if (writePreviewState.status !== "ready" || writePreviewTask.source !== "Core li
   throw new Error("Core write-precheck smoke failed: live Core projection was not applied.");
 }
 
-for (const expectedState of ["available", "user_cancelled", "expired"]) {
+for (const expectedState of ["available", "user_cancelled", "expired", "page_changed"]) {
   if (!writePreviewStates.includes(expectedState)) {
     throw new Error(`Core write-precheck smoke failed: ${expectedState} state was not projected.`);
   }
@@ -1186,6 +1277,53 @@ if (!writePreviewTask.runs.some((run) => run.approval?.statuses.some((status) =>
 
 if (bossWritePreviewTask.runs.some((run) => run.lifecycle !== "blocked" || run.approval?.statuses.some((status) => status.status === "pending"))) {
   throw new Error("Core BOSS write-precheck smoke failed: unsafe previews were not blocked.");
+}
+
+const terminalConflictCases = [
+  {
+    label: "failed + preview.available + submitted=false",
+    run: bossWritePreviewTask.runs.find((run) => run.id.includes("boss_failed_available_false_submitted")),
+    status: "failed",
+    state: "preview_unavailable",
+    lifecycle: "blocked",
+  },
+  {
+    label: "expired + preview.available + submitted=false",
+    run: writePreviewTask.runs.find((run) => run.id.includes("expired")),
+    status: "expired",
+    state: "expired",
+    lifecycle: "blocked",
+  },
+  {
+    label: "cancelled + preview.available + submitted=false",
+    run: writePreviewTask.runs.find((run) => run.id.includes("cancelled")),
+    status: "cancelled",
+    state: "user_cancelled",
+    lifecycle: "completed",
+  },
+  {
+    label: "page_changed + preview.available + submitted=false",
+    run: writePreviewTask.runs.find((run) => run.id.includes("page_changed")),
+    status: "failed",
+    state: "page_changed",
+    lifecycle: "blocked",
+  },
+];
+
+for (const { label, run, status, state, lifecycle } of terminalConflictCases) {
+  if (!run) {
+    throw new Error(`Core write-precheck smoke failed: ${label} fixture is missing.`);
+  }
+  if (
+    run.writePrecheck?.state !== state ||
+    run.lifecycle !== lifecycle ||
+    run.approval?.riskLevel === "low" ||
+    run.approval?.statuses.some((approvalStatus) => approvalStatus.status === "pending") ||
+    !run.resultRows.some((row) => row.label === "Run status" && row.value === status) ||
+    !run.resultRows.some((row) => row.label === "Submitted" && row.value === "false / 未提交")
+  ) {
+    throw new Error(`Core write-precheck smoke failed: ${label} was displayed as pending/low approval or lost owner terminal facts.`);
+  }
 }
 
 if (!bossWritePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label === "Submitted" && row.value === "unknown / blocked"))) {
