@@ -1,0 +1,54 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-244",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Spec gate allow for APP-244 at head e2cca67cad115a1fb71cc5c6c9825a1584986885: minimal suite spec/plan/evidence/task-carrier cover App #243-#247, consume Core #230 truth, preserve no-submit and external-action boundaries, and current-head validation passed.",
+  "reviewer": "codex-main-controller",
+  "authored_at": "2026-07-07T10:38:25Z",
+  "reviewed_head": "e2cca67cad115a1fb71cc5c6c9825a1584986885",
+  "reviewed_validation_summary": "2026-07-07T10:35:16Z current-head validation passed for `e2cca67cad115a1fb71cc5c6c9825a1584986885`: `npm run typecheck`, `npm run smoke`, `git diff --check`, `loom suite validate --target . --item APP-244 --json`, `loom suite carrier validate --target . --item APP-244 --json`, and `loom suite evidence validate --target . --item APP-244 --json` passed. Smoke covers Xiaohongshu and BOSS Core live write-precheck mapping, pending/cancelled/expired states, preview_unavailable and generic failed/blocked fail-closed states, submitted unknown/true blocked labels, preview_result evidence_refs, submitted=false / 未提交 boundary when Core owner truth explicitly reports false, blocked owner run plus available preview conflict staying blocked without pending/low approval, failed/expired/cancelled/page_changed terminal conflicts with `preview.state=available` and `submitted=false`, page_changed projection as blocked/non-pending, and missing `action_request_id` displaying `not exposed` instead of synthesized `action-request:<run_id>`. PR #254 metadata readback matched branch `work/app-244-real-write-precheck-display`, head `e2cca67cad115a1fb71cc5c6c9825a1584986885`, anchor #244, covered issues #243/#244/#245/#246/#247, and explicit non-goals. Previous hosted run `28855487905` passed `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check`; `loom-pr-merge-gate` failed because review artifacts were missing, not because App code or PR metadata failed. Deterministic review-readiness commands were executed: `tools/skills_surface.py check` against the installed Loom package failed with `skills_docs_reference_sync_drift` for missing Loom scaffold doc references, and `tools/loom_check.py --profile source --source-surface contract-only` against the installed Loom package failed with `scope mismatch` because the installed package lacks Loom source/distribution markers; both are classified as external Loom tool surface issues outside the App PR write scope. No real Core endpoint, browser, account, profile, Cookie, production page, approval execution, submit, publish, send, or external visible action was used.",
+  "reviewed_validation_summary_hash": "41a082af3a229a823fb936e00d60a7f5cb8bc3ee696b97085952e99f925b18e2",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-244.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-244.md",
+    "recovery_entry": ".loom/progress/APP-244.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null,
+    "suite_validation": "suite validate",
+    "suite_validator": "loom",
+    "suite_validator_mode": "global-cli",
+    "suite_spec": ".loom/specs/APP-244/spec.md",
+    "suite_plan": ".loom/specs/APP-244/plan.md",
+    "suite_evidence_map": ".loom/specs/APP-244/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-244/task-carrier.md"
+    ],
+    "suite_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/spec-suite.md"
+    ]
+  }
+}

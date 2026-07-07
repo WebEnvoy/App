@@ -21,7 +21,12 @@ import { type SiteSkill, type SiteSkillStatus, siteSkillFixtures } from "./siteS
 
 const directoryTabs = ["全部", "电商", "内容平台", "招聘", "内容发布", "账号身份", "诊断"] as const;
 type DirectoryTab = (typeof directoryTabs)[number];
-const app239ReadOnlyTaskIds = new Set<string>(["task-xhs-real-read", "task-boss-real-read"]);
+const appMilestone14TaskIds = new Set<string>([
+  "task-xhs-real-read",
+  "task-boss-real-read",
+  "task-xhs-publish-write-preview",
+  "task-boss-greeting-write-preview",
+]);
 
 export function SiteSkillDirectoryPage({
   selectedSkillId,
@@ -155,7 +160,7 @@ export function SiteSkillDetailPage({
   onOpenTask: (skill: SiteSkill) => void;
 }) {
   const firstRelatedTaskId = skill.relatedTaskIds[0] ?? null;
-  const canLaunchTask = firstRelatedTaskId != null && app239ReadOnlyTaskIds.has(firstRelatedTaskId) && skill.status !== "unavailable";
+  const canLaunchTask = firstRelatedTaskId != null && appMilestone14TaskIds.has(firstRelatedTaskId) && skill.status !== "unavailable";
 
   return (
     <div className="site-skill-page site-skill-detail-page we-sectioned-page">
@@ -368,8 +373,9 @@ export function SiteSkillDetailPage({
 }
 
 function readOnlyTaskActionText(skill: SiteSkill, canLaunchTask: boolean) {
+  if (canLaunchTask && skill.relatedTaskIds.some((taskId) => taskId.includes("write-preview"))) return "查看写前验证";
   if (canLaunchTask) return "启动只读任务";
-  if (skill.relatedTaskIds.some((taskId) => taskId.includes("write-preview"))) return "等写前验证";
+  if (skill.relatedTaskIds.some((taskId) => taskId.includes("write-preview"))) return "写前验证不可用";
   if (skill.relatedTaskIds.length > 0) return "非只读任务";
   return "暂无任务";
 }

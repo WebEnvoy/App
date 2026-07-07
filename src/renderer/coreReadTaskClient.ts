@@ -11,6 +11,7 @@ type CoreReadCapability = {
 
 type CoreReadTaskSpec = {
   taskId: string;
+  mode: "read" | "write-precheck";
   packageName: string;
   packageVersion: string;
   capabilities: CoreReadCapability[];
@@ -40,6 +41,9 @@ type CoreRunSummary = {
     capability_source_ref?: string;
     capability_lock_ref?: string;
     package_ref?: string;
+  };
+  admission?: {
+    action_risk?: string;
   };
   runtime_refs?: {
     session_binding?: {
@@ -79,12 +83,40 @@ type CoreResultEnvelope = {
       package_ref?: string;
       source_refs?: string[];
       evidence_refs?: string[];
+      preview_result?: CorePreviewResult;
       post_check?: { status?: string; summary?: string };
       failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
     };
+    preview_result?: CorePreviewResult;
   };
   failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
   evidence_refs?: CoreEvidenceRef[];
+};
+
+type CorePreviewState = "available" | "preview_unavailable" | "page_changed" | "user_cancelled" | "expired";
+
+type CorePreviewResult = {
+  state?: string;
+  submitted?: boolean;
+  expected_change?: {
+    change_kind?: string;
+    target_ref?: string;
+    summary?: string;
+    external_submit?: boolean;
+  };
+  action_refs?: {
+    action_request_id?: string;
+  };
+  capability?: {
+    capability_ref?: string;
+    capability_version?: string;
+    capability_source_ref?: string;
+    capability_lock_ref?: string;
+    package_ref?: string;
+  };
+  evidence_refs?: string[];
+  failure_class?: string;
+  consumer_boundary?: string;
 };
 
 type CoreFailureEnvelope = {
@@ -118,6 +150,7 @@ const coreLiveSource: OwnerSource = "Core live";
 const coreReadTaskSpecs: CoreReadTaskSpec[] = [
   {
     taskId: "task-xhs-real-read",
+    mode: "read",
     packageName: "@lode/xiaohongshu-read-only",
     packageVersion: "0.1.0",
     capabilities: [
@@ -136,6 +169,7 @@ const coreReadTaskSpecs: CoreReadTaskSpec[] = [
   },
   {
     taskId: "task-boss-real-read",
+    mode: "read",
     packageName: "@lode/boss-read-only",
     packageVersion: "0.1.0",
     capabilities: [
@@ -152,6 +186,34 @@ const coreReadTaskSpecs: CoreReadTaskSpec[] = [
     ],
     boundary: "Core owner API 只暴露 BOSS 只读 run/result/evidence refs；App 不打招呼、不投递、不保存聊天或简历材料。",
   },
+  {
+    taskId: "task-xhs-publish-write-preview",
+    mode: "write-precheck",
+    packageName: "@lode/xiaohongshu-write-pre-preview",
+    packageVersion: "0.1.0",
+    capabilities: [
+      {
+        capabilityRef: "lode:capability/xiaohongshu-draft-precheck",
+        capabilityVersion: "0.1.0",
+        packageRef: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      },
+    ],
+    boundary: "Core owner API 返回小红书写前验证 run/result/evidence refs；App 只展示 expected_change、approval state 和 owner submitted 状态，不点击发布。",
+  },
+  {
+    taskId: "task-boss-greeting-write-preview",
+    mode: "write-precheck",
+    packageName: "@lode/boss-greeting-write-pre-preview",
+    packageVersion: "0.1.0",
+    capabilities: [
+      {
+        capabilityRef: "lode:capability/boss-greeting-precheck",
+        capabilityVersion: "0.1.0",
+        packageRef: "lode://site-capability/boss/greeting-precheck@0.1.0",
+      },
+    ],
+    boundary: "Core owner API 返回 BOSS 打招呼写前验证 refs；App 只展示消息框预览、风险状态和 owner submitted 状态，不发送消息。",
+  },
 ];
 
 export function coreReadTaskStateFromFallback(endpoint: string, tasks: TaskProjection[]): CoreReadTaskLoadState {
@@ -159,7 +221,7 @@ export function coreReadTaskStateFromFallback(endpoint: string, tasks: TaskProje
     status: "loading",
     endpoint,
     fetchedAt: "pending",
-    summary: "正在读取 Core capability-runs、run result、evidence refs 和 failure refs。",
+    summary: "正在读取 Core capability-runs、run result、evidence refs、failure refs 和 write-precheck refs。",
     tasks,
     liveTaskIds: [],
   };
@@ -189,7 +251,7 @@ export async function fetchCoreReadTaskState(
       status: "offline",
       endpoint,
       fetchedAt,
-      summary: `Core endpoint 未返回可消费的真实只读 run projection；继续显示本地 fallback。${errors[0] ? ` ${errors[0]}` : ""}`,
+      summary: `Core endpoint 未返回可消费的真实 run projection；继续显示本地 fallback。${errors[0] ? ` ${errors[0]}` : ""}`,
       tasks: fallbackTasks,
       liveTaskIds: [],
     };
@@ -200,7 +262,7 @@ export async function fetchCoreReadTaskState(
     status: "ready",
     endpoint,
     fetchedAt,
-    summary: `已读取 ${projectedTasks.length} 个 Core 真实只读任务 projection；结果正文仍由 owner refs 承接。`,
+    summary: `已读取 ${projectedTasks.length} 个 Core 真实任务 projection；结果正文、写前验证和证据仍由 owner refs 承接。`,
     tasks: fallbackTasks.map((task) => liveById.get(task.id) ?? task),
     liveTaskIds: projectedTasks.map((task) => task.id),
   };
@@ -216,7 +278,7 @@ async function fetchCoreReadTask(
   const errors: string[] = [];
 
   for (const capability of spec.capabilities) {
-    const result = await fetchCapabilityRuns(endpoint, capability);
+    const result = await fetchCapabilityRuns(endpoint, capability, spec);
     if (result.ok) {
       projectedRuns.push(...result.runs);
     } else {
@@ -261,6 +323,7 @@ async function fetchCoreReadTask(
 async function fetchCapabilityRuns(
   endpoint: string,
   capability: CoreReadCapability,
+  spec: CoreReadTaskSpec,
 ): Promise<{ ok: true; runs: Array<{ run: RunProjection; updatedAt: string }> } | { ok: false; error: string }> {
   const params = new URLSearchParams({
     capability_ref: capability.capabilityRef,
@@ -283,7 +346,7 @@ async function fetchCapabilityRuns(
       const run = coreRunSummary(item);
       return run == null
         ? ({ ok: false, error: `${capability.capabilityRef} run ${index + 1} returned invalid summary` } as const)
-        : fetchRunProjection(endpoint, run);
+        : fetchRunProjection(endpoint, run, spec);
     }),
   );
   const failures = projections.flatMap((projection) => (projection.ok ? [] : [projection.error]));
@@ -303,6 +366,7 @@ async function fetchCapabilityRuns(
 async function fetchRunProjection(
   endpoint: string,
   run: CoreRunSummary,
+  spec: CoreReadTaskSpec,
 ): Promise<{ ok: true; projection: { run: RunProjection; updatedAt: string } } | { ok: false; error: string }> {
   const runId = encodeURIComponent(run.run_id);
   const [resultResponse, evidenceResponse, failureResponse, sessionResponse] = await Promise.all([
@@ -325,6 +389,8 @@ async function fetchRunProjection(
   const failure = failurePayload.payload as CoreFailureEnvelope;
   const session = sessionPayload.payload as CoreSessionRefsEnvelope;
   const envelope = result?.result?.result_envelope;
+  const isWritePrecheck = spec.mode === "write-precheck";
+  const previewResult = corePreviewResult(envelope?.preview_result ?? result?.result?.preview_result);
   const postCheck = run.terminal_summary?.post_check ?? envelope?.post_check;
   const runtimeSessionRefFromSession =
     session?.session_refs?.runtime_session_ref ??
@@ -332,18 +398,44 @@ async function fetchRunProjection(
   const objectEvidenceRefs = coreEvidenceRefs(evidence?.evidence_refs).length > 0
     ? coreEvidenceRefs(evidence?.evidence_refs)
     : coreEvidenceRefs(result?.evidence_refs);
-  const evidenceRefs = objectEvidenceRefs.length > 0
+  const resultEvidenceRefs = objectEvidenceRefs.length > 0
     ? objectEvidenceRefs
     : envelopeEvidenceRefs(envelope?.evidence_refs, run, runtimeSessionRefFromSession);
+  const evidenceRefs = dedupeEvidenceRefs([
+    ...resultEvidenceRefs,
+    ...envelopeEvidenceRefs(previewResult?.evidence_refs, run, runtimeSessionRefFromSession, "preview_result"),
+  ]);
   const runtimeSessionRef =
     runtimeSessionRefFromSession ??
     evidenceRefs.find((ref) => ref.runtime_session_ref)?.runtime_session_ref;
   const failureRecord = failure?.failure ?? result?.failure ?? envelope?.failure ?? run.terminal_summary?.failure;
   const hasFailureRecovery = Boolean(failureRecord || (failure?.reason_class && failure.reason_class !== "none"));
-  const resultKind = envelope?.result_kind ?? result?.result?.unavailable_reason ?? "not_available";
+  const resultKind = envelope?.result_kind ?? (isWritePrecheck ? "real_page_write_precheck_projection" : result?.result?.unavailable_reason ?? "not_available");
   const payloadState = result?.result?.payload_state ?? "not_reported";
-  const lifecycle = lifecycleFromStatus(run.status);
-  const outcome = outcomeFromStatus(run.status);
+  const writeState = isWritePrecheck
+    ? writePrecheckState(run, result, previewResult, failureRecord, failure?.reason_class)
+    : null;
+  const lifecycle = isWritePrecheck && writeState != null
+    ? lifecycleFromWritePrecheck(run.status, writeState)
+    : lifecycleFromStatus(run.status);
+  const outcome = isWritePrecheck && writeState != null
+    ? outcomeFromWritePrecheck(run.status, writeState)
+    : outcomeFromStatus(run.status);
+  const resultRows = isWritePrecheck && writeState != null
+    ? writePrecheckResultRows(run, resultKind, payloadState, previewResult, writeState, runtimeSessionRef)
+    : [
+        { label: "Run status", value: run.status, source: coreLiveSource },
+        { label: "Result kind", value: resultKind, source: coreLiveSource },
+        { label: "Payload state", value: payloadState, source: coreLiveSource },
+        { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
+        ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
+      ];
+  const writePrecheck = isWritePrecheck && writeState != null
+    ? coreWritePrecheck(run, previewResult, writeState, evidenceRefs, runtimeSessionRef)
+    : undefined;
+  const approval = isWritePrecheck && writeState != null
+    ? coreApprovalPreview(run, previewResult, writeState)
+    : undefined;
 
   return {
     ok: true,
@@ -354,17 +446,15 @@ async function fetchRunProjection(
         label: `${siteRunLabel(run)} ${run.run_id.replace(/^run_/, "").slice(0, 24)}`,
         lifecycle,
         outcome,
-        summary: summaryFromCoreRun(run, resultKind, evidenceRefs.length, failureRecord),
-        actionIntent: actionIntentFromCoreRun(run, failure),
+        summary: isWritePrecheck && writeState != null
+          ? summaryFromWritePrecheckRun(run, writeState, evidenceRefs.length, previewResult)
+          : summaryFromCoreRun(run, resultKind, evidenceRefs.length, failureRecord),
+        actionIntent: isWritePrecheck && writeState != null
+          ? actionIntentFromWritePrecheckRun(writeState)
+          : actionIntentFromCoreRun(run, failure),
         owner: "Core",
         source: coreLiveSource,
-        resultRows: [
-          { label: "Run status", value: run.status, source: coreLiveSource },
-          { label: "Result kind", value: resultKind, source: coreLiveSource },
-          { label: "Payload state", value: payloadState, source: coreLiveSource },
-          { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
-          ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
-        ],
+        resultRows,
         fieldSources: evidenceRefs.map((entry, index) => ({
           field: `证据引用 ${index + 1}`,
           value: entry.ref,
@@ -384,12 +474,16 @@ async function fetchRunProjection(
           provenance: entry.source ?? "Core evidence refs query",
         })),
         capabilityAttribution: {
-          capabilityRef: run.task?.capability_ref ?? "unknown",
-          version: run.task?.capability_version ?? "unknown",
-          sourceRef: run.task?.capability_source_ref ?? run.task?.package_ref ?? "unknown",
+          capabilityRef: previewResult?.capability?.capability_ref ?? run.task?.capability_ref ?? "unknown",
+          version: previewResult?.capability?.capability_version ?? run.task?.capability_version ?? "unknown",
+          sourceRef: previewResult?.capability?.capability_source_ref ?? run.task?.capability_source_ref ?? run.task?.package_ref ?? "unknown",
           failureClass: failureClass(failure?.reason_class, failureRecord?.code),
-          summary: "Core 查询返回 capability、package、runtime session 和 evidence refs；App 只展示引用。",
+          summary: isWritePrecheck
+            ? "Core 查询返回写前验证 capability、action request、runtime session、submitted 状态和 evidence refs；App 只展示引用。"
+            : "Core 查询返回 capability、package、runtime session 和 evidence refs；App 只展示引用。",
         },
+        ...(writePrecheck ? { writePrecheck } : {}),
+        ...(approval ? { approval } : {}),
         ...(hasFailureRecovery
           ? {
               failureRecovery: {
@@ -458,6 +552,7 @@ function envelopeEvidenceRefs(
   value: unknown,
   run: CoreRunSummary,
   runtimeSessionRef: string | undefined,
+  source = "result_envelope",
 ): CoreEvidenceRef[] {
   return arrayValue(value).flatMap((item) => {
     const ref = stringValue(item);
@@ -465,7 +560,7 @@ function envelopeEvidenceRefs(
       ? [
           {
             ref,
-            source: "result_envelope",
+            source,
             state: "available",
             raw_access: "not_available_from_core",
             recorded_at: run.timeline?.terminal_at ?? run.timeline?.updated_at ?? "unknown",
@@ -473,6 +568,15 @@ function envelopeEvidenceRefs(
           },
         ]
       : [];
+  });
+}
+
+function dedupeEvidenceRefs(refs: CoreEvidenceRef[]): CoreEvidenceRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    if (seen.has(ref.ref)) return false;
+    seen.add(ref.ref);
+    return true;
   });
 }
 
@@ -486,6 +590,7 @@ function coreRunSummary(value: unknown): CoreRunSummary | null {
     status,
     timeline: recordValue(value.timeline) as CoreRunSummary["timeline"],
     task: recordValue(value.task) as CoreRunSummary["task"],
+    admission: recordValue(value.admission) as CoreRunSummary["admission"],
     runtime_refs: recordValue(value.runtime_refs) as CoreRunSummary["runtime_refs"],
     terminal_summary: recordValue(value.terminal_summary) as CoreRunSummary["terminal_summary"],
   };
@@ -497,6 +602,210 @@ function coreEvidenceRefs(value: unknown): CoreEvidenceRef[] {
     const ref = stringValue(record?.ref);
     return ref ? [{ ...record, ref } as CoreEvidenceRef] : [];
   });
+}
+
+function corePreviewResult(value: unknown): CorePreviewResult | undefined {
+  const record = recordValue(value);
+  if (record == null) return undefined;
+  return {
+    state: stringValue(record.state),
+    submitted: typeof record.submitted === "boolean" ? record.submitted : undefined,
+    expected_change: recordValue(record.expected_change) as CorePreviewResult["expected_change"],
+    action_refs: recordValue(record.action_refs) as CorePreviewResult["action_refs"],
+    capability: recordValue(record.capability) as CorePreviewResult["capability"],
+    evidence_refs: arrayValue(record.evidence_refs).flatMap((item) => stringValue(item) ?? []),
+    failure_class: stringValue(record.failure_class),
+    consumer_boundary: stringValue(record.consumer_boundary),
+  };
+}
+
+function writePrecheckState(
+  run: CoreRunSummary,
+  result: CoreResultEnvelope,
+  preview: CorePreviewResult | undefined,
+  failure: CoreResultEnvelope["failure"] | undefined,
+  failureReasonClass: string | undefined,
+): CorePreviewState {
+  if (run.status === "expired" || result.result?.payload_state === "expired" || failureReasonClass === "expired") return "expired";
+  if (run.status === "cancelled" || failure?.code === "user_cancelled" || failureReasonClass === "user_cancelled") return "user_cancelled";
+  if (failure?.code === "page_changed" || failureReasonClass === "page_changed") return "page_changed";
+  if (failure?.code === "preview_unavailable" || failureReasonClass === "preview_unavailable" || result.result?.unavailable_reason) return "preview_unavailable";
+  if (run.status === "failed" || run.status === "blocked") return "preview_unavailable";
+  const state = previewStateValue(preview?.state);
+  if (state === "available") return preview?.submitted === false ? "available" : "preview_unavailable";
+  if (state) return state;
+  return "preview_unavailable";
+}
+
+function previewStateValue(value: string | undefined): CorePreviewState | undefined {
+  if (
+    value === "available" ||
+    value === "preview_unavailable" ||
+    value === "page_changed" ||
+    value === "user_cancelled" ||
+    value === "expired"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function lifecycleFromWritePrecheck(
+  status: CoreRunStatus,
+  state: CorePreviewState,
+): RunProjection["lifecycle"] {
+  if (state === "available" && status === "succeeded") return "needs-action";
+  if (state === "expired" || state === "page_changed" || state === "preview_unavailable") return "blocked";
+  if (state === "user_cancelled") return "completed";
+  return lifecycleFromStatus(status);
+}
+
+function outcomeFromWritePrecheck(status: CoreRunStatus, state: CorePreviewState): OutcomeKind {
+  if (state === "available") return "partial";
+  if (state === "expired") return "expired";
+  if (state === "user_cancelled") return "failure-safe";
+  if (state === "page_changed" || state === "preview_unavailable") return "unavailable";
+  return outcomeFromStatus(status);
+}
+
+function writePrecheckResultRows(
+  run: CoreRunSummary,
+  resultKind: string,
+  payloadState: string,
+  preview: CorePreviewResult | undefined,
+  state: CorePreviewState,
+  runtimeSessionRef: string | undefined,
+): RunProjection["resultRows"] {
+  return [
+    { label: "Run status", value: run.status, source: coreLiveSource },
+    { label: "Result kind", value: resultKind, source: coreLiveSource },
+    { label: "Preview state", value: state, source: coreLiveSource },
+    { label: "Payload state", value: payloadState, source: coreLiveSource },
+    { label: "Submitted", value: submittedLabel(preview), source: coreLiveSource },
+    { label: "Action request", value: preview?.action_refs?.action_request_id ?? "not exposed", source: coreLiveSource },
+    ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
+  ];
+}
+
+function coreWritePrecheck(
+  run: CoreRunSummary,
+  preview: CorePreviewResult | undefined,
+  state: CorePreviewState,
+  evidenceRefs: CoreEvidenceRef[],
+  runtimeSessionRef: string | undefined,
+): NonNullable<RunProjection["writePrecheck"]> {
+  const expectedChange = preview?.expected_change;
+  const targetRef = expectedChange?.target_ref ?? "owner writable target ref";
+  const expectedSummary = expectedChange?.summary ?? "Core write-precheck projection is available from owner refs.";
+  const externalSubmit = expectedChange?.external_submit === false ? "false" : "not exposed";
+  const submitted = submittedLabel(preview);
+  return {
+    state,
+    modeLabel: `真实页面写前验证 / ${state}`,
+    expectedChangeSummary: expectedSummary,
+    beforeLabel: runtimeSessionRef ?? "Core owner refs",
+    afterLabel: targetRef,
+    submittedLabel: submitted,
+    diffRows: [
+      {
+        label: "expected_change",
+        before: "当前页面 owner refs",
+        after: expectedSummary,
+        source: coreLiveSource,
+      },
+      {
+        label: "external_submit",
+        before: "not requested",
+        after: externalSubmit,
+        source: coreLiveSource,
+      },
+      {
+        label: "submitted",
+        before: "Core owner truth",
+        after: submitted,
+        source: coreLiveSource,
+      },
+      {
+        label: "evidence refs",
+        before: "owner refs",
+        after: `${evidenceRefs.length} refs`,
+        source: coreLiveSource,
+      },
+    ],
+    noSubmitGuard: "active",
+    stateNote: writePrecheckStateNote(state, preview),
+  };
+}
+
+function coreApprovalPreview(
+  run: CoreRunSummary,
+  preview: CorePreviewResult | undefined,
+  state: CorePreviewState,
+): NonNullable<RunProjection["approval"]> {
+  const actionRequestId = preview?.action_refs?.action_request_id ?? "not exposed";
+  const statuses: NonNullable<RunProjection["approval"]>["statuses"] = [];
+  const canApprove = state === "available" && preview?.submitted === false;
+  if (canApprove) {
+    statuses.push({
+      label: "审批请求",
+      status: "pending",
+      detail: "等待用户审查 owner 写前验证；App 不执行审批或提交。",
+    });
+  }
+  if (state === "available" && !canApprove) {
+    statuses.push({
+      label: "阻止审批",
+      status: "blocked",
+      detail: "Core 未明确返回 submitted=false，App 不显示为可审批。",
+    });
+  }
+  if (state === "expired") {
+    statuses.push({
+      label: "过期请求",
+      status: "expired",
+      detail: "写前验证已过期，不能继续审批或提交。",
+    });
+  }
+  if (state === "page_changed" || state === "preview_unavailable") {
+    statuses.push({
+      label: "阻止审批",
+      status: "blocked",
+      detail: "页面或证据状态不再匹配，必须重新验证。",
+    });
+  }
+  if (state === "user_cancelled") {
+    statuses.push({
+      label: "取消记录",
+      status: "cancelled",
+      detail: "取消只记录终止状态，不生成提交结果。",
+    });
+  }
+
+  return {
+    actionRequestId,
+    riskLabel: `${run.admission?.action_risk ?? "write"} / medium / no-submit`,
+    riskLevel: canApprove ? "low" : "blocked",
+    statuses,
+    cancelIntent: "记录取消意图；不发送提交、发布、打招呼或投递动作。",
+    boundary: preview?.consumer_boundary ?? "Core owns action request and submitted truth; App only displays refs and local cancel intent.",
+  };
+}
+
+function writePrecheckStateNote(state: CorePreviewState, preview: CorePreviewResult | undefined) {
+  if (preview?.submitted !== false) {
+    return `写前验证阻断：${submittedLabel(preview)}，App 不显示为可审批或已提交。`;
+  }
+  if (state === "expired") return "页面状态已过期；未提交，submitted=false / 未提交。";
+  if (state === "user_cancelled") return "已取消：没有执行提交，submitted=false / 未提交。";
+  if (state === "page_changed") return "页面已变化：写前验证不可继续，submitted=false / 未提交。";
+  if (state === "preview_unavailable") return "写前验证不可用：没有提交结果，submitted=false / 未提交。";
+  return "写前验证可审查；这不是提交结果，submitted=false / 未提交。";
+}
+
+function submittedLabel(preview: CorePreviewResult | undefined) {
+  if (preview?.submitted === false) return "false / 未提交";
+  if (preview?.submitted === true) return "true / blocked";
+  return "unknown / blocked";
 }
 
 function lifecycleFromStatus(status: CoreRunStatus): RunProjection["lifecycle"] {
@@ -519,6 +828,7 @@ function outcomeFromStatus(status: CoreRunStatus): OutcomeKind {
 function evidenceStatus(status: string | undefined): RunProjection["evidenceCards"][number]["status"] {
   if (status === "expired") return "expired";
   if (status === "redacted") return "redacted";
+  if (status === "stale") return "stale";
   if (status === "access_denied" || status === "deleted_by_policy" || status === "missing") return "unavailable";
   return "available";
 }
@@ -527,6 +837,9 @@ function failureClass(
   reasonClass: string | undefined,
   code: string | undefined,
 ): NonNullable<RunProjection["capabilityAttribution"]>["failureClass"] {
+  if (code === "user_cancelled") return "none";
+  if (code === "page_changed") return "site_changed";
+  if (code === "preview_unavailable") return "evidence_expired";
   if (!reasonClass || reasonClass === "none") return "none";
   if (reasonClass === "login_required") return "login_required";
   if (reasonClass === "page_changed") return "site_changed";
@@ -538,6 +851,9 @@ function failureClass(
 }
 
 function failureStateLabel(reasonClass: string | undefined, code: string | undefined) {
+  if (code === "user_cancelled") return "已取消";
+  if (code === "page_changed") return "页面变化";
+  if (code === "preview_unavailable") return "写前验证不可用";
   if (reasonClass === "login_required") return "未登录";
   if (reasonClass === "risk_prompt") return "验证码";
   if (reasonClass === "page_changed") return "页面变化";
@@ -553,6 +869,43 @@ function failureNextActions(failure: CoreFailureEnvelope | null): string[] {
     action ? `执行 owner-supported action: ${action}` : "查看 Core failure reason",
     failure?.retryable ? "修复身份环境或页面状态后再次执行" : "等待 owner 修复或人工处理",
   ];
+}
+
+function summaryFromWritePrecheckRun(
+  run: CoreRunSummary,
+  state: CorePreviewState,
+  evidenceCount: number,
+  preview: CorePreviewResult | undefined,
+) {
+  if (state === "preview_unavailable") {
+    return `Core 返回 ${run.status} 写前验证阻断状态；App 不显示 pending approval，submitted 状态按 owner truth 展示。`;
+  }
+  if (state === "available") {
+    return `Core 返回真实页面写前验证：${evidenceCount} 个 evidence ref 可审查；submitted=false / 未提交。`;
+  }
+  if (preview?.submitted !== false) {
+    return `Core 返回 ${run.status} 写前验证状态；${submittedLabel(preview)}，不能继续审批或提交。`;
+  }
+  if (state === "expired") {
+    return "Core 返回写前验证过期状态；不能继续审批或提交，submitted=false / 未提交。";
+  }
+  if (state === "user_cancelled") {
+    return "Core 返回取消状态；App 不显示为已提交，submitted=false / 未提交。";
+  }
+  if (state === "page_changed") {
+    return "Core 返回页面变化状态；需要重新生成写前验证，submitted=false / 未提交。";
+  }
+  return `Core 返回 ${run.status} 写前验证状态；App 只展示 refs 和 no-submit guard。`;
+}
+
+function actionIntentFromWritePrecheckRun(state: CorePreviewState) {
+  if (state === "available") {
+    return "Owner-supported action intent: 审查写前验证；App 只记录取消意图，不执行审批或提交。";
+  }
+  if (state === "expired" || state === "page_changed" || state === "preview_unavailable") {
+    return "Owner-supported action intent: 刷新页面证据后重新生成写前验证。";
+  }
+  return "Owner-supported action intent: 重新生成写前验证或修改输入。";
 }
 
 function summaryFromCoreRun(
@@ -580,6 +933,8 @@ function actionIntentFromCoreRun(run: CoreRunSummary, failure: CoreFailureEnvelo
 
 function siteRunLabel(run: CoreRunSummary) {
   const packageRef = run.task?.package_ref ?? run.task?.capability_source_ref ?? "";
+  if (packageRef.includes("xiaohongshu") && packageRef.includes("precheck")) return "小红书 Preview";
+  if (packageRef.includes("boss") && packageRef.includes("precheck")) return "BOSS Preview";
   if (packageRef.includes("xiaohongshu")) return "小红书 Run";
   if (packageRef.includes("boss")) return "BOSS Run";
   return "Core Run";

@@ -97,10 +97,10 @@ function EvidenceTab({ selectedRun }: { selectedRun: RunProjection }) {
       <p>Evidence card only links owner viewer refs; App does not read raw evidence body.</p>
       {selectedRun.writePrecheck ? (
         <dl className="context-facts compact">
-          <SourceField label="Preview state" value={selectedRun.writePrecheck.state} source="Core fixture" />
-          <SourceField label="Submitted" value="false / 未提交" source="Core fixture" />
-          <SourceField label="No-submit guard" value={selectedRun.writePrecheck.noSubmitGuard} source="Core fixture" />
-          <SourceField label="State note" value={selectedRun.writePrecheck.stateNote} source="Core fixture" />
+          <SourceField label="Preview state" value={selectedRun.writePrecheck.state} source={selectedRun.source} />
+          <SourceField label="Submitted" value={selectedRun.writePrecheck.submittedLabel ?? "false / 未提交"} source={selectedRun.source} />
+          <SourceField label="No-submit guard" value={selectedRun.writePrecheck.noSubmitGuard} source={selectedRun.source} />
+          <SourceField label="State note" value={selectedRun.writePrecheck.stateNote} source={selectedRun.source} />
         </dl>
       ) : null}
       {selectedRun.fieldSources ? (

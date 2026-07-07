@@ -70,6 +70,8 @@ function CoreReadSourceStrip({
   state: CoreReadTaskLoadState;
 }) {
   const isLiveTask = state.liveTaskIds.includes(selectedTask.id);
+  const isWritePrecheckTask = selectedTask.runs.some((run) => run.writePrecheck);
+  const taskKind = isWritePrecheckTask ? "写前验证" : "只读任务结果";
   const status = state.status === "ready" && !isLiveTask ? "fallback" : state.status;
   const label =
     status === "ready"
@@ -81,9 +83,11 @@ function CoreReadSourceStrip({
       : "本地展示";
   const summary =
     status === "ready"
-      ? "已读取 owner 返回的只读运行结果引用；页面只展示结果、证据引用和恢复状态。"
+      ? isWritePrecheckTask
+        ? "已读取 owner 返回的写前验证引用；页面只展示预期变化、证据引用、风险状态和 owner submitted 状态。"
+        : "已读取 owner 返回的只读运行结果引用；页面只展示结果、证据引用和恢复状态。"
       : status === "loading"
-      ? "正在检查是否有可用的只读运行结果；检查期间保留本地展示。"
+      ? `正在检查是否有可用的${taskKind}；检查期间保留本地展示。`
       : status === "fallback"
       ? "当前任务没有可用的实时结果，继续显示明确标记的本地展示。"
       : "暂未读取到可用实时结果，继续显示明确标记的本地展示。";
@@ -92,7 +96,7 @@ function CoreReadSourceStrip({
     <section className={`core-read-source-strip core-read-source-${status}`} aria-label="Core read task status">
       <div>
         <strong>{label}</strong>
-        <span>只读任务结果</span>
+        <span>{taskKind}</span>
       </div>
       <p>{summary}</p>
       <span className="badge">{status === "ready" ? "owner refs" : "fallback"}</span>
@@ -276,6 +280,7 @@ function WritePrecheckPreview({ run }: { run: RunProjection }) {
   if (!preview) {
     return null;
   }
+  const ownerSource = run.source;
 
   return (
     <section className="write-precheck-panel" aria-label="Write-pre preview">
@@ -286,19 +291,19 @@ function WritePrecheckPreview({ run }: { run: RunProjection }) {
       </div>
       <p>{preview.expectedChangeSummary}</p>
       <dl className="input-grid">
-        <SourceField label="Preview state" value={preview.state} source="Core fixture" />
-        <SourceField label="Submitted" value="false / 未提交" source="Core fixture" />
-        <SourceField label="No-submit guard" value={preview.noSubmitGuard} source="Core fixture" />
-        {run.approval ? <SourceField label="Risk" value={run.approval.riskLabel} source="Core fixture" /> : null}
+        <SourceField label="Preview state" value={preview.state} source={ownerSource} />
+        <SourceField label="Submitted" value={preview.submittedLabel ?? "false / 未提交"} source={ownerSource} />
+        <SourceField label="No-submit guard" value={preview.noSubmitGuard} source={ownerSource} />
+        {run.approval ? <SourceField label="Risk" value={run.approval.riskLabel} source={ownerSource} /> : null}
         {run.approval ? (
           <SourceField
             label="Approval states"
             value={run.approval.statuses.map((item) => item.status).join(" / ")}
-            source="Core fixture"
+            source={ownerSource}
           />
         ) : null}
-        <SourceField label="Before" value={preview.beforeLabel} source="Harbor fixture" />
-        <SourceField label="After" value={preview.afterLabel} source="Lode fixture" />
+        <SourceField label="Before" value={preview.beforeLabel} source={ownerSource} />
+        <SourceField label="After" value={preview.afterLabel} source={ownerSource} />
       </dl>
       <div className="diff-preview" aria-label="Diff-like preview">
         {preview.diffRows.map((row) => (
@@ -321,6 +326,7 @@ function ApprovalPreview({ run }: { run: RunProjection }) {
   if (!approval) {
     return null;
   }
+  const ownerSource = run.source;
 
   return (
     <section className="approval-panel" aria-label="Risk and approval request">
@@ -330,7 +336,7 @@ function ApprovalPreview({ run }: { run: RunProjection }) {
         <span className={`status-pill status-${approval.riskLevel}`}>{approval.riskLabel}</span>
       </div>
       <dl className="input-grid">
-        <SourceField label="Action request" value={approval.actionRequestId} source="Core fixture" />
+        <SourceField label="Action request" value={approval.actionRequestId} source={ownerSource} />
         <SourceField label="Cancel intent" value={approval.cancelIntent} source="App local-only" />
       </dl>
       <div className="approval-state-list">

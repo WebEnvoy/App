@@ -1,0 +1,136 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item_id": "APP-244",
+  "delegations": [
+    {
+      "id": "darwin-write-precheck-exploration",
+      "status": "integrated",
+      "task_goal": "Locate existing APP-244 write-precheck UI/data flow and minimal implementation points.",
+      "context_locators": [
+        "src/renderer/TaskThreadPage.tsx",
+        "src/renderer/TaskThreadRightPanel.tsx",
+        "src/renderer/realWritePreviewFixtures.ts",
+        "src/renderer/coreReadTaskClient.ts",
+        "scripts/smoke.mjs"
+      ],
+      "read_scope": [
+        "App renderer write-precheck UI",
+        "smoke coverage",
+        "design boundary docs"
+      ],
+      "write_ownership": [
+        "read_only:no_tracked_writes:darwin-write-precheck-exploration"
+      ],
+      "non_goals": [
+        "file edits",
+        "GitHub writes",
+        "Loom carrier edits",
+        "real account/profile/external actions"
+      ],
+      "validation_expectation": "Identify existing UI, minimal files, smoke extension, and risks.",
+      "output_format": "Summary with file locators and risks.",
+      "integration_target": "Main controller integrated task reachability, live Core mapping, and smoke coverage."
+    },
+    {
+      "id": "ramanujan-smoke-implementation",
+      "status": "integrated",
+      "task_goal": "Add bounded smoke assertions for APP-244 write-precheck display strings.",
+      "context_locators": [
+        "scripts/smoke.mjs"
+      ],
+      "read_scope": [
+        "scripts/smoke.mjs",
+        "existing write-precheck fixtures"
+      ],
+      "write_ownership": [
+        "scripts/smoke.mjs#bundle-text-smoke"
+      ],
+      "non_goals": [
+        ".loom/** edits",
+        "GitHub writes",
+        "real account/profile/external actions"
+      ],
+      "validation_expectation": "npm run typecheck; npm run smoke",
+      "output_format": "Changed paths, validation result, residual risk.",
+      "integration_target": "Main controller retained the smoke additions and extended the same file with live Core write-precheck mapping checks."
+    },
+    {
+      "id": "epicurus-live-write-precheck-p1-fix",
+      "status": "integrated",
+      "task_goal": "Fix live Core write-precheck mapping so unsafe or ambiguous states fail closed and smoke covers XHS/BOSS live projections.",
+      "context_locators": [
+        "src/renderer/coreReadTaskClient.ts",
+        "scripts/smoke.mjs"
+      ],
+      "read_scope": [
+        "Core live write-precheck projection",
+        "submitted owner truth mapping",
+        "smoke coverage"
+      ],
+      "write_ownership": [
+        "src/renderer/coreReadTaskClient.ts#write-precheck-live-mapping",
+        "scripts/smoke.mjs#write-precheck-live-smoke"
+      ],
+      "non_goals": [
+        ".loom/** edits",
+        "GitHub writes",
+        "real account/profile/external actions",
+        "approval execution",
+        "submit/publish/send"
+      ],
+      "validation_expectation": "git diff --check; npm run typecheck; npm run smoke",
+      "output_format": "Changed paths, validation result, residual risk.",
+      "integration_target": "Main controller retained the fail-closed mapping, added dynamic submitted label UI wiring, and refreshed APP-244 carriers."
+    }
+  ],
+  "integration_evidence": [
+    {
+      "id": "task-reachability-integrated",
+      "status": "integrated",
+      "summary": "Task Thread list and Library CTA now include Xiaohongshu/BOSS write-precheck tasks.",
+      "locators": [
+        "src/renderer/App.tsx",
+        "src/renderer/SiteSkillPages.tsx"
+      ],
+      "validation": [
+        "npm run typecheck",
+        "npm run smoke"
+      ]
+    },
+    {
+      "id": "live-write-precheck-integrated",
+      "status": "integrated",
+      "summary": "Core live write-precheck projection maps preview_result/action refs/evidence/session/failure states into existing writePrecheck and approval UI fields.",
+      "locators": [
+        "src/renderer/coreReadTaskClient.ts",
+        "src/renderer/TaskThreadPage.tsx",
+        "src/renderer/TaskThreadRightPanel.tsx",
+        "scripts/smoke.mjs"
+      ],
+      "validation": [
+        "npm run typecheck",
+        "npm run smoke",
+        "git diff --check"
+      ]
+    },
+    {
+      "id": "live-write-precheck-fail-closed-integrated",
+      "status": "integrated",
+      "summary": "Core live preview_unavailable, generic failed/blocked, submitted=true, and missing submitted states now render as blocked rather than pending approval; submitted=false / 未提交 is displayed only when Core owner truth explicitly reports false.",
+      "locators": [
+        "src/renderer/coreReadTaskClient.ts",
+        "src/renderer/TaskThreadPage.tsx",
+        "src/renderer/TaskThreadRightPanel.tsx",
+        "src/renderer/taskThreadFixtures.ts",
+        "scripts/smoke.mjs"
+      ],
+      "validation": [
+        "git diff --check",
+        "npm run typecheck",
+        "npm run smoke"
+      ]
+    }
+  ],
+  "ownership_overlap": [],
+  "repeated_blockers": []
+}
