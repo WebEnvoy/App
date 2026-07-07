@@ -2,22 +2,22 @@
 
 ## Derived Fact Chain View
 
-- Item ID: APP-239
-- Goal: Display App milestone #14 real read-only task results for Xiaohongshu and BOSS by consuming Core owner API run/result/evidence projections when available, with safe fallback projections offline.
-- Scope: App Task Thread read-result display, Core read-only query client, source status UI, Library/Browser entry copy, smoke coverage, APP-239 item-specific carrier, and ownership constraints: main controller owns shared Loom/PR/GitHub carriers while subagents provide bounded App implementation/review outputs that are integrated before review.
-- Execution Path: milestone14/app-real-read-results
-- Workspace Entry: .
-- Recovery Entry: .loom/progress/APP-239.md
-- Review Entry: .loom/reviews/APP-239.json
-- Validation Entry: npm run typecheck; npm run smoke; git diff --check
-- Closing Condition: PR Ready for #238/#239/#240/#241/#242 without merge, issue closeout, live site access, or external write.
-- Current Checkpoint: closed_out
-- Current Stop: PR #251 is merged and terminal closeout metadata is recorded for APP-239.
-- Next Step: Merge this closeout carrier PR, write post-merge issue evidence for #238/#239/#240/#241/#242, then retire current pointer to no_active_item.
-- Blockers: None recorded.
-- Latest Validation Summary: 2026-07-07T06:42:46Z App PR #251 delivery dry-run consumed PR metadata readback/preflight for APP-239, current-head spec and implementation review records, suite evidence/carrier validation, and local checks (`npm run typecheck`, `npm run smoke`, `git diff --check`). Hosted run 28846787015 passed `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check`; `loom-pr-merge-gate` fell back only because this carrier still advertised the build checkpoint before this sync. Smoke covers XHS Core live projection, BOSS Core live projection, raw evidence boundary, non-none failure recovery, app_action none suppression, mixed run detail failure fallback, and read-only-only Library task launch CTA.
-- Recovery Boundary: Revert PR #251 branch `work/app-239-real-read-results`; no Core/Harbor/Lode repo changes, external site access, real account/profile/Cookie use, raw evidence storage, host merge, issue closeout, or live write occurred. Core #230 / PR #240 write-precheck facts remain excluded scope and are not consumed by this read-only display batch.
-- Current Lane: App milestone #14 real read-only task result display batch
+- Item ID: no_active_item
+- Goal: not_applicable
+- Scope: not_applicable
+- Execution Path: not_applicable
+- Workspace Entry: not_applicable
+- Recovery Entry: not_applicable
+- Review Entry: not_applicable
+- Validation Entry: not_applicable
+- Closing Condition: not_applicable
+- Current Checkpoint: not_applicable
+- Current Stop: not_applicable
+- Next Step: not_applicable
+- Blockers: not_applicable
+- Latest Validation Summary: not_applicable
+- Recovery Boundary: not_applicable
+- Current Lane: not_applicable
 
 ## Runtime Evidence
 
@@ -25,11 +25,11 @@
 - Logs Entry: not_applicable
 - Diagnostics Entry: not_applicable
 - Verification Entry: loom verify --target . --json
-- Lane Entry: App milestone #14 real read-only task result display batch
+- Lane Entry: not_applicable
 
 ## Sources
 
-- Static Truth: .loom/work-items/APP-239.md
-- Dynamic Truth: .loom/progress/APP-239.md
+- Static Truth: not_applicable
+- Dynamic Truth: not_applicable
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
