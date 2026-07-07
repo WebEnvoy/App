@@ -28,4 +28,4 @@
 ## Host Binding
 
 - Pull Request: https://github.com/WebEnvoy/App/pull/254
-- Reviewed Head: 2c68e73ceeda35f3afe3428ace9a365c0053a804
+- Reviewed Head: supplied by `.loom/reviews/APP-244.spec.json` and `.loom/reviews/APP-244.json`
