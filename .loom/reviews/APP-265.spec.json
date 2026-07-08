@@ -1,0 +1,54 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-265",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Spec review allows APP-265: the suite covers the App runtime admission corrective slice, including Harbor /readiness probing, Core/Harbor diagnostics, fixture/demo/live=false fail-closed behavior, packaged vertical smoke, and explicit exclusions for real site/account/profile/Cookie actions, production writes, hosted browser, marketplace, batch collection, and risk-control bypass.",
+  "reviewer": "Codex main controller thread 019f3a6c-9bb5-7a80-8095-13751f46cead",
+  "authored_at": "2026-07-08T17:44:04Z",
+  "reviewed_head": "1eaa72cba1932c7f55173f048e88590cda055b7d",
+  "reviewed_validation_summary": "2026-07-08T17:21Z UTC main-controller validation passed: `loom doctor --target . --json`; `loom verify --target . --json`; `loom fact-chain --target . --json`; `npm run typecheck`; `npm run smoke`; `npm run smoke:packaged`; `npm run smoke:packaged:vertical`; `git diff --check`; `loom build --target . --item APP-265 --build-evidence .loom/specs/APP-265/build-evidence.json --json`. Deterministic review-readiness evidence was run and classified as repo-local tool surface absent, not product failure: `tools/skills_surface.py check` exit 127; `tools/loom_check.py --profile source --source-surface contract-only` exit 127; `tools/check_release_surface.py` exit 127; `tools/version_surface_check.py` exit 127; `tools/check_npm_package.py` exit 127.",
+  "reviewed_validation_summary_hash": "6c445735ec5b9b2232d048c5e47fee6135f7cd102b130835fdcec8b70a67361e",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-265.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-265.md",
+    "recovery_entry": ".loom/progress/APP-265.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null,
+    "suite_validation": "suite validate",
+    "suite_validator": "loom",
+    "suite_validator_mode": "global-cli",
+    "suite_spec": ".loom/specs/APP-265/spec.md",
+    "suite_plan": ".loom/specs/APP-265/plan.md",
+    "suite_evidence_map": ".loom/specs/APP-265/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-265/task-carrier.md"
+    ],
+    "suite_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/spec-suite.md"
+    ]
+  }
+}
