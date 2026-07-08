@@ -1,0 +1,60 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-260",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "Code review allows APP-260 at head 375df4b: App packages local Lode capability registry/site JSON assets, validates required Xiaohongshu/BOSS package refs, passes Lode asset env to Core child launch only when ready, and records packaged vertical smoke evidence through local owner-shaped Core/Harbor health endpoints. No real browser/profile/account/Cookie/site access or external visible write was performed, and the smoke is not live Xiaohongshu/BOSS production evidence.",
+  "reviewer": "Codex main controller",
+  "authored_at": "2026-07-08T14:53:10Z",
+  "reviewed_head": "375df4b57f97b906b7db61b5aae0eeba42b4d8c5",
+  "reviewed_validation_summary": "2026-07-08T14:50:18Z UTC local validation passed: `npm run typecheck`; `npm run smoke`; `npm run smoke:packaged`; `npm run smoke:packaged:vertical`; `git diff --check`; `loom fact-chain --target . --json`; `loom suite validate --target . --item APP-260 --json`; `loom suite carrier validate --target . --item APP-260 --json`; `loom suite evidence validate --target . --item APP-260 --json`. `loom build --target . --item APP-260 --build-evidence .loom/specs/APP-260/build-evidence.json --json --full-output` classified only `checkpoint-admission` as block with `missing_inputs=[]`; `build-execution` was pass and no unintegrated delegation output remained. Deterministic review-readiness checks were run against the installed Loom package because App has no `tools/` directory: `tools/skills_surface.py check` failed with `skills_docs_reference_sync_drift`; `tools/loom_check.py --profile source --source-surface contract-only` failed with source scope mismatch; `tools/check_release_surface.py` failed because source release docs/workflows are absent from the installed package; `tools/version_surface_check.py` failed because `packages/loom-installer/package.json` is absent from the installed package; `tools/check_npm_package.py` failed with runtime copy parity gaps for source/plugin/.loom/bin paths. These deterministic check failures are classified as external Loom tool surface/package-layout issues outside APP-260 write scope. `smoke:packaged:vertical` used local temporary Core/Harbor HTTP smoke servers, packaged Lode build-output assets, and generated `artifacts/app-261-packaged-vertical-smoke.png`; it did not use real accounts, browser profiles, Cookies, production pages, submit/publish/send, or external visible actions.",
+  "reviewed_validation_summary_hash": "4ad847d35ebbaaf3ef97e239ef19c54830cacb72a5cd8814acf2f0cae3da0405",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-260.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-260.md",
+    "recovery_entry": ".loom/progress/APP-260.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "checkpoint-admission tool-surface block with no missing inputs; build-execution pass",
+    "budget_risk": {
+      "schema_version": "loom-execution-budget-risk/v1",
+      "status": "not_applicable",
+      "enforcement": "advisory",
+      "highest_risk": "none",
+      "risk_dimensions": [],
+      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
+      "budget_summary": "execution budget is not collected for this invocation.",
+      "adapter_evidence_locator": "",
+      "provenance": {
+        "source": "github_host"
+      }
+    },
+    "engine_adapter": null,
+    "engine_evidence": null,
+    "normalized_findings": null,
+    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke --item APP-260 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke --item APP-260 --json",
+    "suite_evidence_map": ".loom/specs/APP-260/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-260/task-carrier.md"
+    ],
+    "suite_evidence_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/evidence-map.md"
+    ],
+    "suite_carrier_consumed_contracts": [
+      "docs/methodology/harness/task-carrier-contract.md",
+      "docs/methodology/templates/execution-breakdown.md",
+      "docs/methodology/harness/full-spec-suite-cli-surface.md"
+    ]
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Authored implementation review approved the current head for merge checkpoint consumption, with evidence limited to App packaged/local owner-shaped smoke and explicit non-live boundaries."
+  }
+}
