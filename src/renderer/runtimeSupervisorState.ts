@@ -10,6 +10,7 @@ export type RuntimeProbe = {
   url: string;
   statusCode?: number;
   summary: string;
+  attempts?: Array<{ url: string; statusCode?: number; summary: string }>;
 };
 
 export type RuntimeServiceState = {
@@ -197,6 +198,9 @@ function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState
       { label: "Core health", value: coreHealth, source: runtimeSupervisorSource },
       { label: "Core admission", value: coreAdmission, source: runtimeSupervisorSource },
       { label: "Harbor health", value: harborHealth, source: runtimeSupervisorSource },
+      { label: "Core health endpoint", value: core?.health.url ?? "not checked", source: runtimeSupervisorSource },
+      { label: "Core admission endpoint", value: core?.admission?.url ?? "not checked", source: runtimeSupervisorSource },
+      { label: "Harbor health endpoint", value: harbor?.health.url ?? "not checked", source: runtimeSupervisorSource },
       { label: "Lode assets", value: runtime.lodeAssets.state, source: runtimeSupervisorSource },
       { label: "Fixture/demo", value: "隔离；不作为可用任务、真实结果或写前验证成功", source: runtimeSupervisorSource },
     ],
@@ -234,8 +238,11 @@ function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState
     },
     process: [
       `Core health: ${coreHealth}.`,
+      `Core health probe: ${core?.health.summary ?? "not checked"}.`,
       `Core admission: ${coreAdmission}.`,
+      `Core admission probe: ${core?.admission?.summary ?? "not checked"}.`,
       `Harbor health: ${harborHealth}.`,
+      `Harbor health probe: ${harbor?.health.summary ?? "not checked"}.`,
       `Lode assets: ${runtime.lodeAssets.state}.`,
       "No fixture/demo projection was promoted to a usable real result.",
     ],
