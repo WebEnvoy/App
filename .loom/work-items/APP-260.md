@@ -6,7 +6,7 @@
 - Goal: Package Lode Xiaohongshu/BOSS capability assets with the App build so local Core can consume the registry and package refs without relying on a live Lode server or fixture-as-runtime behavior.
 - Scope: App build-time Lode JSON asset packaging, Electron runtime Lode asset resolver, Core child-process env handoff, packaged smoke checks, vertical packaged smoke evidence, APP-260 item-specific carrier, and ownership constraints for the changed App build/runtime/smoke files.
 - Execution Path: milestone14/app-lode-assets-packaged-smoke
-- Workspace Entry: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/APP-260.md
 - Review Entry: .loom/reviews/APP-260.json
 - Validation Entry: loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:vertical; git diff --check

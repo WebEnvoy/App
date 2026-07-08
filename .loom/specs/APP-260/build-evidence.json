@@ -7,7 +7,7 @@
       "status": "integrated",
       "task_goal": "Implement App #260 local packaged Lode asset path.",
       "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke",
+        ".",
         "https://github.com/WebEnvoy/App/issues/256",
         "https://github.com/WebEnvoy/App/issues/260",
         "https://github.com/WebEnvoy/App/issues/261"
@@ -53,7 +53,7 @@
   "ownership_contract": {
     "task_goal": "Implement App #260/#261 packaged Lode asset and vertical smoke batch.",
     "context_locators": [
-      "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke",
+      ".",
       "https://github.com/WebEnvoy/App/issues/256",
       "https://github.com/WebEnvoy/App/issues/260",
       "https://github.com/WebEnvoy/App/issues/261"

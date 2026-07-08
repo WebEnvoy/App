@@ -7,7 +7,7 @@
 - Parent FR: #256
 - Covered Issues: #260, #261
 - Branch: work/app-260-packaged-vertical-smoke
-- Workspace: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke
+- Workspace: .
 
 ## Approved Scope
 

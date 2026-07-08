@@ -36,8 +36,8 @@
     "engine_adapter": null,
     "engine_evidence": null,
     "normalized_findings": null,
-    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke --item APP-260 --json",
-    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-260-packaged-vertical-smoke --item APP-260 --json",
+    "suite_evidence_validation": "loom suite evidence validate --target . --item APP-260 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target . --item APP-260 --json",
     "suite_evidence_map": ".loom/specs/APP-260/evidence-map.md",
     "suite_consistency_analysis": null,
     "suite_task_carriers": [
