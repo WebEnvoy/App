@@ -11,9 +11,9 @@
 - Review Entry: .loom/reviews/APP-265.json
 - Validation Entry: loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:vertical; git diff --check
 - Closing Condition: PR Ready for App #265 after local App E2E evidence proves Core/Harbor health/admission contracts are consumed correctly and no fixture/demo state is promoted to live.
-- Current Checkpoint: build
-- Current Stop: App-side supervisor/UI/smoke fix is integrated in this worktree; Harbor/Core owner outputs are recorded as external lane dependencies for final App E2E.
-- Next Step: Commit/push the APP-265 probe hardening and review carriers, update PR metadata to the new head, then run App against merged or checked-out Harbor/Core owner runtime heads.
+- Current Checkpoint: merge
+- Current Stop: Current-head spec/code review and PR metadata are recorded; ready to run PR gate and merge-ready for App #265 runtime admission PR.
+- Next Step: Run PR gate and merge-ready, then merge App #266 after Harbor/Core compatibility PRs are merged.
 - Blockers: None
 - Latest Validation Summary: 2026-07-08T17:59Z UTC main-controller validation passed after APP-265 review fixes: `npm run typecheck`; `npm run smoke`; `npm run smoke:packaged`; `npm run smoke:packaged:vertical`; `git diff --check`; `loom fact-chain --target . --json`; `loom build --target . --item APP-265 --build-evidence .loom/specs/APP-265/build-evidence.json --json`. Packaged vertical smoke now covers both live_ready owner-shaped Core/Harbor/Lode readiness and fixture fail-closed behavior where Harbor `/readiness` returns `source=fixture` while `/health` returns ready. No real account, Cookie, browser profile import, production page action, submit, publish, send, or external visible action was performed.
 - Recovery Boundary: Revert branch `work/app-265-runtime-admission-e2e`; no real account/profile/Cookie/production page action, submit, publish, send, or external visible action occurred.
