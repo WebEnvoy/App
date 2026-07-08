@@ -40,6 +40,7 @@ try {
     coreEndpoint: core.endpoint,
     harborEndpoint: harbor.endpoint,
     screenshotPath,
+    expectation: "live_ready",
   });
 
   if (!result.runtimeSupervisorState?.canUseLiveRuntime) {
@@ -50,6 +51,35 @@ try {
     throw new Error(`Packaged vertical smoke failed: Lode assets were not packaged. ${JSON.stringify(result.runtimeSupervisorState.lodeAssets)}`);
   }
 
+  const fixtureCore = await startJsonServer((pathname) => {
+    if (["/health", "/admission/health"].includes(pathname)) {
+      return {
+        service: "webenvoy-core-smoke",
+        status: "ready",
+      };
+    }
+    return null;
+  });
+  const fixtureHarbor = await startJsonServer((pathname) => {
+    if (pathname === "/readiness") return { service: "webenvoy-harbor-smoke", status: "ready", source: "fixture" };
+    if (pathname === "/health") return { service: "webenvoy-harbor-smoke", status: "ready" };
+    return null;
+  });
+  try {
+    const fixtureResult = await runElectronSmoke({
+      coreEndpoint: fixtureCore.endpoint,
+      harborEndpoint: fixtureHarbor.endpoint,
+      expectation: "fail_closed",
+    });
+    const harborHealth = fixtureResult.runtimeSupervisorState?.services?.find((service) => service.id === "harbor")?.health;
+    if (!fixtureResult.runtimeSupervisorState?.failClosed || fixtureResult.runtimeSupervisorState.canUseLiveRuntime || harborHealth?.state !== "unavailable") {
+      throw new Error(`Packaged vertical smoke failed: fixture Harbor readiness opened live gate. ${JSON.stringify(fixtureResult.runtimeSupervisorState)}`);
+    }
+  } finally {
+    await fixtureCore.close();
+    await fixtureHarbor.close();
+  }
+
   console.log(
     [
       "Packaged vertical smoke passed.",
@@ -57,6 +87,7 @@ try {
       `Harbor endpoint: ${harbor.endpoint}`,
       `Lode asset source: ${result.runtimeSupervisorState.lodeAssets.source}`,
       `Screenshot: ${screenshotPath}`,
+      "Fixture fail-closed check: passed.",
       "Boundary: local owner-shaped health/admission/evidence refs only; no real account/profile/Cookie/production page and no submit/publish/send.",
     ].join("\n"),
   );
@@ -65,15 +96,15 @@ try {
   await harbor.close();
 }
 
-async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath }) {
+async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath, expectation }) {
   const child = spawn(electron, ["dist-electron/main.js"], {
     env: {
       ...process.env,
       WEBENVOY_PACKAGED_SMOKE: "1",
-      WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION: "live_ready",
+      WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION: expectation,
       WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT: coreEndpoint,
       WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT: harborEndpoint,
-      WEBENVOY_PACKAGED_SMOKE_SCREENSHOT: screenshotPath,
+      ...(screenshotPath ? { WEBENVOY_PACKAGED_SMOKE_SCREENSHOT: screenshotPath } : {}),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

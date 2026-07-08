@@ -29,6 +29,10 @@ export type RuntimeProbe = {
   attempts?: Array<{ url: string; statusCode?: number; summary: string }>;
 };
 
+type RuntimeProbeAttempt = RuntimeProbe & {
+  continueFallback: boolean;
+};
+
 export type RuntimeServiceState = {
   id: RuntimeServiceId;
   name: string;
@@ -233,7 +237,9 @@ async function probeFirst(endpoint: string, paths: string[]): Promise<RuntimePro
   for (const probePath of paths) {
     const result = await probeEndpoint(endpoint, probePath);
     attempts.push({ url: result.url, statusCode: result.statusCode, summary: result.summary });
-    if (result.state === "ready") return { ...result, attempts };
+    const { continueFallback, ...probe } = result;
+    if (result.state === "ready") return { ...probe, attempts };
+    if (!continueFallback) return { ...probe, attempts };
   }
 
   return {
@@ -245,7 +251,7 @@ async function probeFirst(endpoint: string, paths: string[]): Promise<RuntimePro
   };
 }
 
-async function probeEndpoint(endpoint: string, probePath: string): Promise<RuntimeProbe> {
+async function probeEndpoint(endpoint: string, probePath: string): Promise<RuntimeProbeAttempt> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 1500);
   const url = `${endpoint}${probePath}`;
@@ -261,20 +267,49 @@ async function probeEndpoint(endpoint: string, probePath: string): Promise<Runti
     const fixtureReason = fixturePayloadReason(payload);
     const unavailableReason = explicitUnavailableReason(payload);
     if (!response.ok) {
-      return { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned ${response.status}.` };
+      return {
+        state: "unavailable",
+        url,
+        statusCode: response.status,
+        summary: `${probePath} returned ${response.status}.`,
+        continueFallback: response.status === 404,
+      };
     }
     if (fixtureReason) {
-      return { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned fixture/demo state: ${fixtureReason}.` };
+      return {
+        state: "unavailable",
+        url,
+        statusCode: response.status,
+        summary: `${probePath} returned fixture/demo state: ${fixtureReason}.`,
+        continueFallback: false,
+      };
     }
     if (unavailableReason) {
-      return { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned unavailable state: ${unavailableReason}.` };
+      return {
+        state: "unavailable",
+        url,
+        statusCode: response.status,
+        summary: `${probePath} returned unavailable state: ${unavailableReason}.`,
+        continueFallback: false,
+      };
     }
-    return { state: "ready", url, statusCode: response.status, summary: `${probePath} returned ${response.status}.` };
+    const readyReason = explicitReadyReason(payload);
+    if (!readyReason) {
+      return {
+        state: "unavailable",
+        url,
+        statusCode: response.status,
+        summary: `${probePath} returned ${response.status} without owner readiness facts.`,
+        continueFallback: false,
+      };
+    }
+    return { state: "ready", url, statusCode: response.status, summary: `${probePath} returned ${response.status}: ${readyReason}.`, continueFallback: false };
   } catch (error) {
     return {
       state: "unavailable",
       url,
       summary: error instanceof Error ? error.message : String(error),
+      continueFallback: true,
     };
   } finally {
     clearTimeout(timeout);
@@ -314,6 +349,21 @@ function explicitUnavailableReason(value: unknown): string | null {
   }
   if (value.ready === false || value.healthy === false) {
     return value.ready === false ? "ready=false" : "healthy=false";
+  }
+  return null;
+}
+
+function explicitReadyReason(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  for (const key of ["status", "state", "readiness", "health"]) {
+    const field = value[key];
+    if (field === true) return `${key}=true`;
+    if (typeof field === "string" && /^(ready|ok|healthy|available|up)$/i.test(field)) {
+      return `${key}=${field}`;
+    }
+  }
+  if (value.ready === true || value.healthy === true) {
+    return value.ready === true ? "ready=true" : "healthy=true";
   }
   return null;
 }
