@@ -50,4 +50,17 @@ if (!result.hasPreload || result.rootChildCount === 0 || result.rootTextLength =
   throw new Error(`Packaged Electron smoke failed: ${JSON.stringify(result)}`);
 }
 
-console.log(`Packaged Electron smoke passed. Screenshot: ${screenshotPath}`);
+const lodeAssets = result.runtimeSupervisorState?.lodeAssets;
+if (!lodeAssets) {
+  throw new Error("Packaged Electron smoke failed: Lode asset bundle state is missing.");
+}
+
+if (lodeAssets.state === "ready" && lodeAssets.packageCount < 6) {
+  throw new Error(`Packaged Electron smoke failed: incomplete Lode asset bundle ${JSON.stringify(lodeAssets)}`);
+}
+
+if (lodeAssets.state !== "ready" && !result.runtimeSupervisorState?.failClosed) {
+  throw new Error(`Packaged Electron smoke failed: missing Lode assets did not fail closed ${JSON.stringify(result.runtimeSupervisorState)}`);
+}
+
+console.log(`Packaged Electron smoke passed. Lode assets: ${lodeAssets.state}. Screenshot: ${screenshotPath}`);

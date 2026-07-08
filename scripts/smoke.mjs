@@ -207,6 +207,7 @@ for (const expectedText of [
   "App runtime supervisor",
   "Core health / admission",
   "Harbor health",
+  "Lode assets",
   "runtime 未连接",
 ]) {
   if (!rendererAssets.includes(expectedText)) {
@@ -216,6 +217,9 @@ for (const expectedText of [
 
 const runtimeSupervisorModule = await import(
   pathToFileURL(path.resolve("dist-electron/runtimeSupervisor.js")).href
+);
+const lodeAssetBundleModule = await import(
+  pathToFileURL(path.resolve("dist-electron/lodeAssetBundle.js")).href
 );
 const harborLaunch = runtimeSupervisorModule.resolveRuntimeServiceLaunchConfig(
   "harbor",
@@ -258,6 +262,49 @@ const readiness = runtimeSupervisorModule.summarizeRuntimeReadiness([
 
 if (!readiness.failClosed || readiness.canUseLiveRuntime) {
   throw new Error("Runtime supervisor smoke failed: missing Core admission did not fail closed.");
+}
+
+const lodeBundle = lodeAssetBundleModule.resolveLodeAssetBundle({}, undefined);
+
+if (lodeBundle.state !== "ready" || lodeBundle.packageCount < 6 || lodeBundle.missingPackageRefs.length > 0) {
+  throw new Error(`Lode asset bundle smoke failed: ${JSON.stringify(lodeBundle)}`);
+}
+
+const coreLodeEnv = lodeAssetBundleModule.coreLodeAssetEnvironment(lodeBundle);
+
+if (!coreLodeEnv.WEBENVOY_LODE_ASSETS_PATH || !coreLodeEnv.WEBENVOY_LODE_REGISTRY_PATH) {
+  throw new Error("Lode asset bundle smoke failed: Core env did not include asset paths.");
+}
+
+const liveReadiness = runtimeSupervisorModule.summarizeRuntimeReadiness(
+  [
+    {
+      id: "core",
+      name: "Core",
+      endpoint: "http://127.0.0.1:8787",
+      processState: "running",
+      launchSource: "packaged-path",
+      health: { state: "ready", url: "core/health", summary: "ready" },
+      admission: { state: "ready", url: "core/admission", summary: "ready" },
+      checkedAt: "smoke",
+      repairAction: "ready",
+    },
+    {
+      id: "harbor",
+      name: "Harbor",
+      endpoint: "http://127.0.0.1:8788",
+      processState: "running",
+      launchSource: "packaged-path",
+      health: { state: "ready", url: "harbor/health", summary: "ready" },
+      checkedAt: "smoke",
+      repairAction: "ready",
+    },
+  ],
+  lodeBundle,
+);
+
+if (!liveReadiness.canUseLiveRuntime || liveReadiness.failClosed) {
+  throw new Error("Runtime supervisor smoke failed: ready Core/Harbor/Lode did not open live gate.");
 }
 
 const { outputText: connectionConfigModuleSource } = ts.transpileModule(connectionConfigSource, {

@@ -9,6 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
 const packagedSmoke = process.env.WEBENVOY_PACKAGED_SMOKE === "1";
 const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
+const packagedSmokeRuntimeExpectation = process.env.WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION ?? "fail_closed";
+const packagedSmokeCoreEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT ?? "http://127.0.0.1:8787";
+const packagedSmokeHarborEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT ?? "http://127.0.0.1:8788";
 const runtimeSupervisor = createRuntimeSupervisor();
 
 function getSystemColorScheme() {
@@ -65,6 +68,12 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
         const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
+        const runtimeSupervisorState = shell?.getRuntimeSupervisorState
+          ? await shell.getRuntimeSupervisorState({
+              coreEndpoint: ${JSON.stringify(packagedSmokeCoreEndpoint)},
+              harborEndpoint: ${JSON.stringify(packagedSmokeHarborEndpoint)}
+            })
+          : null;
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
           left: appShell?.getAttribute("data-left-panel-open"),
@@ -174,6 +183,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
           hasPreload: typeof shell?.getShellContext === "function",
           hasRuntimeSupervisorApi: typeof shell?.getRuntimeSupervisorState === "function",
           shellContext: shell?.getShellContext ? await shell.getShellContext() : null,
+          runtimeSupervisorState,
           hasRuntimeGate: Boolean(runtimeGate),
           runtimeGateText: runtimeGate?.textContent ?? "",
           panelControls: panelButtons.length,
@@ -229,6 +239,12 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       hasPreload: boolean;
       hasRuntimeSupervisorApi: boolean;
       shellContext: unknown;
+      runtimeSupervisorState: {
+        canUseLiveRuntime?: boolean;
+        failClosed?: boolean;
+        services?: { id: string; health?: { state?: string }; admission?: { state?: string } }[];
+        lodeAssets?: { state?: string; packageCount?: number };
+      } | null;
       hasRuntimeGate: boolean;
       runtimeGateText: string;
       panelControls: number;
@@ -247,7 +263,26 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       throw new Error("packaged renderer smoke failed: preload was not injected.");
     }
 
-    if (!result.hasRuntimeSupervisorApi || !result.hasRuntimeGate || !result.runtimeGateText.includes("生产运行已阻断")) {
+    if (!result.hasRuntimeSupervisorApi || !result.hasRuntimeGate || result.runtimeSupervisorState === null) {
+      throw new Error("packaged renderer smoke failed: runtime supervisor bridge or gate is missing.");
+    }
+
+    if (
+      packagedSmokeRuntimeExpectation === "live_ready" &&
+      (!result.runtimeSupervisorState.canUseLiveRuntime ||
+        result.runtimeSupervisorState.lodeAssets?.state !== "ready" ||
+        result.runtimeSupervisorState.services?.some((service) => service.health?.state !== "ready") ||
+        result.runtimeSupervisorState.services?.some((service) => service.id === "core" && service.admission?.state !== "ready"))
+    ) {
+      throw new Error(
+        `packaged renderer smoke failed: runtime supervisor did not reach live_ready. ${JSON.stringify(result.runtimeSupervisorState)}`,
+      );
+    }
+
+    if (
+      packagedSmokeRuntimeExpectation !== "live_ready" &&
+      (!result.runtimeSupervisorState.failClosed || !result.runtimeGateText.includes("生产运行已阻断"))
+    ) {
       throw new Error("packaged renderer smoke failed: runtime supervisor fail-closed gate is missing.");
     }
 
