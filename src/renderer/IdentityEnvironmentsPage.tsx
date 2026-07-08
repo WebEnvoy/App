@@ -39,6 +39,10 @@ import {
   removeLocalIdentityEnvironmentDraft,
   upsertLocalIdentityEnvironmentDraft,
 } from "./localIdentityEnvironmentStore";
+import {
+  projectRuntimeGatedIdentities,
+  type RuntimeSupervisorState,
+} from "./runtimeSupervisorState";
 
 const initialHarborState: HarborIdentityLoadState = {
   status: "loading",
@@ -49,9 +53,11 @@ const initialHarborState: HarborIdentityLoadState = {
 
 export function IdentityEnvironmentsPage({
   harborEndpoint,
+  runtimeSupervisorState,
   onOpenTask,
 }: {
   harborEndpoint: string;
+  runtimeSupervisorState: RuntimeSupervisorState;
   onOpenTask: (taskId: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState(
@@ -65,8 +71,12 @@ export function IdentityEnvironmentsPage({
   const [sessionBusy, setSessionBusy] = useState("");
   const [sessionOverrides, setSessionOverrides] = useState<Record<string, BrowserSessionProjection>>({});
   const identityEnvironments = useMemo(
-    () => mergeIdentityEnvironmentProjections(harborState.identities, identityEnvironmentFixtures),
-    [harborState.identities],
+    () =>
+      projectRuntimeGatedIdentities(
+        mergeIdentityEnvironmentProjections(harborState.identities, identityEnvironmentFixtures),
+        runtimeSupervisorState,
+      ),
+    [harborState.identities, runtimeSupervisorState],
   );
   const selected =
     identityEnvironments.find((identity) => identity.id === selectedId) ??

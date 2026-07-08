@@ -1,0 +1,223 @@
+import type { IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
+import type { OwnerSource, RunProjection, TaskProjection } from "./taskThreadFixtures";
+
+export type RuntimeServiceId = "core" | "harbor";
+export type RuntimeProcessState = "not_configured" | "starting" | "running" | "exited" | "failed";
+export type RuntimeProbeState = "ready" | "unavailable";
+
+export type RuntimeProbe = {
+  state: RuntimeProbeState;
+  url: string;
+  statusCode?: number;
+  summary: string;
+};
+
+export type RuntimeServiceState = {
+  id: RuntimeServiceId;
+  name: string;
+  endpoint: string;
+  processState: RuntimeProcessState;
+  launchSource: "env-command" | "env-path" | "packaged-path" | "local-cwd" | "not_configured";
+  command?: string;
+  cwd?: string;
+  pid?: number;
+  health: RuntimeProbe;
+  admission?: RuntimeProbe;
+  checkedAt: string;
+  lastExitCode?: number | null;
+  lastError?: string;
+  repairAction: string;
+};
+
+export type RuntimeSupervisorState = {
+  mode: "real";
+  checkedAt: string;
+  services: RuntimeServiceState[];
+  canUseLiveRuntime: boolean;
+  failClosed: boolean;
+  summary: string;
+};
+
+const runtimeSupervisorSource: OwnerSource = "App runtime supervisor";
+
+export function runtimeSupervisorCheckingState(): RuntimeSupervisorState {
+  const checkedAt = new Date().toISOString();
+  return {
+    mode: "real",
+    checkedAt,
+    services: [],
+    canUseLiveRuntime: false,
+    failClosed: true,
+    summary: "正在检查本地 Core/Harbor runtime；检查完成前生产任务保持 fail closed。",
+  };
+}
+
+export function runtimeSupervisorUnavailableState(summary: string): RuntimeSupervisorState {
+  return {
+    ...runtimeSupervisorCheckingState(),
+    checkedAt: new Date().toISOString(),
+    summary,
+  };
+}
+
+export function projectRuntimeGatedTasks(
+  tasks: TaskProjection[],
+  runtime: RuntimeSupervisorState,
+  liveTaskIds: string[],
+) {
+  if (runtime.canUseLiveRuntime) {
+    return tasks.map((task) => (liveTaskIds.includes(task.id) ? task : runtimeBlockedTask(task, runtime)));
+  }
+
+  return tasks.map((task) => runtimeBlockedTask(task, runtime));
+}
+
+export function projectRuntimeGatedIdentities(
+  identities: IdentityEnvironmentProjection[],
+  runtime: RuntimeSupervisorState,
+) {
+  const harborReady = runtime.services.some((service) => service.id === "harbor" && service.health.state === "ready");
+  if (harborReady) {
+    return identities.map((identity) =>
+      identity.source === "Harbor live"
+        ? identity
+        : runtimeBlockedIdentity(identity, "Harbor live identity facts unavailable；fixture/demo identity 已隔离。"),
+    );
+  }
+
+  return identities.map((identity) =>
+    runtimeBlockedIdentity(
+      identity,
+      "Harbor runtime health 未通过；fixture/demo provider 不作为生产可用状态。",
+    ),
+  );
+}
+
+function runtimeBlockedIdentity(identity: IdentityEnvironmentProjection, reason: string) {
+  return {
+    ...identity,
+    source: runtimeSupervisorSource,
+    provider: {
+      selected: "未可用" as const,
+      role: "不可启动" as const,
+      state: "blocked" as const,
+      reason,
+    },
+    login: {
+      ...identity.login,
+      state: "未知" as const,
+      recoveryRequired: true,
+      manualAuthenticationState: "需要认证" as const,
+      recoveryActions: ["启动 Harbor runtime 后刷新身份环境"],
+      reason: "生产模式需要 Harbor owner facts；App 不使用 fixture 登录态。",
+    },
+    readiness: {
+      state: "blocked" as const,
+      label: "runtime 未连接",
+      reasons: ["Harbor runtime health unavailable", "fixture/demo 已隔离，不能作为 provider、identity 或 session 可用证明。"],
+    },
+    browser: {
+      ...identity.browser,
+      providers: identity.browser.providers.map((provider) => ({
+        ...provider,
+        state: "missing" as const,
+        statusLabel: "不可用",
+        summary: "生产模式未通过 Harbor runtime health；fixture/demo provider 已隔离。",
+      })),
+      session: {
+        ...identity.browser.session,
+        state: "failed" as const,
+        statusLabel: "不可用",
+        controller: "空闲" as const,
+        currentUrl: "runtime unavailable",
+        title: "Harbor runtime 未连接",
+        message: "App 不把 fixture browser session 显示成可查看、可接管或真实运行现场。",
+      },
+    },
+    taskEntries: identity.taskEntries.map((entry) => ({
+      ...entry,
+      readiness: "生产运行已阻断；Core/Harbor health/admission 可用前不启动真实任务。",
+      source: runtimeSupervisorSource,
+    })),
+  };
+}
+
+export function runtimeService(runtime: RuntimeSupervisorState, id: RuntimeServiceId) {
+  return runtime.services.find((service) => service.id === id);
+}
+
+function runtimeBlockedTask(task: TaskProjection, runtime: RuntimeSupervisorState): TaskProjection {
+  const run = runtimeBlockedRun(task, runtime);
+  return {
+    ...task,
+    source: runtimeSupervisorSource,
+    packageSource: {
+      ...task.packageSource,
+      source: runtimeSupervisorSource,
+      fetchedAt: runtime.checkedAt,
+      boundary: "生产/real mode 需要 Core/Harbor owner runtime；fixture/demo capability projection 已隔离，不能作为可运行证明。",
+    },
+    blocker: "生产运行已 fail closed：Core/Harbor runtime health/admission 未通过，App 不展示 fixture 结果、真实成功或可审批写前验证。",
+    runs: [run],
+  };
+}
+
+function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState): RunProjection {
+  const core = runtimeService(runtime, "core");
+  const harbor = runtimeService(runtime, "harbor");
+  const coreHealth = core?.health.state ?? "unavailable";
+  const coreAdmission = core?.admission?.state ?? "unavailable";
+  const harborHealth = harbor?.health.state ?? "unavailable";
+
+  return {
+    id: `runtime-blocked-${task.id}`,
+    label: "Runtime gate",
+    lifecycle: "blocked",
+    outcome: "unavailable",
+    summary: "生产运行已阻断：没有通过本地 Core health/admission 与 Harbor runtime health，fixture/demo 不显示为真实成功。",
+    actionIntent: "Repair action: 启动或配置本地 Core 与 Harbor runtime，然后刷新运行状态。",
+    owner: "Core",
+    source: runtimeSupervisorSource,
+    resultRows: [
+      { label: "Core health", value: coreHealth, source: runtimeSupervisorSource },
+      { label: "Core admission", value: coreAdmission, source: runtimeSupervisorSource },
+      { label: "Harbor health", value: harborHealth, source: runtimeSupervisorSource },
+      { label: "Fixture/demo", value: "隔离；不作为可用任务、真实结果或写前验证成功", source: runtimeSupervisorSource },
+    ],
+    evidenceCards: [
+      {
+        id: `runtime-gate-${task.id}`,
+        title: "Runtime fail-closed gate",
+        summary: runtime.summary,
+        viewerLabel: "No live evidence viewer",
+        viewerHref: "#runtime-fail-closed",
+        source: runtimeSupervisorSource,
+        status: "unavailable",
+        freshness: runtime.checkedAt,
+        provenance: "Electron runtime supervisor",
+      },
+    ],
+    capabilityAttribution: {
+      capabilityRef: task.packageSource.capabilityRef,
+      version: task.packageSource.version,
+      sourceRef: task.packageSource.sourceRef,
+      failureClass: "runtime",
+      summary: "Capability fixture remains visible only as isolated metadata; Core live run projection is required before showing results.",
+    },
+    failureRecovery: {
+      state: "runtime unavailable",
+      reason: runtime.summary,
+      nextActions: [
+        core?.repairAction ?? "Configure Core runtime command/path.",
+        harbor?.repairAction ?? "Configure Harbor runtime command/path.",
+      ],
+      source: runtimeSupervisorSource,
+    },
+    process: [
+      `Core health: ${coreHealth}.`,
+      `Core admission: ${coreAdmission}.`,
+      `Harbor health: ${harborHealth}.`,
+      "No fixture/demo projection was promoted to a usable real result.",
+    ],
+  };
+}

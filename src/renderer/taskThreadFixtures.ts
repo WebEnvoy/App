@@ -6,7 +6,8 @@ export type OwnerSource =
   | "Harbor fixture"
   | "Harbor live"
   | "Lode fixture"
-  | "App local-only";
+  | "App local-only"
+  | "App runtime supervisor";
 
 export type OutcomeKind =
   | "success"
@@ -120,7 +121,7 @@ export type DirectSessionProjection = {
   id: string;
   title: string;
   accountIdentity: string;
-  sessionState: "available";
+  sessionState: "blocked";
   source: OwnerSource;
   summary: string;
   providerStatus: {
@@ -1225,14 +1226,14 @@ export const directSessionFixture: DirectSessionProjection = {
   id: "direct-session-local-chrome",
   title: "本机 Chrome 手动浏览实例",
   accountIdentity: "本机 Chrome",
-  sessionState: "available",
+  sessionState: "blocked",
   source: "Harbor fixture",
   summary:
-    "direct Identity Runtime Session is Browser/Harbor only; it is not Core Task/Run/Result and must not display as task success.",
+    "Harbor fixture direct session is demo-only and blocked in real mode; it is not Core Task/Run/Result and is not launchable.",
   providerStatus: {
     provider: "Harbor Browser provider fixture",
     browserSessionRef: "browser-session://local-chrome/manual-001",
-    status: "connected",
+    status: "unavailable",
     viewerRef: "viewer://harbor/local-chrome/manual-001",
     fetchedAt: "2026-07-03T04:20:00Z",
     source: "Harbor fixture",

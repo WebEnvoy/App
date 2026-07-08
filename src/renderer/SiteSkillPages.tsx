@@ -28,19 +28,79 @@ const appMilestone14TaskIds = new Set<string>([
   "task-boss-greeting-write-preview",
 ]);
 
+function hasLiveRuntimeEvidence(skill: SiteSkill, canUseLiveRuntime: boolean, liveTaskIds: string[]) {
+  return canUseLiveRuntime && skill.relatedTaskIds.some((taskId) => liveTaskIds.includes(taskId));
+}
+
+function projectSiteSkill(skill: SiteSkill, canUseLiveRuntime: boolean, liveTaskIds: string[]): SiteSkill {
+  const hasLiveEvidence = hasLiveRuntimeEvidence(skill, canUseLiveRuntime, liveTaskIds);
+
+  if (hasLiveEvidence) {
+    return {
+      ...skill,
+      status: "ready",
+      sourceHealth: {
+        label: "live runtime evidence",
+        status: "ready",
+        detail: "Core live task projection 与本地 Core/Harbor runtime gate 均可用。",
+      },
+    };
+  }
+
+  if (skill.status === "unavailable") return skill;
+
+  return {
+    ...skill,
+    status: "fixture",
+    readiness: skill.readiness.map((item) => ({
+      ...item,
+      status: item.status === "unavailable" ? "unavailable" : "fixture",
+      detail: item.detail.includes("生产不可启动") ? item.detail : `${item.detail}；demo/fixture，生产不可启动。`,
+    })),
+    recentTest:
+      skill.recentTest == null
+        ? undefined
+        : {
+            ...skill.recentTest,
+            status: skill.recentTest.status === "failed" || skill.recentTest.status === "blocked" ? skill.recentTest.status : "stale",
+            failureReason:
+              skill.recentTest.status === "failed" || skill.recentTest.status === "blocked"
+                ? skill.recentTest.failureReason
+                : "fixture_only_not_live",
+          },
+    boundaries: [
+      "Demo/fixture 只展示 metadata；Core/Harbor runtime gate 通过前不启动真实任务。",
+      ...skill.boundaries,
+    ],
+    sourceHealth: {
+      label: "demo only",
+      status: "fixture",
+      detail: "缺少 live Core/Harbor/runtime evidence；fixture/demo 不可启动，也不显示为生产可用。",
+    },
+  };
+}
+
 export function SiteSkillDirectoryPage({
+  canUseLiveRuntime,
+  liveTaskIds,
   selectedSkillId,
   onSelectSkill,
 }: {
+  canUseLiveRuntime: boolean;
+  liveTaskIds: string[];
   selectedSkillId: string;
   onSelectSkill: (skill: SiteSkill) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState<DirectoryTab>("全部");
+  const siteSkills = useMemo(
+    () => siteSkillFixtures.map((skill) => projectSiteSkill(skill, canUseLiveRuntime, liveTaskIds)),
+    [canUseLiveRuntime, liveTaskIds],
+  );
   const filteredSkills = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return siteSkillFixtures.filter((skill) => {
+    return siteSkills.filter((skill) => {
       const tabMatches = selectedTab === "全部" || skill.category === selectedTab;
       if (!tabMatches) {
         return false;
@@ -55,7 +115,7 @@ export function SiteSkillDirectoryPage({
         .toLowerCase()
         .includes(query);
     });
-  }, [searchQuery, selectedTab]);
+  }, [searchQuery, selectedTab, siteSkills]);
   const sections =
     searchQuery.trim().length > 0
       ? [{ id: "search", title: "搜索结果", skills: filteredSkills }]
@@ -151,16 +211,24 @@ export function SiteSkillDirectoryPage({
 }
 
 export function SiteSkillDetailPage({
+  canUseLiveRuntime,
+  liveTaskIds,
   skill,
   onBack,
   onOpenTask,
 }: {
+  canUseLiveRuntime: boolean;
+  liveTaskIds: string[];
   skill: SiteSkill;
   onBack: () => void;
   onOpenTask: (skill: SiteSkill) => void;
 }) {
-  const firstRelatedTaskId = skill.relatedTaskIds[0] ?? null;
-  const canLaunchTask = firstRelatedTaskId != null && appMilestone14TaskIds.has(firstRelatedTaskId) && skill.status !== "unavailable";
+  const projectedSkill = projectSiteSkill(skill, canUseLiveRuntime, liveTaskIds);
+  const firstRelatedTaskId = projectedSkill.relatedTaskIds[0] ?? null;
+  const canLaunchTask =
+    firstRelatedTaskId != null &&
+    appMilestone14TaskIds.has(firstRelatedTaskId) &&
+    projectedSkill.status === "ready";
 
   return (
     <div className="site-skill-page site-skill-detail-page we-sectioned-page">
@@ -169,16 +237,16 @@ export function SiteSkillDetailPage({
           <ArrowLeft size={15} />
           Library
         </button>
-        <StatusPill status={skill.status} />
+        <StatusPill status={projectedSkill.status} />
       </div>
 
       <section className="site-skill-detail-hero">
-        <SkillIcon skill={skill} size="large" />
+        <SkillIcon skill={projectedSkill} size="large" />
         <div className="site-skill-detail-title">
-          <h1>{skill.name}</h1>
-          <p>{skill.description}</p>
+          <h1>{projectedSkill.name}</h1>
+          <p>{projectedSkill.description}</p>
           <div className="site-skill-tags">
-            {skill.tags.map((tag) => (
+            {projectedSkill.tags.map((tag) => (
               <span key={tag}>{tag}</span>
             ))}
           </div>
@@ -186,30 +254,31 @@ export function SiteSkillDetailPage({
         <div className="site-skill-detail-actions">
           <button className="site-skill-secondary-action" type="button">
             <Download size={15} />
-            {installActionText(skill.installState)}
+            {installActionText(projectedSkill.installState)}
           </button>
           <button className="site-skill-secondary-action" type="button">
             <LockKeyhole size={15} />
-            {skill.lockRef == null ? "锁定版本" : "已锁定"}
+            {projectedSkill.lockRef == null ? "锁定版本" : "已锁定"}
           </button>
-          <button className="site-skill-secondary-action" type="button" disabled={skill.updateState !== "update-available"}>
+          <button className="site-skill-secondary-action" type="button" disabled={projectedSkill.updateState !== "update-available"}>
             <RefreshCw size={15} />
-            {updateActionText(skill.updateState)}
+            {updateActionText(projectedSkill.updateState)}
           </button>
           <button
             className="site-skill-primary-action"
             type="button"
             disabled={!canLaunchTask}
-            onClick={canLaunchTask ? () => onOpenTask(skill) : undefined}
+            title={canLaunchTask ? undefined : projectedSkill.sourceHealth.detail}
+            onClick={canLaunchTask ? () => onOpenTask(projectedSkill) : undefined}
           >
             <Play size={15} />
-            {readOnlyTaskActionText(skill, canLaunchTask)}
+            {readOnlyTaskActionText(projectedSkill, canLaunchTask)}
           </button>
         </div>
       </section>
 
       <section className="site-skill-prompt-band" aria-label="业务输入模板">
-        {skill.inputTemplates.map((template) => (
+        {projectedSkill.inputTemplates.map((template) => (
           <button className="site-skill-prompt" type="button" key={template}>
             <Sparkles size={14} />
             <span>{template}</span>
@@ -224,7 +293,7 @@ export function SiteSkillDetailPage({
             <h3>Readiness</h3>
           </div>
           <div className="site-skill-readiness-list">
-            {skill.readiness.map((item) => (
+            {projectedSkill.readiness.map((item) => (
               <div className="site-skill-readiness-row" key={item.label}>
                 <span>{item.label}</span>
                 <StatusPill status={item.status} />
@@ -240,14 +309,14 @@ export function SiteSkillDetailPage({
             <h3>Lode metadata</h3>
           </div>
           <dl className="site-skill-facts">
-            <SkillFact label="Package" value={skill.packageName} />
-            <SkillFact label="Installed" value={skill.version} />
-            <SkillFact label="Latest" value={skill.latestVersion} />
-            <SkillFact label="Source" value={skill.source} />
-            <SkillFact label="Package ref" value={skill.packageRef} />
-            <SkillFact label="Capability ref" value={skill.capabilityRef} />
-            {skill.lockRef == null ? null : <SkillFact label="Lock ref" value={skill.lockRef} />}
-            <SkillFact label="Fetched at" value={skill.fetchedAt} />
+            <SkillFact label="Package" value={projectedSkill.packageName} />
+            <SkillFact label="Installed" value={projectedSkill.version} />
+            <SkillFact label="Latest" value={projectedSkill.latestVersion} />
+            <SkillFact label="Source" value={projectedSkill.source} />
+            <SkillFact label="Package ref" value={projectedSkill.packageRef} />
+            <SkillFact label="Capability ref" value={projectedSkill.capabilityRef} />
+            {projectedSkill.lockRef == null ? null : <SkillFact label="Lock ref" value={projectedSkill.lockRef} />}
+            <SkillFact label="Fetched at" value={projectedSkill.fetchedAt} />
           </dl>
         </section>
 
@@ -257,12 +326,12 @@ export function SiteSkillDetailPage({
             <h3>本地状态</h3>
           </div>
           <dl className="site-skill-facts">
-            <SkillFact label="Install" value={installStateText(skill.installState)} />
-            <SkillFact label="Update" value={updateStateText(skill.updateState)} />
-            <SkillFact label="Risk" value={riskText(skill.risk)} />
-            <SkillFact label="Source health" value={skill.sourceHealth.label} status={skill.sourceHealth.status} />
+            <SkillFact label="Install" value={installStateText(projectedSkill.installState)} />
+            <SkillFact label="Update" value={updateStateText(projectedSkill.updateState)} />
+            <SkillFact label="Risk" value={riskText(projectedSkill.risk)} />
+            <SkillFact label="Source health" value={projectedSkill.sourceHealth.label} status={projectedSkill.sourceHealth.status} />
           </dl>
-          <p className="site-skill-state-detail">{skill.sourceHealth.detail}</p>
+          <p className="site-skill-state-detail">{projectedSkill.sourceHealth.detail}</p>
         </section>
       </div>
 
@@ -272,24 +341,24 @@ export function SiteSkillDetailPage({
             <BadgeCheck size={18} />
             <h3>Tests</h3>
           </div>
-          {skill.recentTest ? (
+          {projectedSkill.recentTest ? (
             <dl className="site-skill-facts">
               <SkillFact
                 label="Latest run"
-                value={skill.recentTest.label}
-                status={testStatusToSkillStatus(skill.recentTest.status)}
+                value={projectedSkill.recentTest.label}
+                status={testStatusToSkillStatus(projectedSkill.recentTest.status)}
               />
               <SkillFact
                 label="Post-check"
-                value={skill.recentTest.postCheck}
-                status={testStatusToSkillStatus(skill.recentTest.status)}
+                value={projectedSkill.recentTest.postCheck}
+                status={testStatusToSkillStatus(projectedSkill.recentTest.status)}
               />
               <SkillFact
                 label="Failure reason"
-                value={skill.recentTest.failureReason}
-                status={testStatusToSkillStatus(skill.recentTest.status)}
+                value={projectedSkill.recentTest.failureReason}
+                status={testStatusToSkillStatus(projectedSkill.recentTest.status)}
               />
-              <SkillFact label="Ran at" value={skill.recentTest.ranAt} status="fixture" />
+              <SkillFact label="Ran at" value={projectedSkill.recentTest.ranAt} status="fixture" />
             </dl>
           ) : (
             <p className="site-skill-state-detail">No recent test fixture is available.</p>
@@ -301,17 +370,17 @@ export function SiteSkillDetailPage({
             <AlertTriangle size={18} />
             <h3>Report</h3>
           </div>
-          {skill.reportIntent ? (
+          {projectedSkill.reportIntent ? (
             <>
               <button
                 className="site-skill-secondary-action"
                 type="button"
-                disabled={skill.reportIntent.state === "unavailable"}
+                disabled={projectedSkill.reportIntent.state === "unavailable"}
               >
                 <AlertTriangle size={15} />
-                {skill.reportIntent.label}
+                {projectedSkill.reportIntent.label}
               </button>
-              <p className="site-skill-state-detail">{skill.reportIntent.detail}</p>
+              <p className="site-skill-state-detail">{projectedSkill.reportIntent.detail}</p>
             </>
           ) : (
             <p className="site-skill-state-detail">No report intent is available for this fixture.</p>
@@ -324,28 +393,28 @@ export function SiteSkillDetailPage({
             <h3>Repair drafts</h3>
           </div>
           <div className="site-skill-readiness-list">
-            {(skill.repairDrafts ?? []).map((draft) => (
+            {(projectedSkill.repairDrafts ?? []).map((draft) => (
               <div className="site-skill-readiness-row" key={draft.ref}>
                 <span>{draft.state}</span>
                 <StatusPill status={repairStateToSkillStatus(draft.state)} />
                 <p>{draft.reason} · {draft.provenance} · {draft.ref}</p>
               </div>
             ))}
-            {skill.repairDrafts == null || skill.repairDrafts.length === 0 ? (
+            {projectedSkill.repairDrafts == null || projectedSkill.repairDrafts.length === 0 ? (
               <p className="site-skill-state-detail">No repair draft fixture is available.</p>
             ) : null}
           </div>
         </section>
       </div>
 
-      {skill.overlayBoundary ? (
+      {projectedSkill.overlayBoundary ? (
         <section className="site-skill-detail-card">
           <div className="card-title">
             <ShieldCheck size={18} />
             <h3>Overlay and platform fix boundary</h3>
           </div>
           <dl className="site-skill-facts">
-            {skill.overlayBoundary.map((item) => (
+            {projectedSkill.overlayBoundary.map((item) => (
               <SkillFact
                 label={item.label}
                 value={`${item.detail} · ${item.source}`}
@@ -363,7 +432,7 @@ export function SiteSkillDetailPage({
           <h3>边界</h3>
         </div>
         <ul className="site-skill-boundaries">
-          {skill.boundaries.map((boundary) => (
+          {projectedSkill.boundaries.map((boundary) => (
             <li key={boundary}>{boundary}</li>
           ))}
         </ul>
@@ -375,6 +444,9 @@ export function SiteSkillDetailPage({
 function readOnlyTaskActionText(skill: SiteSkill, canLaunchTask: boolean) {
   if (canLaunchTask && skill.relatedTaskIds.some((taskId) => taskId.includes("write-preview"))) return "查看写前验证";
   if (canLaunchTask) return "启动只读任务";
+  if (skill.status === "fixture") return "Demo 不可启动";
+  if (skill.status === "needs-identity") return "待配置不可启动";
+  if (skill.status === "unavailable") return "不可用";
   if (skill.relatedTaskIds.some((taskId) => taskId.includes("write-preview"))) return "写前验证不可用";
   if (skill.relatedTaskIds.length > 0) return "非只读任务";
   return "暂无任务";
@@ -515,7 +587,7 @@ function riskText(risk: SiteSkill["risk"]) {
 
 function testStatusToSkillStatus(status: NonNullable<SiteSkill["recentTest"]>["status"]): SiteSkillStatus {
   if (status === "passed") {
-    return "ready";
+    return "fixture";
   }
   if (status === "failed" || status === "blocked") {
     return "unavailable";
@@ -525,7 +597,7 @@ function testStatusToSkillStatus(status: NonNullable<SiteSkill["recentTest"]>["s
 
 function repairStateToSkillStatus(state: NonNullable<SiteSkill["repairDrafts"]>[number]["state"]): SiteSkillStatus {
   if (state === "validated" || state === "promoted") {
-    return "ready";
+    return "fixture";
   }
   if (state === "rejected" || state === "unavailable") {
     return "unavailable";

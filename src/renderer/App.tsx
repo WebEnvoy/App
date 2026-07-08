@@ -39,6 +39,12 @@ import {
 } from "./taskThreadFixtures";
 import { type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph } from "./RunStatusGlyph";
+import {
+  projectRuntimeGatedTasks,
+  runtimeSupervisorCheckingState,
+  runtimeSupervisorUnavailableState,
+  type RuntimeSupervisorState,
+} from "./runtimeSupervisorState";
 import { outcomeLabel } from "./TaskThreadFields";
 import { TaskThreadComposer } from "./TaskThreadComposer";
 import { TaskThreadPage } from "./TaskThreadPage";
@@ -91,6 +97,9 @@ export function App() {
   const [connectionConfig, setConnectionConfig] = useState<LocalConnectionConfig>(
     defaultConnectionConfig,
   );
+  const [runtimeSupervisorState, setRuntimeSupervisorState] = useState<RuntimeSupervisorState>(
+    runtimeSupervisorCheckingState,
+  );
   const [coreReadState, setCoreReadState] = useState<CoreReadTaskLoadState>(() =>
     coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
   );
@@ -102,7 +111,15 @@ export function App() {
   const [selectedSiteSkillId, setSelectedSiteSkillId] = useState(siteSkillFixtures[0].id);
   const [isSiteSkillDetailOpen, setSiteSkillDetailOpen] = useState(false);
 
-  const taskThreads = coreReadState.tasks;
+  const taskThreads = useMemo(
+    () =>
+      projectRuntimeGatedTasks(
+        coreReadState.tasks,
+        runtimeSupervisorState,
+        coreReadState.liveTaskIds,
+      ),
+    [coreReadState.liveTaskIds, coreReadState.tasks, runtimeSupervisorState],
+  );
   const selectedTask =
     taskThreads.find((task) => task.id === selectedTaskId) ?? taskThreads[0] ?? defaultTaskThread;
   const selectedRun =
@@ -211,6 +228,46 @@ export function App() {
   }, [connectionConfig.coreEndpoint]);
 
   useEffect(() => {
+    let cancelled = false;
+    setRuntimeSupervisorState(runtimeSupervisorCheckingState());
+
+    const readSupervisor = window.webenvoyShell?.getRuntimeSupervisorState;
+    if (readSupervisor == null) {
+      setRuntimeSupervisorState(
+        runtimeSupervisorUnavailableState(
+          "Electron runtime supervisor unavailable；生产任务保持 fail closed，fixture/demo 不作为可用结果。",
+        ),
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const refreshRuntimeSupervisor = () => {
+      readSupervisor(connectionConfig)
+        .then((state) => {
+          if (!cancelled) setRuntimeSupervisorState(state);
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setRuntimeSupervisorState(
+              runtimeSupervisorUnavailableState(
+                error instanceof Error ? error.message : String(error),
+              ),
+            );
+          }
+        });
+    };
+    refreshRuntimeSupervisor();
+    const interval = window.setInterval(refreshRuntimeSupervisor, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [connectionConfig]);
+
+  useEffect(() => {
     const task = taskThreads.find((item) => item.id === selectedTaskId) ?? taskThreads[0];
     if (!task) return;
     if (task.id !== selectedTaskId) {
@@ -257,7 +314,11 @@ export function App() {
 
   function startReadTask(skill: SiteSkill) {
     const taskId = skill.relatedTaskIds[0];
-    if (taskId != null) {
+    if (
+      taskId != null &&
+      runtimeSupervisorState.canUseLiveRuntime &&
+      coreReadState.liveTaskIds.includes(taskId)
+    ) {
       openTaskById(taskId);
     }
   }
@@ -309,6 +370,7 @@ export function App() {
         configScope={shellContext?.configScope}
         connectionConfig={connectionConfig}
         platform={shellContext?.platform}
+        runtimeSupervisorState={runtimeSupervisorState}
         settingsError={settingsError}
         settingsSaved={settingsSaved}
         onBack={openTaskThread}
@@ -410,7 +472,7 @@ export function App() {
 
               <article className="direct-session-card">
                 <strong>{directSessionFixture.title}</strong>
-                <span>{directSessionFixture.accountIdentity}</span>
+                <span>{directSessionFixture.accountIdentity} · {directSessionFixture.sessionState}</span>
                 <p>{directSessionFixture.summary}</p>
               </article>
             </section>
@@ -480,18 +542,26 @@ export function App() {
       workspace={
         isIdentityEnvironmentsView ? (
           <ThreadWorkspace>
-            <IdentityEnvironmentsPage harborEndpoint={connectionConfig.harborEndpoint} onOpenTask={openTaskById} />
+            <IdentityEnvironmentsPage
+              harborEndpoint={connectionConfig.harborEndpoint}
+              runtimeSupervisorState={runtimeSupervisorState}
+              onOpenTask={openTaskById}
+            />
           </ThreadWorkspace>
         ) : isSiteSkillView ? (
           <ThreadWorkspace>
             {isSiteSkillDetailOpen ? (
               <SiteSkillDetailPage
+                canUseLiveRuntime={runtimeSupervisorState.canUseLiveRuntime}
+                liveTaskIds={coreReadState.liveTaskIds}
                 skill={selectedSiteSkill}
                 onBack={openSiteSkillDirectory}
                 onOpenTask={startReadTask}
               />
             ) : (
               <SiteSkillDirectoryPage
+                canUseLiveRuntime={runtimeSupervisorState.canUseLiveRuntime}
+                liveTaskIds={coreReadState.liveTaskIds}
                 selectedSkillId={selectedSiteSkill.id}
                 onSelectSkill={openSiteSkillDetail}
               />
@@ -504,6 +574,7 @@ export function App() {
             <TaskThreadPage
               coreReadState={coreReadState}
               navigationItems={threadNavigationItems}
+              runtimeSupervisorState={runtimeSupervisorState}
               selectedRun={selectedRun}
               selectedTask={selectedTask}
               onActiveRunChange={setSelectedRunId}
@@ -515,6 +586,7 @@ export function App() {
         <RightPanel>
           <TaskThreadRightPanel
             coreReadState={coreReadState}
+            runtimeSupervisorState={runtimeSupervisorState}
             selectedRun={selectedRun}
             selectedTask={selectedTask}
             shellDiagnostics={{

@@ -1,0 +1,116 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item_id": "APP-257",
+  "delegations": [],
+  "ownership_contract": {
+    "task_goal": "Implement App-only runtime supervisor and fail-closed batch for App #257/#258/#259.",
+    "context_locators": [
+      "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-257-runtime-supervisor",
+      "https://github.com/WebEnvoy/App/issues/256",
+      "https://github.com/WebEnvoy/App/issues/257",
+      "https://github.com/WebEnvoy/App/issues/258",
+      "https://github.com/WebEnvoy/App/issues/259"
+    ],
+    "read_scope": [
+      "AGENTS.md",
+      "VISION.md",
+      "ROADMAP.md",
+      "DESIGN.md",
+      "docs/adr/0008-desktop-ui-design-checkpoint.md",
+      "src/electron/**",
+      "src/renderer/**",
+      "scripts/smoke*.mjs",
+      ".loom/**"
+    ],
+    "write_ownership": [
+      "src/electron/runtimeSupervisor.ts",
+      "src/electron/main.ts",
+      "src/electron/preload.cts",
+      "src/renderer/runtimeSupervisorState.ts",
+      "src/renderer/App.tsx",
+      "src/renderer/SiteSkillPages.tsx",
+      "src/renderer/TaskThreadPage.tsx",
+      "src/renderer/TaskThreadRightPanel.tsx",
+      "src/renderer/IdentityEnvironmentsPage.tsx",
+      "src/renderer/IdentityEnvironmentDetails.tsx",
+      "src/renderer/SettingsPage.tsx",
+      "src/renderer/styles.css",
+      "src/renderer/vite-env.d.ts",
+      "src/renderer/taskThreadFixtures.ts",
+      "src/renderer/siteSkillFixtures.ts",
+      "scripts/smoke.mjs",
+      ".loom/work-items/APP-257.md",
+      ".loom/progress/APP-257.md",
+      ".loom/specs/APP-257/**",
+      ".loom/status/current.md"
+    ],
+    "non_goals": [
+      "Core/Harbor/Lode changes",
+      "GitHub writes",
+      "PR creation",
+      "push/merge/issue closeout",
+      "real external site/account/profile/Cookie access",
+      "submit/publish/send/write actions",
+      "raw evidence storage"
+    ],
+    "validation_expectation": "loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; npm run typecheck; npm run smoke; npm run smoke:packaged; git diff --check",
+    "output_format": "Worker handoff with worktree, branch, HEAD, git status, changed files, validation results, covered issues, and residual risk.",
+    "integration_target": "Main controller PR integration for App #257/#258/#259."
+  },
+  "integration_evidence": [
+    {
+      "id": "runtime-supervisor-integrated",
+      "status": "integrated",
+      "summary": "Electron main supervises configured local Core/Harbor runtime commands and probes health/admission through preload IPC.",
+      "locators": [
+        "src/electron/runtimeSupervisor.ts",
+        "src/electron/main.ts",
+        "src/electron/preload.cts"
+      ],
+      "validation": [
+        "npm run typecheck",
+        "npm run smoke"
+      ]
+    },
+    {
+      "id": "fail-closed-ui-integrated",
+      "status": "integrated",
+      "summary": "Task Thread and Browser/identity surfaces fail closed when live runtime or live identity facts are unavailable.",
+      "locators": [
+        "src/renderer/runtimeSupervisorState.ts",
+        "src/renderer/App.tsx",
+        "src/renderer/TaskThreadPage.tsx",
+        "src/renderer/IdentityEnvironmentsPage.tsx",
+        "src/renderer/IdentityEnvironmentDetails.tsx"
+      ],
+      "validation": [
+        "npm run smoke",
+        "npm run smoke:packaged"
+      ]
+    },
+    {
+      "id": "site-skill-fixture-launch-p1-fixed",
+      "status": "integrated",
+      "summary": "Library/SiteSkill projections keep fixture/demo metadata visible but mark it demo-only, stale, and not launchable unless live Core task evidence and the runtime supervisor gate are both ready.",
+      "locators": [
+        "src/renderer/SiteSkillPages.tsx"
+      ],
+      "validation": [
+        "npm run typecheck",
+        "npm run smoke",
+        "git diff --check"
+      ]
+    }
+  ],
+  "ownership_conflicts": [],
+  "repeated_blocker_signal": {
+    "present": false,
+    "signature": null
+  },
+  "suite_path_consumption": {
+    "path": "repo-local-verify-no-suite-required",
+    "not_applicable_rationale": "loom verify reports suite validation is not required for this installed-state; this worker records local validation and item-specific carrier evidence.",
+    "consumer_boundary": "Main controller may run stronger hosted gates during PR integration.",
+    "recheck_condition": "Before PR creation or after any code/carrier diff."
+  }
+}

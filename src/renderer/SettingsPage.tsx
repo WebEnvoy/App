@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { type LocalConnectionConfig } from "./localConnectionConfig";
+import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
 
 type SettingsSectionId = "connections" | "appearance" | "boundaries" | "diagnostics";
 
@@ -24,6 +25,7 @@ type SettingsPageProps = {
   configScope?: "local-ui-only";
   connectionConfig: LocalConnectionConfig;
   platform?: string;
+  runtimeSupervisorState: RuntimeSupervisorState;
   settingsError: string;
   settingsSaved: boolean;
   onBack: () => void;
@@ -43,6 +45,7 @@ export function SettingsPage({
   configScope,
   connectionConfig,
   platform,
+  runtimeSupervisorState,
   settingsError,
   settingsSaved,
   onBack,
@@ -152,10 +155,24 @@ export function SettingsPage({
             ) : null}
 
             {activeSection === "diagnostics" ? (
-              <SettingsGroup title="诊断" subtitle="本页只展示 shell 上下文，不连接 live runtime。">
+              <SettingsGroup title="诊断" subtitle="本页只展示 shell 上下文和本地 runtime gate，不保存敏感材料。">
                 <SettingsRow title="Platform" detail={platform ?? "loading"} />
                 <SettingsRow title="Color scheme" detail={colorScheme ?? "loading"} />
                 <SettingsRow title="Config scope" detail={configScope ?? "loading"} />
+                <SettingsRow
+                  title="Runtime gate"
+                  detail={runtimeSupervisorState.canUseLiveRuntime ? "ready" : "fail-closed"}
+                />
+                <SettingsRow title="Runtime summary" detail={runtimeSupervisorState.summary} />
+                {runtimeSupervisorState.services.map((service) => (
+                  <SettingsRow
+                    title={`${service.name} repair`}
+                    detail={`${service.processState} / ${service.health.state}${
+                      service.admission ? ` / admission ${service.admission.state}` : ""
+                    } / ${service.repairAction}`}
+                    key={service.id}
+                  />
+                ))}
               </SettingsGroup>
             ) : null}
           </div>

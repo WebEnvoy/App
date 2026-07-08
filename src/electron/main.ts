@@ -3,10 +3,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
 const packagedSmoke = process.env.WEBENVOY_PACKAGED_SMOKE === "1";
 const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
+const runtimeSupervisor = createRuntimeSupervisor();
 
 function getSystemColorScheme() {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
@@ -61,6 +64,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const rightFullscreenButton = document.querySelector('[data-shell-panel-fullscreen="right"]');
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
+        const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
           left: appShell?.getAttribute("data-left-panel-open"),
@@ -168,7 +172,10 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
           rootChildCount: root?.childElementCount ?? 0,
           rootTextLength: root?.textContent?.trim().length ?? 0,
           hasPreload: typeof shell?.getShellContext === "function",
+          hasRuntimeSupervisorApi: typeof shell?.getRuntimeSupervisorState === "function",
           shellContext: shell?.getShellContext ? await shell.getShellContext() : null,
+          hasRuntimeGate: Boolean(runtimeGate),
+          runtimeGateText: runtimeGate?.textContent ?? "",
           panelControls: panelButtons.length,
           hasComposer: Boolean(composer),
           composerFocused,
@@ -220,7 +227,10 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       rootChildCount: number;
       rootTextLength: number;
       hasPreload: boolean;
+      hasRuntimeSupervisorApi: boolean;
       shellContext: unknown;
+      hasRuntimeGate: boolean;
+      runtimeGateText: string;
       panelControls: number;
       hasComposer: boolean;
       composerFocused: boolean;
@@ -235,6 +245,10 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
 
     if (!result.hasPreload || result.shellContext === null) {
       throw new Error("packaged renderer smoke failed: preload was not injected.");
+    }
+
+    if (!result.hasRuntimeSupervisorApi || !result.hasRuntimeGate || !result.runtimeGateText.includes("生产运行已阻断")) {
+      throw new Error("packaged renderer smoke failed: runtime supervisor fail-closed gate is missing.");
     }
 
     if (result.panelControls < 2 || !result.panelToggleSmoke) {
@@ -289,6 +303,9 @@ app.whenReady().then(() => {
     colorScheme: getSystemColorScheme(),
     configScope: "local-ui-only",
   }));
+  ipcMain.handle("webenvoy:runtime-supervisor-state", (_event, config) =>
+    runtimeSupervisor.readState(config),
+  );
 
   nativeTheme.on("updated", () => {
     const colorScheme = getSystemColorScheme();
@@ -310,4 +327,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  runtimeSupervisor.stop();
 });
