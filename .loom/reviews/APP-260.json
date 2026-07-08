@@ -6,7 +6,7 @@
   "summary": "Closeout carrier-only review allows APP-260 at current closeout carrier head: terminal closeout metadata was refreshed after PR #263 merged and App #233-#247/#256/#260/#261 were closed; this review only approves closeout carrier consumption and does not approve product behavior, real browser/profile/account/site access, or any write action.",
   "reviewer": "Codex main controller",
   "authored_at": "2026-07-08T15:25:20Z",
-  "reviewed_head": "c13d6fb7d97880111749c4335dc2734313846187",
+  "reviewed_head": "c13d6fba5d0b4086d0b7b092688baed79540a9df",
   "reviewed_validation_summary": "2026-07-08T14:50:18Z UTC local validation passed: `npm run typecheck`; `npm run smoke`; `npm run smoke:packaged`; `npm run smoke:packaged:vertical`; `git diff --check`; `loom fact-chain --target . --json`; `loom suite validate --target . --item APP-260 --json`; `loom suite carrier validate --target . --item APP-260 --json`; `loom suite evidence validate --target . --item APP-260 --json`. `loom build --target . --item APP-260 --build-evidence .loom/specs/APP-260/build-evidence.json --json --full-output` classified only `checkpoint-admission` as block with `missing_inputs=[]`; `build-execution` was pass and no unintegrated delegation output remained. Deterministic review-readiness checks were run against the installed Loom package because App has no `tools/` directory: `tools/skills_surface.py check` failed with `skills_docs_reference_sync_drift`; `tools/loom_check.py --profile source --source-surface contract-only` failed with source scope mismatch; `tools/check_release_surface.py` failed because source release docs/workflows are absent from the installed package; `tools/version_surface_check.py` failed because `packages/loom-installer/package.json` is absent from the installed package; `tools/check_npm_package.py` failed with runtime copy parity gaps for source/plugin/.loom/bin paths. These deterministic check failures are classified as external Loom tool surface/package-layout issues outside APP-260 write scope. `smoke:packaged:vertical` used local temporary Core/Harbor HTTP smoke servers, packaged Lode build-output assets, and generated `artifacts/app-261-packaged-vertical-smoke.png`; it did not use real accounts, browser profiles, Cookies, production pages, submit/publish/send, or external visible actions.",
   "reviewed_validation_summary_hash": "4ad847d35ebbaaf3ef97e239ef19c54830cacb72a5cd8814acf2f0cae3da0405",
   "validation_summary_source": "recovery.latest_validation_summary",
@@ -56,5 +56,9 @@
   "carrier_only_closeout_review": {
     "status": "passed",
     "reason": "Authored closeout review approved only terminal carrier metadata and idle current pointer consumption; it does not approve product implementation behavior."
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Authored implementation review disposition is retained only for APP-260 terminal closeout carrier consumption after implementation PR #263 merged; this does not approve new product code, live site access, real account/profile/Cookie use, or write/submit/publish/send actions."
   }
 }
