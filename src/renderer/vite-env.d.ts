@@ -31,10 +31,23 @@ type WebEnvoyRuntimeServiceState = {
   lastError?: string;
   repairAction: string;
 };
+type WebEnvoyLodeAssetBundleState = {
+  state: "ready" | "missing" | "invalid";
+  source: "env-path" | "packaged-path" | "build-output" | "not_configured";
+  rootPath?: string;
+  registryPath?: string;
+  packageCount: number;
+  requiredPackageRefs: string[];
+  missingPackageRefs: string[];
+  checkedAt: string;
+  summary: string;
+  consumerBoundary: string;
+};
 type WebEnvoyRuntimeSupervisorState = {
   mode: "real";
   checkedAt: string;
   services: WebEnvoyRuntimeServiceState[];
+  lodeAssets: WebEnvoyLodeAssetBundleState;
   canUseLiveRuntime: boolean;
   failClosed: boolean;
   summary: string;

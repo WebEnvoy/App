@@ -2,6 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+import { coreLodeAssetEnvironment, resolveLodeAssetBundle, type LodeAssetBundleState } from "./lodeAssetBundle.js";
+
 export type RuntimeServiceId = "core" | "harbor";
 
 export type RuntimeEndpointConfig = {
@@ -47,6 +49,7 @@ export type RuntimeSupervisorState = {
   mode: "real";
   checkedAt: string;
   services: RuntimeServiceState[];
+  lodeAssets: LodeAssetBundleState;
   canUseLiveRuntime: boolean;
   failClosed: boolean;
   summary: string;
@@ -95,20 +98,21 @@ export function resolveRuntimeServiceLaunchConfig(
   return null;
 }
 
-export function summarizeRuntimeReadiness(services: RuntimeServiceState[]) {
+export function summarizeRuntimeReadiness(services: RuntimeServiceState[], lodeAssets = resolveLodeAssetBundle()) {
   const core = services.find((service) => service.id === "core");
   const harbor = services.find((service) => service.id === "harbor");
   const canUseLiveRuntime =
     core?.health.state === "ready" &&
     core.admission?.state === "ready" &&
-    harbor?.health.state === "ready";
+    harbor?.health.state === "ready" &&
+    lodeAssets.state === "ready";
 
   return {
     canUseLiveRuntime,
     failClosed: !canUseLiveRuntime,
     summary: canUseLiveRuntime
-      ? "本地 Core health/admission 与 Harbor runtime health 均可用。"
-      : "生产运行已 fail closed：Core health/admission 或 Harbor runtime health 尚不可用，fixture/demo 不作为可用结果。",
+      ? "本地 Core health/admission、Harbor runtime health 与 Lode capability assets 均可用。"
+      : "生产运行已 fail closed：Core health/admission、Harbor runtime health 或 Lode capability assets 尚不可用，fixture/demo 不作为可用结果。",
   };
 }
 
@@ -118,17 +122,19 @@ export function createRuntimeSupervisor() {
   return {
     async readState(config: RuntimeEndpointConfig): Promise<RuntimeSupervisorState> {
       const checkedAt = new Date().toISOString();
+      const lodeAssets = resolveLodeAssetBundle();
       const services = await Promise.all(
         (["core", "harbor"] as const).map((id) =>
-          readServiceState(id, endpointFor(id, config), checkedAt, processSnapshots),
+          readServiceState(id, endpointFor(id, config), checkedAt, processSnapshots, lodeAssets),
         ),
       );
-      const readiness = summarizeRuntimeReadiness(services);
+      const readiness = summarizeRuntimeReadiness(services, lodeAssets);
 
       return {
         mode: "real",
         checkedAt,
         services,
+        lodeAssets,
         ...readiness,
       };
     },
@@ -145,9 +151,10 @@ async function readServiceState(
   endpoint: string,
   checkedAt: string,
   processSnapshots: Map<RuntimeServiceId, ProcessSnapshot>,
+  lodeAssets: LodeAssetBundleState,
 ): Promise<RuntimeServiceState> {
   const launch = resolveRuntimeServiceLaunchConfig(id);
-  const snapshot = ensureProcess(id, launch, processSnapshots);
+  const snapshot = ensureProcess(id, launch, processSnapshots, id === "core" ? coreLodeAssetEnvironment(lodeAssets) : {});
   const health = await probeFirst(endpoint, serviceHealthPaths[id]);
   const admission = id === "core" ? await probeFirst(endpoint, coreAdmissionPaths) : undefined;
   const processState = health.state === "ready" && snapshot.processState === "not_configured" ? "running" : snapshot.processState;
@@ -174,6 +181,7 @@ function ensureProcess(
   id: RuntimeServiceId,
   launch: RuntimeServiceLaunchConfig | null,
   processSnapshots: Map<RuntimeServiceId, ProcessSnapshot>,
+  extraEnv: NodeJS.ProcessEnv = {},
 ): ProcessSnapshot {
   const current = processSnapshots.get(id);
   if (current?.child && current.processState !== "exited" && current.processState !== "failed") {
@@ -189,7 +197,7 @@ function ensureProcess(
   try {
     const child = spawn(launch.command, launch.args ?? [], {
       cwd: launch.cwd,
-      env: { ...process.env },
+      env: { ...process.env, ...extraEnv },
       stdio: "ignore",
       windowsHide: true,
     });

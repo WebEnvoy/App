@@ -7,10 +7,11 @@
   "scripts": {
     "dev": "node scripts/dev-electron.mjs",
     "build": "npm run typecheck && npm run build:main && vite build",
-    "build:main": "node -e \"require('fs').rmSync('dist-electron', { recursive: true, force: true })\" && tsc -p tsconfig.electron.json",
+    "build:main": "node -e \"require('fs').rmSync('dist-electron', { recursive: true, force: true })\" && tsc -p tsconfig.electron.json && node scripts/package-lode-assets.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "smoke": "npm run build && node scripts/smoke.mjs",
     "smoke:packaged": "npm run build && node scripts/smoke-packaged.mjs",
+    "smoke:packaged:vertical": "npm run build && node scripts/smoke-packaged-vertical.mjs",
     "start": "electron dist-electron/main.js"
   },
   "dependencies": {

@@ -29,10 +29,24 @@ export type RuntimeServiceState = {
   repairAction: string;
 };
 
+export type LodeAssetBundleState = {
+  state: "ready" | "missing" | "invalid";
+  source: "env-path" | "packaged-path" | "build-output" | "not_configured";
+  rootPath?: string;
+  registryPath?: string;
+  packageCount: number;
+  requiredPackageRefs: string[];
+  missingPackageRefs: string[];
+  checkedAt: string;
+  summary: string;
+  consumerBoundary: string;
+};
+
 export type RuntimeSupervisorState = {
   mode: "real";
   checkedAt: string;
   services: RuntimeServiceState[];
+  lodeAssets: LodeAssetBundleState;
   canUseLiveRuntime: boolean;
   failClosed: boolean;
   summary: string;
@@ -46,6 +60,7 @@ export function runtimeSupervisorCheckingState(): RuntimeSupervisorState {
     mode: "real",
     checkedAt,
     services: [],
+    lodeAssets: runtimeBlockedLodeAssets(checkedAt, "Lode capability assets are still being checked."),
     canUseLiveRuntime: false,
     failClosed: true,
     summary: "正在检查本地 Core/Harbor runtime；检查完成前生产任务保持 fail closed。",
@@ -182,6 +197,7 @@ function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState
       { label: "Core health", value: coreHealth, source: runtimeSupervisorSource },
       { label: "Core admission", value: coreAdmission, source: runtimeSupervisorSource },
       { label: "Harbor health", value: harborHealth, source: runtimeSupervisorSource },
+      { label: "Lode assets", value: runtime.lodeAssets.state, source: runtimeSupervisorSource },
       { label: "Fixture/demo", value: "隔离；不作为可用任务、真实结果或写前验证成功", source: runtimeSupervisorSource },
     ],
     evidenceCards: [
@@ -210,6 +226,9 @@ function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState
       nextActions: [
         core?.repairAction ?? "Configure Core runtime command/path.",
         harbor?.repairAction ?? "Configure Harbor runtime command/path.",
+        runtime.lodeAssets.state === "ready"
+          ? "Lode capability assets are available."
+          : "Package or configure Lode local capability assets before enabling Core tasks.",
       ],
       source: runtimeSupervisorSource,
     },
@@ -217,7 +236,22 @@ function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState
       `Core health: ${coreHealth}.`,
       `Core admission: ${coreAdmission}.`,
       `Harbor health: ${harborHealth}.`,
+      `Lode assets: ${runtime.lodeAssets.state}.`,
       "No fixture/demo projection was promoted to a usable real result.",
     ],
+  };
+}
+
+function runtimeBlockedLodeAssets(checkedAt: string, summary: string): LodeAssetBundleState {
+  return {
+    state: "missing",
+    source: "not_configured",
+    packageCount: 0,
+    requiredPackageRefs: [],
+    missingPackageRefs: [],
+    checkedAt,
+    summary,
+    consumerBoundary:
+      "App only displays Lode asset availability; Core consumes package refs and Harbor/Core produce runtime/live evidence.",
   };
 }
