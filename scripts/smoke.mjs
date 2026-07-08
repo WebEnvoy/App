@@ -1,4 +1,5 @@
 import { access, readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
@@ -305,6 +306,26 @@ const liveReadiness = runtimeSupervisorModule.summarizeRuntimeReadiness(
 
 if (!liveReadiness.canUseLiveRuntime || liveReadiness.failClosed) {
   throw new Error("Runtime supervisor smoke failed: ready Core/Harbor/Lode did not open live gate.");
+}
+
+const fixtureCore = await startJsonServer((pathname) =>
+  ["/health", "/admission/health"].includes(pathname) ? { status: "ready" } : null,
+);
+const fixtureHarbor = await startJsonServer((pathname) =>
+  pathname === "/readiness" ? { status: "ready", source: "fixture" } : null,
+);
+try {
+  const fixtureState = await runtimeSupervisorModule.createRuntimeSupervisor().readState({
+    coreEndpoint: fixtureCore.endpoint,
+    harborEndpoint: fixtureHarbor.endpoint,
+  });
+  const harborHealth = fixtureState.services.find((service) => service.id === "harbor")?.health;
+  if (harborHealth?.state !== "unavailable" || fixtureState.canUseLiveRuntime) {
+    throw new Error(`Runtime supervisor smoke failed: fixture Harbor readiness opened live gate. ${JSON.stringify(fixtureState)}`);
+  }
+} finally {
+  await fixtureCore.close();
+  await fixtureHarbor.close();
 }
 
 const { outputText: connectionConfigModuleSource } = ts.transpileModule(connectionConfigSource, {
@@ -1465,6 +1486,44 @@ if (blockedAvailableRun.approval?.actionRequestId.startsWith("action-request:"))
 
 if (!bossWritePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/boss/greeting/preview-result-only"))) {
   throw new Error("Core BOSS write-precheck smoke failed: preview_result evidence refs were not projected.");
+}
+
+async function startJsonServer(bodyForPath) {
+  const server = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const body = bodyForPath(url.pathname);
+    if (body == null) {
+      response.writeHead(404, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(`${JSON.stringify({ status: "missing" })}\n`);
+      return;
+    }
+    response.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end(`${JSON.stringify(body)}\n`);
+  });
+
+  await new Promise((resolve, reject) => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not allocate a local smoke server port.");
+  }
+
+  return {
+    endpoint: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
+  };
 }
 
 console.log("WebEnvoy desktop shell smoke passed.");

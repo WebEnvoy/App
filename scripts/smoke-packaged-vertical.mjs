@@ -17,14 +17,10 @@ const core = await startJsonServer((pathname) => {
     };
   }
 
-  return {
-    ok: true,
-    result_ref: "core:smoke/app-261/result-ref",
-    evidence_refs: ["harbor:evidence/app-261/local-smoke"],
-  };
+  return null;
 });
 const harbor = await startJsonServer((pathname) => {
-  if (["/health", "/ready", "/runtime/health"].includes(pathname)) {
+  if (pathname === "/readiness") {
     return {
       service: "webenvoy-harbor-smoke",
       status: "ready",
@@ -34,11 +30,7 @@ const harbor = await startJsonServer((pathname) => {
     };
   }
 
-  return {
-    ok: true,
-    session_ref: "harbor:runtime-session/app-261/local-smoke",
-    evidence_refs: ["harbor:evidence/app-261/local-smoke"],
-  };
+  return null;
 });
 
 try {
@@ -118,11 +110,20 @@ async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath }
 async function startJsonServer(bodyForPath) {
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const body = bodyForPath(url.pathname);
+    if (body == null) {
+      response.writeHead(404, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(`${JSON.stringify({ status: "missing" })}\n`);
+      return;
+    }
     response.writeHead(200, {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
     });
-    response.end(`${JSON.stringify(bodyForPath(url.pathname))}\n`);
+    response.end(`${JSON.stringify(body)}\n`);
   });
 
   await new Promise((resolve, reject) => {

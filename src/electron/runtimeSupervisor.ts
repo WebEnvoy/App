@@ -26,6 +26,7 @@ export type RuntimeProbe = {
   url: string;
   statusCode?: number;
   summary: string;
+  attempts?: Array<{ url: string; statusCode?: number; summary: string }>;
 };
 
 export type RuntimeServiceState = {
@@ -69,7 +70,7 @@ const serviceNames: Record<RuntimeServiceId, string> = {
 
 const serviceHealthPaths: Record<RuntimeServiceId, string[]> = {
   core: ["/health", "/ready", "/runtime/health"],
-  harbor: ["/health", "/ready", "/runtime/health"],
+  harbor: ["/readiness", "/health", "/ready", "/runtime/health"],
 };
 
 const coreAdmissionPaths = ["/admission/health", "/admission/ready", "/tasks/admission/health"];
@@ -227,15 +228,20 @@ function ensureProcess(
 }
 
 async function probeFirst(endpoint: string, paths: string[]): Promise<RuntimeProbe> {
+  const attempts: RuntimeProbe["attempts"] = [];
+
   for (const probePath of paths) {
     const result = await probeEndpoint(endpoint, probePath);
-    if (result.state === "ready") return result;
+    attempts.push({ url: result.url, statusCode: result.statusCode, summary: result.summary });
+    if (result.state === "ready") return { ...result, attempts };
   }
 
   return {
     state: "unavailable",
     url: `${endpoint}${paths[0]}`,
-    summary: `No ready response from ${paths.join(", ")}.`,
+    statusCode: attempts.at(-1)?.statusCode,
+    summary: `No ready response from ${paths.join(", ")}. ${attempts.at(-1)?.summary ?? ""}`.trim(),
+    attempts,
   };
 }
 
@@ -250,9 +256,20 @@ async function probeEndpoint(endpoint: string, probePath: string): Promise<Runti
       headers: { Accept: "application/json" },
       signal: controller.signal,
     });
-    return response.ok
-      ? { state: "ready", url, statusCode: response.status, summary: `${probePath} returned ${response.status}.` }
-      : { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned ${response.status}.` };
+    const text = await response.text();
+    const payload = parseJson(text);
+    const fixtureReason = fixturePayloadReason(payload);
+    const unavailableReason = explicitUnavailableReason(payload);
+    if (!response.ok) {
+      return { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned ${response.status}.` };
+    }
+    if (fixtureReason) {
+      return { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned fixture/demo state: ${fixtureReason}.` };
+    }
+    if (unavailableReason) {
+      return { state: "unavailable", url, statusCode: response.status, summary: `${probePath} returned unavailable state: ${unavailableReason}.` };
+    }
+    return { state: "ready", url, statusCode: response.status, summary: `${probePath} returned ${response.status}.` };
   } catch (error) {
     return {
       state: "unavailable",
@@ -262,6 +279,47 @@ async function probeEndpoint(endpoint: string, probePath: string): Promise<Runti
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function parseJson(text: string) {
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function fixturePayloadReason(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  for (const key of ["source", "mode", "environment", "runtime_mode", "kind", "type"]) {
+    const field = value[key];
+    if (typeof field === "string" && /\b(demo|fixture)\b/i.test(field)) return `${key}=${field}`;
+  }
+  for (const key of ["demo", "fixture", "is_demo", "is_fixture"]) {
+    if (value[key] === true) return `${key}=true`;
+  }
+  if (value.live === false) return "live=false";
+  return null;
+}
+
+function explicitUnavailableReason(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  for (const key of ["status", "state", "readiness", "health"]) {
+    const field = value[key];
+    if (field === false) return `${key}=false`;
+    if (typeof field === "string" && /^(blocked|down|error|failed|missing|not[-_ ]?ready|unavailable)$/i.test(field)) {
+      return `${key}=${field}`;
+    }
+  }
+  if (value.ready === false || value.healthy === false) {
+    return value.ready === false ? "ready=false" : "healthy=false";
+  }
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function endpointFor(id: RuntimeServiceId, config: RuntimeEndpointConfig) {

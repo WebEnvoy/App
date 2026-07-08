@@ -91,6 +91,15 @@ function RuntimeSupervisorStrip({ state }: { state: RuntimeSupervisorState }) {
           source="App runtime supervisor"
         />
         <SourceField
+          label="Runtime probes"
+          value={[
+            core?.health.summary,
+            core?.admission?.summary,
+            harbor?.health.summary,
+          ].filter(Boolean).join(" ")}
+          source="App runtime supervisor"
+        />
+        <SourceField
           label="Repair"
           value={runtimeRepairAction(state)}
           source="App runtime supervisor"

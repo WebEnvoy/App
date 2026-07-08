@@ -14,6 +14,7 @@ type WebEnvoyRuntimeProbe = {
   url: string;
   statusCode?: number;
   summary: string;
+  attempts?: Array<{ url: string; statusCode?: number; summary: string }>;
 };
 type WebEnvoyRuntimeServiceState = {
   id: "core" | "harbor";

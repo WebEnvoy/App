@@ -288,6 +288,7 @@ function SourceHealthSection({
             <span className={`status-pill status-${source.status}`}>{statusLabel(source.status)}</span>
           </div>
           <p>{source.ownerTruth}</p>
+          <p>{source.summary}</p>
         </article>
       ))}
     </section>

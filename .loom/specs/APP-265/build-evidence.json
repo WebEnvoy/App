@@ -1,0 +1,206 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item_id": "APP-265",
+  "generated_at": "2026-07-08T17:08:47Z",
+  "branch": "work/app-265-runtime-admission-e2e",
+  "pre_commit_head": "44e1ae589d8461ef81fe4a3bb93b7b506f96d0a3",
+  "task_goal": "Repair App/Core/Harbor runtime admission contract consumption so App does not promote fixture/demo state to live availability.",
+  "delegations": [],
+  "subagent_notes": [
+    "Harbor lane output is integrated in the Harbor worktree and consumed by APP-265 as an external PR/head dependency, not as an App-owned delegation.",
+    "Core lane output is integrated in the Core worktree and consumed by APP-265 as an external PR/head dependency, not as an App-owned delegation.",
+    "App lane code changes are integrated in this worktree and represented by integration_evidence entries below."
+  ],
+  "external_dependencies": [
+    {
+      "lane": "Harbor",
+      "issue": "WebEnvoy/Harbor#219",
+      "workspace": "/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-219-health-contract",
+      "status": "integrated_by_reference",
+      "boundary": "No App code changed from Harbor lane; Harbor PR/head integration remains required before final App E2E."
+    },
+    {
+      "lane": "Core",
+      "issue": "WebEnvoy/WebEnvoy#244",
+      "workspace": "/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-admission-contract",
+      "status": "integrated_by_reference",
+      "boundary": "No App code changed from Core lane; Core PR/head integration remains required before final App E2E."
+    }
+  ],
+  "ownership_constraints": {
+    "write_ownership": [
+      "src/electron/runtimeSupervisor.ts",
+      "src/renderer/runtimeSupervisorState.ts",
+      "src/renderer/vite-env.d.ts",
+      "src/renderer/TaskThreadPage.tsx",
+      "src/renderer/TaskThreadRightPanel.tsx",
+      "scripts/smoke.mjs",
+      "scripts/smoke-packaged-vertical.mjs",
+      "artifacts/app-261-packaged-vertical-smoke.png",
+      "artifacts/gh-168-packaged-preview.png",
+      ".loom/work-items/APP-265.md",
+      ".loom/progress/APP-265.md",
+      ".loom/specs/APP-265/**",
+      ".loom/status/current.md"
+    ],
+    "forbidden_targets": [
+      "Core/WebEnvoy repository code",
+      "Harbor repository code",
+      "Lode repository code",
+      "raw credentials",
+      "raw cookies",
+      "browser profile storage",
+      "raw DOM",
+      "raw HAR",
+      "network response bodies",
+      "real Xiaohongshu or BOSS production page actions",
+      "submit",
+      "publish",
+      "send",
+      "risk-control bypass",
+      "GitHub issue closeout",
+      "merge"
+    ],
+    "shared_carrier_policy": ".loom/status/current.md may be active for APP-265 only in the App worktree so Loom build can consume runtime evidence for this Work Item."
+  },
+  "ownership_contract": {
+    "task_goal": "Repair App-side runtime admission gate and smoke evidence for APP-265.",
+    "context_locators": [
+      ".loom/status/current.md",
+      ".loom/specs/APP-265/build-evidence.json",
+      ".loom/work-items/APP-265.md",
+      ".loom/progress/APP-265.md",
+      ".loom/specs/APP-265/**"
+    ],
+    "read_scope": [
+      "APP-265 Loom carriers",
+      "App runtime supervisor and smoke scripts",
+      "Harbor/Core lane outputs by reference only"
+    ],
+    "write_ownership": [
+      "src/electron/runtimeSupervisor.ts",
+      "src/renderer/runtimeSupervisorState.ts",
+      "src/renderer/vite-env.d.ts",
+      "src/renderer/TaskThreadPage.tsx",
+      "src/renderer/TaskThreadRightPanel.tsx",
+      "scripts/smoke.mjs",
+      "scripts/smoke-packaged-vertical.mjs",
+      "artifacts/app-261-packaged-vertical-smoke.png",
+      "artifacts/gh-168-packaged-preview.png",
+      ".loom/work-items/APP-265.md",
+      ".loom/progress/APP-265.md",
+      ".loom/specs/APP-265/**",
+      ".loom/status/current.md"
+    ],
+    "non_goals": [
+      "No Core, Harbor, or Lode repository code changes",
+      "No GitHub operation, commit, push, merge, or closeout from a subagent",
+      "No real account, profile, Cookie, production page, submit, publish, send, or external visible action"
+    ],
+    "validation_expectation": [
+      "loom fact-chain --target . --json",
+      "loom build --target . --item APP-265 --build-evidence .loom/specs/APP-265/build-evidence.json --json",
+      "npm run typecheck",
+      "npm run smoke",
+      "npm run smoke:packaged",
+      "npm run smoke:packaged:vertical",
+      "git diff --check"
+    ],
+    "output_format": "Main-controller report with changed files, validation results, PR/head metadata, and remaining live E2E blockers.",
+    "integration_target": [
+      "APP-265 App PR",
+      "App #14 runtime admission E2E closeout input"
+    ],
+    "no_overlap": true
+  },
+  "validation": {
+    "passed": [
+      {
+        "command": "loom doctor --target . --json",
+        "evidence": "Installed Loom surface passed in the APP-265 worktree before edits."
+      },
+      {
+        "command": "loom verify --target . --json",
+        "evidence": "Installed Loom delivery layers verified in the APP-265 worktree before edits."
+      },
+      {
+        "command": "loom fact-chain --target . --json",
+        "evidence": "Fact chain passed before App carrier activation; must be refreshed after this build evidence repair."
+      },
+      {
+        "command": "npm run typecheck",
+        "evidence": "App TypeScript checks passed after supervisor/UI/smoke changes."
+      },
+      {
+        "command": "npm run smoke",
+        "evidence": "Desktop shell smoke passed, including fixture Harbor readiness fail-closed coverage."
+      },
+      {
+        "command": "npm run smoke:packaged",
+        "evidence": "Packaged Electron smoke passed with packaged Lode assets."
+      },
+      {
+        "command": "npm run smoke:packaged:vertical",
+        "evidence": "Packaged vertical smoke passed with local owner-shaped Core/Harbor endpoints and Harbor /readiness-only compatibility."
+      },
+      {
+        "command": "git diff --check",
+        "evidence": "No whitespace errors."
+      }
+    ],
+    "to_refresh_after_commit": [
+      "head SHA",
+      "PR metadata readback",
+      "App E2E against Harbor/Core PR heads or merged heads"
+    ]
+  },
+  "integration_evidence": [
+    {
+      "id": "harbor-readiness-compatibility-consumed",
+      "status": "integrated",
+      "locators": [
+        "src/electron/runtimeSupervisor.ts",
+        "scripts/smoke-packaged-vertical.mjs"
+      ],
+      "summary": "App Harbor supervisor probes readiness-compatible owner endpoints and packaged vertical smoke covers Harbor /readiness-only compatibility."
+    },
+    {
+      "id": "core-admission-remains-required",
+      "status": "integrated",
+      "locators": [
+        "src/electron/runtimeSupervisor.ts",
+        "src/renderer/TaskThreadPage.tsx"
+      ],
+      "summary": "Core admission remains required for live gate availability; malformed, missing, fixture, demo, or unavailable facts fail closed."
+    },
+    {
+      "id": "runtime-diagnostics-visible",
+      "status": "integrated",
+      "locators": [
+        "src/renderer/runtimeSupervisorState.ts",
+        "src/renderer/TaskThreadRightPanel.tsx"
+      ],
+      "summary": "App exposes runtime probe diagnostics so users can see which local owner runtime gate is blocking live operation."
+    }
+  ],
+  "runtime_boundary": {
+    "runtime_evidence_kind": "local owner-shaped smoke and App runtime gate diagnostics",
+    "live_site_evidence": "not_attempted",
+    "profile": "none opened by this App lane",
+    "forbidden_actions": [
+      "login",
+      "submit",
+      "publish",
+      "apply",
+      "greet",
+      "send_message",
+      "captcha_or_risk_bypass",
+      "raw_cookie_token_profile_dom_har_or_body_export"
+    ]
+  },
+  "remaining_limitations": [
+    "Real App E2E with Harbor and Core PR heads is still pending.",
+    "No real Xiaohongshu/BOSS account, profile, Cookie, production page, submit, publish, send, or external visible action was performed.",
+    "CloakBrowser availability depends on the user's workstation; this App PR only displays owner facts and fail-closed diagnostics."
+  ]
+}
