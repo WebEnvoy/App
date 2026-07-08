@@ -7,7 +7,7 @@
 - Parent FR: #256
 - Covered Issues: #257, #258, #259
 - Branch: work/app-257-runtime-supervisor
-- Workspace: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-257-runtime-supervisor
+- Workspace: .
 
 ## Approved Scope
 
@@ -39,5 +39,5 @@
 
 ## Host Binding
 
-- Pull Request: not_created
-- Reviewed Head: pending
+- Pull Request: https://github.com/WebEnvoy/App/pull/262
+- Reviewed Head: .loom/reviews/APP-257.json

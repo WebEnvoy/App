@@ -6,7 +6,7 @@
 - Goal: Start/supervise local Core and Harbor runtime from the App shell, display health/admission state, and fail closed so production UI does not promote fixture/demo projections to usable results.
 - Scope: App Electron main runtime supervisor, preload IPC, renderer runtime health/admission gate, Task Thread fail-closed projection, Browser/identity fail-closed projection, Settings diagnostics, focused smoke coverage, APP-257 item-specific carrier, and ownership constraints for worker-produced App-only changes integrated by the main controller.
 - Execution Path: milestone14/app-runtime-supervisor
-- Workspace Entry: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-257-runtime-supervisor
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/APP-257.md
 - Review Entry: .loom/reviews/APP-257.json
 - Validation Entry: loom doctor --target . --json; loom verify --target . --json; loom fact-chain --target . --json; npm run typecheck; npm run smoke; npm run smoke:packaged; git diff --check
