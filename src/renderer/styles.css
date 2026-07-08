@@ -2258,6 +2258,7 @@ h3 {
 
 .identity-connection-strip,
 .core-read-source-strip,
+.runtime-supervisor-strip,
 .identity-management-panel {
   display: grid;
   gap: 10px;
@@ -2268,7 +2269,8 @@ h3 {
 }
 
 .identity-connection-strip,
-.core-read-source-strip {
+.core-read-source-strip,
+.runtime-supervisor-strip {
   grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1fr) auto;
   align-items: center;
 }
@@ -2291,8 +2293,19 @@ h3 {
   background: var(--we-surface-secondary);
 }
 
+.runtime-supervisor-ready {
+  border-color: var(--we-status-success-border);
+  background: var(--we-status-success-background);
+}
+
+.runtime-supervisor-blocked {
+  border-color: var(--we-status-error-border);
+  background: var(--we-status-error-background);
+}
+
 .identity-connection-strip div,
 .core-read-source-strip div,
+.runtime-supervisor-strip div:first-child,
 .identity-management-heading {
   display: flex;
   min-width: 0;
@@ -2306,8 +2319,21 @@ h3 {
   gap: 2px;
 }
 
+.runtime-supervisor-strip dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.runtime-supervisor-strip dl > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
 .identity-connection-strip strong,
 .core-read-source-strip strong,
+.runtime-supervisor-strip strong,
 .identity-management-heading strong {
   color: var(--we-foreground);
   font-size: 13px;
@@ -2317,6 +2343,9 @@ h3 {
 .identity-connection-strip p,
 .core-read-source-strip span,
 .core-read-source-strip p,
+.runtime-supervisor-strip dt,
+.runtime-supervisor-strip dd,
+.runtime-supervisor-strip p,
 .identity-management-heading span,
 .identity-management-message {
   margin: 0;
@@ -2324,6 +2353,10 @@ h3 {
   color: var(--we-foreground-muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.runtime-supervisor-strip dt {
+  font-weight: 800;
 }
 
 .identity-connection-strip button,

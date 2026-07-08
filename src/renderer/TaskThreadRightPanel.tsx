@@ -10,6 +10,7 @@ import {
 import { ContextPanel, SourceField } from "./TaskThreadFields";
 import { PanelTabs } from "./shellPrimitives";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
+import { type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 import { sourceHealthFixture, type SourceHealth, type SourceHealthStatus } from "./sourceHealthFixture";
 
@@ -41,11 +42,13 @@ function statusLabel(status: SourceHealth["status"]) {
 
 export function TaskThreadRightPanel({
   coreReadState,
+  runtimeSupervisorState,
   selectedRun,
   selectedTask,
   shellDiagnostics,
 }: {
   coreReadState: CoreReadTaskLoadState;
+  runtimeSupervisorState: RuntimeSupervisorState;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   shellDiagnostics: ShellDiagnostics;
@@ -82,7 +85,7 @@ export function TaskThreadRightPanel({
         }))}
       />
 
-      <SourceHealthSection coreReadState={coreReadState} />
+      <SourceHealthSection coreReadState={coreReadState} runtimeSupervisorState={runtimeSupervisorState} />
     </aside>
   );
 }
@@ -236,20 +239,38 @@ function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
   );
 }
 
-function SourceHealthSection({ coreReadState }: { coreReadState: CoreReadTaskLoadState }) {
+function SourceHealthSection({
+  coreReadState,
+  runtimeSupervisorState,
+}: {
+  coreReadState: CoreReadTaskLoadState;
+  runtimeSupervisorState: RuntimeSupervisorState;
+}) {
   const coreStatus: SourceHealthStatus =
-    coreReadState.status === "ready"
+    runtimeSupervisorState.services.find((service) => service.id === "core")?.health.state === "ready"
       ? "ready"
-      : coreReadState.status === "offline"
-      ? "unavailable"
-      : "fixture";
+      : "unavailable";
+  const harborStatus: SourceHealthStatus =
+    runtimeSupervisorState.services.find((service) => service.id === "harbor")?.health.state === "ready"
+      ? "ready"
+      : "unavailable";
   const sources = sourceHealthFixture.map((source) =>
     source.id === "core"
       ? {
           ...source,
           status: coreStatus,
-          summary: coreReadState.summary,
-          fetchedAt: coreReadState.fetchedAt,
+          summary: runtimeSupervisorState.summary,
+          fetchedAt: runtimeSupervisorState.checkedAt,
+        }
+      : source.id === "harbor"
+      ? {
+          ...source,
+          status: harborStatus,
+          summary:
+            harborStatus === "ready"
+              ? "Harbor runtime health is ready."
+              : "Harbor runtime health unavailable；fixture/demo provider 不作为可用。",
+          fetchedAt: runtimeSupervisorState.checkedAt,
         }
       : source,
   );
@@ -258,7 +279,7 @@ function SourceHealthSection({ coreReadState }: { coreReadState: CoreReadTaskLoa
     <section className="source-health" id="source-health">
       <div className="section-heading">
         <span>来源</span>
-        <span className="badge">{coreReadState.status}</span>
+        <span className="badge">{runtimeSupervisorState.canUseLiveRuntime ? coreReadState.status : "fail-closed"}</span>
       </div>
       {sources.map((source) => (
         <article className="source-card" key={source.id}>

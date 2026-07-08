@@ -1,21 +1,24 @@
-import { AlertTriangle, Ban, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
+import { Activity, AlertTriangle, Ban, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
 import { useState } from "react";
 
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
+import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
 export function TaskThreadPage({
   coreReadState,
   navigationItems,
+  runtimeSupervisorState,
   selectedRun,
   selectedTask,
   onActiveRunChange,
 }: {
   coreReadState: CoreReadTaskLoadState;
   navigationItems: ThreadNavigationItem[];
+  runtimeSupervisorState: RuntimeSupervisorState;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   onActiveRunChange: (runId: string) => void;
@@ -36,6 +39,7 @@ export function TaskThreadPage({
         </div>
 
         <CoreReadSourceStrip selectedTask={selectedTask} state={coreReadState} />
+        <RuntimeSupervisorStrip state={runtimeSupervisorState} />
         <TaskIntentTurn selectedTask={selectedTask} />
 
         {selectedTask.blocker ? (
@@ -60,6 +64,50 @@ export function TaskThreadPage({
       </div>
     </div>
   );
+}
+
+function RuntimeSupervisorStrip({ state }: { state: RuntimeSupervisorState }) {
+  const core = runtimeService(state, "core");
+  const harbor = runtimeService(state, "harbor");
+  const status = state.canUseLiveRuntime ? "ready" : "blocked";
+
+  return (
+    <section className={`runtime-supervisor-strip runtime-supervisor-${status}`} aria-label="Runtime supervisor status">
+      <div>
+        <Activity size={16} />
+        <strong>{state.canUseLiveRuntime ? "本地 runtime 可用" : "生产运行已阻断"}</strong>
+        <span className={`status-pill status-${status}`}>{status}</span>
+      </div>
+      <p>{state.summary}</p>
+      <dl>
+        <SourceField
+          label="Core health / admission"
+          value={`${core?.health.state ?? "unavailable"} / ${core?.admission?.state ?? "unavailable"}`}
+          source="App runtime supervisor"
+        />
+        <SourceField
+          label="Harbor health"
+          value={harbor?.health.state ?? "unavailable"}
+          source="App runtime supervisor"
+        />
+        <SourceField
+          label="Repair"
+          value={runtimeRepairAction(state)}
+          source="App runtime supervisor"
+        />
+      </dl>
+    </section>
+  );
+}
+
+function runtimeRepairAction(state: RuntimeSupervisorState) {
+  const core = runtimeService(state, "core");
+  const harbor = runtimeService(state, "harbor");
+
+  if (!core || core.health.state !== "ready") return core?.repairAction ?? "Configure Core runtime command/path.";
+  if (core.admission?.state !== "ready") return core.repairAction;
+  if (harbor?.health.state !== "ready") return harbor?.repairAction ?? "Configure Harbor runtime command/path.";
+  return core?.repairAction ?? harbor?.repairAction ?? "Configure local runtime command/path.";
 }
 
 function CoreReadSourceStrip({

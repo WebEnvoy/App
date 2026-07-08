@@ -1,4 +1,6 @@
 import { access, readFile } from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const requiredFiles = [
@@ -38,8 +40,16 @@ if (!mainSource.includes("webenvoy:shell-context")) {
   throw new Error("Electron main smoke failed: shell context IPC is missing.");
 }
 
+if (!mainSource.includes("webenvoy:runtime-supervisor-state")) {
+  throw new Error("Electron main smoke failed: runtime supervisor IPC is missing.");
+}
+
 if (!preloadSource.includes("webenvoyShell")) {
   throw new Error("Preload smoke failed: shell bridge is missing.");
+}
+
+if (!preloadSource.includes("getRuntimeSupervisorState")) {
+  throw new Error("Preload smoke failed: runtime supervisor bridge is missing.");
 }
 
 if (rendererHtml.includes('src="/assets/') || rendererHtml.includes('href="/assets/')) {
@@ -191,10 +201,63 @@ for (const expectedText of [
   "页面变化",
   "字段缺失",
   "不打招呼、不投递、不发送消息",
+  "Runtime supervisor status",
+  "生产运行已阻断",
+  "fixture/demo 不作为可用结果",
+  "App runtime supervisor",
+  "Core health / admission",
+  "Harbor health",
+  "runtime 未连接",
 ]) {
   if (!rendererAssets.includes(expectedText)) {
     throw new Error(`Renderer smoke failed: ${expectedText} is missing.`);
   }
+}
+
+const runtimeSupervisorModule = await import(
+  pathToFileURL(path.resolve("dist-electron/runtimeSupervisor.js")).href
+);
+const harborLaunch = runtimeSupervisorModule.resolveRuntimeServiceLaunchConfig(
+  "harbor",
+  { WEBENVOY_HARBOR_RUNTIME_CWD: "/tmp/harbor-runtime" },
+  undefined,
+);
+
+if (
+  harborLaunch?.command !== "pnpm" ||
+  harborLaunch.args?.join(" ") !== "start:runtime" ||
+  harborLaunch.cwd !== "/tmp/harbor-runtime" ||
+  harborLaunch.source !== "local-cwd"
+) {
+  throw new Error("Runtime supervisor smoke failed: Harbor local start script config was not resolved.");
+}
+
+const readiness = runtimeSupervisorModule.summarizeRuntimeReadiness([
+  {
+    id: "core",
+    name: "Core",
+    endpoint: "http://127.0.0.1:8787",
+    processState: "not_configured",
+    launchSource: "not_configured",
+    health: { state: "ready", url: "core/health", summary: "ready" },
+    admission: { state: "unavailable", url: "core/admission", summary: "missing" },
+    checkedAt: "smoke",
+    repairAction: "repair core",
+  },
+  {
+    id: "harbor",
+    name: "Harbor",
+    endpoint: "http://127.0.0.1:8788",
+    processState: "not_configured",
+    launchSource: "not_configured",
+    health: { state: "ready", url: "harbor/health", summary: "ready" },
+    checkedAt: "smoke",
+    repairAction: "repair harbor",
+  },
+]);
+
+if (!readiness.failClosed || readiness.canUseLiveRuntime) {
+  throw new Error("Runtime supervisor smoke failed: missing Core admission did not fail closed.");
 }
 
 const { outputText: connectionConfigModuleSource } = ts.transpileModule(connectionConfigSource, {

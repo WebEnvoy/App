@@ -53,6 +53,7 @@ export function BrowserLaunchPanel({
 }) {
   const canControl = session.state === "running" || session.state === "takeover";
   const canView = session.state !== "idle" && session.state !== "stopped";
+  const runtimeBlocked = identity.source === "App runtime supervisor";
 
   return (
     <section className="identity-browser-panel" aria-label="身份浏览器会话">
@@ -66,11 +67,16 @@ export function BrowserLaunchPanel({
       </div>
 
       <ProviderStatusList providers={identity.browser.providers} />
-      <BrowserTargetButtons targets={identity.browser.targets} onStartTarget={onStartTarget} sessionBusy={sessionBusy} />
-      <ReadTaskEntryPanel entries={identity.taskEntries} onOpenTask={onOpenTask} />
+      <BrowserTargetButtons
+        isRuntimeBlocked={runtimeBlocked}
+        targets={identity.browser.targets}
+        onStartTarget={onStartTarget}
+        sessionBusy={sessionBusy}
+      />
+      <ReadTaskEntryPanel entries={identity.taskEntries} isRuntimeBlocked={runtimeBlocked} onOpenTask={onOpenTask} />
       <SessionControlPanel
-        canControl={canControl}
-        canView={canView}
+        canControl={canControl && !runtimeBlocked}
+        canView={canView && !runtimeBlocked}
         session={session}
         onReleaseSession={onReleaseSession}
         onStopSession={onStopSession}
@@ -108,10 +114,12 @@ function ProviderStatusList({
 }
 
 function BrowserTargetButtons({
+  isRuntimeBlocked,
   targets,
   onStartTarget,
   sessionBusy,
 }: {
+  isRuntimeBlocked: boolean;
   targets: BrowserTargetProjection[];
   onStartTarget: (target: BrowserTargetProjection) => void;
   sessionBusy: string;
@@ -119,7 +127,7 @@ function BrowserTargetButtons({
   return (
     <div className="identity-browser-targets" aria-label="打开默认页面">
       {targets.map((target) => (
-        <button type="button" disabled={Boolean(sessionBusy)} onClick={() => onStartTarget(target)} key={target.id}>
+        <button type="button" disabled={isRuntimeBlocked || Boolean(sessionBusy)} onClick={() => onStartTarget(target)} key={target.id}>
           <Play size={15} />
           打开{target.label}
           <span>{target.readiness}</span>
@@ -131,9 +139,11 @@ function BrowserTargetButtons({
 
 function ReadTaskEntryPanel({
   entries,
+  isRuntimeBlocked,
   onOpenTask,
 }: {
   entries: IdentityTaskEntryProjection[];
+  isRuntimeBlocked: boolean;
   onOpenTask: (taskId: string) => void;
 }) {
   return (
@@ -143,7 +153,7 @@ function ReadTaskEntryPanel({
         <span>Core task path 才产生 Run / Result / Evidence；App 只读取 Core owner API projection。</span>
       </div>
       {entries.map((entry) => (
-        <button type="button" onClick={() => onOpenTask(entry.taskId)} key={entry.id}>
+        <button type="button" disabled={isRuntimeBlocked} onClick={() => onOpenTask(entry.taskId)} key={entry.id}>
           <Play size={15} />
           <span>
             {entry.label}
