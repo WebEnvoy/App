@@ -128,7 +128,7 @@ function parsePort(value, fallback) {
 function harborStartScript() {
   return `import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { HarborRuntime } from "./dist/packages/runtime-api/src/index.js";
+import { createFixtureLauncher, HarborRuntime } from "./dist/packages/runtime-api/src/index.js";
 import { startHarborRuntimeServer } from "./dist/packages/runtime-api/src/server.js";
 
 const host = process.env.HARBOR_RUNTIME_HOST ?? "127.0.0.1";
@@ -137,7 +137,8 @@ const runtimeDataDir = process.env.WEBENVOY_RUNTIME_DATA_DIR ?? join(process.cwd
 const identityStore = process.env.HARBOR_IDENTITY_ENVIRONMENTS_PATH ?? join(runtimeDataDir, "harbor", "identity-environments.json");
 mkdirSync(dirname(identityStore), { recursive: true });
 
-const runtime = new HarborRuntime(undefined, { persistence_path: identityStore });
+const launcher = process.env.HARBOR_RUNTIME_PROVIDER === "fixture" ? createFixtureLauncher("ready") : undefined;
+const runtime = new HarborRuntime(launcher, { persistence_path: identityStore });
 const running = await startHarborRuntimeServer({ host, port, runtime });
 console.log(JSON.stringify({ service: "harbor-runtime-api", status: "ready", url: running.url, identity_environment_store: "configured" }));
 
