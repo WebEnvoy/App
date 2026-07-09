@@ -3,12 +3,12 @@
   "item_id": "APP-265",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Code review allows PR #273 for APP-265 at current scope. The change corrects the packaged readonly smoke so the App uses packaged Core/Harbor runtime processes, seeds Harbor public identity facts through the Harbor API, submits to Core /tasks, and renders owner-shaped run/session/evidence refs under the explicit Harbor fixture launcher boundary. This review does not claim final App #14 live E2E completion.",
+  "summary": "Code review allows APP-265 at current pre-commit scope. The change routes App managed identity create/session requests through Harbor owner API refs, keeps App local-only and fixture identities fail-closed, keeps Chrome restricted fallback blocked for Core task submit, and preserves packaged Core/Harbor readonly smoke under the explicit fixture-launcher boundary. This review does not claim final App #14 live E2E completion.",
   "reviewer": "Codex master controller thread 019f3a6c-9bb5-7a80-8095-13751f46cead",
-  "authored_at": "2026-07-09T17:24:00Z",
-  "reviewed_head": "9e09efd9c9a71b773d5aca2e44190f4f8092d02a",
-  "reviewed_validation_summary": "2026-07-09T17:18Z UTC local validation passed for PR #273 branch `work/app-265-real-packaged-readonly-smoke` at head `9e09efd9c9a71b773d5aca2e44190f4f8092d02a`: `npm run typecheck`, `WEBENVOY_CORE_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-harbor-site-facts-run WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-218-fixture-site-facts npm run smoke:packaged:readonly`, `WEBENVOY_CORE_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-harbor-site-facts-run WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-218-fixture-site-facts npm run smoke:packaged:runtime`, and `git diff --check`. Evidence boundary: packaged App launched local Core/Harbor runtime processes, seeded Harbor public identity facts through the Harbor API, submitted a readonly Xiaohongshu task from the App UI to Core `/tasks`, and rendered Core run/session/evidence refs under the Harbor fixture launcher only. This is owner-shaped contract evidence, not live-site evidence; no real Xiaohongshu/BOSS account, browser profile, Cookie, production page action, submit, publish, send, hosted browser, marketplace, bulk collection, full account cloud hosting, or risk-control bypass occurred.",
-  "reviewed_validation_summary_hash": "ddbbc6b7514c3155e0e53a5d0f3830f83195f9b81b34c72b54da4c2da6ca4873",
+  "authored_at": "2026-07-09T18:29:00Z",
+  "reviewed_head": "8014dfebb5a0dab14d80c3594583c1a7a9e7a4e5",
+  "reviewed_validation_summary": "2026-07-09T18:29Z UTC local validation passed on branch `work/app-265-real-e2e-final` before commit: `npm run smoke`, `WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-219-persistent-profile-session npm run smoke:packaged:runtime`, `WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-219-persistent-profile-session npm run smoke:packaged:readonly`, `git diff --check`, `loom fact-chain --target . --json`, `loom suite carrier validate --target . --item APP-265 --json`, and `loom suite evidence validate --target . --item APP-265 --json`. Evidence boundary: packaged App launched local Core/Harbor runtime processes, used the Harbor owner API contract for managed identity/session requests, kept local/fixture/Chrome restricted fallback submit paths fail-closed, submitted a readonly Xiaohongshu task through App UI to Core `/tasks`, and rendered Core/Harbor refs under the Harbor fixture launcher only. This is owner-shaped contract evidence, not live-site evidence; no real Xiaohongshu/BOSS account, browser profile, Cookie, production page action, submit, publish, send, hosted browser, marketplace, bulk collection, full account cloud hosting, or risk-control bypass occurred.",
+  "reviewed_validation_summary_hash": "302c9b00a5d5ef57fd431c47b842e00f4ab3fc4af87fce69cbb9e4cbf79940e1",
   "validation_summary_source": "recovery.latest_validation_summary",
   "validation_summary_locator": ".loom/progress/APP-265.md",
   "fallback_to": null,
@@ -36,8 +36,8 @@
     "engine_adapter": null,
     "engine_evidence": null,
     "normalized_findings": null,
-    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-main-e2e-check --item APP-265 --json",
-    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-main-e2e-check --item APP-265 --json",
+    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-265-real-e2e-final --item APP-265 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-265-real-e2e-final --item APP-265 --json",
     "suite_evidence_map": ".loom/specs/APP-265/evidence-map.md",
     "suite_consistency_analysis": null,
     "suite_task_carriers": [
@@ -55,6 +55,6 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored implementation review approved the current head for merge checkpoint consumption."
+    "reason": "Authored implementation review approved the current pre-commit head for PR creation; final merge consumption still requires committed head readback and hosted gate."
   }
 }

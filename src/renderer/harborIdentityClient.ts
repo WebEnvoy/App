@@ -1,10 +1,11 @@
-import { identityInputFromProjection, projectHarborIdentity, projectHarborSession, projectLocalDraft } from "./harborIdentityProjection";
+import { projectHarborIdentity, projectHarborSession, projectLocalDraft } from "./harborIdentityProjection";
 import {
   type HarborIdentityFacts,
   type HarborIdentityLoadState,
   type HarborProviderCatalog,
   type HarborRuntimeSession,
   type LocalIdentityEnvironmentDraft,
+  type SiteId,
   isHarborIdentityFacts,
   isProviderCatalog,
   isRecord,
@@ -55,17 +56,39 @@ export async function openHarborIdentitySession(
   identity: IdentityEnvironmentProjection,
   target: BrowserTargetProjection,
 ) {
+  if (identity.source !== "Harbor live") {
+    return {
+      status: "unavailable" as const,
+      message: "只有 Harbor live identity environment 可以启动真实身份浏览器；App local/fixture identity 必须先注册并由 Harbor 回读。",
+      retryable: true,
+    };
+  }
   return postHarborSession(harborEndpoint, [
     "/runtime/identity-environment-sessions",
     "/runtime/sessions/identity-environment",
     "/identity-environment-sessions",
   ], {
-    identity_environment: identityInputFromProjection(identity),
+    identity_environment_ref: identity.identityEnvironmentRef,
     url: target.defaultUrl,
+    headless: false,
     control_owner: "user",
     holder_ref: "app-browser-page",
     reuse_existing: true,
   });
+}
+
+export async function createHarborIdentityEnvironment(harborEndpoint: string, draft: LocalIdentityEnvironmentDraft) {
+  const result = await postFirstJson<unknown>(
+    harborEndpoint,
+    ["/runtime/identity-environments", "/identity-environments"],
+    identityInputFromDraft(draft),
+    "Harbor endpoint 未接受 identity environment 创建请求。",
+  );
+  if (!result.ok) return result;
+  const createdRef = identityEnvironmentRefFromCreateResponse(result.value);
+  return createdRef === draft.identityEnvironmentRef
+    ? { ok: true as const }
+    : { ok: false as const, error: "Harbor 创建响应未回传匹配的 identity_environment_ref；保持 App local-only 草稿。" };
 }
 
 export async function lockHarborSession(harborEndpoint: string, sessionRef: string) {
@@ -98,7 +121,12 @@ async function fetchFirstJson<T>(base: string, paths: string[]) {
   return { ok: false as const, error: `无法读取 ${base}` };
 }
 
-async function postFirstJson<T>(base: string, paths: string[], body: unknown) {
+async function postFirstJson<T>(
+  base: string,
+  paths: string[],
+  body: unknown,
+  fallbackError = "Harbor endpoint 未接受会话请求。",
+) {
   for (const path of paths) {
     const result = await requestJson<T>(base, path, {
       method: "POST",
@@ -106,7 +134,7 @@ async function postFirstJson<T>(base: string, paths: string[], body: unknown) {
     });
     if (result.ok) return result;
   }
-  return { ok: false as const, error: "Harbor endpoint 未接受会话请求。" };
+  return { ok: false as const, error: fallbackError };
 }
 
 async function requestJson<T>(base: string, path: string, init: RequestInit) {
@@ -141,6 +169,47 @@ function parseIdentityList(value: unknown, catalog: HarborProviderCatalog | null
     const publicFacts = identityFactsFromPublicRecord(item, catalog);
     return publicFacts ? [publicFacts] : [];
   });
+}
+
+function identityInputFromDraft(draft: LocalIdentityEnvironmentDraft) {
+  return {
+    identity_environment_ref: draft.identityEnvironmentRef,
+    execution_identity_ref: draft.executionIdentityRef,
+    profile_ref: draft.profileRef,
+    profile_storage_ref: draft.profileStorageRef,
+    site: {
+      site_id: draft.siteId,
+      origin: siteOrigin(draft.siteId),
+      display_name: draft.siteId === "boss" ? "BOSS" : "小红书",
+      account_identifier: draft.accountLabel,
+    },
+    login_state: draft.loginState,
+    storage_state: draft.profileStorageRef ? "present" : "unknown",
+    credential_ref: draft.credentialRef || undefined,
+    proxy_ref: draft.proxyRef || undefined,
+    proxy_label: draft.proxyLabel,
+    region: draft.region,
+    language: draft.language,
+    timezone: draft.timezone,
+    browser_family: draft.requestedProviderId,
+    requested_provider_id: draft.requestedProviderId,
+    user_agent_summary: draft.userAgentSummary,
+    viewport: draft.viewport,
+    fingerprint_summary: draft.fingerprintSummary,
+    login_method: "manual",
+    manual_authentication_state: draft.manualAuthenticationState,
+    human_verification: draft.manualAuthenticationState === "not_required" ? [] : ["manual_login"],
+  };
+}
+
+function identityEnvironmentRefFromCreateResponse(value: unknown): string | undefined {
+  const record = recordValue(value);
+  const nested = recordValue(record?.identity_environment);
+  return stringValue(record?.identity_environment_ref) ?? stringValue(nested?.identity_environment_ref);
+}
+
+function siteOrigin(siteId: SiteId) {
+  return siteId === "boss" ? "https://www.zhipin.com" : "https://www.xiaohongshu.com";
 }
 
 function sessionPaths(sessionRef: string, action: "lock" | "release" | "stop") {

@@ -582,13 +582,29 @@ const harborContract = await startHarborIdentityContractServer();
 let readyXhsIdentity;
 let harborRuntimeSession;
 try {
-  const createResponse = await fetch(`${harborContract.endpoint}/runtime/identity-environments`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ site_id: "xiaohongshu", identity_environment_ref: "harbor://identity-environment/xhs-smoke" }),
+  const createPayload = await harborIdentityClientModule.createHarborIdentityEnvironment(harborContract.endpoint, {
+    id: "harbor://identity-environment/xhs-smoke",
+    name: "小红书 smoke",
+    siteId: "xiaohongshu",
+    accountLabel: "运营号 smoke",
+    identityEnvironmentRef: "harbor://identity-environment/xhs-smoke",
+    executionIdentityRef: "harbor://execution-identity/xhs-smoke",
+    profileRef: "harbor://profile/xhs-smoke",
+    requestedProviderId: "cloakbrowser",
+    loginState: "logged_in",
+    manualAuthenticationState: "not_required",
+    profileStorageRef: "harbor://profile-storage/xhs-smoke",
+    credentialRef: "credential:smoke-ref",
+    proxyRef: "proxy:smoke",
+    proxyLabel: "local contract proxy ref",
+    region: "CN-SH",
+    language: "zh-CN",
+    timezone: "Asia/Shanghai",
+    userAgentSummary: "Chrome family smoke",
+    viewport: "1440 x 900",
+    fingerprintSummary: "provider_claim_smoke",
   });
-  const createPayload = await createResponse.json();
-  if (!createResponse.ok || createPayload.ok !== true) {
+  if (createPayload.ok !== true) {
     throw new Error(`Harbor identity contract smoke failed: create was not accepted: ${JSON.stringify(createPayload)}`);
   }
 
@@ -605,6 +621,25 @@ try {
   );
   if ("status" in harborRuntimeSession || harborRuntimeSession.lifecycle_state !== "active") {
     throw new Error(`Harbor identity contract smoke failed: session was not active: ${JSON.stringify(harborRuntimeSession)}`);
+  }
+
+  let localOnlySessionFetchCalled = false;
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    localOnlySessionFetchCalled = true;
+    throw new Error("local-only identity must not call Harbor session endpoint");
+  };
+  try {
+    const localOnlySession = await harborIdentityClientModule.openHarborIdentitySession(
+      harborContract.endpoint,
+      { ...readyXhsIdentity, source: "App local-only" },
+      readyXhsIdentity.browser.targets[0],
+    );
+    if (!("status" in localOnlySession) || localOnlySessionFetchCalled) {
+      throw new Error(`Harbor identity contract smoke failed: local-only session was not fail-closed before fetch: ${JSON.stringify(localOnlySession)}`);
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
   }
 } finally {
   await harborContract.close();
@@ -666,6 +701,32 @@ const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
 
 if (needsAuthReadiness.ok) {
   throw new Error("Core submit smoke failed: needs-auth Harbor identity was accepted.");
+}
+
+for (const source of ["App local-only", "Harbor fixture"]) {
+  const nonLiveReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+    readonlySubmitTask,
+    liveRuntimeForSubmit,
+    [{ ...readyXhsIdentity, source }],
+  );
+  if (nonLiveReadiness.ok) {
+    throw new Error(`Core submit smoke failed: ${source} identity was accepted as live.`);
+  }
+}
+
+const chromeFallbackReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [
+    {
+      ...readyXhsIdentity,
+      provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", state: "warning" },
+      readiness: { ...readyXhsIdentity.readiness, state: "warning" },
+    },
+  ],
+);
+if (chromeFallbackReadiness.ok) {
+  throw new Error("Core submit smoke failed: Chrome restricted fallback was accepted for Core task submit.");
 }
 
 const crossOriginReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -784,7 +845,9 @@ globalThis.fetch = async (url, init = {}) => {
     : { ok: false, error: { code: "unexpected_submit_smoke_path" } };
   return {
     ok: true,
+    status: 200,
     json: async () => json,
+    text: async () => JSON.stringify(json),
   };
 };
 const submittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
@@ -823,7 +886,9 @@ globalThis.fetch = async (url, init = {}) => {
     : { ok: false, error: { code: "unexpected_pending_smoke_path" } };
   return {
     ok: true,
+    status: 200,
     json: async () => json,
+    text: async () => JSON.stringify(json),
   };
 };
 const pendingRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
@@ -1833,7 +1898,18 @@ async function startHarborIdentityContractServer() {
 
     if (request.method === "POST" && ["/runtime/identity-environment-sessions", "/runtime/sessions/identity-environment", "/identity-environment-sessions"].includes(pathname)) {
       const body = await readRequestJson(request);
-      sendJson(response, created ? 200 : 409, created ? harborRuntimeSessionFacts(body?.url) : { ok: false, error: "identity_not_created" });
+      const managedRefRequest =
+        body?.identity_environment_ref === identity.identity_environment_ref &&
+        body?.identity_environment == null &&
+        body?.headless === false &&
+        body?.control_owner === "user";
+      sendJson(
+        response,
+        created && managedRefRequest ? 200 : 409,
+        created && managedRefRequest
+          ? harborRuntimeSessionFacts(body?.url)
+          : { ok: false, error: created ? "managed_identity_ref_required" : "identity_not_created" },
+      );
       return;
     }
 
