@@ -1,5 +1,7 @@
-import { access, readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
@@ -21,6 +23,9 @@ const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
 const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
+const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
+const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
+const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
@@ -279,6 +284,8 @@ if (!coreLodeEnv.WEBENVOY_LODE_ASSETS_PATH || !coreLodeEnv.WEBENVOY_LODE_REGISTR
   throw new Error("Lode asset bundle smoke failed: Core env did not include asset paths.");
 }
 
+await assertPackagedRuntimeRequiredFailsClosed();
+
 const liveReadiness = runtimeSupervisorModule.summarizeRuntimeReadiness(
   [
     {
@@ -346,6 +353,44 @@ const { outputText: harborIdentityTypesModuleSource } = ts.transpileModule(harbo
   },
 });
 const harborIdentityTypesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(harborIdentityTypesModuleSource)}`;
+const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const identityEnvironmentFixturesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(identityEnvironmentFixturesModuleSource)}`;
+const { outputText: harborIdentityProjectionModuleSource } = ts.transpileModule(harborIdentityProjectionSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const harborIdentityProjectionModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+  harborIdentityProjectionModuleSource.replace(
+    'from "./identityEnvironmentFixtures";',
+    `from "${identityEnvironmentFixturesModuleUrl}";`,
+  ),
+)}`;
+const { outputText: harborIdentityClientModuleSource } = ts.transpileModule(harborIdentityClientSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const harborIdentityClientModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(
+    harborIdentityClientModuleSource
+      .replace(
+        'from "./harborIdentityProjection";',
+        `from "${harborIdentityProjectionModuleUrl}";`,
+      )
+      .replace(
+        'from "./harborIdentityTypes";',
+        `from "${harborIdentityTypesModuleUrl}";`,
+      ),
+  )}`
+);
 const { outputText: localIdentityStoreModuleSource } = ts.transpileModule(localIdentityStoreSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -401,10 +446,12 @@ function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
 
   globalThis.window = {
+    clearTimeout: globalThis.clearTimeout,
     localStorage: {
       getItem: (key) => store.get(key) ?? null,
       setItem: (key, value) => store.set(key, value),
     },
+    setTimeout: globalThis.setTimeout,
   };
 
   return store;
@@ -531,21 +578,44 @@ if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
   throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
 }
 
+const harborContract = await startHarborIdentityContractServer();
+let readyXhsIdentity;
+let harborRuntimeSession;
+try {
+  const createResponse = await fetch(`${harborContract.endpoint}/runtime/identity-environments`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ site_id: "xiaohongshu", identity_environment_ref: "harbor://identity-environment/xhs-smoke" }),
+  });
+  const createPayload = await createResponse.json();
+  if (!createResponse.ok || createPayload.ok !== true) {
+    throw new Error(`Harbor identity contract smoke failed: create was not accepted: ${JSON.stringify(createPayload)}`);
+  }
+
+  const harborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
+  readyXhsIdentity = harborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-smoke");
+  if (harborReadback.status !== "ready" || readyXhsIdentity?.source !== "Harbor live" || readyXhsIdentity.readiness.state !== "ready") {
+    throw new Error(`Harbor identity contract smoke failed: readback did not return ready Harbor live identity: ${JSON.stringify(harborReadback)}`);
+  }
+
+  harborRuntimeSession = await harborIdentityClientModule.openHarborIdentitySession(
+    harborContract.endpoint,
+    readyXhsIdentity,
+    readyXhsIdentity.browser.targets[0],
+  );
+  if ("status" in harborRuntimeSession || harborRuntimeSession.lifecycle_state !== "active") {
+    throw new Error(`Harbor identity contract smoke failed: session was not active: ${JSON.stringify(harborRuntimeSession)}`);
+  }
+} finally {
+  await harborContract.close();
+}
+
 const liveRuntimeForSubmit = {
   canUseLiveRuntime: true,
   services: [
     { id: "core", health: { state: "ready" }, admission: { state: "ready" } },
     { id: "harbor", health: { state: "ready" } },
   ],
-};
-const readyXhsIdentity = {
-  source: "Harbor live",
-  siteId: "xiaohongshu",
-  origin: "https://www.xiaohongshu.com",
-  identityEnvironmentRef: "harbor://identity-environment/xhs-smoke",
-  provider: { state: "ready" },
-  login: { recoveryRequired: false },
-  readiness: { state: "ready" },
 };
 const readonlySubmitTask = {
   id: "task-xhs-real-read",
@@ -634,7 +704,7 @@ const fakeRun = {
   },
   runtime_refs: {
     session_binding: {
-      runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+      runtime_session_ref: harborRuntimeSession.runtime_session_ref,
       control_owner: "core_task",
       lifecycle_state: "active",
       session_use: "core_task_run",
@@ -692,7 +762,7 @@ globalThis.fetch = async (url, init = {}) => {
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:01:03.000Z",
-              runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+              runtime_session_ref: harborRuntimeSession.runtime_session_ref,
             },
           ],
         },
@@ -704,7 +774,7 @@ globalThis.fetch = async (url, init = {}) => {
         ok: true,
         session_refs: {
           session_refs: {
-            runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+            runtime_session_ref: harborRuntimeSession.runtime_session_ref,
             control_owner: "core_task",
             lifecycle_state: "active",
             session_use: "core_task_run",
@@ -738,6 +808,10 @@ for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/e
 
 if (!submittedRun.run.evidenceCards[0]?.summary.includes("harbor:evidence/xiaohongshu/search-notes/submitted")) {
   throw new Error("Core submit smoke failed: submitted run evidence refs were not projected.");
+}
+
+if (!submittedRun.run.resultRows.some((row) => row.value === harborRuntimeSession.runtime_session_ref)) {
+  throw new Error("Core submit smoke failed: Harbor session ref from create/readback/session chain was not projected.");
 }
 
 globalThis.fetch = async (url, init = {}) => {
@@ -797,7 +871,7 @@ globalThis.fetch = async (url) => {
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:00:03.000Z",
-              runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+              runtime_session_ref: harborRuntimeSession.runtime_session_ref,
             },
           ],
         },
@@ -811,7 +885,7 @@ globalThis.fetch = async (url) => {
       }
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
-    : { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly" } } };
+    : { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref } } };
   return {
     ok: true,
     json: async () => json,
@@ -1114,7 +1188,7 @@ globalThis.fetch = async (url) => {
     ? { ok: true, evidence: { evidence_refs: [] } }
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
-    : { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly" } } };
+    : { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref } } };
   return {
     ok: true,
     json: async () => json,
@@ -1709,6 +1783,194 @@ if (blockedAvailableRun.approval?.actionRequestId.startsWith("action-request:"))
 
 if (!bossWritePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/boss/greeting/preview-result-only"))) {
   throw new Error("Core BOSS write-precheck smoke failed: preview_result evidence refs were not projected.");
+}
+
+async function assertPackagedRuntimeRequiredFailsClosed() {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "webenvoy-runtime-assets-smoke-"));
+  try {
+    const result = spawnSync(process.execPath, [path.resolve("scripts/package-runtime-assets.mjs")], {
+      cwd: tempDir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        WEBENVOY_REQUIRE_PACKAGED_RUNTIME: "1",
+        WEBENVOY_CORE_RUNTIME_SOURCE_DIR: path.join(tempDir, "missing-core"),
+        WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR: path.join(tempDir, "missing-harbor"),
+      },
+    });
+    const output = `${result.stdout}\n${result.stderr}`;
+    if (result.status === 0 || !output.includes("Packaged runtime assets blocked")) {
+      throw new Error(`Runtime asset packaging smoke failed: missing assets did not fail closed. ${output}`);
+    }
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function startHarborIdentityContractServer() {
+  let created = false;
+  const identity = harborIdentityFacts();
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const pathname = url.pathname;
+
+    if (request.method === "GET" && ["/runtime/browser-providers", "/runtime/browser-provider-status", "/browser-providers"].includes(pathname)) {
+      sendJson(response, 200, harborProviderCatalog());
+      return;
+    }
+
+    if (request.method === "GET" && ["/runtime/identity-environments", "/identity-environments", "/runtime/local-identity-environments"].includes(pathname)) {
+      sendJson(response, 200, { items: created ? [identity] : [] });
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/runtime/identity-environments") {
+      const body = await readRequestJson(request);
+      created = body?.identity_environment_ref === identity.identity_environment_ref;
+      sendJson(response, created ? 200 : 422, created ? { ok: true, identity_environment: identity } : { ok: false, error: "identity_ref_mismatch" });
+      return;
+    }
+
+    if (request.method === "POST" && ["/runtime/identity-environment-sessions", "/runtime/sessions/identity-environment", "/identity-environment-sessions"].includes(pathname)) {
+      const body = await readRequestJson(request);
+      sendJson(response, created ? 200 : 409, created ? harborRuntimeSessionFacts(body?.url) : { ok: false, error: "identity_not_created" });
+      return;
+    }
+
+    sendJson(response, 404, { status: "missing" });
+  });
+
+  await new Promise((resolve, reject) => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not allocate a local Harbor contract smoke port.");
+  }
+
+  return {
+    endpoint: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
+  };
+}
+
+function harborProviderCatalog() {
+  return {
+    schema_version: "harbor-browser-provider-status/v0",
+    providers: [
+      {
+        provider_id: "cloakbrowser",
+        display_name: "CloakBrowser",
+        role: "primary",
+        install: {
+          status: "installed",
+          path: "/Applications/CloakBrowser.app",
+          version: "smoke",
+          launchability: "launchable",
+          reason: null,
+        },
+        limitations: [],
+        diagnostics: [{ app_summary: "Local contract smoke provider; no browser was launched.", suggested_action: "none" }],
+      },
+    ],
+    excluded_providers: [{ provider: "chromium", reason: "not identity-stable for production App runtime" }],
+  };
+}
+
+function harborIdentityFacts() {
+  return {
+    schema_version: "harbor-local-identity-environment/v0",
+    identity_environment_ref: "harbor://identity-environment/xhs-smoke",
+    execution_identity_ref: "harbor://execution-identity/xhs-smoke",
+    profile_ref: "harbor://profile/xhs-smoke",
+    site_binding: {
+      site_id: "xiaohongshu",
+      origin: "https://www.xiaohongshu.com",
+      display_name: "小红书",
+      account_label: "运营号 smoke",
+    },
+    login_state: {
+      state: "logged_in",
+      reason: "local contract smoke only",
+      recovery_required: false,
+      manual_authentication_state: "not_required",
+      human_verification: [],
+    },
+    browser_storage: {
+      profile_storage_ref: "harbor://profile-storage/xhs-smoke",
+      state: "present",
+      cookies_session_state: "present",
+    },
+    environment: {
+      proxy: { state: "configured", proxy_ref: "proxy:smoke", label: "local contract proxy ref" },
+      region: "CN-SH",
+      language: "zh-CN",
+      timezone: "Asia/Shanghai",
+      browser_family: "cloakbrowser",
+      user_agent_summary: "Chrome family smoke",
+      viewport: "1440 x 900",
+      fingerprint_summary: "provider_claim_smoke",
+    },
+    provider_binding: {
+      selected_provider_id: "cloakbrowser",
+      selection_reason: "smoke_create_readback",
+      requires_user_notice: false,
+      selected_provider: harborProviderCatalog().providers[0],
+      warnings: [],
+      unavailable_reason: null,
+    },
+    credential_recovery: {
+      credential_ref: "credential:smoke-ref",
+      recovery_actions: [],
+    },
+    diagnostics: [],
+  };
+}
+
+function harborRuntimeSessionFacts(requestedUrl) {
+  const url = typeof requestedUrl === "string" ? requestedUrl : "https://www.xiaohongshu.com/explore";
+  return {
+    schema_version: "harbor-runtime-facts/v0",
+    runtime_session_ref: "harbor:runtime-session/xhs-smoke/readonly",
+    provider_ref: "harbor:provider/cloakbrowser",
+    lifecycle_state: "active",
+    created_at: "2026-07-09T12:00:00.000Z",
+    last_seen_at: "2026-07-09T12:00:01.000Z",
+    viewer_ref: "harbor:viewer/xhs-smoke/readonly",
+    current_page: {
+      requested_url: url,
+      current_url: url,
+      title: "小红书 - smoke",
+      status: "ready",
+    },
+    control_owner: "user",
+    control_lock: { owner: "user", state: "held" },
+    current_error: null,
+  };
+}
+
+async function readRequestJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  if (chunks.length === 0) return null;
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function sendJson(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  response.end(`${JSON.stringify(body)}\n`);
 }
 
 async function startJsonServer(bodyForPath) {

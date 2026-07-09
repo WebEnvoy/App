@@ -500,7 +500,12 @@ function repairAction(
   }
 
   if (!launch) {
-    return `Configure WEBENVOY_${id.toUpperCase()}_RUNTIME_CWD or WEBENVOY_${id.toUpperCase()}_RUNTIME_COMMAND, then restart App.`;
+    const prefix = `WEBENVOY_${id.toUpperCase()}_RUNTIME`;
+    const packagedState =
+      process.env.WEBENVOY_DISABLE_PACKAGED_RUNTIME === "1"
+        ? "Packaged runtime launch is disabled for this smoke/test run."
+        : `Packaged ${serviceNames[id]} runtime assets are missing from the Electron output.`;
+    return `${packagedState} Configure ${prefix}_CWD or ${prefix}_COMMAND, or rebuild App with packaged runtime assets.`;
   }
 
   if (admission?.state === "unavailable") {
