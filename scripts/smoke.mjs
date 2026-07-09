@@ -1527,3 +1527,4 @@ async function startJsonServer(bodyForPath) {
 }
 
 console.log("WebEnvoy desktop shell smoke passed.");
+process.exit(0);

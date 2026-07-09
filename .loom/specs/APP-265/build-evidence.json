@@ -1,42 +1,49 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-265",
-  "generated_at": "2026-07-08T17:08:47Z",
-  "branch": "work/app-265-runtime-admission-e2e",
-  "pre_commit_head": "44e1ae589d8461ef81fe4a3bb93b7b506f96d0a3",
-  "task_goal": "Repair App/Core/Harbor runtime admission contract consumption so App does not promote fixture/demo state to live availability.",
+  "generated_at": "2026-07-09T02:24:28Z",
+  "branch": "work/app-265-smoke-endpoint-isolation",
+  "pre_commit_head": "176f01e5353526c9de5d35c443674107e5b047cf",
+  "task_goal": "Repair App/Core/Harbor runtime admission contract consumption and packaged runtime launch so App can supervise bundled local Core/Harbor runtimes, keep fixture/demo state out of live availability, and retain a visible Electron window for E2E.",
   "delegations": [],
   "subagent_notes": [
     "Harbor lane output is integrated in the Harbor worktree and consumed by APP-265 as an external PR/head dependency, not as an App-owned delegation.",
     "Core lane output is integrated in the Core worktree and consumed by APP-265 as an external PR/head dependency, not as an App-owned delegation.",
+    "App blocker explorer 019f431f-8315-7541-b8ba-ceb21cee7320 reported that packaged smoke did not prove a stable visible OS window and that App needed packaged start-runtime resources before it could open as an out-of-the-box runtime shell.",
     "App lane code changes are integrated in this worktree and represented by integration_evidence entries below."
   ],
   "external_dependencies": [
     {
       "lane": "Harbor",
       "issue": "WebEnvoy/Harbor#219",
-      "workspace": "/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-219-health-contract",
-      "status": "integrated_by_reference",
-      "boundary": "No App code changed from Harbor lane; Harbor PR/head integration remains required before final App E2E."
+      "workspace": "/Volumes/2T/dev/WebEnvoy/Harbor",
+      "status": "merged_by_reference",
+      "boundary": "No App code changed from Harbor lane; Harbor PR #232 is merged and was consumed by local API admission E2E."
     },
     {
       "lane": "Core",
       "issue": "WebEnvoy/WebEnvoy#244",
-      "workspace": "/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-admission-contract",
-      "status": "integrated_by_reference",
-      "boundary": "No App code changed from Core lane; Core PR/head integration remains required before final App E2E."
+      "workspace": "/Volumes/2T/dev/WebEnvoy/WebEnvoy",
+      "status": "merged_by_reference",
+      "boundary": "No App code changed from Core lane; Core PR #253 is merged and was consumed by local API admission E2E."
     }
   ],
   "ownership_constraints": {
     "write_ownership": [
       "src/electron/runtimeSupervisor.ts",
+      "src/electron/main.ts",
+      "package.json",
+      "scripts/package-runtime-assets.mjs",
       "src/renderer/runtimeSupervisorState.ts",
       "src/renderer/vite-env.d.ts",
       "src/renderer/TaskThreadPage.tsx",
       "src/renderer/TaskThreadRightPanel.tsx",
       "scripts/smoke.mjs",
+      "scripts/smoke-packaged.mjs",
+      "scripts/smoke-packaged-runtime.mjs",
       "scripts/smoke-packaged-vertical.mjs",
       "artifacts/app-261-packaged-vertical-smoke.png",
+      "artifacts/app-265-packaged-runtime-smoke.png",
       "artifacts/gh-168-packaged-preview.png",
       ".loom/work-items/APP-265.md",
       ".loom/progress/APP-265.md",
@@ -79,13 +86,19 @@
     ],
     "write_ownership": [
       "src/electron/runtimeSupervisor.ts",
+      "src/electron/main.ts",
+      "package.json",
+      "scripts/package-runtime-assets.mjs",
       "src/renderer/runtimeSupervisorState.ts",
       "src/renderer/vite-env.d.ts",
       "src/renderer/TaskThreadPage.tsx",
       "src/renderer/TaskThreadRightPanel.tsx",
       "scripts/smoke.mjs",
+      "scripts/smoke-packaged.mjs",
+      "scripts/smoke-packaged-runtime.mjs",
       "scripts/smoke-packaged-vertical.mjs",
       "artifacts/app-261-packaged-vertical-smoke.png",
+      "artifacts/app-265-packaged-runtime-smoke.png",
       "artifacts/gh-168-packaged-preview.png",
       ".loom/work-items/APP-265.md",
       ".loom/progress/APP-265.md",
@@ -104,6 +117,7 @@
       "npm run smoke",
       "npm run smoke:packaged",
       "npm run smoke:packaged:vertical",
+      "npm run smoke:packaged:runtime",
       "git diff --check"
     ],
     "output_format": "Main-controller report with changed files, validation results, PR/head metadata, and remaining live E2E blockers.",
@@ -125,7 +139,7 @@
       },
       {
         "command": "loom fact-chain --target . --json",
-        "evidence": "Fact chain passed before App carrier activation; must be refreshed after this build evidence repair."
+        "evidence": "Fact chain passed after APP-265 smoke/window carrier sync."
       },
       {
         "command": "npm run typecheck",
@@ -144,6 +158,10 @@
         "evidence": "Packaged vertical smoke passed with local owner-shaped Core/Harbor endpoints and Harbor /readiness-only compatibility."
       },
       {
+        "command": "npm run smoke:packaged:runtime",
+        "evidence": "Packaged runtime smoke passed after App built and launched bundled Core and Harbor from dist-electron/runtime/*/start-runtime.mjs on isolated local ports; Core /health plus /admission/health, Harbor /readiness, packaged Lode assets, and screenshot artifacts/app-265-packaged-runtime-smoke.png were verified."
+      },
+      {
         "command": "git diff --check",
         "evidence": "No whitespace errors."
       }
@@ -152,9 +170,22 @@
       "head SHA",
       "PR metadata readback",
       "App E2E against Harbor/Core PR heads or merged heads"
-    ]
+    ],
+    "blocked": []
   },
   "integration_evidence": [
+    {
+      "id": "packaged-core-harbor-runtime-assets",
+      "status": "integrated",
+      "locators": [
+        "package.json",
+        "scripts/package-runtime-assets.mjs",
+        "src/electron/runtimeSupervisor.ts",
+        "scripts/smoke-packaged-runtime.mjs",
+        "artifacts/app-265-packaged-runtime-smoke.png"
+      ],
+      "summary": "App build now packages sibling Core and Harbor build outputs into dist-electron/runtime with start-runtime.mjs wrappers, then launches them through the Electron Node runtime on the configured local endpoints."
+    },
     {
       "id": "harbor-readiness-compatibility-consumed",
       "status": "integrated",
@@ -181,10 +212,29 @@
         "src/renderer/TaskThreadRightPanel.tsx"
       ],
       "summary": "App exposes runtime probe diagnostics so users can see which local owner runtime gate is blocking live operation."
+    },
+    {
+      "id": "packaged-smoke-endpoints-isolated",
+      "status": "integrated",
+      "locators": [
+        "src/electron/main.ts",
+        "scripts/smoke-packaged.mjs",
+        "scripts/smoke-packaged-vertical.mjs",
+        "scripts/smoke-packaged-runtime.mjs"
+      ],
+      "summary": "Packaged smoke injects isolated local connection endpoints and uses temporary userData so host 8787/8788 runtime state cannot contaminate fail-closed checks; the runtime smoke leaves packaged runtime enabled to prove bundled Core/Harbor launch."
+    },
+    {
+      "id": "normal-electron-window-retained",
+      "status": "integrated",
+      "locators": [
+        "src/electron/main.ts"
+      ],
+      "summary": "Normal Electron startup retains BrowserWindow references and explicitly shows/focuses the main window for future Computer Use E2E once the workstation is unlocked."
     }
   ],
   "runtime_boundary": {
-    "runtime_evidence_kind": "local owner-shaped smoke and App runtime gate diagnostics",
+    "runtime_evidence_kind": "local packaged Core/Harbor runtime smoke, owner-shaped smoke, and App runtime gate diagnostics",
     "live_site_evidence": "not_attempted",
     "profile": "none opened by this App lane",
     "forbidden_actions": [
@@ -199,7 +249,7 @@
     ]
   },
   "remaining_limitations": [
-    "Real App E2E with Harbor and Core PR heads is still pending.",
+    "Final visible App E2E with Computer Use and real browser provider/session/task flows remains outside APP-265 and must run before closing the broader App #14 user stories.",
     "No real Xiaohongshu/BOSS account, profile, Cookie, production page, submit, publish, send, or external visible action was performed.",
     "CloakBrowser availability depends on the user's workstation; this App PR only displays owner facts and fail-closed diagnostics."
   ]

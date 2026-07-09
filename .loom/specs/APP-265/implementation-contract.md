@@ -2,7 +2,7 @@
 
 ## Ownership
 
-- App lane owns App runtime supervisor, App runtime health/admission clients, App gate display, and App smoke checks.
+- App lane owns App runtime supervisor, packaged Core/Harbor runtime asset launch, App runtime health/admission clients, App gate display, and App smoke checks.
 - Harbor lane owns Harbor runtime API health/readiness endpoints.
 - Core lane owns Core admission health and capability run query behavior.
 - Main controller owns integration, PR metadata, review, merge, closeout, and final Computer Use E2E.
@@ -10,11 +10,11 @@
 ## Required Evidence
 
 - GitHub issue: App #265.
-- Branch: work/app-265-runtime-admission-e2e.
+- Branch: work/app-265-smoke-endpoint-isolation.
 - Validation commands and results.
-- Runtime health/admission readback.
-- Provider detection readback from Harbor.
-- Computer Use App E2E evidence before closeout.
+- Runtime health/admission readback from packaged local Core/Harbor smoke.
+- Harbor provider detection readback remains required for downstream live browser user stories before their closeout.
+- Computer Use App E2E evidence remains required before closing the broader App #14 user stories.
 
 ## Non-goals
 

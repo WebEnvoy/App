@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { coreLodeAssetEnvironment, resolveLodeAssetBundle, type LodeAssetBundleState } from "./lodeAssetBundle.js";
 
@@ -9,6 +10,10 @@ export type RuntimeServiceId = "core" | "harbor";
 export type RuntimeEndpointConfig = {
   coreEndpoint: string;
   harborEndpoint: string;
+};
+
+export type RuntimeSupervisorOptions = {
+  dataDir?: string;
 };
 
 export type RuntimeServiceLaunchConfig = {
@@ -47,6 +52,7 @@ export type RuntimeServiceState = {
   checkedAt: string;
   lastExitCode?: number | null;
   lastError?: string;
+  lastOutput?: string;
   repairAction: string;
 };
 
@@ -63,8 +69,10 @@ export type RuntimeSupervisorState = {
 type ProcessSnapshot = {
   processState: RuntimeProcessState;
   child?: ChildProcess;
+  endpoint?: string;
   lastExitCode?: number | null;
   lastError?: string;
+  lastOutput?: string;
 };
 
 const serviceNames: Record<RuntimeServiceId, string> = {
@@ -94,11 +102,13 @@ export function resolveRuntimeServiceLaunchConfig(
   const explicitPath = env[`${prefix}_PATH`]?.trim();
   if (explicitPath) return { command: explicitPath, cwd: env[`${prefix}_CWD`], source: "env-path" };
 
-  const packagedPath = resolvePackagedRuntimePath(id, resourcesPath);
-  if (packagedPath) return { command: packagedPath, source: "packaged-path" };
-
   const cwd = env[`${prefix}_CWD`]?.trim();
   if (cwd) return { command: "pnpm", args: ["start:runtime"], cwd, source: "local-cwd" };
+
+  if (env.WEBENVOY_DISABLE_PACKAGED_RUNTIME !== "1") {
+    const packagedPath = resolvePackagedRuntimePath(id, resourcesPath);
+    if (packagedPath) return { command: process.execPath, args: [packagedPath], source: "packaged-path" };
+  }
 
   return null;
 }
@@ -121,8 +131,9 @@ export function summarizeRuntimeReadiness(services: RuntimeServiceState[], lodeA
   };
 }
 
-export function createRuntimeSupervisor() {
+export function createRuntimeSupervisor(options: RuntimeSupervisorOptions = {}) {
   const processSnapshots = new Map<RuntimeServiceId, ProcessSnapshot>();
+  const runtimeDataDir = options.dataDir ?? process.env.WEBENVOY_RUNTIME_DATA_DIR;
 
   return {
     async readState(config: RuntimeEndpointConfig): Promise<RuntimeSupervisorState> {
@@ -130,7 +141,7 @@ export function createRuntimeSupervisor() {
       const lodeAssets = resolveLodeAssetBundle();
       const services = await Promise.all(
         (["core", "harbor"] as const).map((id) =>
-          readServiceState(id, endpointFor(id, config), checkedAt, processSnapshots, lodeAssets),
+          readServiceState(id, config, checkedAt, processSnapshots, lodeAssets, runtimeDataDir),
         ),
       );
       const readiness = summarizeRuntimeReadiness(services, lodeAssets);
@@ -153,13 +164,21 @@ export function createRuntimeSupervisor() {
 
 async function readServiceState(
   id: RuntimeServiceId,
-  endpoint: string,
+  config: RuntimeEndpointConfig,
   checkedAt: string,
   processSnapshots: Map<RuntimeServiceId, ProcessSnapshot>,
   lodeAssets: LodeAssetBundleState,
+  runtimeDataDir: string | undefined,
 ): Promise<RuntimeServiceState> {
+  const endpoint = endpointFor(id, config);
   const launch = resolveRuntimeServiceLaunchConfig(id);
-  const snapshot = ensureProcess(id, launch, processSnapshots, id === "core" ? coreLodeAssetEnvironment(lodeAssets) : {});
+  const snapshot = ensureProcess(
+    id,
+    launch,
+    processSnapshots,
+    runtimeProcessEnvironment(id, config, lodeAssets, runtimeDataDir),
+    endpoint,
+  );
   const health = await probeFirst(endpoint, serviceHealthPaths[id]);
   const admission = id === "core" ? await probeFirst(endpoint, coreAdmissionPaths) : undefined;
   const processState = health.state === "ready" && snapshot.processState === "not_configured" ? "running" : snapshot.processState;
@@ -178,6 +197,7 @@ async function readServiceState(
     checkedAt,
     lastExitCode: snapshot.lastExitCode,
     lastError: snapshot.lastError,
+    lastOutput: snapshot.lastOutput,
     repairAction: repairAction(id, launch, health, admission),
   };
 }
@@ -187,14 +207,19 @@ function ensureProcess(
   launch: RuntimeServiceLaunchConfig | null,
   processSnapshots: Map<RuntimeServiceId, ProcessSnapshot>,
   extraEnv: NodeJS.ProcessEnv = {},
+  endpoint?: string,
 ): ProcessSnapshot {
   const current = processSnapshots.get(id);
-  if (current?.child && current.processState !== "exited" && current.processState !== "failed") {
+  if (current?.child && current.endpoint === endpoint && current.processState !== "exited" && current.processState !== "failed") {
     return current;
+  }
+  if (current?.child && current.endpoint !== endpoint) {
+    current.child.kill();
   }
 
   if (!launch) {
-    const snapshot = current ?? { processState: "not_configured" as const };
+    const snapshot = current ?? { processState: "not_configured" as const, endpoint };
+    snapshot.endpoint = endpoint;
     processSnapshots.set(id, snapshot);
     return snapshot;
   }
@@ -202,11 +227,15 @@ function ensureProcess(
   try {
     const child = spawn(launch.command, launch.args ?? [], {
       cwd: launch.cwd,
-      env: { ...process.env, ...extraEnv },
-      stdio: "ignore",
+      env: {
+        ...process.env,
+        ...(launch.source === "packaged-path" ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+        ...extraEnv,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
-    const snapshot: ProcessSnapshot = { child, processState: "starting" };
+    const snapshot: ProcessSnapshot = { child, endpoint, processState: "starting" };
     processSnapshots.set(id, snapshot);
     child.on("spawn", () => {
       snapshot.processState = "running";
@@ -214,6 +243,12 @@ function ensureProcess(
     child.on("error", (error) => {
       snapshot.processState = "failed";
       snapshot.lastError = error.message;
+    });
+    child.stdout?.on("data", (chunk) => {
+      snapshot.lastOutput = trimRuntimeOutput(`${snapshot.lastOutput ?? ""}${chunk.toString()}`);
+    });
+    child.stderr?.on("data", (chunk) => {
+      snapshot.lastError = trimRuntimeOutput(`${snapshot.lastError ?? ""}${chunk.toString()}`);
     });
     child.on("exit", (code) => {
       snapshot.processState = code === 0 ? "exited" : "failed";
@@ -229,6 +264,40 @@ function ensureProcess(
     processSnapshots.set(id, snapshot);
     return snapshot;
   }
+}
+
+function trimRuntimeOutput(value: string): string {
+  const normalized = value.replace(/\s+$/g, "");
+  return normalized.length > 1000 ? normalized.slice(-1000) : normalized;
+}
+
+function runtimeProcessEnvironment(
+  id: RuntimeServiceId,
+  config: RuntimeEndpointConfig,
+  lodeAssets: LodeAssetBundleState,
+  runtimeDataDir: string | undefined,
+): NodeJS.ProcessEnv {
+  const endpoint = endpointFor(id, config);
+  const port = endpointPort(endpoint);
+  const baseEnv: NodeJS.ProcessEnv = {
+    ...(runtimeDataDir ? { WEBENVOY_RUNTIME_DATA_DIR: runtimeDataDir } : {}),
+    ...(port ? { PORT: port } : {}),
+  };
+
+  if (id === "harbor") {
+    return {
+      ...baseEnv,
+      ...(port ? { HARBOR_RUNTIME_PORT: port } : {}),
+      ...(runtimeDataDir ? { HARBOR_IDENTITY_ENVIRONMENTS_PATH: path.join(runtimeDataDir, "harbor", "identity-environments.json") } : {}),
+    };
+  }
+
+  return {
+    ...baseEnv,
+    ...coreLodeAssetEnvironment(lodeAssets),
+    WEBENVOY_HARBOR_RUNTIME_URL: endpointFor("harbor", config),
+    ...(runtimeDataDir ? { WEBENVOY_RUN_RECORD_DIR: path.join(runtimeDataDir, "core", "run-records") } : {}),
+  };
 }
 
 async function probeFirst(endpoint: string, paths: string[]): Promise<RuntimeProbe> {
@@ -386,10 +455,28 @@ function normalizeEndpoint(value: string) {
   }
 }
 
+function endpointPort(value: string): string | undefined {
+  try {
+    const parsed = new URL(value);
+    if (parsed.port) return parsed.port;
+    if (parsed.protocol === "http:") return "80";
+    if (parsed.protocol === "https:") return "443";
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 function resolvePackagedRuntimePath(id: RuntimeServiceId, resourcesPath: string | undefined) {
-  if (!resourcesPath) return null;
-  const candidate = path.join(resourcesPath, "runtime", id, "start-runtime");
-  return existsSync(candidate) ? candidate : null;
+  const roots = [
+    resourcesPath ? path.join(resourcesPath, "runtime") : null,
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "runtime"),
+  ].filter((value): value is string => Boolean(value));
+  for (const root of roots) {
+    const candidate = path.join(root, id, "start-runtime.mjs");
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 function getResourcesPath() {

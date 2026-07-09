@@ -12,7 +12,17 @@ const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
 const packagedSmokeRuntimeExpectation = process.env.WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION ?? "fail_closed";
 const packagedSmokeCoreEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT ?? "http://127.0.0.1:8787";
 const packagedSmokeHarborEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT ?? "http://127.0.0.1:8788";
-const runtimeSupervisor = createRuntimeSupervisor();
+const packagedSmokeLodeEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_LODE_ENDPOINT ?? "http://127.0.0.1:8789";
+const packagedSmokeUserDataDir = process.env.WEBENVOY_PACKAGED_SMOKE_USER_DATA_DIR;
+const localConnectionStorageKey = "webenvoy.localConnectionConfig.v1";
+let runtimeSupervisor = createRuntimeSupervisor();
+const mainWindows = new Set<BrowserWindow>();
+
+app.setName("WebEnvoy App");
+
+if (packagedSmoke && packagedSmokeUserDataDir) {
+  app.setPath("userData", packagedSmokeUserDataDir);
+}
 
 function getSystemColorScheme() {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
@@ -42,10 +52,15 @@ function createMainWindow() {
       sandbox: true,
     },
   });
+  mainWindows.add(window);
+  window.on("closed", () => {
+    mainWindows.delete(window);
+  });
 
   const loadRenderer = rendererDevUrl
     ? window.loadURL(rendererDevUrl)
     : window.loadFile(path.join(__dirname, "../dist/renderer/index.html"));
+  revealMainWindow(window);
 
   if (packagedSmoke) {
     void runPackagedSmoke(window, loadRenderer);
@@ -54,9 +69,24 @@ function createMainWindow() {
   return window;
 }
 
+function revealMainWindow(window: BrowserWindow) {
+  const reveal = () => {
+    if (window.isDestroyed()) return;
+    window.show();
+    window.focus();
+    if (process.platform === "darwin") {
+      app.focus({ steal: true });
+    }
+  };
+  window.once("ready-to-show", reveal);
+  window.webContents.once("did-finish-load", reveal);
+  setTimeout(reveal, 500);
+}
+
 async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<void>) {
   try {
     await loadRenderer;
+    await applyPackagedSmokeConnectionConfig(window);
     const result = (await window.webContents.executeJavaScript(`
       (async () => {
         const root = document.getElementById("root");
@@ -68,12 +98,20 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
         const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
-        const runtimeSupervisorState = shell?.getRuntimeSupervisorState
-          ? await shell.getRuntimeSupervisorState({
+        const readRuntimeSupervisorState = async () => {
+          if (!shell?.getRuntimeSupervisorState) return null;
+          let latest = null;
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            latest = await shell.getRuntimeSupervisorState({
               coreEndpoint: ${JSON.stringify(packagedSmokeCoreEndpoint)},
               harborEndpoint: ${JSON.stringify(packagedSmokeHarborEndpoint)}
-            })
-          : null;
+            });
+            if (${JSON.stringify(packagedSmokeRuntimeExpectation)} !== "live_ready" || latest?.canUseLiveRuntime) return latest;
+            await new Promise((resolve) => setTimeout(resolve, 750));
+          }
+          return latest;
+        };
+        const runtimeSupervisorState = await readRuntimeSupervisorState();
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
           left: appShell?.getAttribute("data-left-panel-open"),
@@ -332,7 +370,40 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
   }
 }
 
+async function applyPackagedSmokeConnectionConfig(window: BrowserWindow) {
+  const connectionConfig = JSON.stringify({
+    coreEndpoint: packagedSmokeCoreEndpoint,
+    harborEndpoint: packagedSmokeHarborEndpoint,
+    lodeEndpoint: packagedSmokeLodeEndpoint,
+  });
+  await window.webContents.executeJavaScript(
+    `window.localStorage.setItem(${JSON.stringify(localConnectionStorageKey)}, ${JSON.stringify(connectionConfig)})`,
+  );
+  await reloadWindow(window);
+}
+
+function reloadWindow(window: BrowserWindow) {
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      window.webContents.off("did-finish-load", didFinishLoad);
+      window.webContents.off("did-fail-load", didFailLoad);
+    };
+    const didFinishLoad = () => {
+      cleanup();
+      resolve();
+    };
+    const didFailLoad = (_event: Electron.Event, _errorCode: number, errorDescription: string) => {
+      cleanup();
+      reject(new Error(`packaged smoke renderer reload failed: ${errorDescription}`));
+    };
+    window.webContents.once("did-finish-load", didFinishLoad);
+    window.webContents.once("did-fail-load", didFailLoad);
+    window.webContents.reload();
+  });
+}
+
 app.whenReady().then(() => {
+  runtimeSupervisor = createRuntimeSupervisor({ dataDir: path.join(app.getPath("userData"), "runtime") });
   ipcMain.handle("webenvoy:shell-context", () => ({
     platform: process.platform,
     colorScheme: getSystemColorScheme(),

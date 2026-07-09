@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdir } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import electron from "electron";
 
@@ -97,6 +98,7 @@ try {
 }
 
 async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath, expectation }) {
+  const userDataDir = await mkdtemp(path.join(tmpdir(), "webenvoy-app-packaged-smoke-"));
   const child = spawn(electron, ["dist-electron/main.js"], {
     env: {
       ...process.env,
@@ -104,6 +106,8 @@ async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath, 
       WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION: expectation,
       WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT: coreEndpoint,
       WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT: harborEndpoint,
+      WEBENVOY_PACKAGED_SMOKE_USER_DATA_DIR: userDataDir,
+      WEBENVOY_DISABLE_PACKAGED_RUNTIME: "1",
       ...(screenshotPath ? { WEBENVOY_PACKAGED_SMOKE_SCREENSHOT: screenshotPath } : {}),
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -122,6 +126,8 @@ async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath, 
   const exitCode = await new Promise((resolve) => {
     child.on("exit", resolve);
   });
+
+  await rm(userDataDir, { recursive: true, force: true });
 
   if (exitCode !== 0) {
     throw new Error(`Packaged vertical Electron smoke failed.\n${stderr || stdout}`);
