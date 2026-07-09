@@ -80,6 +80,15 @@ function projectSiteSkill(skill: SiteSkill, canUseLiveRuntime: boolean, liveTask
   };
 }
 
+function canOpenReadOnlyTaskFromLibrary(taskId: string | null, canUseLiveRuntime: boolean) {
+  return Boolean(
+    taskId != null &&
+      canUseLiveRuntime &&
+      appMilestone14TaskIds.has(taskId) &&
+      !taskId.includes("write-preview"),
+  );
+}
+
 export function SiteSkillDirectoryPage({
   canUseLiveRuntime,
   liveTaskIds,
@@ -228,7 +237,7 @@ export function SiteSkillDetailPage({
   const canLaunchTask =
     firstRelatedTaskId != null &&
     appMilestone14TaskIds.has(firstRelatedTaskId) &&
-    projectedSkill.status === "ready";
+    (projectedSkill.status === "ready" || canOpenReadOnlyTaskFromLibrary(firstRelatedTaskId, canUseLiveRuntime));
 
   return (
     <div className="site-skill-page site-skill-detail-page we-sectioned-page">

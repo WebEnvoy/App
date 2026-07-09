@@ -19,15 +19,19 @@ export function TaskThreadComposer({
   coreSubmitState,
   harborIdentityState,
   runtimeSupervisorState,
+  businessInput,
   selectedRun,
   selectedTask,
+  onBusinessInputChange,
   onSubmitCoreTask,
 }: {
   coreSubmitState: CoreTaskSubmitState;
   harborIdentityState: HarborIdentityLoadState;
   runtimeSupervisorState: RuntimeSupervisorState;
+  businessInput: string;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
+  onBusinessInputChange: (value: string) => void;
   onSubmitCoreTask: () => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -124,9 +128,9 @@ export function TaskThreadComposer({
       <textarea
         ref={inputRef}
         data-webenvoy-composer=""
-        value={selectedTask.businessInput}
+        value={businessInput}
         rows={2}
-        readOnly
+        onChange={(event) => onBusinessInputChange(event.currentTarget.value)}
         placeholder="当前任务的结构化业务输入"
       />
       <div className="composer-toolbar" ref={toolbarRef}>

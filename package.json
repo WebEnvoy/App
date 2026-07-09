@@ -13,6 +13,7 @@
     "smoke:packaged": "npm run build && node scripts/smoke-packaged.mjs",
     "smoke:packaged:vertical": "npm run build && node scripts/smoke-packaged-vertical.mjs",
     "smoke:packaged:runtime": "WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 npm run build && node scripts/smoke-packaged-runtime.mjs",
+    "smoke:packaged:readonly": "npm run build && node scripts/smoke-packaged-readonly.mjs",
     "start": "electron dist-electron/main.js"
   },
   "dependencies": {

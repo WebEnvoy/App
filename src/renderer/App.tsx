@@ -76,6 +76,7 @@ type SubmittedTaskOverride = {
   taskId: string;
   task: TaskProjection;
 };
+type SiteId = "xiaohongshu" | "boss";
 const milestone14TaskIds = new Set([
   "task-xhs-publish-write-preview",
   "task-boss-greeting-write-preview",
@@ -116,6 +117,36 @@ function coreSubmitStateKey(taskId: string, endpoint: string) {
   return `${endpoint}::${taskId}`;
 }
 
+function siteForTask(task: TaskProjection): SiteId {
+  return task.id.includes("boss") || task.siteSkill.toLowerCase().includes("boss") ? "boss" : "xiaohongshu";
+}
+
+function applyLocalTaskContext(
+  task: TaskProjection,
+  businessInputOverrides: Record<string, string>,
+  harborIdentityState: HarborIdentityLoadState,
+): TaskProjection {
+  const businessInput = businessInputOverrides[task.id] ?? task.businessInput;
+  const liveIdentity = harborIdentityState.identities.find(
+    (identity) => identity.source === "Harbor live" && identity.siteId === siteForTask(task),
+  );
+
+  return {
+    ...task,
+    businessInput,
+    ...(liveIdentity == null
+      ? {}
+      : {
+          accountIdentity: liveIdentity.name,
+          identitySource: liveIdentity.source,
+        }),
+  };
+}
+
+function readOnlyTaskId(taskId: string) {
+  return milestone14TaskIds.has(taskId) && !taskId.includes("write-preview");
+}
+
 export function App() {
   const [shellContext, setShellContext] = useState<ShellContext | null>(null);
   const [connectionConfig, setConnectionConfig] = useState<LocalConnectionConfig>(
@@ -129,6 +160,7 @@ export function App() {
   );
   const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
+  const [taskBusinessInputOverrides, setTaskBusinessInputOverrides] = useState<Record<string, string>>({});
   const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
@@ -174,19 +206,26 @@ export function App() {
       liveTaskIds,
     };
   }, [coreReadState, currentEndpointSubmittedOverrides, submittedLiveTaskIds]);
+  const effectiveCoreReadTasks = useMemo(
+    () =>
+      effectiveCoreReadState.tasks.map((task) =>
+        applyLocalTaskContext(task, taskBusinessInputOverrides, harborIdentityState),
+      ),
+    [effectiveCoreReadState.tasks, harborIdentityState, taskBusinessInputOverrides],
+  );
   const taskThreads = useMemo(
     () =>
       projectRuntimeGatedTasks(
-        effectiveCoreReadState.tasks,
+        effectiveCoreReadTasks,
         runtimeSupervisorState,
         effectiveCoreReadState.liveTaskIds,
       ),
-    [effectiveCoreReadState.liveTaskIds, effectiveCoreReadState.tasks, runtimeSupervisorState],
+    [effectiveCoreReadState.liveTaskIds, effectiveCoreReadTasks, runtimeSupervisorState],
   );
   const selectedTask =
     taskThreads.find((task) => task.id === selectedTaskId) ?? taskThreads[0] ?? defaultTaskThread;
   const selectedSubmitTask =
-    effectiveCoreReadState.tasks.find((task) => task.id === selectedTask.id) ?? selectedTask;
+    effectiveCoreReadTasks.find((task) => task.id === selectedTask.id) ?? selectedTask;
   const selectedSubmitStateKey = coreSubmitStateKey(selectedSubmitTask.id, connectionConfig.coreEndpoint);
   const coreSubmitState = coreSubmitStatesByKey[selectedSubmitStateKey] ?? initialCoreTaskSubmitState;
   const selectedRun =
@@ -395,10 +434,23 @@ export function App() {
     if (
       taskId != null &&
       runtimeSupervisorState.canUseLiveRuntime &&
-      effectiveCoreReadState.liveTaskIds.includes(taskId)
+      (readOnlyTaskId(taskId) || effectiveCoreReadState.liveTaskIds.includes(taskId))
     ) {
       openTaskById(taskId);
     }
+  }
+
+  function updateSelectedTaskBusinessInput(value: string) {
+    const taskId = selectedSubmitTask.id;
+    const submitKey = coreSubmitStateKey(taskId, connectionConfig.coreEndpoint);
+    setTaskBusinessInputOverrides((current) => ({
+      ...current,
+      [taskId]: value,
+    }));
+    setCoreSubmitStatesByKey((current) => ({
+      ...current,
+      [submitKey]: initialCoreTaskSubmitState,
+    }));
   }
 
   async function submitSelectedCoreTask() {
@@ -441,6 +493,7 @@ export function App() {
           task: {
             ...submitTask,
             source: "Core live",
+            identitySource: "Harbor live",
             runs: [result.run, ...submitTask.runs.filter((run) => run.id !== result.run.id)],
           },
         },
@@ -702,8 +755,10 @@ export function App() {
                 coreSubmitState={coreSubmitState}
                 harborIdentityState={harborIdentityState}
                 runtimeSupervisorState={runtimeSupervisorState}
+                businessInput={selectedSubmitTask.businessInput}
                 selectedRun={selectedRun}
                 selectedTask={selectedSubmitTask}
+                onBusinessInputChange={updateSelectedTaskBusinessInput}
                 onSubmitCoreTask={submitSelectedCoreTask}
               />
             }

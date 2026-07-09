@@ -100,6 +100,7 @@ export type TaskProjection = {
   id: string;
   title: string;
   accountIdentity: string;
+  identitySource?: OwnerSource;
   siteSkill: string;
   businessInput: string;
   source: OwnerSource;

@@ -10,6 +10,10 @@ const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
 const packagedSmoke = process.env.WEBENVOY_PACKAGED_SMOKE === "1";
 const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
 const packagedSmokeRuntimeExpectation = process.env.WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION ?? "fail_closed";
+const packagedSmokeAction = process.env.WEBENVOY_PACKAGED_SMOKE_ACTION ?? "none";
+const packagedSmokeReadonlyInput =
+  process.env.WEBENVOY_PACKAGED_SMOKE_READONLY_INPUT ??
+  "关键词：AI 工具；笔记：https://www.xiaohongshu.com/explore/app265-readonly-smoke";
 const packagedSmokeCoreEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT ?? "http://127.0.0.1:8787";
 const packagedSmokeHarborEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT ?? "http://127.0.0.1:8788";
 const packagedSmokeLodeEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_LODE_ENDPOINT ?? "http://127.0.0.1:8789";
@@ -97,7 +101,17 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const rightFullscreenButton = document.querySelector('[data-shell-panel-fullscreen="right"]');
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
+        const submitButton = document.querySelector("[aria-label='提交只读 Core task']");
         const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
+        const waitUntil = async (predicate, attempts = 40, delayMs = 250) => {
+          let latest = null;
+          for (let attempt = 0; attempt < attempts; attempt += 1) {
+            latest = predicate();
+            if (latest) return latest;
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+          return latest;
+        };
         const readRuntimeSupervisorState = async () => {
           if (!shell?.getRuntimeSupervisorState) return null;
           let latest = null;
@@ -180,6 +194,37 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         composer?.focus();
         await waitFrame();
         const composerFocused = document.activeElement === composer;
+        let readonlySubmitSmoke = null;
+        if (${JSON.stringify(packagedSmokeAction)} === "readonly_submit") {
+          await waitUntil(() => submitButton && !submitButton.disabled, 48, 250);
+          const editableComposer = document.querySelector("[data-webenvoy-composer]");
+          const editableSubmitButton = document.querySelector("[aria-label='提交只读 Core task']");
+          const inputValue = ${JSON.stringify(packagedSmokeReadonlyInput)};
+          const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+          if (editableComposer && valueSetter) {
+            valueSetter.call(editableComposer, inputValue);
+            editableComposer.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          await waitFrame();
+          const canSubmitBeforeClick = Boolean(editableSubmitButton && !editableSubmitButton.disabled);
+          if (canSubmitBeforeClick) {
+            editableSubmitButton.click();
+          }
+          const readyText = await waitUntil(() => {
+            const text = root?.textContent ?? "";
+            return text.includes("Core accepted /tasks") &&
+              text.includes("harbor:evidence/app265/readonly") &&
+              text.includes("harbor:runtime-session/app265/readonly") &&
+              text.includes("Harbor live")
+              ? text
+              : null;
+          }, 80, 250);
+          readonlySubmitSmoke = {
+            canSubmitBeforeClick,
+            ready: Boolean(readyText),
+            text: (readyText || root?.textContent || "").slice(0, 4000)
+          };
+        }
         const deviceScale = window.devicePixelRatio || 1;
         const leftHandleAfterRestore = document.querySelector(".left-panel-resizer .resize-handle-right");
         const leftStayOpenDragDistance = -(leftRestored.leftWidth - 180) * deviceScale;
@@ -252,6 +297,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
             leftAfterDragRestore.left === "true" &&
             dragRestored.left === "true" &&
             dragRestored.right === "true",
+          readonlySubmitSmoke,
           panelStateTrace: {
             initialPanels,
             rightCollapsed,
@@ -290,6 +336,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       composerFocused: boolean;
       panelToggleSmoke: boolean;
       panelDragSmoke: boolean;
+      readonlySubmitSmoke: { canSubmitBeforeClick?: boolean; ready?: boolean; text?: string } | null;
       panelStateTrace: unknown;
     };
 
@@ -332,6 +379,12 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
 
     if (!result.hasComposer || !result.composerFocused) {
       throw new Error("packaged renderer smoke failed: composer is missing or cannot receive focus.");
+    }
+
+    if (packagedSmokeAction === "readonly_submit" && !result.readonlySubmitSmoke?.ready) {
+      throw new Error(
+        `packaged renderer smoke failed: read-only submit did not reach owner refs. ${JSON.stringify(result.readonlySubmitSmoke)}`,
+      );
     }
 
     if (!result.panelDragSmoke) {

@@ -1,71 +1,91 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-265",
-  "generated_at": "2026-07-09T13:59:00Z",
-  "branch": "work/app-265-runtime-e2e-preflight",
-  "implementation_head": "017f8762d0f5cff2f812a403f18cd4bac5e33497",
-  "task_goal": "Prepare the App-only packaged runtime preflight slice for APP-265 without promoting fixture/demo state to live availability.",
+  "generated_at": "2026-07-09T15:46:00Z",
+  "branch": "work/app-265-live-readonly-e2e",
+  "implementation_head": "pending_pr_head_sha",
+  "task_goal": "Prepare the App-only live-safe readonly submit slice for APP-265 without promoting fixture/demo state to live availability.",
   "delegations": [
     {
-      "id": "app-265-runtime-e2e-preflight-worker",
-      "task_goal": "Strengthen App packaged runtime smoke and local Harbor identity/session to Core submit contract coverage.",
+      "id": "app-265-harbor-runtime-api-readback",
+      "task_goal": "Read Harbor origin/main runtime API endpoints and App #265 integration constraints without changing files or touching real profile/site state.",
       "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-265-runtime-e2e-preflight",
-        "package.json",
-        "scripts/package-runtime-assets.mjs",
-        "scripts/smoke.mjs",
-        "src/electron/runtimeSupervisor.ts",
-        "artifacts/app-265-packaged-runtime-smoke.png"
+        "/Volumes/2T/dev/WebEnvoy/Harbor",
+        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-265-live-readonly-e2e",
+        "Harbor packages/runtime-api/src/server.ts",
+        "App #265"
       ],
       "read_scope": [
-        "App package/runtime supervisor/smoke files",
-        "APP-265 Loom carriers",
-        "GitHub issue App #265 readback"
+        "Harbor origin/main runtime API endpoint definitions",
+        "App #265 integration notes"
       ],
       "write_ownership": [
-        "package.json",
-        "scripts/package-runtime-assets.mjs",
-        "scripts/smoke.mjs",
-        "src/electron/runtimeSupervisor.ts",
-        "artifacts/app-265-packaged-runtime-smoke.png",
-        ".loom/work-items/APP-265.md",
-        ".loom/progress/APP-265.md",
-        ".loom/specs/APP-265/**"
+        "none; read-only Harbor endpoint readback"
       ],
       "non_goals": [
-        "No Core, Harbor, or Lode repository changes",
-        "No GitHub issue state changes",
-        "No PR creation or merge",
-        "No real account, Cookie, browser profile, production page, submit, publish, send, save, hosted browser, marketplace, bulk collection, or risk-control bypass"
+        "No file edits",
+        "No runtime start",
+        "No real browser/profile/Cookie/production page access"
       ],
       "validation_expectation": [
-        "npm ci",
-        "npm run typecheck",
-        "npm run smoke",
-        "npm run smoke:packaged:runtime",
-        "git diff --check",
-        "loom doctor --target . --json",
-        "loom verify --target . --json",
-        "loom fact-chain --target . --json",
-        "loom suite carrier validate --target . --item APP-265 --json",
-        "loom suite evidence validate --target . --item APP-265 --json"
+        "Return endpoint table, launch command, call sequence, limitations, and App #265 adaptation notes"
       ],
-      "output_format": "PR-ready report with changed files, validation results, PR body guidance, and precise blockers.",
+      "output_format": "Concise endpoint/readiness/session/evidence contract summary with boundaries.",
       "integration_target": [
-        "APP-265 App PR",
-        "App #14 runtime/task E2E closeout input"
+        "APP-265 App readonly submit and packaged smoke planning"
       ],
       "status": "integrated",
-      "summary": "Implementation head 017f876 requires packaged Core/Harbor runtime assets for packaged smoke, records blocked packaging state when assets are missing, improves unavailable diagnostics, and extends local smoke through Harbor identity create/readback/session refs into Core task result/evidence/session projection. This is local contract evidence only, not live Xiaohongshu/BOSS evidence."
+      "summary": "Harbor exposes readiness, provider catalog, identity environments, session lifecycle, snapshot/site-resource/write-precheck facts, and evidence refs. Readiness is API process ready only; App must also check provider/session facts. No production page, profile, or Cookie action was performed."
+    },
+    {
+      "id": "app-265-app-submit-gap-readback",
+      "task_goal": "Read current App #265 implementation and identify the minimal App-side gaps for Xiaohongshu readonly submit.",
+      "context_locators": [
+        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-265-live-readonly-e2e",
+        "src/renderer/App.tsx",
+        "src/renderer/TaskThreadComposer.tsx",
+        "src/renderer/SiteSkillPages.tsx",
+        "src/renderer/coreTaskSubmitClient.ts"
+      ],
+      "read_scope": [
+        "App #265 renderer submit path",
+        "Library task launch path",
+        "Harbor identity projection display",
+        "Existing smoke coverage"
+      ],
+      "write_ownership": [
+        "none; read-only App submit gap readback"
+      ],
+      "non_goals": [
+        "No file edits",
+        "No packaged runtime launch",
+        "No real browser/profile/Cookie/production page access"
+      ],
+      "validation_expectation": [
+        "Identify minimal App-side changes and recommended validation commands"
+      ],
+      "output_format": "Findings with locators, fixture/demo boundaries, and suggested minimal implementation.",
+      "integration_target": [
+        "APP-265 App readonly submit implementation"
+      ],
+      "status": "integrated",
+      "summary": "Composer business input was read-only, Library first launch was gated on already-existing liveTaskIds, Task identity source still displayed Harbor fixture, and packaged smoke did not cover App -> Core /tasks -> refs rendering."
     }
   ],
   "ownership_constraints": {
     "write_ownership": [
       "package.json",
-      "scripts/package-runtime-assets.mjs",
-      "scripts/smoke.mjs",
-      "src/electron/runtimeSupervisor.ts",
+      "scripts/smoke-packaged-readonly.mjs",
+      "src/electron/main.ts",
+      "src/renderer/App.tsx",
+      "src/renderer/SiteSkillPages.tsx",
+      "src/renderer/TaskThreadComposer.tsx",
+      "src/renderer/TaskThreadPage.tsx",
+      "src/renderer/taskThreadFixtures.ts",
+      "artifacts/app-265-packaged-readonly-smoke.png",
       "artifacts/app-265-packaged-runtime-smoke.png",
+      "artifacts/app-261-packaged-vertical-smoke.png",
+      "artifacts/gh-168-packaged-preview.png",
       ".loom/work-items/APP-265.md",
       ".loom/progress/APP-265.md",
       ".loom/specs/APP-265/**"
@@ -89,84 +109,99 @@
       "GitHub issue closeout",
       "merge"
     ],
-    "shared_carrier_policy": ".loom/status/current.md remains no_active_item in this worker branch because no formal workspace takeover was performed. Main controller may activate or refresh current-head review in its PR/gate lane."
+    "shared_carrier_policy": ".loom/status/current.md remains no_active_item for this lane. The PR body metadata binds the exact pushed head SHA before PR gate consumption."
   },
   "validation": {
     "passed": [
       {
-        "command": "npm ci",
-        "evidence": "Previous worker installed App dependencies before implementation validation."
-      },
-      {
         "command": "npm run typecheck",
-        "evidence": "Carrier-cleanup worker reran TypeScript checks at 2026-07-09T13:59Z UTC."
+        "evidence": "Passed at 2026-07-09T15:39Z UTC."
       },
       {
         "command": "npm run smoke",
-        "evidence": "Carrier-cleanup worker reran App smoke at 2026-07-09T13:59Z UTC; smoke covers local Harbor identity create/readback/session contract and Core task result/evidence/session refs projection."
+        "evidence": "Passed at 2026-07-09T15:39Z UTC; full App build plus local renderer/Core/Harbor/Lode contract smoke completed."
       },
       {
-        "command": "npm run smoke:packaged:runtime",
-        "evidence": "Previous worker reported packaged runtime smoke passed with WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 and screenshot artifacts/app-265-packaged-runtime-smoke.png."
+        "command": "npm run smoke:packaged:readonly",
+        "evidence": "Passed at 2026-07-09T15:52Z UTC; packaged Electron edited Xiaohongshu same-origin input, submitted to Core /tasks, rendered run id app-xiaohongshu-mrdounvl, session ref harbor:runtime-session/app265/readonly, evidence ref harbor:evidence/app265/readonly, and screenshot artifacts/app-265-packaged-readonly-smoke.png."
+      },
+      {
+        "command": "WEBENVOY_CORE_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-app-admission-e2e WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-main-packaged-smoke npm run smoke:packaged:runtime",
+        "evidence": "Passed at 2026-07-09T15:43Z UTC; packaged Core/Harbor runtime launched from packaged paths and owner health/admission was ready."
+      },
+      {
+        "command": "WEBENVOY_CORE_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-app-admission-e2e WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-main-packaged-smoke npm run smoke:packaged:vertical",
+        "evidence": "Passed at 2026-07-09T15:44Z UTC; packaged vertical health/admission/Lode assets and fixture fail-closed checks passed."
+      },
+      {
+        "command": "npm run smoke:packaged",
+        "evidence": "Passed at 2026-07-09T15:45Z UTC; default packaged smoke remains compatible with the new optional readonly_submit smoke hook."
       },
       {
         "command": "git diff --check",
-        "evidence": "No whitespace errors for the carrier-cleanup diff at 2026-07-09T13:59Z UTC."
+        "evidence": "Passed at 2026-07-09T15:45Z UTC."
       },
       {
-        "command": "loom verify --target . --json; loom fact-chain --target . --json; loom suite carrier validate --target . --item APP-265 --json; loom suite evidence validate --target . --item APP-265 --json",
-        "evidence": "Carrier-cleanup readback passed at 2026-07-09T13:59Z UTC with no missing inputs or blocking gaps."
+        "command": "loom status --target . --json; loom fact-chain --target . --json",
+        "evidence": "Passed at 2026-07-09T15:46Z UTC with no active item and readable fact-chain."
+      },
+      {
+        "command": "tools/skills_surface.py check; tools/loom_check.py --profile source --source-surface contract-only; tools/check_release_surface.py; tools/version_surface_check.py; tools/check_npm_package.py",
+        "evidence": "Not applicable in this App worktree: `tools/` is absent. Hosted `.github/workflows/loom-check.yml` remains the authoritative repo-local-cli surface for PR #272."
       }
     ],
     "blocked": [],
-    "to_refresh_after_carrier_change_or_pr_creation": [
-      "git diff --check",
-      "loom fact-chain --target . --json",
+    "to_refresh_after_pr_creation": [
       "loom suite carrier validate --target . --item APP-265 --json",
       "loom suite evidence validate --target . --item APP-265 --json",
-      "formal current-head review and PR/gate lane checks after PR metadata readback",
-      "current-head spec/code review records",
       "PR metadata readback with pushed head SHA",
+      "loom pr gate with pushed head SHA",
       "hosted loom-pr-merge-gate"
     ]
   },
   "integration_evidence": [
     {
-      "id": "packaged-runtime-required-smoke",
+      "id": "editable-readonly-business-input",
       "status": "integrated",
       "locators": [
+        "src/renderer/TaskThreadComposer.tsx",
+        "src/renderer/App.tsx"
+      ],
+      "summary": "Task Thread composer now allows local business input edits and passes the edited same-origin input into Core /tasks readiness/payload construction."
+    },
+    {
+      "id": "library-readonly-entry-open",
+      "status": "integrated",
+      "locators": [
+        "src/renderer/SiteSkillPages.tsx",
+        "src/renderer/App.tsx"
+      ],
+      "summary": "Library can open supported readonly milestone tasks after local runtime readiness even before a liveTaskIds projection already exists; Core submit remains separately gated by runtime/admission/Harbor identity readiness."
+    },
+    {
+      "id": "harbor-live-identity-source",
+      "status": "integrated",
+      "locators": [
+        "src/renderer/App.tsx",
+        "src/renderer/TaskThreadPage.tsx",
+        "src/renderer/taskThreadFixtures.ts"
+      ],
+      "summary": "Task context uses matching Harbor live identity summary when available instead of hardcoding Harbor fixture in the identity source chip."
+    },
+    {
+      "id": "packaged-readonly-smoke",
+      "status": "integrated",
+      "locators": [
+        "src/electron/main.ts",
+        "scripts/smoke-packaged-readonly.mjs",
         "package.json",
-        "scripts/package-runtime-assets.mjs"
+        "artifacts/app-265-packaged-readonly-smoke.png"
       ],
-      "summary": "smoke:packaged:runtime sets WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 so missing Core/Harbor runtime assets fail closed instead of warning-only success."
-    },
-    {
-      "id": "runtime-repair-diagnostic",
-      "status": "integrated",
-      "locators": [
-        "src/electron/runtimeSupervisor.ts"
-      ],
-      "summary": "Unavailable runtime repair text distinguishes disabled packaged launch from missing packaged assets and points to runtime env overrides or rebuilding with packaged assets."
-    },
-    {
-      "id": "harbor-core-contract-smoke",
-      "status": "integrated",
-      "locators": [
-        "scripts/smoke.mjs"
-      ],
-      "summary": "Local-only smoke creates a Harbor identity, reads back a Harbor live identity projection, opens a runtime session, and verifies the session ref flows into Core task result/evidence/session refs."
-    },
-    {
-      "id": "packaged-runtime-screenshot",
-      "status": "integrated",
-      "locators": [
-        "artifacts/app-265-packaged-runtime-smoke.png"
-      ],
-      "summary": "Screenshot artifact records packaged runtime smoke UI state. It is local runtime evidence only, not live site/browser evidence."
+      "summary": "Optional packaged smoke action submits a local owner-shaped Xiaohongshu readonly task through the App UI and verifies Core run/result/evidence/session refs render."
     }
   ],
   "runtime_boundary": {
-    "runtime_evidence_kind": "local App contract smoke and packaged owner-runtime build path",
+    "runtime_evidence_kind": "local App packaged contract smoke and packaged owner-runtime build path",
     "live_site_evidence": "not_attempted",
     "profile": "none opened by this App lane",
     "forbidden_actions": [
@@ -182,7 +217,7 @@
   },
   "remaining_limitations": [
     "This PR does not perform real Xiaohongshu/BOSS site access or browser profile actions.",
-    "Current .loom/reviews/APP-265*.json still describe the previous APP-265 retire head and must be refreshed by the main controller before merge gate.",
-    "Final App #14 closeout still needs user-authorized Computer Use E2E with real provider detection, identity browser session, read-only tasks, evidence refs, and write-precheck submitted=false."
+    "This PR does not prove final App #14 live E2E and must not close App #265.",
+    "Final closeout still needs user-authorized Computer Use E2E with real provider detection, identity browser session, Xiaohongshu/BOSS read-only tasks, evidence refs, and write-precheck submitted=false."
   ]
 }
