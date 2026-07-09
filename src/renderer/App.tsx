@@ -12,7 +12,7 @@ import {
   SquarePen,
   UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   defaultConnectionConfig,
@@ -25,6 +25,14 @@ import {
   fetchCoreReadTaskState,
   type CoreReadTaskLoadState,
 } from "./coreReadTaskClient";
+import {
+  coreTaskSubmitReadiness,
+  initialCoreTaskSubmitState,
+  submitCoreReadOnlyTask,
+  type CoreTaskSubmitState,
+} from "./coreTaskSubmitClient";
+import { fetchHarborIdentityState } from "./harborIdentityClient";
+import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import {
   SiteSkillDetailPage,
   SiteSkillDirectoryPage,
@@ -45,6 +53,7 @@ import {
   runtimeSupervisorUnavailableState,
   type RuntimeSupervisorState,
 } from "./runtimeSupervisorState";
+import { loadLocalIdentityEnvironmentDrafts } from "./localIdentityEnvironmentStore";
 import { outcomeLabel } from "./TaskThreadFields";
 import { TaskThreadComposer } from "./TaskThreadComposer";
 import { TaskThreadPage } from "./TaskThreadPage";
@@ -62,6 +71,11 @@ type ShellContext = {
   configScope: "local-ui-only";
 };
 type AppView = "task-thread" | "site-skills" | "identity-environments" | "settings";
+type SubmittedTaskOverride = {
+  endpoint: string;
+  taskId: string;
+  task: TaskProjection;
+};
 const milestone14TaskIds = new Set([
   "task-xhs-publish-write-preview",
   "task-boss-greeting-write-preview",
@@ -88,9 +102,19 @@ function applyDocumentTheme(colorScheme: ShellContext["colorScheme"]) {
 }
 
 const defaultTaskThread =
-  milestone14TaskThreadFixtures.find((task) => task.id === "task-xhs-publish-write-preview") ??
+  milestone14TaskThreadFixtures.find((task) => task.id === "task-xhs-real-read") ??
   milestone14TaskThreadFixtures[0] ??
   taskThreadFixtures[0];
+const initialHarborIdentityState: HarborIdentityLoadState = {
+  status: "loading",
+  fetchedAt: "pending",
+  summary: "正在读取 Harbor live identity public facts。",
+  identities: [],
+};
+
+function coreSubmitStateKey(taskId: string, endpoint: string) {
+  return `${endpoint}::${taskId}`;
+}
 
 export function App() {
   const [shellContext, setShellContext] = useState<ShellContext | null>(null);
@@ -103,6 +127,9 @@ export function App() {
   const [coreReadState, setCoreReadState] = useState<CoreReadTaskLoadState>(() =>
     coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
   );
+  const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
+  const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
+  const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [activeView, setActiveView] = useState<AppView>("task-thread");
@@ -110,18 +137,58 @@ export function App() {
   const [selectedRunId, setSelectedRunId] = useState(defaultTaskThread.runs[0]?.id ?? "");
   const [selectedSiteSkillId, setSelectedSiteSkillId] = useState(siteSkillFixtures[0].id);
   const [isSiteSkillDetailOpen, setSiteSkillDetailOpen] = useState(false);
+  const selectedTaskIdRef = useRef(selectedTaskId);
+  const coreEndpointRef = useRef(connectionConfig.coreEndpoint);
 
+  useEffect(() => {
+    selectedTaskIdRef.current = selectedTaskId;
+  }, [selectedTaskId]);
+
+  useEffect(() => {
+    coreEndpointRef.current = connectionConfig.coreEndpoint;
+  }, [connectionConfig.coreEndpoint]);
+
+  const currentEndpointSubmittedOverrides = useMemo(
+    () =>
+      Object.values(submittedTaskOverrides).filter(
+        (override) => override.endpoint === connectionConfig.coreEndpoint,
+      ),
+    [connectionConfig.coreEndpoint, submittedTaskOverrides],
+  );
+  const submittedLiveTaskIds = useMemo(
+    () => currentEndpointSubmittedOverrides.map((override) => override.taskId),
+    [currentEndpointSubmittedOverrides],
+  );
+  const effectiveCoreReadState = useMemo<CoreReadTaskLoadState>(() => {
+    const liveTaskIds = Array.from(new Set([...coreReadState.liveTaskIds, ...submittedLiveTaskIds]));
+    const submittedTasksById = new Map(
+      currentEndpointSubmittedOverrides.map((override) => [override.taskId, override.task]),
+    );
+    return {
+      ...coreReadState,
+      status: liveTaskIds.length > coreReadState.liveTaskIds.length ? "ready" : coreReadState.status,
+      summary: submittedLiveTaskIds.length > 0
+        ? `${coreReadState.summary} 已包含 UI 提交产生的 live run。`
+        : coreReadState.summary,
+      tasks: coreReadState.tasks.map((task) => submittedTasksById.get(task.id) ?? task),
+      liveTaskIds,
+    };
+  }, [coreReadState, currentEndpointSubmittedOverrides, submittedLiveTaskIds]);
   const taskThreads = useMemo(
     () =>
       projectRuntimeGatedTasks(
-        coreReadState.tasks,
+        effectiveCoreReadState.tasks,
         runtimeSupervisorState,
-        coreReadState.liveTaskIds,
+        effectiveCoreReadState.liveTaskIds,
       ),
-    [coreReadState.liveTaskIds, coreReadState.tasks, runtimeSupervisorState],
+    [effectiveCoreReadState.liveTaskIds, effectiveCoreReadState.tasks, runtimeSupervisorState],
   );
   const selectedTask =
     taskThreads.find((task) => task.id === selectedTaskId) ?? taskThreads[0] ?? defaultTaskThread;
+  const selectedSubmitTask =
+    effectiveCoreReadState.tasks.find((task) => task.id === selectedTask.id) ?? selectedTask;
+  const selectedSubmitStateKey = coreSubmitStateKey(selectedSubmitTask.id, connectionConfig.coreEndpoint);
+  const coreSubmitState = coreSubmitStatesByKey[selectedSubmitStateKey] ?? initialCoreTaskSubmitState;
   const selectedRun =
     selectedTask.runs.find((run) => run.id === selectedRunId) ?? selectedTask.runs[0];
   const selectedSiteSkill =
@@ -229,6 +296,17 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
+    setHarborIdentityState(initialHarborIdentityState);
+    fetchHarborIdentityState(connectionConfig.harborEndpoint, loadLocalIdentityEnvironmentDrafts()).then((state) => {
+      if (!cancelled) setHarborIdentityState(state);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionConfig.harborEndpoint]);
+
+  useEffect(() => {
+    let cancelled = false;
     setRuntimeSupervisorState(runtimeSupervisorCheckingState());
 
     const readSupervisor = window.webenvoyShell?.getRuntimeSupervisorState;
@@ -317,9 +395,59 @@ export function App() {
     if (
       taskId != null &&
       runtimeSupervisorState.canUseLiveRuntime &&
-      coreReadState.liveTaskIds.includes(taskId)
+      effectiveCoreReadState.liveTaskIds.includes(taskId)
     ) {
       openTaskById(taskId);
+    }
+  }
+
+  async function submitSelectedCoreTask() {
+    const submitTask = selectedSubmitTask;
+    const submitEndpoint = connectionConfig.coreEndpoint;
+    const submitKey = coreSubmitStateKey(submitTask.id, submitEndpoint);
+    const readiness = coreTaskSubmitReadiness(
+      submitTask,
+      runtimeSupervisorState,
+      harborIdentityState.identities,
+    );
+    if (!readiness.ok) {
+      setCoreSubmitStatesByKey((current) => ({
+        ...current,
+        [submitKey]: { status: "blocked", summary: readiness.reason },
+      }));
+      return;
+    }
+
+    setCoreSubmitStatesByKey((current) => ({
+      ...current,
+      [submitKey]: {
+        status: "submitting",
+        summary: "正在向 Core POST /tasks 提交只读 task intent。",
+      },
+    }));
+    const result = await submitCoreReadOnlyTask(
+      submitEndpoint,
+      submitTask,
+      runtimeSupervisorState,
+      harborIdentityState.identities,
+    );
+    setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
+    if (result.status === "ready") {
+      setSubmittedTaskOverrides((current) => ({
+        ...current,
+        [submitKey]: {
+          endpoint: submitEndpoint,
+          taskId: submitTask.id,
+          task: {
+            ...submitTask,
+            source: "Core live",
+            runs: [result.run, ...submitTask.runs.filter((run) => run.id !== result.run.id)],
+          },
+        },
+      }));
+      if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
+        setSelectedRunId(result.run.id);
+      }
     }
   }
 
@@ -553,7 +681,7 @@ export function App() {
             {isSiteSkillDetailOpen ? (
               <SiteSkillDetailPage
                 canUseLiveRuntime={runtimeSupervisorState.canUseLiveRuntime}
-                liveTaskIds={coreReadState.liveTaskIds}
+                liveTaskIds={effectiveCoreReadState.liveTaskIds}
                 skill={selectedSiteSkill}
                 onBack={openSiteSkillDirectory}
                 onOpenTask={startReadTask}
@@ -561,7 +689,7 @@ export function App() {
             ) : (
               <SiteSkillDirectoryPage
                 canUseLiveRuntime={runtimeSupervisorState.canUseLiveRuntime}
-                liveTaskIds={coreReadState.liveTaskIds}
+                liveTaskIds={effectiveCoreReadState.liveTaskIds}
                 selectedSkillId={selectedSiteSkill.id}
                 onSelectSkill={openSiteSkillDetail}
               />
@@ -569,10 +697,20 @@ export function App() {
           </ThreadWorkspace>
         ) : (
           <ThreadWorkspace
-            composer={<TaskThreadComposer selectedRun={selectedRun} selectedTask={selectedTask} />}
+            composer={
+              <TaskThreadComposer
+                coreSubmitState={coreSubmitState}
+                harborIdentityState={harborIdentityState}
+                runtimeSupervisorState={runtimeSupervisorState}
+                selectedRun={selectedRun}
+                selectedTask={selectedSubmitTask}
+                onSubmitCoreTask={submitSelectedCoreTask}
+              />
+            }
           >
             <TaskThreadPage
-              coreReadState={coreReadState}
+              coreReadState={effectiveCoreReadState}
+              coreSubmitState={coreSubmitState}
               navigationItems={threadNavigationItems}
               runtimeSupervisorState={runtimeSupervisorState}
               selectedRun={selectedRun}
@@ -585,7 +723,8 @@ export function App() {
       right={isAppLevelView ? null : (
         <RightPanel>
           <TaskThreadRightPanel
-            coreReadState={coreReadState}
+            coreReadState={effectiveCoreReadState}
+            coreSubmitState={coreSubmitState}
             runtimeSupervisorState={runtimeSupervisorState}
             selectedRun={selectedRun}
             selectedTask={selectedTask}

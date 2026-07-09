@@ -3,18 +3,20 @@ import type { OutcomeKind, OwnerSource, RunProjection, TaskProjection } from "./
 type CoreReadStatus = "loading" | "ready" | "offline";
 type JsonRecord = Record<string, unknown>;
 
-type CoreReadCapability = {
+export type CoreReadCapability = {
   capabilityRef: string;
   capabilityVersion: string;
   packageRef: string;
 };
 
-type CoreReadTaskSpec = {
+export type CoreReadTaskSpec = {
   taskId: string;
   mode: "read" | "write-precheck";
   packageName: string;
   packageVersion: string;
   capabilities: CoreReadCapability[];
+  resourceRequirementRefs: string[];
+  evidencePolicyRef: string;
   boundary: string;
 };
 
@@ -147,7 +149,7 @@ export type CoreReadTaskLoadState = {
 
 const coreLiveSource: OwnerSource = "Core live";
 
-const coreReadTaskSpecs: CoreReadTaskSpec[] = [
+export const coreReadTaskSpecs: CoreReadTaskSpec[] = [
   {
     taskId: "task-xhs-real-read",
     mode: "read",
@@ -165,6 +167,8 @@ const coreReadTaskSpecs: CoreReadTaskSpec[] = [
         packageRef: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
       },
     ],
+    resourceRequirementRefs: ["xiaohongshu.search-notes.resources"],
+    evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 返回 run/result/evidence refs；App 不读取 raw evidence、DOM、截图正文、Cookie、token 或 profile storage。",
   },
   {
@@ -184,6 +188,8 @@ const coreReadTaskSpecs: CoreReadTaskSpec[] = [
         packageRef: "lode://site-capability/boss/read-job-detail@0.1.0",
       },
     ],
+    resourceRequirementRefs: ["boss.job-search.resources"],
+    evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 只暴露 BOSS 只读 run/result/evidence refs；App 不打招呼、不投递、不保存聊天或简历材料。",
   },
   {
@@ -198,6 +204,8 @@ const coreReadTaskSpecs: CoreReadTaskSpec[] = [
         packageRef: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
       },
     ],
+    resourceRequirementRefs: ["xiaohongshu.publish-note-precheck.resources"],
+    evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 返回小红书写前验证 run/result/evidence refs；App 只展示 expected_change、approval state 和 owner submitted 状态，不点击发布。",
   },
   {
@@ -212,6 +220,8 @@ const coreReadTaskSpecs: CoreReadTaskSpec[] = [
         packageRef: "lode://site-capability/boss/greeting-precheck@0.1.0",
       },
     ],
+    resourceRequirementRefs: ["boss.greet-precheck.resources"],
+    evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 返回 BOSS 打招呼写前验证 refs；App 只展示消息框预览、风险状态和 owner submitted 状态，不发送消息。",
   },
 ];
@@ -502,6 +512,26 @@ async function fetchRunProjection(
       },
     },
   };
+}
+
+export async function fetchCoreRunProjectionById(
+  endpoint: string,
+  runId: string,
+  spec: CoreReadTaskSpec,
+): Promise<{ ok: true; run: RunProjection } | { ok: false; error: string }> {
+  const encodedRunId = encodeURIComponent(runId);
+  const response = await requestJson(endpoint, `/runs/${encodedRunId}`);
+  const body = okPayload(response, "run") ?? okPayload(response, "run_record") ?? recordValue(response);
+  const run = coreRunSummary(body);
+
+  if (run == null) {
+    return { ok: false, error: `/runs/${encodedRunId} returned invalid run summary` };
+  }
+
+  const projection = await fetchRunProjection(endpoint, run, spec);
+  return projection.ok
+    ? { ok: true, run: projection.projection.run }
+    : { ok: false, error: projection.error };
 }
 
 async function requestJson(base: string, path: string): Promise<unknown> {

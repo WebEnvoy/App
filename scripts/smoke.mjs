@@ -20,8 +20,10 @@ const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
+const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
+const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
 const rendererAssets = await readFile(
   "dist/renderer/assets/index.js",
   "utf8",
@@ -367,6 +369,33 @@ const { outputText: coreReadTaskClientModuleSource } = ts.transpileModule(coreRe
 const coreReadTaskClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleSource)}`
 );
+const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(runtimeSupervisorStateSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const runtimeSupervisorStateModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(runtimeSupervisorStateModuleSource)}`;
+const coreReadTaskClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleSource)}`;
+const { outputText: coreTaskSubmitClientModuleSource } = ts.transpileModule(coreTaskSubmitClientSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const coreTaskSubmitClientModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(
+    coreTaskSubmitClientModuleSource
+      .replace(
+        'from "./coreReadTaskClient";',
+        `from "${coreReadTaskClientModuleUrl}";`,
+      )
+      .replace(
+        'from "./runtimeSupervisorState";',
+        `from "${runtimeSupervisorStateModuleUrl}";`,
+      ),
+  )}`
+);
 
 function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
@@ -502,6 +531,86 @@ if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
   throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
 }
 
+const liveRuntimeForSubmit = {
+  canUseLiveRuntime: true,
+  services: [
+    { id: "core", health: { state: "ready" }, admission: { state: "ready" } },
+    { id: "harbor", health: { state: "ready" } },
+  ],
+};
+const readyXhsIdentity = {
+  source: "Harbor live",
+  siteId: "xiaohongshu",
+  origin: "https://www.xiaohongshu.com",
+  identityEnvironmentRef: "harbor://identity-environment/xhs-smoke",
+  provider: { state: "ready" },
+  login: { recoveryRequired: false },
+  readiness: { state: "ready" },
+};
+const readonlySubmitTask = {
+  id: "task-xhs-real-read",
+  title: "小红书搜索与笔记读取",
+  accountIdentity: "小红书运营号 A",
+  siteSkill: "小红书搜索和笔记读取",
+  businessInput: "读取 https://www.xiaohongshu.com/explore/abc?xsec_token=url-ref-only",
+  packageSource: {
+    lockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+  },
+  runs: [],
+};
+const submitReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+
+if (!submitReadiness.ok) {
+  throw new Error(`Core submit smoke failed: ready live identity was blocked: ${submitReadiness.reason}`);
+}
+
+if (Object.prototype.hasOwnProperty.call(submitReadiness.payload, "entrypoint")) {
+  throw new Error("Core submit smoke failed: payload still has invalid top-level entrypoint.");
+}
+
+if (
+  submitReadiness.payload.task_intent.schema_version !== "webenvoy.task-intent.v0" ||
+  submitReadiness.payload.task_intent.entrypoint !== "app" ||
+  submitReadiness.payload.task_intent.scope.target_ref !== "https://www.xiaohongshu.com/explore/abc?xsec_token=url-ref-only" ||
+  submitReadiness.payload.task_intent.resource_requirement_refs[0] !== "xiaohongshu.search-notes.resources" ||
+  submitReadiness.payload.task_intent.evidence_policy_ref !== "evidence-policy:refs-only"
+) {
+  throw new Error(`Core submit smoke failed: task intent payload is malformed: ${JSON.stringify(submitReadiness.payload)}`);
+}
+
+const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [
+    {
+      ...readyXhsIdentity,
+      login: { recoveryRequired: true },
+      readiness: { state: "needs-auth" },
+    },
+  ],
+);
+
+if (needsAuthReadiness.ok) {
+  throw new Error("Core submit smoke failed: needs-auth Harbor identity was accepted.");
+}
+
+const crossOriginReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  {
+    ...readonlySubmitTask,
+    businessInput: "读取 https://example.test/not-the-selected-site",
+  },
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+
+if (crossOriginReadiness.ok) {
+  throw new Error("Core submit smoke failed: cross-origin task URL was accepted.");
+}
+
 const originalFetch = globalThis.fetch;
 const fakeRun = {
   schema_version: "webenvoy.run-query.v0",
@@ -542,6 +651,120 @@ const fakeRun = {
     },
   },
 };
+
+const submitFetchCalls = [];
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  submitFetchCalls.push(`${init.method ?? "GET"} ${pathname}`);
+  const submitRun = { ...fakeRun, run_id: "run_submit_xhs_001" };
+  const json = pathname.endsWith("/tasks")
+    ? { ok: true, run_id: submitRun.run_id }
+    : pathname.endsWith(`/runs/${submitRun.run_id}`)
+    ? { ok: true, run: submitRun }
+    : pathname.endsWith("/result")
+    ? {
+        ok: true,
+        result: {
+          schema_version: "webenvoy.result-query.v0",
+          run_id: submitRun.run_id,
+          status: "succeeded",
+          terminal: true,
+          result: {
+            envelope_state: "available",
+            payload_state: "not_persisted_in_core",
+            result_envelope: {
+              result_kind: "xhs_note_search",
+              result_ref: "result:core/xiaohongshu/search-notes/submitted",
+              package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/submitted"],
+            },
+          },
+        },
+      }
+    : pathname.endsWith("/evidence-refs")
+    ? {
+        ok: true,
+        evidence: {
+          evidence_refs: [
+            {
+              ref: "harbor:evidence/xiaohongshu/search-notes/submitted",
+              source: "submit_smoke",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:01:03.000Z",
+              runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+            },
+          ],
+        },
+      }
+    : pathname.endsWith("/failure")
+    ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
+    : pathname.endsWith("/session-refs")
+    ? {
+        ok: true,
+        session_refs: {
+          session_refs: {
+            runtime_session_ref: "harbor:runtime-session/xiaohongshu/readonly",
+            control_owner: "core_task",
+            lifecycle_state: "active",
+            session_use: "core_task_run",
+          },
+        },
+      }
+    : { ok: false, error: { code: "unexpected_submit_smoke_path" } };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const submittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+  { pollAttempts: 1, pollIntervalMs: 0 },
+);
+globalThis.fetch = originalFetch;
+
+if (submittedRun.status !== "ready" || submittedRun.runId !== "run_submit_xhs_001") {
+  throw new Error(`Core submit smoke failed: submit/poll did not return ready run: ${JSON.stringify(submittedRun)}`);
+}
+
+for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/evidence-refs", "/failure", "/session-refs"]) {
+  if (!submitFetchCalls.some((entry) => entry.includes(expectedPath))) {
+    throw new Error(`Core submit smoke failed: ${expectedPath} was not consumed.`);
+  }
+}
+
+if (!submittedRun.run.evidenceCards[0]?.summary.includes("harbor:evidence/xiaohongshu/search-notes/submitted")) {
+  throw new Error("Core submit smoke failed: submitted run evidence refs were not projected.");
+}
+
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  const json = pathname.endsWith("/tasks")
+    ? { ok: true, run_id: "run_submit_pending_001" }
+    : pathname.includes("/runs/run_submit_pending_001")
+    ? { ok: false, error: { code: "run_not_queryable_yet" } }
+    : { ok: false, error: { code: "unexpected_pending_smoke_path" } };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const pendingRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+  { pollAttempts: 2, pollIntervalMs: 0 },
+);
+globalThis.fetch = originalFetch;
+
+if (pendingRun.status !== "polling" || pendingRun.runId !== "run_submit_pending_001") {
+  throw new Error(`Core submit smoke failed: accepted-but-not-ready run was not kept in polling state: ${JSON.stringify(pendingRun)}`);
+}
+
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
