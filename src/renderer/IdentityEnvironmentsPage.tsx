@@ -16,6 +16,7 @@ import {
   type IdentityManagementMode,
 } from "./IdentityEnvironmentManagementPanel";
 import {
+  createHarborIdentityEnvironment,
   fetchHarborIdentityState,
   lockHarborSession,
   openHarborIdentitySession,
@@ -159,23 +160,38 @@ export function IdentityEnvironmentsPage({
     setManagementMessage(message);
   }
 
-  function createIdentity(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    saveDraft(
-      createLocalIdentityEnvironmentDraft(Object.fromEntries(new FormData(event.currentTarget))),
-      "已保存 App 本地允许配置；真实 provider/session 状态仍需 Harbor 回读。",
-    );
-    event.currentTarget.reset();
+  async function registerDraftWithHarbor(draft: ReturnType<typeof createLocalIdentityEnvironmentDraft>, fallbackMessage: string) {
+    setManagementMessage("正在写入 Harbor identity environment owner API。");
+    const result = await createHarborIdentityEnvironment(harborEndpoint, draft);
+    if (!result.ok) {
+      saveDraft(draft, `${fallbackMessage} ${result.error} 已保存为 App local-only 草稿；不能启动真实身份浏览器或提交真实 Core task。`);
+      return;
+    }
+
+    removeLocalIdentityEnvironmentDraft(draft.id);
+    setLocalDrafts(loadLocalIdentityEnvironmentDrafts());
+    selectIdentity(draft.identityEnvironmentRef);
+    setManagementMode("closed");
+    setManagementMessage("已写入 Harbor identity environment owner API；App localStorage 未保存 Cookie、token、profile 原始内容或 raw evidence。");
+    await refreshHarborState();
   }
 
-  function importIdentity() {
+  async function createIdentity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const draft = createLocalIdentityEnvironmentDraft(Object.fromEntries(new FormData(form)));
+    form.reset();
+    await registerDraftWithHarbor(draft, "Harbor 暂未接受创建请求。");
+  }
+
+  async function importIdentity() {
     const parsed = parseImportedIdentityEnvironment(importText);
     if (!parsed.ok) {
       setManagementMessage(parsed.error);
       return;
     }
-    saveDraft(parsed.draft, "已导入 Harbor public summary；敏感材料未写入 App localStorage。");
     setImportText("");
+    await registerDraftWithHarbor(parsed.draft, "Harbor 暂未接受导入请求。");
   }
 
   function deleteSelectedIdentity() {
