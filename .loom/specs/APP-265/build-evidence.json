@@ -1,107 +1,74 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-265",
-  "generated_at": "2026-07-09T06:24:23Z",
-  "branch": "work/app-265-core-task-submit",
-  "pre_commit_head": "b0ea8d7000f19ccea44fb9ccb4a8e8aa35abe361",
-  "task_goal": "Add the App-side Core read-only task submit and refs polling path for APP-265 without promoting fixture/demo state to live availability.",
+  "generated_at": "2026-07-09T13:59:00Z",
+  "branch": "work/app-265-runtime-e2e-preflight",
+  "implementation_head": "017f8762d0f5cff2f812a403f18cd4bac5e33497",
+  "task_goal": "Prepare the App-only packaged runtime preflight slice for APP-265 without promoting fixture/demo state to live availability.",
   "delegations": [
     {
-      "id": "meitner-app-265-prefinal-review",
-      "task_goal": "Review the dirty App #265 worktree for Core task submit integration readiness.",
+      "id": "app-265-runtime-e2e-preflight-worker",
+      "task_goal": "Strengthen App packaged runtime smoke and local Harbor identity/session to Core submit contract coverage.",
       "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/.worktrees/App-265-core-task-submit",
-        "src/renderer/coreTaskSubmitClient.ts",
-        "src/renderer/coreReadTaskClient.ts",
-        "src/renderer/App.tsx"
+        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-265-runtime-e2e-preflight",
+        "package.json",
+        "scripts/package-runtime-assets.mjs",
+        "scripts/smoke.mjs",
+        "src/electron/runtimeSupervisor.ts",
+        "artifacts/app-265-packaged-runtime-smoke.png"
       ],
       "read_scope": [
-        "App submit client and changed renderer files",
-        "Core #248 task-intent contract by read-only reference"
+        "App package/runtime supervisor/smoke files",
+        "APP-265 Loom carriers",
+        "GitHub issue App #265 readback"
       ],
       "write_ownership": [
-        "read_only:no_tracked_writes:meitner-app-265-prefinal-review"
+        "package.json",
+        "scripts/package-runtime-assets.mjs",
+        "scripts/smoke.mjs",
+        "src/electron/runtimeSupervisor.ts",
+        "artifacts/app-265-packaged-runtime-smoke.png",
+        ".loom/work-items/APP-265.md",
+        ".loom/progress/APP-265.md",
+        ".loom/specs/APP-265/**"
       ],
       "non_goals": [
-        "No file edits",
-        "No GitHub operations",
-        "No real browser/site/profile/account actions"
+        "No Core, Harbor, or Lode repository changes",
+        "No GitHub issue state changes",
+        "No PR creation or merge",
+        "No real account, Cookie, browser profile, production page, submit, publish, send, save, hosted browser, marketplace, bulk collection, or risk-control bypass"
       ],
       "validation_expectation": [
-        "git diff --check",
-        "npm run typecheck if dependencies are already installed"
-      ],
-      "output_format": "Findings ordered by severity with locators and validation results.",
-      "integration_target": [
-        "src/renderer/coreTaskSubmitClient.ts",
-        "scripts/smoke.mjs"
-      ],
-      "agent": "019f4561-8dd9-7430-8b6e-e85fb57d8b1f",
-      "role": "read_only_review",
-      "status": "integrated",
-      "summary": "Reported the stale pre-fix payload shape, needs-auth readiness gap, cross-origin target risk, short polling window, and composer draft limitation. Main controller fixed payload/readiness/origin/polling behavior and made the composer business input read-only so local draft text is not mistaken for submitted payload."
-    },
-    {
-      "id": "chandrasekhar-app-265-current-diff-review",
-      "task_goal": "Review the current App #265 diff after payload/readiness fixes and smoke coverage.",
-      "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/.worktrees/App-265-core-task-submit",
-        "src/renderer/coreTaskSubmitClient.ts",
-        "scripts/smoke.mjs"
-      ],
-      "read_scope": [
-        "Current App diff",
-        "Submit payload/readiness/fail-closed behavior",
-        "Local validation results"
-      ],
-      "write_ownership": [
-        "read_only:no_tracked_writes:chandrasekhar-app-265-current-diff-review"
-      ],
-      "non_goals": [
-        "No file edits",
-        "No GitHub operations",
-        "No real browser/site/profile/account actions",
-        "No Loom carrier edits"
-      ],
-      "validation_expectation": [
-        "git diff --check",
+        "npm ci",
         "npm run typecheck",
-        "npm run smoke"
+        "npm run smoke",
+        "npm run smoke:packaged:runtime",
+        "git diff --check",
+        "loom doctor --target . --json",
+        "loom verify --target . --json",
+        "loom fact-chain --target . --json",
+        "loom suite carrier validate --target . --item APP-265 --json",
+        "loom suite evidence validate --target . --item APP-265 --json"
       ],
-      "output_format": "Findings ordered by severity with changed files, validation commands/results, remaining risks, and scope confirmation.",
+      "output_format": "PR-ready report with changed files, validation results, PR body guidance, and precise blockers.",
       "integration_target": [
-        "APP-265 PR readiness review",
-        "main-controller final review input"
+        "APP-265 App PR",
+        "App #14 runtime/task E2E closeout input"
       ],
-      "agent": "019f457b-2f9c-7191-8deb-3d423e17433b",
-      "role": "read_only_review",
       "status": "integrated",
-      "summary": "Reported two High findings: submit state was not bound to task/Core endpoint, and accepted-but-not-ready runs were shown as failed. Main controller fixed both by keying submit state and submitted live run overrides by taskId plus Core endpoint, returning `polling` with runId for accepted-but-not-ready runs, adding submit/poll smoke coverage, and making the composer business input read-only to avoid draft submission ambiguity."
-    }
-  ],
-  "external_dependencies": [
-    {
-      "lane": "Core",
-      "issue": "WebEnvoy/WebEnvoy#248",
-      "pr": "https://github.com/WebEnvoy/WebEnvoy/pull/255",
-      "merge_commit": "65c6a3989d12112ddb536e5ad9a58c1fe7d5ac19",
-      "boundary": "Core now exposes terminal read-only result/evidence/session refs for accepted App tasks. This App PR consumes the contract but does not prove live site execution."
+      "summary": "Implementation head 017f876 requires packaged Core/Harbor runtime assets for packaged smoke, records blocked packaging state when assets are missing, improves unavailable diagnostics, and extends local smoke through Harbor identity create/readback/session refs into Core task result/evidence/session projection. This is local contract evidence only, not live Xiaohongshu/BOSS evidence."
     }
   ],
   "ownership_constraints": {
     "write_ownership": [
-      "src/renderer/coreTaskSubmitClient.ts",
-      "src/renderer/coreReadTaskClient.ts",
-      "src/renderer/App.tsx",
-      "src/renderer/TaskThreadComposer.tsx",
-      "src/renderer/TaskThreadPage.tsx",
-      "src/renderer/TaskThreadRightPanel.tsx",
-      "src/renderer/styles.css",
+      "package.json",
+      "scripts/package-runtime-assets.mjs",
       "scripts/smoke.mjs",
+      "src/electron/runtimeSupervisor.ts",
+      "artifacts/app-265-packaged-runtime-smoke.png",
       ".loom/work-items/APP-265.md",
       ".loom/progress/APP-265.md",
-      ".loom/specs/APP-265/**",
-      ".loom/status/current.md"
+      ".loom/specs/APP-265/**"
     ],
     "forbidden_targets": [
       "Core/WebEnvoy repository code",
@@ -117,136 +84,85 @@
       "submit",
       "publish",
       "send",
+      "save sensitive material",
       "risk-control bypass",
       "GitHub issue closeout",
       "merge"
     ],
-    "shared_carrier_policy": ".loom/status/current.md is active for APP-265 only in this App worktree and must be retired or handed over before the next App Work Item."
-  },
-  "ownership_contract": {
-    "task_goal": "Add App-side Core read-only task submit and refs polling for APP-265.",
-    "context_locators": [
-      ".loom/status/current.md",
-      ".loom/specs/APP-265/build-evidence.json",
-      ".loom/work-items/APP-265.md",
-      ".loom/progress/APP-265.md",
-      ".loom/specs/APP-265/**",
-      "src/renderer/coreTaskSubmitClient.ts",
-      "src/renderer/coreReadTaskClient.ts"
-    ],
-    "read_scope": [
-      "APP-265 Loom carriers",
-      "App submit/read clients and task thread UI",
-      "Core #248 merged PR evidence by reference only"
-    ],
-    "write_ownership": [
-      "src/renderer/coreTaskSubmitClient.ts",
-      "src/renderer/coreReadTaskClient.ts",
-      "src/renderer/App.tsx",
-      "src/renderer/TaskThreadComposer.tsx",
-      "src/renderer/TaskThreadPage.tsx",
-      "src/renderer/TaskThreadRightPanel.tsx",
-      "src/renderer/styles.css",
-      "scripts/smoke.mjs",
-      ".loom/work-items/APP-265.md",
-      ".loom/progress/APP-265.md",
-      ".loom/specs/APP-265/**",
-      ".loom/status/current.md",
-      ".loom/bootstrap/init-result.json"
-    ],
-    "non_goals": [
-      "No Core, Harbor, or Lode repository code changes",
-      "No issue closeout",
-      "No real account, profile, Cookie, production page, submit, publish, send, or external visible action"
-    ],
-    "validation_expectation": [
-      "git diff --check",
-      "npm run typecheck",
-      "npm run smoke",
-      "loom fact-chain --target . --json",
-      "loom suite carrier validate --target . --item APP-265 --json",
-      "loom suite evidence validate --target . --item APP-265 --json",
-      "loom build --target . --item APP-265 --build-evidence .loom/specs/APP-265/build-evidence.json --json"
-    ],
-    "output_format": "PR-ready report with changed files, validation results, PR/head metadata, and remaining live E2E blockers.",
-    "integration_target": [
-      "APP-265 App PR",
-      "App #14 runtime/task submit E2E closeout input"
-    ],
-    "no_overlap": true
+    "shared_carrier_policy": ".loom/status/current.md remains no_active_item in this worker branch because no formal workspace takeover was performed. Main controller may activate or refresh current-head review in its PR/gate lane."
   },
   "validation": {
     "passed": [
       {
-        "command": "git diff --check",
-        "evidence": "No whitespace errors after App submit client, UI, smoke, and carrier changes."
+        "command": "npm ci",
+        "evidence": "Previous worker installed App dependencies before implementation validation."
       },
       {
         "command": "npm run typecheck",
-        "evidence": "Renderer and Electron TypeScript checks passed after installing dependencies with npm ci."
+        "evidence": "Carrier-cleanup worker reran TypeScript checks at 2026-07-09T13:59Z UTC."
       },
       {
         "command": "npm run smoke",
-        "evidence": "Build and desktop shell smoke passed. Smoke validates Core task-intent v0 payload, ready Harbor live identity gating, needs-auth rejection, same-origin task URL guard, refs-only evidence policy, absence of invalid top-level task `entrypoint`, POST /tasks submit/poll happy path, returned run/evidence/session refs projection, and accepted-but-not-ready runs staying in `polling` instead of failed."
+        "evidence": "Carrier-cleanup worker reran App smoke at 2026-07-09T13:59Z UTC; smoke covers local Harbor identity create/readback/session contract and Core task result/evidence/session refs projection."
+      },
+      {
+        "command": "npm run smoke:packaged:runtime",
+        "evidence": "Previous worker reported packaged runtime smoke passed with WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 and screenshot artifacts/app-265-packaged-runtime-smoke.png."
+      },
+      {
+        "command": "git diff --check",
+        "evidence": "No whitespace errors for the carrier-cleanup diff at 2026-07-09T13:59Z UTC."
+      },
+      {
+        "command": "loom verify --target . --json; loom fact-chain --target . --json; loom suite carrier validate --target . --item APP-265 --json; loom suite evidence validate --target . --item APP-265 --json",
+        "evidence": "Carrier-cleanup readback passed at 2026-07-09T13:59Z UTC with no missing inputs or blocking gaps."
       }
     ],
-    "to_refresh_after_commit": [
-      "head SHA",
-      "PR metadata readback",
-      "Loom build/review/gate",
-      "Computer Use App E2E after explicit user authorization for any real account/profile/site action"
-    ],
-    "blocked": []
+    "blocked": [],
+    "to_refresh_after_carrier_change_or_pr_creation": [
+      "git diff --check",
+      "loom fact-chain --target . --json",
+      "loom suite carrier validate --target . --item APP-265 --json",
+      "loom suite evidence validate --target . --item APP-265 --json",
+      "formal current-head review and PR/gate lane checks after PR metadata readback",
+      "current-head spec/code review records",
+      "PR metadata readback with pushed head SHA",
+      "hosted loom-pr-merge-gate"
+    ]
   },
   "integration_evidence": [
     {
-      "id": "core-task-submit-client",
+      "id": "packaged-runtime-required-smoke",
       "status": "integrated",
       "locators": [
-        "src/renderer/coreTaskSubmitClient.ts",
-        "src/renderer/coreReadTaskClient.ts"
+        "package.json",
+        "scripts/package-runtime-assets.mjs"
       ],
-      "summary": "App constructs Core `webenvoy.task-intent.v0`, posts to `/tasks`, and polls `/runs/:id`, `/result`, `/evidence-refs`, `/failure`, and `/session-refs` through owner APIs. Accepted runs whose refs are not queryable yet remain `polling` with runId instead of being marked failed."
+      "summary": "smoke:packaged:runtime sets WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 so missing Core/Harbor runtime assets fail closed instead of warning-only success."
     },
     {
-      "id": "fail-closed-submit-readiness",
+      "id": "runtime-repair-diagnostic",
       "status": "integrated",
       "locators": [
-        "src/renderer/coreTaskSubmitClient.ts",
-        "src/renderer/TaskThreadComposer.tsx"
+        "src/electron/runtimeSupervisor.ts"
       ],
-      "summary": "Submit remains disabled unless local runtime is live, Core health/admission are ready, Harbor health is ready, a read-only task spec exists, and a matching ready Harbor live identity is available."
+      "summary": "Unavailable runtime repair text distinguishes disabled packaged launch from missing packaged assets and points to runtime env overrides or rebuilding with packaged assets."
     },
     {
-      "id": "same-origin-and-sensitive-boundary",
+      "id": "harbor-core-contract-smoke",
       "status": "integrated",
       "locators": [
-        "src/renderer/coreTaskSubmitClient.ts",
         "scripts/smoke.mjs"
       ],
-      "summary": "Task URLs must match the selected identity origin; payload key scanning blocks forbidden structured fields while not treating ordinary business input strings as schema keys."
+      "summary": "Local-only smoke creates a Harbor identity, reads back a Harbor live identity projection, opens a runtime session, and verifies the session ref flows into Core task result/evidence/session refs."
     },
     {
-      "id": "task-endpoint-submit-state-binding",
+      "id": "packaged-runtime-screenshot",
       "status": "integrated",
       "locators": [
-        "src/renderer/App.tsx",
-        "src/renderer/TaskThreadPage.tsx",
-        "src/renderer/TaskThreadRightPanel.tsx"
+        "artifacts/app-265-packaged-runtime-smoke.png"
       ],
-      "summary": "Submit state and UI-submitted Core live run overrides are keyed by taskId plus Core endpoint, preventing stale run ids from being displayed on another task or after an endpoint switch."
-    },
-    {
-      "id": "ui-result-consumption",
-      "status": "integrated",
-      "locators": [
-        "src/renderer/App.tsx",
-        "src/renderer/TaskThreadPage.tsx",
-        "src/renderer/TaskThreadRightPanel.tsx",
-        "src/renderer/TaskThreadComposer.tsx",
-        "src/renderer/styles.css"
-      ],
-      "summary": "A successful submit injects the Core live run into the matching task/endpoint and shows submit status, run id, diagnostics, evidence refs, and session refs without raw evidence. The composer displays the selected task business input as read-only so free-form draft text is not mistaken for submitted payload."
+      "summary": "Screenshot artifact records packaged runtime smoke UI state. It is local runtime evidence only, not live site/browser evidence."
     }
   ],
   "runtime_boundary": {
@@ -266,7 +182,7 @@
   },
   "remaining_limitations": [
     "This PR does not perform real Xiaohongshu/BOSS site access or browser profile actions.",
-    "Final App #14 closeout still needs user-authorized Computer Use E2E with real provider detection, identity browser session, read-only tasks, evidence refs, and write-precheck submitted=false.",
-    "Composer free-form draft entry is intentionally out of scope; this slice displays the selected task's structured business input as read-only and submits only that task input."
+    "Current .loom/reviews/APP-265*.json still describe the previous APP-265 retire head and must be refreshed by the main controller before merge gate.",
+    "Final App #14 closeout still needs user-authorized Computer Use E2E with real provider detection, identity browser session, read-only tasks, evidence refs, and write-precheck submitted=false."
   ]
 }
