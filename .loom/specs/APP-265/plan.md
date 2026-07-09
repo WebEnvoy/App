@@ -17,8 +17,13 @@
 
 ## Phase 4
 
+- Objective: Add App -> Core read-only submit and result/evidence refs polling.
+- Exit condition: App submit button remains fail-closed until live runtime plus ready Harbor identity is present, Core `/tasks` receives task-intent v0, and the UI can render returned Core run/result/evidence/session refs.
+
+## Phase 5
+
 - Objective: Integrate cross-repo evidence.
-- Exit condition: App PR body and closeout reference Harbor/Core PR heads and real App E2E evidence.
+- Exit condition: App PR body references Core #248/PR #255 and states that live Xiaohongshu/BOSS E2E still requires explicit user authorization.
 
 ## Constraints
 

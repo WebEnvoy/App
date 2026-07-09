@@ -9,20 +9,30 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { handleTypeToComposer, registerComposerInput } from "./focusComposer";
+import { coreTaskSubmitReadiness, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
+import { registerComposerInput } from "./focusComposer";
+import type { HarborIdentityLoadState } from "./harborIdentityTypes";
+import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
 export function TaskThreadComposer({
+  coreSubmitState,
+  harborIdentityState,
+  runtimeSupervisorState,
   selectedRun,
   selectedTask,
+  onSubmitCoreTask,
 }: {
+  coreSubmitState: CoreTaskSubmitState;
+  harborIdentityState: HarborIdentityLoadState;
+  runtimeSupervisorState: RuntimeSupervisorState;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
+  onSubmitCoreTask: () => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const actionsRef = useRef<HTMLDivElement | null>(null);
-  const [draft, setDraft] = useState("");
   const [footerMeasure, setFooterMeasure] = useState({
     actionsWidth: 0,
     columnGap: 0,
@@ -37,6 +47,13 @@ export function TaskThreadComposer({
   const hideRunContext = availableFooterWidth > 0 && availableFooterWidth < 128;
   const hideSkillContext = availableFooterWidth > 0 && availableFooterWidth < 96;
   const hideAccessControl = availableFooterWidth > 0 && availableFooterWidth < 62;
+  const submitReadiness = coreTaskSubmitReadiness(
+    selectedTask,
+    runtimeSupervisorState,
+    harborIdentityState.identities,
+  );
+  const isBusy = coreSubmitState.status === "submitting" || coreSubmitState.status === "polling";
+  const canSubmit = submitReadiness.ok && !isBusy;
 
   useEffect(() => {
     const composerInput = inputRef.current;
@@ -48,27 +65,6 @@ export function TaskThreadComposer({
       composerId: "task-thread-primary",
       isPrimaryComposer: true,
     });
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      const composerInput = inputRef.current;
-      if (composerInput == null) {
-        return;
-      }
-
-      handleTypeToComposer({
-        event,
-        composerController: {
-          focus: () => composerInput.focus(),
-          insertTextAtSelection: (text) =>
-            insertComposerText(composerInput, text, setDraft),
-        },
-      });
-    }
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
   useEffect(() => {
@@ -120,15 +116,18 @@ export function TaskThreadComposer({
     <form
       className="thread-composer"
       aria-label="Task thread composer"
-      onSubmit={(event) => event.preventDefault()}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (canSubmit) onSubmitCoreTask();
+      }}
     >
       <textarea
         ref={inputRef}
         data-webenvoy-composer=""
-        value={draft}
+        value={selectedTask.businessInput}
         rows={2}
-        placeholder="要求后续变更"
-        onChange={(event) => setDraft(event.target.value)}
+        readOnly
+        placeholder="当前任务的结构化业务输入"
       />
       <div className="composer-toolbar" ref={toolbarRef}>
         <div className="composer-inline-controls">
@@ -178,31 +177,22 @@ export function TaskThreadComposer({
           <button className="composer-icon-button" type="button" aria-label="语音输入">
             <Mic size={15} />
           </button>
-          <button className="composer-send" type="submit" aria-label="发送" disabled>
+          <button
+            className="composer-send"
+            type="submit"
+            aria-label="提交只读 Core task"
+            disabled={!canSubmit}
+            title={submitReadiness.ok ? coreSubmitState.summary : submitReadiness.reason}
+          >
             <ArrowUp size={16} />
           </button>
         </div>
       </div>
+      <p className={canSubmit ? "composer-submit-status ready" : "composer-submit-status blocked"}>
+        {submitReadiness.ok
+          ? coreSubmitState.summary
+          : submitReadiness.reason}
+      </p>
     </form>
   );
-}
-
-function insertComposerText(
-  composerInput: HTMLTextAreaElement,
-  text: string,
-  setDraft: (value: string) => void,
-) {
-  const selectionStart = composerInput.selectionStart;
-  const selectionEnd = composerInput.selectionEnd;
-  const nextValue =
-    composerInput.value.slice(0, selectionStart) +
-    text +
-    composerInput.value.slice(selectionEnd);
-
-  setDraft(nextValue);
-  requestAnimationFrame(() => {
-    const nextPosition = selectionStart + text.length;
-    composerInput.selectionStart = nextPosition;
-    composerInput.selectionEnd = nextPosition;
-  });
 }

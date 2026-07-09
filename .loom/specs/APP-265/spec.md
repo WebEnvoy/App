@@ -8,11 +8,11 @@
 
 ## Goal
 
-Users opening the App should see a truthful runtime gate: Core admission, Harbor health/provider facts, and packaged Lode assets must be live before App enables real task/session/write-precheck actions.
+Users opening the App should see a truthful runtime gate and a real Core submit path: Core admission, Harbor health/provider facts, packaged Lode assets, and a ready Harbor live identity must be present before App enables a read-only Core task submit. When a submit succeeds, App must display the Core-owned run/result/evidence/session refs instead of fixture or UI projection.
 
 ## Scope
 
-- In scope: App runtime supervisor health/admission consumption, packaged Core/Harbor runtime asset launch, local endpoint diagnostics, fail-closed UI state, packaged smoke assertions, and E2E evidence plumbing.
+- In scope: App runtime supervisor health/admission consumption, packaged Core/Harbor runtime asset launch from the previous APP-265 batch, local endpoint diagnostics, fail-closed UI state, App-side Core `/tasks` read-only submit client, Core task-intent v0 payload construction, Harbor live identity gating, same-origin target URL guard, result/evidence/failure/session polling, and smoke assertions.
 - Out of scope: Core/Harbor/Lode repository changes, real site access, real account/profile/Cookie use, raw evidence storage, submit/publish/send, hosted browser, marketplace, bulk collection, and risk-control bypass.
 
 ## Acceptance Criteria
@@ -22,5 +22,9 @@ Users opening the App should see a truthful runtime gate: Core admission, Harbor
 - [ ] App can launch packaged local Core and Harbor runtime wrappers from the built Electron output for local readiness smoke.
 - [ ] App shows diagnostic unavailable state when either owner runtime is missing or malformed.
 - [ ] App does not show fixture/demo task results as live results.
+- [ ] App constructs Core `webenvoy.task-intent.v0` payloads with package ref, capability ref/version, resource requirement refs, evidence policy ref, site scope, and Harbor identity environment ref.
+- [ ] App only enables submit when Core health/admission, Harbor health, read-only task spec, and matching ready Harbor live identity are all present.
+- [ ] App blocks fixture/local/needs-auth/warning identities and cross-origin task URLs.
+- [ ] App polls Core owner endpoints and displays returned run/result/evidence/session refs without reading raw evidence, DOM, HAR, Cookie, token, or profile storage.
 - [ ] Packaged smoke covers ready and fail-closed states without real external site actions.
 - [ ] Final Computer Use E2E records real App behavior and remaining blocks, if any.

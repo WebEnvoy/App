@@ -5,11 +5,13 @@ import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
+import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
 export function TaskThreadPage({
   coreReadState,
+  coreSubmitState,
   navigationItems,
   runtimeSupervisorState,
   selectedRun,
@@ -17,6 +19,7 @@ export function TaskThreadPage({
   onActiveRunChange,
 }: {
   coreReadState: CoreReadTaskLoadState;
+  coreSubmitState: CoreTaskSubmitState;
   navigationItems: ThreadNavigationItem[];
   runtimeSupervisorState: RuntimeSupervisorState;
   selectedRun: RunProjection;
@@ -40,6 +43,7 @@ export function TaskThreadPage({
 
         <CoreReadSourceStrip selectedTask={selectedTask} state={coreReadState} />
         <RuntimeSupervisorStrip state={runtimeSupervisorState} />
+        <CoreSubmitStrip state={coreSubmitState} />
         <TaskIntentTurn selectedTask={selectedTask} />
 
         {selectedTask.blocker ? (
@@ -63,6 +67,37 @@ export function TaskThreadPage({
         </div>
       </div>
     </div>
+  );
+}
+
+function CoreSubmitStrip({ state }: { state: CoreTaskSubmitState }) {
+  const status =
+    state.status === "ready"
+      ? "ready"
+      : state.status === "idle" || state.status === "polling" || state.status === "submitting"
+      ? "loading"
+      : "blocked";
+  const runId = "runId" in state ? state.runId : "not submitted";
+  const title =
+    state.status === "ready"
+      ? "提交完成"
+      : state.status === "polling"
+      ? "等待 refs"
+      : state.status === "submitting"
+      ? "提交中"
+      : state.status === "idle"
+      ? "提交待命"
+      : "提交受控";
+
+  return (
+    <section className={`core-read-source-strip core-read-source-${status}`} aria-label="Core task submit status">
+      <div>
+        <strong>{title}</strong>
+        <span>POST /tasks read-only</span>
+      </div>
+      <p>{state.summary}</p>
+      <span className="badge">{runId}</span>
+    </section>
   );
 }
 

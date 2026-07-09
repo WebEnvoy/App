@@ -1,0 +1,290 @@
+import { coreReadTaskSpecs, fetchCoreRunProjectionById, type CoreReadTaskSpec } from "./coreReadTaskClient";
+import type { IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
+import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
+import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
+
+export type CoreTaskSubmitState =
+  | { status: "idle"; summary: string }
+  | { status: "blocked"; summary: string }
+  | { status: "submitting"; summary: string }
+  | { status: "polling"; summary: string; runId: string }
+  | { status: "ready"; summary: string; runId: string; run: RunProjection }
+  | { status: "failed"; summary: string; runId?: string };
+
+type SubmitReadiness =
+  | { ok: true; spec: CoreReadTaskSpec; identity: IdentityEnvironmentProjection; payload: CoreTaskPayload }
+  | { ok: false; reason: string };
+
+type CoreTaskPayload = {
+  run_id: string;
+  package_ref: string;
+  task_intent: {
+    schema_version: "webenvoy.task-intent.v0";
+    intent_id: string;
+    entrypoint: "app";
+    user_intent: {
+      summary: string;
+    };
+    capability: {
+      ref: string;
+      version: string;
+      source_ref: string;
+      lock_ref?: string;
+    };
+    input: {
+      summary: string;
+      refs?: string[];
+    };
+    scope: {
+      target_type: "site";
+      target_ref: string;
+    };
+    policy: {
+      risk: "read";
+      execution_intent: "read";
+      timeout_ms: number;
+    };
+    resource_requirement_refs: string[];
+    evidence_policy_ref: string;
+  };
+  harbor: {
+    identity_environment_ref: string;
+    url: string;
+    reuse_existing: true;
+  };
+};
+
+type CoreTaskSubmitOptions = {
+  pollAttempts?: number;
+  pollIntervalMs?: number;
+};
+
+const sensitivePayloadPattern =
+  /\b(token|cookie|secret|bearer|credential|password|authorization|profile_storage|raw_evidence|dom|har|trace)\b/i;
+
+export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
+  status: "idle",
+  summary: "真实只读任务尚未提交；按钮只在 Core admission、Harbor live identity 和只读 submit spec 都可用时启用。",
+};
+
+export function coreTaskSubmitReadiness(
+  task: TaskProjection,
+  runtime: RuntimeSupervisorState,
+  identities: IdentityEnvironmentProjection[],
+): SubmitReadiness {
+  const core = runtimeService(runtime, "core");
+  const harbor = runtimeService(runtime, "harbor");
+  const spec = coreReadTaskSpecs.find((item) => item.taskId === task.id && item.mode === "read");
+
+  if (!runtime.canUseLiveRuntime) {
+    return { ok: false, reason: "生产 live runtime 不可用；fixture/demo 不可提交为 live task。" };
+  }
+  if (core?.health.state !== "ready" || core.admission?.state !== "ready") {
+    return { ok: false, reason: "Core health/admission 未 ready；提交保持 fail closed。" };
+  }
+  if (harbor?.health.state !== "ready") {
+    return { ok: false, reason: "Harbor runtime health 未 ready；提交保持 fail closed。" };
+  }
+  if (!spec) {
+    return { ok: false, reason: "当前任务缺少只读 submit spec；不构造 Core task payload。" };
+  }
+  if (spec.resourceRequirementRefs.length === 0) {
+    return { ok: false, reason: "当前任务缺少 Lode resource requirement refs；不构造 Core task payload。" };
+  }
+
+  const site = siteForTask(task);
+  const identity = identities.find(
+    (item) =>
+      item.source === "Harbor live" &&
+      item.siteId === site &&
+      item.readiness.state === "ready" &&
+      item.provider.state === "ready" &&
+      !item.login.recoveryRequired,
+  );
+  if (!identity) {
+    return { ok: false, reason: "缺少 ready 的 Harbor live identity；needs-auth/warning/fixture/local identity 不可提交真实任务。" };
+  }
+
+  const capability = spec.capabilities[0];
+  const runId = `app-${site}-${Date.now().toString(36)}`;
+  const targetRef = targetRefForTask(task.businessInput, identity);
+  if (targetRef == null) {
+    return { ok: false, reason: "业务输入中的 URL 不属于所选 Harbor identity origin；已 fail closed。" };
+  }
+  const payload: CoreTaskPayload = {
+    run_id: runId,
+    package_ref: capability.packageRef,
+    task_intent: {
+      schema_version: "webenvoy.task-intent.v0",
+      intent_id: `intent:${runId}`,
+      entrypoint: "app",
+      user_intent: {
+        summary: task.title,
+      },
+      capability: {
+        ref: capability.capabilityRef,
+        version: capability.capabilityVersion,
+        source_ref: capability.packageRef,
+        ...(task.packageSource.lockRef === undefined ? {} : { lock_ref: task.packageSource.lockRef }),
+      },
+      input: {
+        summary: task.businessInput,
+        ...(targetRef === identity.origin ? {} : { refs: [targetRef] }),
+      },
+      scope: {
+        target_type: "site",
+        target_ref: targetRef,
+      },
+      policy: {
+        risk: "read",
+        execution_intent: "read",
+        timeout_ms: 60_000,
+      },
+      resource_requirement_refs: spec.resourceRequirementRefs,
+      evidence_policy_ref: spec.evidencePolicyRef,
+    },
+    harbor: {
+      identity_environment_ref: identity.identityEnvironmentRef,
+      url: targetRef,
+      reuse_existing: true,
+    },
+  };
+
+  return containsSensitiveField(payload)
+    ? { ok: false, reason: "Core task payload 含敏感字段；已 fail closed。" }
+    : { ok: true, spec, identity, payload };
+}
+
+export async function submitCoreReadOnlyTask(
+  endpoint: string,
+  task: TaskProjection,
+  runtime: RuntimeSupervisorState,
+  identities: IdentityEnvironmentProjection[],
+  options: CoreTaskSubmitOptions = {},
+): Promise<CoreTaskSubmitState> {
+  const readiness = coreTaskSubmitReadiness(task, runtime, identities);
+  if (!readiness.ok) {
+    return { status: "blocked", summary: readiness.reason };
+  }
+
+  const submitResponse = await requestJson(endpoint, "/tasks", {
+    method: "POST",
+    body: JSON.stringify(readiness.payload),
+  });
+  const runId = runIdFromSubmitResponse(submitResponse) ?? readiness.payload.run_id;
+
+  if (!isOkResponse(submitResponse)) {
+    return { status: "failed", runId, summary: responseError(submitResponse, "Core /tasks did not accept the read-only task.") };
+  }
+
+  const projected = await pollSubmittedRun(endpoint, runId, readiness.spec, options);
+  return projected.ok
+    ? {
+        status: "ready",
+        runId,
+        run: projected.run,
+        summary: `Core accepted /tasks and returned live run ${runId}; result/evidence/failure/session refs were polled from owner endpoints.`,
+      }
+    : {
+        status: "polling",
+        runId,
+        summary: `Core accepted /tasks as ${runId}; owner refs are not queryable yet. ${projected.error}`,
+      };
+}
+
+function siteForTask(task: TaskProjection): "xiaohongshu" | "boss" {
+  return task.id.includes("boss") || task.siteSkill.toLowerCase().includes("boss") ? "boss" : "xiaohongshu";
+}
+
+function firstHttpUrl(value: string) {
+  return /https?:\/\/[^\s；;，,]+/.exec(value)?.[0];
+}
+
+function targetRefForTask(value: string, identity: IdentityEnvironmentProjection): string | null {
+  const explicitUrl = firstHttpUrl(value);
+  if (explicitUrl == null) return identity.origin;
+  return isSameOrigin(explicitUrl, identity.origin) ? explicitUrl : null;
+}
+
+function isSameOrigin(candidate: string, expectedOrigin: string): boolean {
+  try {
+    return new URL(candidate).origin === new URL(expectedOrigin).origin;
+  } catch {
+    return false;
+  }
+}
+
+function containsSensitiveField(value: unknown): boolean {
+  if (typeof value === "string") return false;
+  if (Array.isArray(value)) return value.some(containsSensitiveField);
+  if (typeof value !== "object" || value == null) return false;
+  return Object.entries(value).some(([key, entry]) => sensitivePayloadPattern.test(key) || containsSensitiveField(entry));
+}
+
+async function pollSubmittedRun(
+  endpoint: string,
+  runId: string,
+  spec: CoreReadTaskSpec,
+  options: CoreTaskSubmitOptions,
+) {
+  let lastError = "";
+  const attempts = Math.max(1, options.pollAttempts ?? 30);
+  const intervalMs = Math.max(0, options.pollIntervalMs ?? 1000);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const projection = await fetchCoreRunProjectionById(endpoint, runId, spec);
+    if (projection.ok) return projection;
+    lastError = projection.error;
+    if (attempt + 1 < attempts && intervalMs > 0) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, intervalMs));
+    }
+  }
+  return { ok: false as const, error: `Core run ${runId} was accepted but not yet queryable: ${lastError}` };
+}
+
+async function requestJson(base: string, path: string, init: RequestInit): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      ...init,
+      credentials: "omit",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) return { ok: false, error: `${path} returned ${response.status}` };
+    return response.json();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+function runIdFromSubmitResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const task = recordValue(value.task);
+  const run = recordValue(value.run);
+  return stringValue(value.run_id) ?? stringValue(task?.run_id) ?? stringValue(run?.run_id);
+}
+
+function isOkResponse(value: unknown) {
+  return isRecord(value) && value.ok === true;
+}
+
+function responseError(value: unknown, fallback: string) {
+  if (!isRecord(value)) return fallback;
+  const error = recordValue(value.error) ?? recordValue(value.failure);
+  return stringValue(error?.message) ?? stringValue(error?.code) ?? stringValue(value.error) ?? fallback;
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

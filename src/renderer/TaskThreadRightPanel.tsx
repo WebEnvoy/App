@@ -10,6 +10,7 @@ import {
 import { ContextPanel, SourceField } from "./TaskThreadFields";
 import { PanelTabs } from "./shellPrimitives";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
+import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 import { sourceHealthFixture, type SourceHealth, type SourceHealthStatus } from "./sourceHealthFixture";
@@ -42,12 +43,14 @@ function statusLabel(status: SourceHealth["status"]) {
 
 export function TaskThreadRightPanel({
   coreReadState,
+  coreSubmitState,
   runtimeSupervisorState,
   selectedRun,
   selectedTask,
   shellDiagnostics,
 }: {
   coreReadState: CoreReadTaskLoadState;
+  coreSubmitState: CoreTaskSubmitState;
   runtimeSupervisorState: RuntimeSupervisorState;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
@@ -74,19 +77,39 @@ export function TaskThreadRightPanel({
             ) : tab.id === "skill" ? (
               <SiteSkillTab selectedTask={selectedTask} />
             ) : (
-              <ContextPanel
-                icon={<Activity size={18} />}
-                title="诊断"
-                body={`Shell context: ${shellDiagnostics.platform ?? "loading"} / ${
-                  shellDiagnostics.colorScheme ?? "loading"
-                } / ${shellDiagnostics.configScope ?? "loading"}. UI selection state is App local-only.`}
-              />
+              <DiagnosticsTab coreSubmitState={coreSubmitState} shellDiagnostics={shellDiagnostics} />
             ),
         }))}
       />
 
       <SourceHealthSection coreReadState={coreReadState} runtimeSupervisorState={runtimeSupervisorState} />
     </aside>
+  );
+}
+
+function DiagnosticsTab({
+  coreSubmitState,
+  shellDiagnostics,
+}: {
+  coreSubmitState: CoreTaskSubmitState;
+  shellDiagnostics: ShellDiagnostics;
+}) {
+  return (
+    <div className="context-copy">
+      <div className="card-title">
+        <Activity size={18} />
+        <h3>诊断</h3>
+      </div>
+      <p>
+        Shell context: {shellDiagnostics.platform ?? "loading"} / {shellDiagnostics.colorScheme ?? "loading"} / {shellDiagnostics.configScope ?? "loading"}.
+        UI selection state is App local-only.
+      </p>
+      <dl className="context-facts compact">
+        <SourceField label="Core submit" value={coreSubmitState.status} source="App local-only" />
+        <SourceField label="Run id" value={"runId" in coreSubmitState ? coreSubmitState.runId ?? "not submitted" : "not submitted"} source="Core live" />
+        <SourceField label="Submit summary" value={coreSubmitState.summary} source="App local-only" />
+      </dl>
+    </div>
   );
 }
 

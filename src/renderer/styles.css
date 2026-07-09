@@ -1422,8 +1422,8 @@ h3 {
 .thread-composer {
   container-type: inline-size;
   display: grid;
-  height: 104px;
-  gap: 8px;
+  height: 124px;
+  gap: 7px;
   padding: 12px 14px 10px;
   border: 1px solid var(--we-border);
   border-radius: 16px;
@@ -1550,6 +1550,25 @@ h3 {
 
 .composer-send:disabled {
   opacity: 0.75;
+}
+
+.composer-submit-status {
+  margin: 0;
+  overflow: hidden;
+  color: var(--we-foreground-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-submit-status.ready {
+  color: var(--we-status-success);
+}
+
+.composer-submit-status.blocked {
+  color: var(--we-status-error);
 }
 
 @container (max-width: 520px) {
@@ -2283,7 +2302,8 @@ h3 {
 
 .identity-connection-offline,
 .core-read-source-offline,
-.core-read-source-fallback {
+.core-read-source-fallback,
+.core-read-source-blocked {
   border-color: var(--we-status-warning-border);
   background: var(--we-status-warning-background);
 }
