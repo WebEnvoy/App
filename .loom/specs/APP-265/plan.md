@@ -25,6 +25,11 @@
 - Objective: Integrate cross-repo evidence.
 - Exit condition: App PR body references Core #248/PR #255 and states that live Xiaohongshu/BOSS E2E still requires explicit user authorization.
 
+## Phase 6
+
+- Objective: Add live-safe App readonly submit E2E coverage without touching production pages.
+- Exit condition: Packaged Electron smoke edits same-origin Xiaohongshu input, submits through Core `/tasks`, polls owner-shaped run/result/evidence/session refs, and renders those refs with Harbor live identity source while preserving no-real-site boundaries.
+
 ## Constraints
 
 - Do not modify Core, Harbor, or Lode repositories from this worktree.

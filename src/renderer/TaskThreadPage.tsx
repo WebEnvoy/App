@@ -216,7 +216,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
         <SourceField
           label="Identity"
           value={selectedTask.accountIdentity}
-          source="Harbor fixture"
+          source={selectedTask.identitySource ?? "Harbor fixture"}
         />
         <SourceField
           label="Business input"

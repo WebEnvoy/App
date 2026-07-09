@@ -72,7 +72,7 @@ export function TaskThreadRightPanel({
               <ContextPanel
                 icon={<ShieldCheck size={18} />}
                 title="账号身份"
-                body="账号身份来自 Harbor fixture；App 不保存 credential、cookie、token 或 profile storage。"
+                body={`账号身份来自 ${selectedTask.identitySource ?? "Harbor fixture"}；App 不保存 credential、cookie、token 或 profile storage。`}
               />
             ) : tab.id === "skill" ? (
               <SiteSkillTab selectedTask={selectedTask} />
