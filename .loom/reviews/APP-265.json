@@ -3,10 +3,10 @@
   "item_id": "APP-265",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Code review allows APP-265 through the carrier checkpoint correction head. The product change routes App managed identity create/session requests through Harbor owner API refs, keeps App local-only and fixture identities fail-closed, keeps Chrome restricted fallback blocked for Core task submit, and preserves packaged Core/Harbor readonly smoke under the explicit fixture-launcher boundary. The follow-up carrier-only change moves the checkpoint from build to merge for PR #274 consumption. This review does not claim final App #14 live E2E completion.",
+  "summary": "Code review allows APP-265 through the carrier checkpoint cleanup head. The product change routes App managed identity create/session requests through Harbor owner API refs, keeps App local-only and fixture identities fail-closed, keeps Chrome restricted fallback blocked for Core task submit, and preserves packaged Core/Harbor readonly smoke under the explicit fixture-launcher boundary. The follow-up carrier-only changes move the checkpoint from build to merge and keep Blockers as None for PR #274 consumption. This review does not claim final App #14 live E2E completion.",
   "reviewer": "Codex master controller thread 019f3a6c-9bb5-7a80-8095-13751f46cead",
-  "authored_at": "2026-07-09T18:49:15Z",
-  "reviewed_head": "c1aeb88cbc748c7d5534fbb4838b1b999121952f",
+  "authored_at": "2026-07-09T18:54:57Z",
+  "reviewed_head": "0e238202389833157d3cb3d32af3f1964e806968",
   "reviewed_validation_summary": "2026-07-09T18:29Z UTC local validation passed on branch `work/app-265-real-e2e-final` before commit: `npm run smoke`, `WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-219-persistent-profile-session npm run smoke:packaged:runtime`, `WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-219-persistent-profile-session npm run smoke:packaged:readonly`, `git diff --check`, `loom fact-chain --target . --json`, `loom suite carrier validate --target . --item APP-265 --json`, and `loom suite evidence validate --target . --item APP-265 --json`. Evidence boundary: packaged App launched local Core/Harbor runtime processes, used the Harbor owner API contract for managed identity/session requests, kept local/fixture/Chrome restricted fallback submit paths fail-closed, submitted a readonly Xiaohongshu task through App UI to Core `/tasks`, and rendered Core/Harbor refs under the Harbor fixture launcher only. This is owner-shaped contract evidence, not live-site evidence; no real Xiaohongshu/BOSS account, browser profile, Cookie, production page action, submit, publish, send, hosted browser, marketplace, bulk collection, full account cloud hosting, or risk-control bypass occurred.",
   "reviewed_validation_summary_hash": "302c9b00a5d5ef57fd431c47b842e00f4ab3fc4af87fce69cbb9e4cbf79940e1",
   "validation_summary_source": "recovery.latest_validation_summary",
@@ -55,6 +55,6 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored implementation review approved product commit ae293a3b6362d6554ab5d2e2e62db70a306b0d9e plus carrier checkpoint correction c1aeb88cbc748c7d5534fbb4838b1b999121952f for PR #274 merge-gate consumption; final merge consumption still requires hosted gate."
+    "reason": "Authored implementation review approved product commit ae293a3b6362d6554ab5d2e2e62db70a306b0d9e plus carrier checkpoint cleanup 0e238202389833157d3cb3d32af3f1964e806968 for PR #274 merge-gate consumption; final merge consumption still requires hosted gate."
   }
 }
