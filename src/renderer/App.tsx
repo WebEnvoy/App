@@ -342,7 +342,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [connectionConfig.harborEndpoint]);
+  }, [connectionConfig.harborEndpoint, runtimeSupervisorState.canUseLiveRuntime]);
 
   useEffect(() => {
     let cancelled = false;

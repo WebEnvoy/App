@@ -251,13 +251,31 @@ async function requestJson(base: string, path: string, init: RequestInit): Promi
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       signal: controller.signal,
     });
-    if (!response.ok) return { ok: false, error: `${path} returned ${response.status}` };
-    return response.json();
+    const text = await response.text();
+    const payload = parseJson(text);
+    if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
+    return payload ?? {};
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   } finally {
     globalThis.clearTimeout(timeout);
   }
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function responseStatusError(path: string, status: number, payload: unknown) {
+  const record = recordValue(payload);
+  const error = recordValue(record?.error);
+  const code = stringValue(error?.code);
+  const category = stringValue(error?.category);
+  return [`${path} returned ${status}`, category, code].filter(Boolean).join(": ");
 }
 
 function runIdFromSubmitResponse(value: unknown): string | undefined {
