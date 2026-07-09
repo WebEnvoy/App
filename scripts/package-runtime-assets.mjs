@@ -6,6 +6,9 @@ import path from "node:path";
 const outRoot = path.resolve("dist-electron/runtime");
 const coreRoot = findRoot("WEBENVOY_CORE_RUNTIME_SOURCE_DIR", ["../WebEnvoy", "../../WebEnvoy"], "packages/api-server/package.json");
 const harborRoot = findRoot("WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR", ["../Harbor", "../../Harbor"], "packages/runtime-api/src/runtime-server.ts");
+const requirePackagedRuntime = process.env.WEBENVOY_REQUIRE_PACKAGED_RUNTIME === "1";
+const packaged = [];
+const missing = [];
 
 await rm(outRoot, { recursive: true, force: true });
 await mkdir(outRoot, { recursive: true });
@@ -13,15 +16,39 @@ await mkdir(outRoot, { recursive: true });
 if (coreRoot) {
   buildRuntime(coreRoot, "Core");
   await packageCoreRuntime(coreRoot, path.join(outRoot, "core"));
+  packaged.push({ service: "core", sourceRoot: coreRoot });
 } else {
-  console.warn("Core runtime packaging skipped: no sibling WebEnvoy/Core repository was found.");
+  missing.push("Core runtime source missing; set WEBENVOY_CORE_RUNTIME_SOURCE_DIR or check out sibling WebEnvoy.");
 }
 
 if (harborRoot) {
   buildRuntime(harborRoot, "Harbor");
   await packageHarborRuntime(harborRoot, path.join(outRoot, "harbor"));
+  packaged.push({ service: "harbor", sourceRoot: harborRoot });
 } else {
-  console.warn("Harbor runtime packaging skipped: no sibling Harbor repository was found.");
+  missing.push("Harbor runtime source missing; set WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR or check out sibling Harbor.");
+}
+
+await writeFile(
+  path.join(outRoot, "packaging-state.json"),
+  `${JSON.stringify(
+    {
+      schema_version: "webenvoy-app-packaged-runtime-assets/v0",
+      status: missing.length === 0 ? "ready" : "blocked",
+      packaged,
+      missing,
+      consumer_boundary:
+        "App packages local Core/Harbor runtime launch wrappers only; Core and Harbor remain runtime truth owners.",
+    },
+    null,
+    2,
+  )}\n`,
+);
+
+if (missing.length > 0) {
+  const message = `Packaged runtime assets blocked: ${missing.join(" ")}`;
+  if (requirePackagedRuntime) throw new Error(message);
+  console.error(message);
 }
 
 async function packageCoreRuntime(sourceRoot, outDir) {

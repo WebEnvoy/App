@@ -10,7 +10,7 @@
 ## Required Evidence
 
 - GitHub issue: App #265.
-- Branch: work/app-265-smoke-endpoint-isolation.
+- Branch: work/app-265-runtime-e2e-preflight.
 - Validation commands and results.
 - Runtime health/admission readback from packaged local Core/Harbor smoke.
 - Harbor provider detection readback remains required for downstream live browser user stories before their closeout.
