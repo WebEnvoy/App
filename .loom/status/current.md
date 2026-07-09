@@ -11,7 +11,7 @@
 - Review Entry: .loom/reviews/APP-265.json
 - Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; npm run smoke:packaged:runtime; npm run smoke:packaged:vertical; git diff --check; loom status --target . --json; loom fact-chain --target . --json; loom suite carrier validate --target . --item APP-265 --json; loom suite evidence validate --target . --item APP-265 --json
 - Closing Condition: PR Ready for the App-only live-safe readonly submit slice after validation proves editable same-origin business input flows through Core `/tasks`, returned owner-shaped run/result/evidence/session refs render in the packaged App, existing packaged runtime/preflight smoke remains green, and no fixture/demo result is promoted to live.
-- Current Checkpoint: build
+- Current Checkpoint: merge
 - Current Stop: Branch `work/app-265-live-readonly-e2e` has implemented the App-only live-safe readonly submit slice. It covers editable same-origin Xiaohongshu input, Library readonly entry opening after local runtime readiness, Harbor live identity source projection in the Task context, and packaged Electron smoke for App -> Core `/tasks` -> run/result/evidence/session refs. This is local owner-shaped contract evidence only; it does not close App #265 or App #14 user stories.
 - Next Step: Commit, push, create PR, read back PR metadata/head SHA, run local PR gate and hosted required checks, and merge only if those gates are clean. Do not close App #265 until user-authorized real App E2E evidence exists.
 - Blockers: None
