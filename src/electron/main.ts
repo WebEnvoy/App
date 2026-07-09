@@ -15,7 +15,7 @@ const packagedSmokeHarborEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_HARBOR_E
 const packagedSmokeLodeEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_LODE_ENDPOINT ?? "http://127.0.0.1:8789";
 const packagedSmokeUserDataDir = process.env.WEBENVOY_PACKAGED_SMOKE_USER_DATA_DIR;
 const localConnectionStorageKey = "webenvoy.localConnectionConfig.v1";
-const runtimeSupervisor = createRuntimeSupervisor();
+let runtimeSupervisor = createRuntimeSupervisor();
 const mainWindows = new Set<BrowserWindow>();
 
 app.setName("WebEnvoy App");
@@ -98,12 +98,20 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
         const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
-        const runtimeSupervisorState = shell?.getRuntimeSupervisorState
-          ? await shell.getRuntimeSupervisorState({
+        const readRuntimeSupervisorState = async () => {
+          if (!shell?.getRuntimeSupervisorState) return null;
+          let latest = null;
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            latest = await shell.getRuntimeSupervisorState({
               coreEndpoint: ${JSON.stringify(packagedSmokeCoreEndpoint)},
               harborEndpoint: ${JSON.stringify(packagedSmokeHarborEndpoint)}
-            })
-          : null;
+            });
+            if (${JSON.stringify(packagedSmokeRuntimeExpectation)} !== "live_ready" || latest?.canUseLiveRuntime) return latest;
+            await new Promise((resolve) => setTimeout(resolve, 750));
+          }
+          return latest;
+        };
+        const runtimeSupervisorState = await readRuntimeSupervisorState();
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
           left: appShell?.getAttribute("data-left-panel-open"),
@@ -395,6 +403,7 @@ function reloadWindow(window: BrowserWindow) {
 }
 
 app.whenReady().then(() => {
+  runtimeSupervisor = createRuntimeSupervisor({ dataDir: path.join(app.getPath("userData"), "runtime") });
   ipcMain.handle("webenvoy:shell-context", () => ({
     platform: process.platform,
     colorScheme: getSystemColorScheme(),

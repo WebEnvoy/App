@@ -12,13 +12,14 @@ Users opening the App should see a truthful runtime gate: Core admission, Harbor
 
 ## Scope
 
-- In scope: App runtime supervisor health/admission consumption, local endpoint diagnostics, fail-closed UI state, packaged smoke assertions, and E2E evidence plumbing.
+- In scope: App runtime supervisor health/admission consumption, packaged Core/Harbor runtime asset launch, local endpoint diagnostics, fail-closed UI state, packaged smoke assertions, and E2E evidence plumbing.
 - Out of scope: Core/Harbor/Lode repository changes, real site access, real account/profile/Cookie use, raw evidence storage, submit/publish/send, hosted browser, marketplace, bulk collection, and risk-control bypass.
 
 ## Acceptance Criteria
 
 - [ ] App recognizes Harbor readiness through the owner contract once Harbor exposes the agreed health/readiness surface.
 - [ ] App recognizes Core admission health once Core exposes the agreed admission surface.
+- [ ] App can launch packaged local Core and Harbor runtime wrappers from the built Electron output for local readiness smoke.
 - [ ] App shows diagnostic unavailable state when either owner runtime is missing or malformed.
 - [ ] App does not show fixture/demo task results as live results.
 - [ ] Packaged smoke covers ready and fail-closed states without real external site actions.

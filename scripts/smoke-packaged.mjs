@@ -22,6 +22,7 @@ const child = spawn(electron, ["dist-electron/main.js"], {
     WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT: core.endpoint,
     WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT: harbor.endpoint,
     WEBENVOY_PACKAGED_SMOKE_USER_DATA_DIR: userDataDir,
+    WEBENVOY_DISABLE_PACKAGED_RUNTIME: "1",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
