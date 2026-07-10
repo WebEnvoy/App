@@ -1,0 +1,40 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-236",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "Controller spec review allows APP-236 at the reviewed head: the minimal suite binds the explicit user-confirmed Harbor session intent to a narrow App process boundary, preserves Harbor as identity/session truth owner, and excludes automatic login, sensitive material, task execution, and all external writes. The minimal-path rationale correctly excludes only full-suite planning artifacts; packaged App E2E remains mandatory before user-story closeout.",
+  "reviewer": "Codex main controller",
+  "authored_at": "2026-07-10T09:29:00Z",
+  "reviewed_head": "491cf2d92d5aefcf06fffe50d4aed77dcfe1846b",
+  "reviewed_validation_summary": "2026-07-10 UTC, `npm run typecheck`, `npm run smoke`, and `git diff --check` passed. Smoke covers bodyless confirmation, invalid/missing authorization, generic owner API denial, public response redaction, token rotation and chunk-safe runtime output redaction. Deterministic review-readiness commands were executed against the installed Loom package because this App worktree has no `tools/` directory: `tools/skills_surface.py check` failed with `skills_docs_reference_sync_drift`; `tools/loom_check.py --profile source --source-surface contract-only` failed with source-surface mismatch because the installed package lacks the required source/distribution markers. Both are external Loom tool-surface defects outside APP-236 ownership and do not alter the App runtime boundary.",
+  "reviewed_validation_summary_hash": "a4e00c6090a6c83bf6c1a54b7e346743f57661debaeac4ef3e5d596655edde69",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-236.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [
+    "After Harbor #241 and App #236 merge, verify the returned public identity state in packaged App E2E before closing the user story."
+  ],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-236.md",
+    "recovery_entry": ".loom/progress/APP-236.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "suite_validation": "loom suite validate --target . --item APP-236 --json",
+    "suite_validator": "loom",
+    "suite_validator_mode": "global-cli",
+    "suite_spec": ".loom/specs/APP-236/spec.md",
+    "suite_plan": ".loom/specs/APP-236/plan.md",
+    "suite_evidence_map": ".loom/specs/APP-236/evidence-map.md",
+    "suite_consistency_analysis": null,
+    "suite_task_carriers": [
+      ".loom/specs/APP-236/task-carrier.md"
+    ],
+    "suite_consumed_contracts": [
+      "docs/methodology/harness/full-spec-suite-cli-surface.md",
+      "docs/methodology/templates/spec-suite.md"
+    ]
+  }
+}
