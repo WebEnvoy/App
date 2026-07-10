@@ -20,6 +20,7 @@ try {
     await assertDisconnectedSessionFailsClosed(clientModulePath, harbor);
     await assertInvalidLookupResponsesFailClosed(clientModulePath, harbor);
     await assertConcurrentRecoveryIsSingleFlight(clientModulePath, harbor);
+    await assertDelayed404RecoveryJoinsInFlight(clientModulePath, harbor);
     console.log("Renderer session restart smoke passed: only validated Harbor HTTP 404 unavailable facts restore once; invalid and concurrent lookups fail closed.");
   } finally {
     await harbor.close();
@@ -99,6 +100,8 @@ async function assertInvalidLookupResponsesFailClosed(clientModulePath, harbor) 
     "missing-404-wrong-failure",
     "missing-404-not-retryable",
     "missing-404-invalid-current-error",
+    "fixture-in-message",
+    "mismatched-message",
   ]) {
     const before = harbor.resumeRequests();
     harbor.setLookupMode(mode);
@@ -121,6 +124,24 @@ async function assertConcurrentRecoveryIsSingleFlight(clientModulePath, harbor) 
     harbor.resumeRequests() !== before + 1
   ) {
     throw new Error(`Renderer session restart smoke failed: concurrent refresh did not share one recovery. ${JSON.stringify({ results, resumes: harbor.resumeRequests() })}`);
+  }
+}
+
+async function assertDelayed404RecoveryJoinsInFlight(clientModulePath, harbor) {
+  const storage = storagePath("delayed-404");
+  const initialSessionRef = harbor.activeSessionRef();
+  await runRenderer(clientModulePath, harbor.endpoint, storage, initialSessionRef);
+  const before = harbor.resumeRequests();
+  harbor.setLookupMode("late-404");
+  const results = await runConcurrentRenderer(clientModulePath, harbor.endpoint, storage);
+  harbor.setLookupMode("normal");
+  if (
+    results.length !== 2 ||
+    results.some((result) => result.state !== "takeover" || result.controller !== "用户接管") ||
+    results.some((result) => result.sessionRef === initialSessionRef || result.sessionRef !== results[0].sessionRef) ||
+    harbor.resumeRequests() !== before + 1
+  ) {
+    throw new Error(`Renderer session restart smoke failed: a delayed matching 404 did not join the original recovery. ${JSON.stringify({ results, resumes: harbor.resumeRequests() })}`);
   }
 }
 
@@ -252,6 +273,7 @@ async function startRestartingHarbor() {
   let lookupMode = "normal";
   let generation = 1;
   let resumes = 0;
+  const late404 = { lookups: 0, sendResponse: null, sendRestore: null };
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (request.method === "GET" && url.pathname === "/runtime/browser-providers") {
@@ -264,7 +286,7 @@ async function startRestartingHarbor() {
     }
     if (request.method === "GET" && url.pathname.startsWith("/runtime/sessions/")) {
       if (lookupMode !== "normal") {
-        sendLookupResponse(response, lookupMode, requestedRuntimeSessionRef(url));
+        sendLookupResponse(response, lookupMode, requestedRuntimeSessionRef(url), late404);
       } else if (activeSessionRef != null && url.pathname === `/runtime/sessions/${encodeURIComponent(activeSessionRef)}`) {
         sendJson(response, sessionFacts(activeSessionRef, activeLifecycle));
       } else {
@@ -287,7 +309,19 @@ async function startRestartingHarbor() {
       activeSessionRef = `harbor:runtime-session/session-resume/${generation}`;
       activeLifecycle = "active";
       resumes += 1;
-      sendJson(response, sessionFacts(activeSessionRef, activeLifecycle));
+      const restoredSession = sessionFacts(activeSessionRef, activeLifecycle);
+      if (lookupMode !== "late-404") {
+        sendJson(response, restoredSession);
+        return;
+      }
+      const sendRestore = () => setTimeout(() => sendJson(response, restoredSession), 25);
+      if (late404.sendResponse) {
+        late404.sendResponse();
+        late404.sendResponse = null;
+        sendRestore();
+      } else {
+        late404.sendRestore = sendRestore;
+      }
       return;
     }
     sendJson(response, { status: "missing" }, 404);
@@ -305,13 +339,18 @@ async function startRestartingHarbor() {
     activeSessionRef: () => activeSessionRef,
     disconnectActiveSession() { activeLifecycle = "disconnected"; },
     restoreActiveSession() { activeLifecycle = "active"; },
-    setLookupMode(mode) { lookupMode = mode; },
+    setLookupMode(mode) {
+      lookupMode = mode;
+      late404.lookups = 0;
+      late404.sendResponse = null;
+      late404.sendRestore = null;
+    },
     resumeRequests: () => resumes,
     close: () => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())),
   };
 }
 
-function sendLookupResponse(response, mode, runtimeSessionRef) {
+function sendLookupResponse(response, mode, runtimeSessionRef, late404) {
   if (mode === "transport") return response.destroy();
   if (mode === "forbidden") return sendJson(response, { error: "forbidden" }, 403);
   if (mode === "server-error") return sendJson(response, { error: "unavailable" }, 503);
@@ -337,6 +376,24 @@ function sendLookupResponse(response, mode, runtimeSessionRef) {
   if (mode === "missing-404-wrong-failure") return sendJson(response, { ...sessionUnavailableFacts("session_missing", runtimeSessionRef), failure_class: "session_expired" }, 404);
   if (mode === "missing-404-not-retryable") return sendJson(response, { ...sessionUnavailableFacts("session_missing", runtimeSessionRef), retryable: false }, 404);
   if (mode === "missing-404-invalid-current-error") return sendJson(response, { ...sessionUnavailableFacts("session_missing", runtimeSessionRef), current_error: { code: "session_expired", message: "Runtime Session is missing.", retryable: false } }, 404);
+  if (mode === "fixture-in-message") return sendJson(response, sessionUnavailableFacts("session_missing", runtimeSessionRef, "Fixture runtime session is missing."), 404);
+  if (mode === "mismatched-message") return sendJson(response, { ...sessionUnavailableFacts("session_missing", runtimeSessionRef), current_error: { code: "session_lost", message: "Runtime Session was lost.", retryable: true } }, 404);
+  if (mode === "late-404") {
+    late404.lookups += 1;
+    if (late404.lookups === 1) return sendJson(response, sessionUnavailableFacts("session_lost", runtimeSessionRef), 404);
+    if (late404.lookups === 2) {
+      const respond = () => sendJson(response, sessionUnavailableFacts("session_lost", runtimeSessionRef), 404);
+      if (late404.sendRestore) {
+        late404.sendRestore();
+        late404.sendRestore = null;
+        respond();
+      } else {
+        late404.sendResponse = respond;
+      }
+      return;
+    }
+    return sendJson(response, sessionUnavailableFacts("session_lost", runtimeSessionRef), 404);
+  }
   return sendJson(response, {
     schema_version: "harbor-runtime-facts/v0",
     runtime_session_ref: "harbor:runtime-session/unmarked",
@@ -374,15 +431,15 @@ function identityFacts() {
   };
 }
 
-function sessionUnavailableFacts(failureClass, runtimeSessionRef) {
+function sessionUnavailableFacts(failureClass, runtimeSessionRef, message = "Runtime Session is missing.") {
   return {
     schema_version: "harbor-runtime-facts/v0",
     runtime_session_ref: runtimeSessionRef,
     status: "unavailable",
     failure_class: failureClass,
-    message: "Runtime Session is missing.",
+    message,
     retryable: true,
-    current_error: { code: "session_lost", message: "Runtime Session is missing.", retryable: true },
+    current_error: { code: "session_lost", message, retryable: true },
   };
 }
 

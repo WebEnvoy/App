@@ -205,13 +205,13 @@ async function hydrateHarborSession(
     !isHarborSessionMissingAfterRestart(result.body, runtimeSessionRef)
   ) return identity;
 
-  if (storedHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef) !== runtimeSessionRef) {
-    return hydrateHarborSession(harborEndpoint, identity);
-  }
-
   const recoveryKey = `${normalizeHarborEndpoint(harborEndpoint)}:${identity.identityEnvironmentRef}:${runtimeSessionRef}`;
   const inFlight = sessionRecoveryFlights.get(recoveryKey);
   if (inFlight) return inFlight;
+
+  if (storedHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef) !== runtimeSessionRef) {
+    return hydrateHarborSession(harborEndpoint, identity);
+  }
 
   const recovery = restoreHarborSession(harborEndpoint, identity);
   sessionRecoveryFlights.set(recoveryKey, recovery);

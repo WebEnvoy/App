@@ -90,7 +90,7 @@
     {
       "id": "validated-single-flight-session-recovery",
       "status": "integrated",
-      "summary": "The renderer rejects fixture/demo markers in runtime page titles and fact values, accepts only complete non-fixture Harbor runtime session facts, recreates a cached session only after the explicit retryable session-missing response, and shares concurrent recovery requests.",
+      "summary": "The renderer rejects fixture/demo markers in runtime page titles, fact values, and both unavailable messages; requires exactly equal unavailable messages; recreates a cached session only after the exact retryable session-missing or session-lost HTTP 404 response; and lets a delayed matching 404 join the original concurrent recovery.",
       "locators": [
         "src/renderer/harborIdentityClient.ts",
         "src/renderer/harborIdentityTypes.ts",
