@@ -3,12 +3,12 @@
   "item_id": "APP-265",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Code review allows APP-265 fixture/smoke fail-closed correction at the current PR head. The product change removes packaged smoke auto-submit/identity seed behavior, keeps Harbor fixture runtime unavailable, rejects fixture/demo/smoke owner payloads before they become Core/Harbor live facts, preserves packaged runtime smoke coverage, and does not claim final App #14 live E2E completion.",
+  "summary": "Code review allows APP-265 owner API IPC and live blocker surfacing correction at the current PR head. The product change routes renderer Core/Harbor owner calls through a local-only Electron IPC bridge, keeps non-local/sensitive owner API paths blocked, accepts real Harbor provider catalog guidance without accepting fixture/demo/smoke refs, keeps packaged runtime smoke coverage, and disables live task-start controls for needs-auth/local/fixture identities. It reaches but does not resolve the missing logged-in Harbor identity blocker, so App #265 and App #14 must remain open.",
   "reviewer": "Codex master controller thread 019f3a6c-9bb5-7a80-8095-13751f46cead",
-  "authored_at": "2026-07-10T03:31:00Z",
-  "reviewed_head": "586d5aabf1edb21a9498e89fc7f110fabbd1a6bf",
-  "reviewed_validation_summary": "2026-07-10T03:23Z UTC local validation passed on branch `work/app-265-live-runtime-e2e`: `npm run smoke`, `npm run typecheck`, `npm run smoke:packaged:runtime`, `npm run smoke:packaged:readonly`, `npm run smoke:packaged:vertical`, `git diff --check`, `loom fact-chain --target . --json`, `loom suite carrier validate --target . --item APP-265 --json`, and `loom suite evidence validate --target . --item APP-265 --json`. Evidence boundary: packaged App launched local Core/Harbor runtime processes, kept Harbor fixture runtime fail-closed, rejected fixture/demo/smoke owner payloads, and removed the packaged smoke submit/identity-seed path. This is owner-shaped contract evidence, not live-site evidence; no real Xiaohongshu/BOSS account, browser profile, Cookie, production page action, submit, publish, send, hosted browser, marketplace, bulk collection, full account cloud hosting, or risk-control bypass occurred.",
-  "reviewed_validation_summary_hash": "f5278752ebd2546b1c1857542633484ac23afb024800ecad1b0527af99169d19",
+  "authored_at": "2026-07-10T04:24:20Z",
+  "reviewed_head": "1e78268ca5b1653ebd191ccf57e0bfd4d630f255",
+  "reviewed_validation_summary": "2026-07-10T04:17Z UTC local validation passed on branch `work/app-265-owner-api-ipc`: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged:runtime`, and `npm run smoke:packaged:readonly`. Computer Use E2E observed App runtime ready, Harbor provider detection with CloakBrowser missing and official Chrome launchable, Harbor live identity creation/readback, a real dedicated-profile Chrome session for Xiaohongshu (`session_7766aac0-9ed7-4832-bb94-52482aa4de5c`, viewer `viewer_dd9cf7ec-41d6-4d06-ba3c-55469668a0bb`, page title `小红书 - 你的生活兴趣社区`), and task submit blocked because the identity requires manual login/authentication. No publish, send, submit, sensitive cleartext save, bulk collection, hosted browser, marketplace, full account cloud hosting, or risk-control bypass occurred.",
+  "reviewed_validation_summary_hash": "d2de388de933380949029eefc9787cd44d3130a20e045d0c1db3cf64796893bf",
   "validation_summary_source": "recovery.latest_validation_summary",
   "validation_summary_locator": ".loom/progress/APP-265.md",
   "fallback_to": null,
@@ -19,7 +19,7 @@
     "work_item": ".loom/work-items/APP-265.md",
     "recovery_entry": ".loom/progress/APP-265.md",
     "status_surface": ".loom/status/current.md",
-    "build_checkpoint": "pass",
+      "build_checkpoint": "pass",
     "budget_risk": {
       "schema_version": "loom-execution-budget-risk/v1",
       "status": "not_applicable",
@@ -55,6 +55,6 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored implementation review approved fixture/smoke fail-closed correction 586d5aabf1edb21a9498e89fc7f110fabbd1a6bf for PR #275 merge-gate consumption; final merge consumption still requires hosted gate."
+    "reason": "Authored implementation review approved owner API IPC, real provider catalog ingestion, and needs-auth task gating correction 1e78268ca5b1653ebd191ccf57e0bfd4d630f255 for PR #276 merge-gate consumption; final merge consumption still requires hosted gate and App #265 remains open for logged-in identity/task evidence."
   }
 }

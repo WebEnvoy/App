@@ -1,5 +1,6 @@
 import { coreReadTaskSpecs, fetchCoreRunProjectionById, type CoreReadTaskSpec } from "./coreReadTaskClient";
 import type { IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
+import { requestOwnerJson } from "./ownerApiClient";
 import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
@@ -242,40 +243,19 @@ async function pollSubmittedRun(
 }
 
 async function requestJson(base: string, path: string, init: RequestInit): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), 3500);
-  try {
-    const response = await fetch(`${base}${path}`, {
-      ...init,
-      credentials: "omit",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const payload = parseJson(text);
-    if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
-    return payload ?? {};
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  } finally {
-    globalThis.clearTimeout(timeout);
-  }
+  return requestOwnerJson(base, path, {
+    method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
+    body: typeof init.body === "string" ? parseJson(init.body) : undefined,
+    timeoutMs: 3500,
+  });
 }
 
 function parseJson(value: string): unknown {
   try {
-    return value ? JSON.parse(value) : null;
+    return value ? JSON.parse(value) : undefined;
   } catch {
-    return null;
+    return undefined;
   }
-}
-
-function responseStatusError(path: string, status: number, payload: unknown) {
-  const record = recordValue(payload);
-  const error = recordValue(record?.error);
-  const code = stringValue(error?.code);
-  const category = stringValue(error?.category);
-  return [`${path} returned ${status}`, category, code].filter(Boolean).join(": ");
 }
 
 function runIdFromSubmitResponse(value: unknown): string | undefined {

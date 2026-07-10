@@ -1,18 +1,20 @@
 const fixtureToken = /(^|[\s:._/-])(demo|fixture|smoke)([\s:._/-]|$)/i;
-const metadataKey = /(capture_method|environment|id|kind|locator|mode|provenance|ref|refs|runtime|schema|source|type)/i;
+const metadataKey =
+  /(^|_)(capture_method|environment|id|kind|locator|mode|provenance|ref|refs|runtime|schema|source|type)($|_)/i;
+const metadataContainerKey = /(^|_)(locator|locators|provenance|ref|refs|source|sources)($|_)/i;
 
 export function fixtureOrDemoPayloadReason(value: unknown): string | null {
-  return fixtureOrDemoReason(value, "$", 0);
+  return fixtureOrDemoReason(value, "$", 0, false);
 }
 
-function fixtureOrDemoReason(value: unknown, path: string, depth: number): string | null {
-  if (typeof value === "string" && metadataKey.test(path) && fixtureToken.test(value)) {
+function fixtureOrDemoReason(value: unknown, path: string, depth: number, metadataContext: boolean): string | null {
+  if (typeof value === "string" && metadataContext && fixtureToken.test(value)) {
     return `${path}=${value}`;
   }
   if (depth > 8) return null;
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
-      const reason = fixtureOrDemoReason(value[index], `${path}[${index}]`, depth + 1);
+      const reason = fixtureOrDemoReason(value[index], `${path}[${index}]`, depth + 1, metadataContext);
       if (reason) return reason;
     }
     return null;
@@ -23,11 +25,12 @@ function fixtureOrDemoReason(value: unknown, path: string, depth: number): strin
     if ((key === "demo" || key === "fixture" || key === "is_demo" || key === "is_fixture") && field === true) {
       return `${path}.${key}=true`;
     }
-    if (typeof field === "string" && metadataKey.test(key) && fixtureToken.test(field)) {
+    const childMetadataContext = metadataContext || metadataContainerKey.test(key);
+    if (typeof field === "string" && childMetadataContext && fixtureToken.test(field)) {
       return `${path}.${key}=${field}`;
     }
     if (isRecord(field) || Array.isArray(field)) {
-      const reason = fixtureOrDemoReason(field, `${path}.${key}`, depth + 1);
+      const reason = fixtureOrDemoReason(field, `${path}.${key}`, depth + 1, childMetadataContext);
       if (reason) return reason;
     }
   }

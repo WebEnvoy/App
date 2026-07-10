@@ -10,12 +10,20 @@ type RuntimeEndpointConfig = {
   coreEndpoint: string;
   harborEndpoint: string;
 };
+type OwnerApiJsonRequest = {
+  base: string;
+  path: string;
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  body?: unknown;
+};
 
 const shellApi = {
   getShellContext: () =>
     ipcRenderer.invoke("webenvoy:shell-context") as Promise<WebEnvoyShellContext>,
   getRuntimeSupervisorState: (config: RuntimeEndpointConfig) =>
     ipcRenderer.invoke("webenvoy:runtime-supervisor-state", config),
+  requestOwnerJson: (request: OwnerApiJsonRequest) =>
+    ipcRenderer.invoke("webenvoy:owner-api-json", request),
   subscribeToSystemThemeVariant: (listener: (colorScheme: WebEnvoyColorScheme) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, colorScheme: WebEnvoyColorScheme) => {
       listener(colorScheme);

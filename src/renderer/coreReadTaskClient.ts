@@ -1,5 +1,6 @@
 import type { OutcomeKind, OwnerSource, RunProjection, TaskProjection } from "./taskThreadFixtures";
 import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
+import { requestOwnerJson } from "./ownerApiClient";
 
 type CoreReadStatus = "loading" | "ready" | "offline";
 type JsonRecord = Record<string, unknown>;
@@ -548,21 +549,7 @@ export async function fetchCoreRunProjectionById(
 }
 
 async function requestJson(base: string, path: string): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), 2500);
-  try {
-    const response = await fetch(`${base}${path}`, {
-      credentials: "omit",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) return { ok: false, error: `${path} returned ${response.status}` };
-    return response.json();
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  } finally {
-    globalThis.clearTimeout(timeout);
-  }
+  return requestOwnerJson(base, path, { timeoutMs: 2500 });
 }
 
 function okPayload(value: unknown, key: string): JsonRecord | null {
