@@ -20,6 +20,7 @@ for (const file of requiredFiles) {
 const mainSource = await readFile("dist-electron/main.js", "utf8");
 const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const runtimeSupervisorSource = await readFile("dist-electron/runtimeSupervisor.js", "utf8");
+const packagedHarborRuntimeSource = await readFile("dist-electron/runtime/harbor/start-runtime.mjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
@@ -76,6 +77,10 @@ if (!mainSource.includes("webenvoy:harbor-manual-authentication-completed")) {
 
 if (!runtimeSupervisorSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || !runtimeSupervisorSource.includes("randomBytes(32)")) {
   throw new Error("Electron supervisor smoke failed: per-launch Harbor manual-auth token is missing.");
+}
+
+if (!packagedHarborRuntimeSource.includes("manual_authentication_supervisor_token: process.env.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
+  throw new Error("Packaged Harbor runtime smoke failed: manual-auth supervisor token was not forwarded to Harbor.");
 }
 
 const splitOutputToken = "smoke-split-supervisor-token";

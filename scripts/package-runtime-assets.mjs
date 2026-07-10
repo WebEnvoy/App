@@ -139,7 +139,12 @@ mkdirSync(dirname(identityStore), { recursive: true });
 
 const launcher = process.env.HARBOR_RUNTIME_PROVIDER === "fixture" ? createFixtureLauncher("ready") : undefined;
 const runtime = new HarborRuntime(launcher, { persistence_path: identityStore });
-const running = await startHarborRuntimeServer({ host, port, runtime });
+const running = await startHarborRuntimeServer({
+  host,
+  port,
+  runtime,
+  manual_authentication_supervisor_token: process.env.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN,
+});
 console.log(JSON.stringify({ service: "harbor-runtime-api", status: "ready", url: running.url, identity_environment_store: "configured" }));
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
