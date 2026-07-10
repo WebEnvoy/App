@@ -747,6 +747,22 @@ try {
   }
 
   const controlledSession = harborIdentityClientModule.projectHarborSession(harborRuntimeSession, readyXhsIdentity.browser.session);
+  harborIdentityClientModule.rememberHarborRuntimeSessionReference(
+    harborContract.endpoint,
+    readyXhsIdentity.identityEnvironmentRef,
+    controlledSession.browserSessionRef,
+  );
+  const rediscoveredSessionReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
+  const rediscoveredIdentity = rediscoveredSessionReadback.identities.find(
+    (identity) => identity.identityEnvironmentRef === readyXhsIdentity.identityEnvironmentRef,
+  );
+  if (
+    rediscoveredIdentity?.browser.session.browserSessionRef !== controlledSession.browserSessionRef ||
+    rediscoveredIdentity.browser.session.state !== "takeover" ||
+    rediscoveredIdentity.browser.session.viewerRef !== controlledSession.viewerRef
+  ) {
+    throw new Error(`Harbor identity session rediscovery smoke failed: persisted public session ref was not rehydrated: ${JSON.stringify(rediscoveredSessionReadback)}`);
+  }
   const missingAuthorization = await manualAuthenticationCompletionModule.requestManualAuthenticationCompletion({
     base: harborContract.endpoint,
     runtimeSessionRef: controlledSession.browserSessionRef,
@@ -2191,6 +2207,11 @@ async function startHarborIdentityContractServer() {
       return;
     }
 
+    if (request.method === "GET" && pathname === "/runtime/sessions/harbor%3Aruntime-session%2Fxhs-contract%2Freadonly") {
+      sendJson(response, created ? 200 : 404, created ? harborRuntimeSessionFacts() : { status: "missing" });
+      return;
+    }
+
     if (request.method === "POST" && pathname === "/runtime/sessions/harbor%3Aruntime-session%2Fxhs-contract%2Freadonly/manual-authentication-completed") {
       const body = await readRequestBody(request);
       manualAuthenticationRequests += 1;
@@ -2351,6 +2372,7 @@ function harborRuntimeSessionFacts(requestedUrl) {
   return {
     schema_version: "harbor-runtime-facts/v0",
     runtime_session_ref: "harbor:runtime-session/xhs-contract/readonly",
+    identity_environment_ref: "harbor://identity-environment/xhs-contract",
     provider_ref: "harbor:provider/cloakbrowser",
     lifecycle_state: "active",
     created_at: "2026-07-09T12:00:00.000Z",

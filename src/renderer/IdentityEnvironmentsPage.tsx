@@ -23,6 +23,7 @@ import {
   openHarborIdentitySession,
   projectHarborSession,
   releaseHarborSession,
+  rememberHarborRuntimeSessionReference,
   stopHarborSession,
 } from "./harborIdentityClient";
 import { mergeIdentityEnvironmentProjections, projectHarborIdentity } from "./harborIdentityProjection";
@@ -71,7 +72,6 @@ export function IdentityEnvironmentsPage({
   const [managementMessage, setManagementMessage] = useState("");
   const [importText, setImportText] = useState("");
   const [sessionBusy, setSessionBusy] = useState("");
-  const [sessionOverrides, setSessionOverrides] = useState<Record<string, BrowserSessionProjection>>({});
   const [manualAuthenticationMessage, setManualAuthenticationMessage] = useState("");
   const identityEnvironments = useMemo(
     () =>
@@ -85,7 +85,7 @@ export function IdentityEnvironmentsPage({
     identityEnvironments.find((identity) => identity.id === selectedId) ??
     identityEnvironments[0] ??
     identityEnvironmentFixtures[0];
-  const session = sessionOverrides[selected.id] ?? selected.browser.session;
+  const session = selected.browser.session;
 
   useEffect(() => {
     void refreshHarborState();
@@ -109,7 +109,24 @@ export function IdentityEnvironmentsPage({
   }
 
   function updateSelectedSession(nextSession: BrowserSessionProjection) {
-    setSessionOverrides((current) => ({ ...current, [selected.id]: nextSession }));
+    setHarborState((current) => ({
+      ...current,
+      identities: current.identities.map((identity) =>
+        identity.identityEnvironmentRef === selected.identityEnvironmentRef
+          ? { ...identity, browser: { ...identity.browser, session: nextSession } }
+          : identity,
+      ),
+    }));
+  }
+
+  function rememberSelectedSession(nextSession: BrowserSessionProjection) {
+    if (nextSession.state !== "failed" && nextSession.browserSessionRef && nextSession.browserSessionRef !== "无") {
+      rememberHarborRuntimeSessionReference(
+        harborEndpoint,
+        selected.identityEnvironmentRef,
+        nextSession.browserSessionRef,
+      );
+    }
   }
 
   async function startManualBrowser(target: BrowserTargetProjection) {
@@ -126,7 +143,13 @@ export function IdentityEnvironmentsPage({
     };
     updateSelectedSession(fallbackSession);
     setSessionBusy(`open-${target.id}`);
-    updateSelectedSession(projectHarborSession(await openHarborIdentitySession(harborEndpoint, selected, target), fallbackSession));
+    const nextSession = projectHarborSession(
+      await openHarborIdentitySession(harborEndpoint, selected, target),
+      fallbackSession,
+    );
+    updateSelectedSession(nextSession);
+    rememberSelectedSession(nextSession);
+    await refreshHarborState();
     setSessionBusy("");
   }
 
@@ -153,19 +176,28 @@ export function IdentityEnvironmentsPage({
 
   async function takeoverSession() {
     setSessionBusy("takeover");
-    updateSelectedSession(projectHarborSession(await lockHarborSession(harborEndpoint, session.browserSessionRef), session));
+    const nextSession = projectHarborSession(await lockHarborSession(harborEndpoint, session.browserSessionRef), session);
+    updateSelectedSession(nextSession);
+    rememberSelectedSession(nextSession);
+    await refreshHarborState();
     setSessionBusy("");
   }
 
   async function releaseSession() {
     setSessionBusy("release");
-    updateSelectedSession(projectHarborSession(await releaseHarborSession(harborEndpoint, session.browserSessionRef), session));
+    const nextSession = projectHarborSession(await releaseHarborSession(harborEndpoint, session.browserSessionRef), session);
+    updateSelectedSession(nextSession);
+    rememberSelectedSession(nextSession);
+    await refreshHarborState();
     setSessionBusy("");
   }
 
   async function stopSession() {
     setSessionBusy("stop");
-    updateSelectedSession(projectHarborSession(await stopHarborSession(harborEndpoint, session.browserSessionRef), session));
+    const nextSession = projectHarborSession(await stopHarborSession(harborEndpoint, session.browserSessionRef), session);
+    updateSelectedSession(nextSession);
+    rememberSelectedSession(nextSession);
+    await refreshHarborState();
     setSessionBusy("");
   }
 

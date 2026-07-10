@@ -39,8 +39,11 @@ export async function fetchHarborIdentityState(
   const liveIdentities = identityResult.ok && !fixtureOrDemoPayloadReason(identityResult.value)
     ? parseIdentityList(identityResult.value, catalog).map((item) => projectHarborIdentity(item, catalog, fetchedAt))
     : [];
+  const hydratedLiveIdentities = await Promise.all(
+    liveIdentities.map((identity) => hydrateHarborSession(harborEndpoint, identity)),
+  );
   const localIdentities = localDrafts.map((draft) => projectLocalDraft(draft, catalog, fetchedAt));
-  const identities = [...liveIdentities, ...localIdentities];
+  const identities = [...hydratedLiveIdentities, ...localIdentities];
 
   if (catalog || liveIdentities.length > 0) {
     return {
@@ -57,6 +60,23 @@ export async function fetchHarborIdentityState(
     summary: `Harbor endpoint 未返回可消费的 provider/identity JSON；本页保留 App 本地允许配置和离线 fixture。${catalogResult.error ? ` ${catalogResult.error}` : ""}`,
     identities,
   };
+}
+
+export function rememberHarborRuntimeSessionReference(
+  harborEndpoint: string,
+  identityEnvironmentRef: string,
+  runtimeSessionRef: string,
+) {
+  if (!isPublicReference(identityEnvironmentRef) || !isPublicReference(runtimeSessionRef)) return;
+
+  try {
+    window.localStorage.setItem(
+      harborSessionStorageKey(harborEndpoint, identityEnvironmentRef),
+      runtimeSessionRef,
+    );
+  } catch {
+    // Storage is an optional display cache. Harbor remains the source of session truth.
+  }
 }
 
 export async function openHarborIdentitySession(
@@ -170,6 +190,34 @@ export async function completeHarborManualAuthentication(
 }
 
 export { projectHarborSession };
+
+async function hydrateHarborSession(
+  harborEndpoint: string,
+  identity: IdentityEnvironmentProjection,
+): Promise<IdentityEnvironmentProjection> {
+  const runtimeSessionRef = storedHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef);
+  if (!runtimeSessionRef) return identity;
+
+  const result = await fetchFirstJson<HarborRuntimeSession>(harborEndpoint, [
+    `/runtime/sessions/${encodeURIComponent(runtimeSessionRef)}`,
+    `/sessions/${encodeURIComponent(runtimeSessionRef)}`,
+  ]);
+  if (
+    !result.ok ||
+    fixtureOrDemoPayloadReason(result.value) ||
+    !isCurrentIdentitySession(result.value, identity.identityEnvironmentRef)
+  ) {
+    return identity;
+  }
+
+  return {
+    ...identity,
+    browser: {
+      ...identity.browser,
+      session: projectHarborSession(result.value, identity.browser.session),
+    },
+  };
+}
 
 async function postHarborSession(harborEndpoint: string, paths: string[], body: unknown): Promise<HarborRuntimeSession> {
   const result = await postFirstJson<HarborRuntimeSession>(harborEndpoint, paths, body);
@@ -289,6 +337,35 @@ function siteOrigin(siteId: SiteId) {
 function sessionPaths(sessionRef: string, action: "lock" | "release" | "stop") {
   const encoded = encodeURIComponent(sessionRef);
   return [`/runtime/sessions/${encoded}/${action}`, `/sessions/${encoded}/${action}`];
+}
+
+function storedHarborRuntimeSessionReference(harborEndpoint: string, identityEnvironmentRef: string) {
+  try {
+    const value = window.localStorage.getItem(harborSessionStorageKey(harborEndpoint, identityEnvironmentRef));
+    return isPublicReference(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function harborSessionStorageKey(harborEndpoint: string, identityEnvironmentRef: string) {
+  return `webenvoy.harbor.runtime-session-ref.v1:${normalizeEndpoint(harborEndpoint)}:${identityEnvironmentRef}`;
+}
+
+function normalizeEndpoint(value: string) {
+  return value.trim().replace(/\/+$/, "");
+}
+
+function isPublicReference(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 512;
+}
+
+function isCurrentIdentitySession(result: HarborRuntimeSession, identityEnvironmentRef: string) {
+  if ("status" in result || !isRecord(result)) return false;
+  const publicFacts = result as unknown as Record<string, unknown>;
+  return result.schema_version === "harbor-runtime-facts/v0" &&
+    result.runtime_session_ref.length > 0 &&
+    publicFacts.identity_environment_ref === identityEnvironmentRef;
 }
 
 function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts | null {
