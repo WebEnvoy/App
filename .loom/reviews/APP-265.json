@@ -55,6 +55,6 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored implementation review approved owner API IPC, real provider catalog ingestion, and needs-auth task gating correction ada9e9c1b403a6e81a63aa7d46c5a2681906c639 for PR #276 merge-gate consumption; any later PR head may only contain this review carrier rebinding. Final merge consumption still requires hosted gate and App #265 remains open for logged-in identity/task evidence."
+    "reason": "Authored implementation review approved owner API IPC, real provider catalog ingestion, and needs-auth task gating correction ada9e9c1b403a6e81a63aa7d46c5a2681906c639 for PR #276 merge-gate consumption; any later PR head may only contain Loom carrier checkpoint/review rebinding. Final merge consumption still requires hosted gate and App #265 remains open for logged-in identity/task evidence."
   }
 }
