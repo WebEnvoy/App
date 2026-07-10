@@ -14,6 +14,10 @@ import {
 import type { BrowserSessionProjection, BrowserTargetProjection, IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
 import { requestOwnerJson } from "./ownerApiClient";
 
+export type ManualAuthenticationCompletionResult =
+  | { ok: true; identity: HarborIdentityFacts }
+  | { ok: false; error: string };
+
 export async function fetchHarborIdentityState(
   harborEndpoint: string,
   localDrafts: LocalIdentityEnvironmentDraft[],
@@ -110,6 +114,60 @@ export async function stopHarborSession(harborEndpoint: string, sessionRef: stri
   return postHarborSession(harborEndpoint, sessionPaths(sessionRef, "stop"), { control_owner: "user" });
 }
 
+export function manualAuthenticationCompletionBlockReason(
+  identity: IdentityEnvironmentProjection,
+  session: BrowserSessionProjection,
+) {
+  if (identity.source !== "Harbor live") {
+    return "仅 Harbor live identity 的受控会话可以确认认证完成。";
+  }
+  if (session.state !== "takeover" || session.controller !== "用户接管") {
+    return "请先在 active 的 Harbor 受控会话中接管浏览器，再确认认证完成。";
+  }
+  if (!session.browserSessionRef || session.browserSessionRef === "无") {
+    return "Harbor 未返回可确认的 runtime session ref；请刷新会话状态。";
+  }
+  return null;
+}
+
+export async function completeHarborManualAuthentication(
+  harborEndpoint: string,
+  identity: IdentityEnvironmentProjection,
+  session: BrowserSessionProjection,
+): Promise<ManualAuthenticationCompletionResult> {
+  const blockedReason = manualAuthenticationCompletionBlockReason(identity, session);
+  if (blockedReason) return { ok: false, error: blockedReason };
+
+  try {
+    const payload = await requestOwnerJson(
+      harborEndpoint,
+      `/runtime/sessions/${encodeURIComponent(session.browserSessionRef)}/manual-authentication-completed`,
+      { method: "POST", timeoutMs: 2500 },
+    );
+    if (isOkFailure(payload)) return { ok: false, error: manualAuthenticationCompletionFailure(payload) };
+    if (fixtureOrDemoPayloadReason(payload)) {
+      return { ok: false, error: "Harbor 未返回可验证的公开身份状态；App 未改变登录状态。" };
+    }
+
+    const completedIdentity = isHarborIdentityFacts(payload)
+      ? payload
+      : identityFactsFromPublicRecord(payload, null);
+    if (
+      !completedIdentity ||
+      completedIdentity.identity_environment_ref !== identity.identityEnvironmentRef ||
+      !hasUserConfirmedAuthenticationProvenance(payload) ||
+      completedIdentity.login_state.state !== "logged_in" ||
+      completedIdentity.login_state.manual_authentication_state !== "completed" ||
+      completedIdentity.login_state.recovery_required
+    ) {
+      return { ok: false, error: "Harbor 未返回可验证的认证完成公开状态；App 未改变登录状态。" };
+    }
+    return { ok: true, identity: completedIdentity };
+  } catch {
+    return { ok: false, error: "无法联系 Harbor 确认认证完成；请检查受控会话后刷新重试。" };
+  }
+}
+
 export { projectHarborSession };
 
 async function postHarborSession(harborEndpoint: string, paths: string[], body: unknown): Promise<HarborRuntimeSession> {
@@ -153,6 +211,14 @@ async function requestJson<T>(base: string, path: string, init: RequestInit) {
 
 function isOkFailure(value: unknown): value is { ok: false; error: string } {
   return isRecord(value) && value.ok === false && typeof value.error === "string";
+}
+
+function manualAuthenticationCompletionFailure(value: { ok: false; error: string; status?: unknown }) {
+  if (value.status === 404) return "Harbor 未找到当前受控会话；请刷新会话状态后重试。";
+  if (value.status === 409) {
+    return "Harbor 未接受该会话的认证确认。仅 active 且由用户控制的 managed identity session 可以确认。";
+  }
+  return "Harbor 未接受认证完成确认；App 未改变登录状态。";
 }
 
 function parseJson(value: string): unknown {
@@ -244,6 +310,7 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
   const storageState = storageStateValue(status?.browser_storage_state);
   const manualAuthenticationState = manualAuthStateValue(status?.manual_authentication_state);
   const blockingReasons = arrayStrings(status?.blocking_reasons);
+  const authenticationProvenance = stringValue(status?.authentication_provenance);
   const selectedProvider = providerId ? catalog?.providers.find((provider) => provider.provider_id === providerId) ?? null : null;
 
   return {
@@ -259,7 +326,9 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
     },
     login_state: {
       state: loginState,
-      reason: blockingReasons.join("；") || null,
+      reason: authenticationProvenance === "user_confirmed_managed_session"
+        ? "认证状态由用户在 Harbor 受控会话中明确确认。"
+        : blockingReasons.join("；") || null,
       recovery_required: status?.recovery_required === true,
       manual_authentication_state: manualAuthenticationState,
       human_verification: status?.recovery_required === true ? ["manual_login"] : [],
@@ -297,6 +366,11 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
     },
     diagnostics: blockingReasons,
   };
+}
+
+function hasUserConfirmedAuthenticationProvenance(value: unknown) {
+  const status = recordValue(recordValue(value)?.status);
+  return status?.authentication_provenance === "user_confirmed_managed_session";
 }
 
 function recordValue(value: unknown) {

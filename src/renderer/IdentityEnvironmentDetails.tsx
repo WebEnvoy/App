@@ -22,6 +22,7 @@ import type {
   IdentityStatus,
   IdentityTaskEntryProjection,
 } from "./identityEnvironmentFixtures";
+import { manualAuthenticationCompletionBlockReason } from "./harborIdentityClient";
 
 const controllerModes = [
   ["手动浏览", "用户从身份环境直接打开浏览器，不创建 Core Task/Run/Result。"],
@@ -340,7 +341,22 @@ export function DetailGrid({ identity }: { identity: IdentityEnvironmentProjecti
   );
 }
 
-export function RecoveryPanel({ identity, onRefresh }: { identity: IdentityEnvironmentProjection; onRefresh: () => void }) {
+export function RecoveryPanel({
+  identity,
+  manualAuthenticationBusy,
+  manualAuthenticationMessage,
+  onCompleteManualAuthentication,
+  onRefresh,
+  session,
+}: {
+  identity: IdentityEnvironmentProjection;
+  manualAuthenticationBusy: boolean;
+  manualAuthenticationMessage: string;
+  onCompleteManualAuthentication: () => void;
+  onRefresh: () => void;
+  session: BrowserSessionProjection;
+}) {
+  const manualAuthenticationBlockReason = manualAuthenticationCompletionBlockReason(identity, session);
   return (
     <section className="identity-recovery-panel">
       <div>
@@ -360,11 +376,20 @@ export function RecoveryPanel({ identity, onRefresh }: { identity: IdentityEnvir
           <KeyRound size={15} />
           打开认证现场
         </button>
+        {manualAuthenticationBlockReason == null ? (
+          <button type="button" disabled={manualAuthenticationBusy} onClick={onCompleteManualAuthentication}>
+            <CheckCircle2 size={15} />
+            我已完成认证
+          </button>
+        ) : (
+          <span>{manualAuthenticationBlockReason}</span>
+        )}
         <button type="button" onClick={onRefresh}>
           <RefreshCw size={15} />
           刷新 Harbor 状态
         </button>
       </div>
+      {manualAuthenticationMessage ? <p>{manualAuthenticationMessage}</p> : null}
     </section>
   );
 }

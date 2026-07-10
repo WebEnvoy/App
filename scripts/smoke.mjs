@@ -188,6 +188,8 @@ for (const expectedText of [
   "敏感材料状态",
   "Cookie/session",
   "打开认证现场",
+  "我已完成认证",
+  "Harbor 已接受认证完成确认",
   "不展示密码、验证码、Cookie、令牌",
   "小红书搜索和笔记读取",
   "BOSS 搜索和职位详情读取",
@@ -673,8 +675,8 @@ try {
 
   const harborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
   readyXhsIdentity = harborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
-  if (harborReadback.status !== "ready" || readyXhsIdentity?.source !== "Harbor live" || readyXhsIdentity.readiness.state !== "ready") {
-    throw new Error(`Harbor identity contract smoke failed: readback did not return ready Harbor live identity: ${JSON.stringify(harborReadback)}`);
+  if (harborReadback.status !== "ready" || readyXhsIdentity?.source !== "Harbor live" || readyXhsIdentity.readiness.state !== "needs-auth") {
+    throw new Error(`Harbor identity contract smoke failed: initial readback did not require manual authentication: ${JSON.stringify(harborReadback)}`);
   }
 
   harborRuntimeSession = await harborIdentityClientModule.openHarborIdentitySession(
@@ -684,6 +686,35 @@ try {
   );
   if ("status" in harborRuntimeSession || harborRuntimeSession.lifecycle_state !== "active") {
     throw new Error(`Harbor identity contract smoke failed: session was not active: ${JSON.stringify(harborRuntimeSession)}`);
+  }
+
+  const controlledSession = harborIdentityClientModule.projectHarborSession(harborRuntimeSession, readyXhsIdentity.browser.session);
+  const completedAuthentication = await harborIdentityClientModule.completeHarborManualAuthentication(
+    harborContract.endpoint,
+    readyXhsIdentity,
+    controlledSession,
+  );
+  if (!completedAuthentication.ok || completedAuthentication.identity.login_state.manual_authentication_state !== "completed") {
+    throw new Error(`Harbor manual authentication smoke failed: completion response was not accepted: ${JSON.stringify(completedAuthentication)}`);
+  }
+
+  const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
+  readyXhsIdentity = refreshedHarborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
+  if (
+    readyXhsIdentity?.readiness.state !== "ready" ||
+    readyXhsIdentity.login.manualAuthenticationState !== "已完成" ||
+    !readyXhsIdentity.login.reason.includes("用户在 Harbor 受控会话中明确确认")
+  ) {
+    throw new Error(`Harbor manual authentication smoke failed: refreshed public identity was not ready: ${JSON.stringify(refreshedHarborReadback)}`);
+  }
+
+  const rejectedManualAuthentication = await harborIdentityClientModule.completeHarborManualAuthentication(
+    harborContract.endpoint,
+    { ...readyXhsIdentity, source: "App local-only" },
+    controlledSession,
+  );
+  if (rejectedManualAuthentication.ok || harborContract.manualAuthenticationRequests() !== 1) {
+    throw new Error("Harbor manual authentication smoke failed: local-only identity did not fail closed before the owner request.");
   }
 
   let localOnlySessionFetchCalled = false;
@@ -1992,6 +2023,8 @@ async function assertPackagedRuntimeRequiredFailsClosed() {
 
 async function startHarborIdentityContractServer() {
   let created = false;
+  let manualAuthenticationCompleted = false;
+  let manualAuthenticationRequests = 0;
   const identity = harborIdentityFacts();
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -2003,7 +2036,7 @@ async function startHarborIdentityContractServer() {
     }
 
     if (request.method === "GET" && ["/runtime/identity-environments", "/identity-environments", "/runtime/local-identity-environments"].includes(pathname)) {
-      sendJson(response, 200, { items: created ? [identity] : [] });
+      sendJson(response, 200, { items: created ? [manualAuthenticationCompleted ? harborManualAuthenticationCompletedRecord() : identity] : [] });
       return;
     }
 
@@ -2031,6 +2064,18 @@ async function startHarborIdentityContractServer() {
       return;
     }
 
+    if (request.method === "POST" && pathname === "/runtime/sessions/harbor%3Aruntime-session%2Fxhs-contract%2Freadonly/manual-authentication-completed") {
+      const body = await readRequestJson(request);
+      manualAuthenticationRequests += 1;
+      manualAuthenticationCompleted = created && body == null;
+      sendJson(
+        response,
+        manualAuthenticationCompleted ? 200 : 409,
+        manualAuthenticationCompleted ? harborManualAuthenticationCompletedRecord() : { status: "unavailable", failure_class: "identity_environment_unmanaged" },
+      );
+      return;
+    }
+
     sendJson(response, 404, { status: "missing" });
   });
 
@@ -2046,6 +2091,7 @@ async function startHarborIdentityContractServer() {
 
   return {
     endpoint: `http://127.0.0.1:${address.port}`,
+    manualAuthenticationRequests: () => manualAuthenticationRequests,
     close: () =>
       new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
@@ -2089,11 +2135,11 @@ function harborIdentityFacts() {
       account_label: "运营号 smoke",
     },
     login_state: {
-      state: "logged_in",
-      reason: "local contract smoke only",
-      recovery_required: false,
-      manual_authentication_state: "not_required",
-      human_verification: [],
+      state: "manual_auth_required",
+      reason: "manual authentication required",
+      recovery_required: true,
+      manual_authentication_state: "required",
+      human_verification: ["manual_login"],
     },
     browser_storage: {
       profile_storage_ref: "harbor://profile-storage/xhs-contract",
@@ -2123,6 +2169,45 @@ function harborIdentityFacts() {
       recovery_actions: [],
     },
     diagnostics: [],
+  };
+}
+
+function harborManualAuthenticationCompletedRecord() {
+  return {
+    schema_version: "harbor-local-identity-environment-store/v0",
+    identity_environment_ref: "harbor://identity-environment/xhs-contract",
+    site: {
+      site_id: "xiaohongshu",
+      origin: "https://www.xiaohongshu.com",
+      display_name: "小红书",
+      account_ref: "运营号 contract",
+    },
+    refs: {
+      execution_identity_ref: "harbor://execution-identity/xhs-contract",
+      profile_ref: "harbor://profile/xhs-contract",
+    },
+    status: {
+      readiness: "ready",
+      login_state: "logged_in",
+      authentication_provenance: "user_confirmed_managed_session",
+      browser_storage_state: "present",
+      manual_authentication_state: "completed",
+      recovery_required: false,
+      blocking_reasons: [],
+    },
+    environment_summary: {
+      provider_id: "cloakbrowser",
+      browser_family: "cloakbrowser",
+      proxy_state: "configured",
+      region: "CN-SH",
+      language: "zh-CN",
+      timezone: "Asia/Shanghai",
+      fingerprint_summary: "provider_claim_contract",
+    },
+    public_boundary: {
+      raw_material: "not_exposed",
+      not_exposed: ["password", "verification_code", "cookie", "token", "profile_storage", "raw_evidence"],
+    },
   };
 }
 

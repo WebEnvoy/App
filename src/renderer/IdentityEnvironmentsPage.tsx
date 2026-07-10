@@ -16,6 +16,7 @@ import {
   type IdentityManagementMode,
 } from "./IdentityEnvironmentManagementPanel";
 import {
+  completeHarborManualAuthentication,
   createHarborIdentityEnvironment,
   fetchHarborIdentityState,
   lockHarborSession,
@@ -24,7 +25,7 @@ import {
   releaseHarborSession,
   stopHarborSession,
 } from "./harborIdentityClient";
-import { mergeIdentityEnvironmentProjections } from "./harborIdentityProjection";
+import { mergeIdentityEnvironmentProjections, projectHarborIdentity } from "./harborIdentityProjection";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import {
   identityEnvironmentBoundaries,
@@ -71,6 +72,7 @@ export function IdentityEnvironmentsPage({
   const [importText, setImportText] = useState("");
   const [sessionBusy, setSessionBusy] = useState("");
   const [sessionOverrides, setSessionOverrides] = useState<Record<string, BrowserSessionProjection>>({});
+  const [manualAuthenticationMessage, setManualAuthenticationMessage] = useState("");
   const identityEnvironments = useMemo(
     () =>
       projectRuntimeGatedIdentities(
@@ -102,6 +104,7 @@ export function IdentityEnvironmentsPage({
 
   function selectIdentity(id: string) {
     setSelectedId(id);
+    setManualAuthenticationMessage("");
     window.localStorage.setItem(localIdentitySelectionStorageKey, id);
   }
 
@@ -149,6 +152,33 @@ export function IdentityEnvironmentsPage({
   async function stopSession() {
     setSessionBusy("stop");
     updateSelectedSession(projectHarborSession(await stopHarborSession(harborEndpoint, session.browserSessionRef), session));
+    setSessionBusy("");
+  }
+
+  async function completeManualAuthentication() {
+    setSessionBusy("manual-authentication-completed");
+    setManualAuthenticationMessage("");
+    const result = await completeHarborManualAuthentication(harborEndpoint, selected, session);
+    if (!result.ok) {
+      setManualAuthenticationMessage(result.error);
+      setSessionBusy("");
+      return;
+    }
+
+    const fetchedAt = new Date().toISOString();
+    setHarborState((current) => ({
+      ...current,
+      status: "ready",
+      fetchedAt,
+      summary: "Harbor 已返回用户确认的公开认证状态；正在刷新 identity projection。",
+      identities: current.identities.map((identity) =>
+        identity.identityEnvironmentRef === result.identity.identity_environment_ref
+          ? projectHarborIdentity(result.identity, null, fetchedAt)
+          : identity,
+      ),
+    }));
+    setManualAuthenticationMessage("Harbor 已接受认证完成确认，并返回公开身份状态。App 未读取或保存认证材料。");
+    await refreshHarborState();
     setSessionBusy("");
   }
 
@@ -279,7 +309,14 @@ export function IdentityEnvironmentsPage({
             onViewSession={viewSession}
             sessionBusy={sessionBusy}
           />
-          <RecoveryPanel identity={selected} onRefresh={refreshHarborState} />
+          <RecoveryPanel
+            identity={selected}
+            manualAuthenticationMessage={manualAuthenticationMessage}
+            manualAuthenticationBusy={sessionBusy === "manual-authentication-completed"}
+            onCompleteManualAuthentication={completeManualAuthentication}
+            onRefresh={refreshHarborState}
+            session={session}
+          />
           <BoundaryPanel identity={selected} />
         </section>
       </div>
