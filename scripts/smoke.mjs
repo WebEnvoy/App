@@ -31,6 +31,7 @@ const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvi
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
+const harborRuntimeSessionFactsSource = await readFile("src/renderer/harborRuntimeSessionFacts.ts", "utf8");
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
 const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
 const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
@@ -430,6 +431,17 @@ const { outputText: ownerPayloadGuardsModuleSource } = ts.transpileModule(ownerP
   },
 });
 const ownerPayloadGuardsModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerPayloadGuardsModuleSource)}`;
+const { outputText: harborRuntimeSessionFactsModuleSource } = ts.transpileModule(harborRuntimeSessionFactsSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const harborRuntimeSessionFactsModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+  harborRuntimeSessionFactsModuleSource
+    .replace('from "./harborIdentityTypes";', `from "${harborIdentityTypesModuleUrl}";`)
+    .replace('from "./ownerPayloadGuards";', `from "${ownerPayloadGuardsModuleUrl}";`),
+)}`;
 const ownerPayloadGuardsModule = await import(ownerPayloadGuardsModuleUrl);
 if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({ evidence_refs: ["harbor:evidence/x/smoke"] })) {
   throw new Error("Owner payload guard smoke failed: smoke refs in arrays were not rejected.");
@@ -500,6 +512,10 @@ const harborIdentityClientModule = await import(
       .replace(
         'from "./harborIdentityTypes";',
         `from "${harborIdentityTypesModuleUrl}";`,
+      )
+      .replace(
+        'from "./harborRuntimeSessionFacts";',
+        `from "${harborRuntimeSessionFactsModuleUrl}";`,
       )
       .replace(
         'from "./ownerPayloadGuards";',
@@ -2389,20 +2405,37 @@ function harborRuntimeSessionFacts(requestedUrl) {
     schema_version: "harbor-runtime-facts/v0",
     runtime_session_ref: "harbor:runtime-session/xhs-contract/readonly",
     identity_environment_ref: "harbor://identity-environment/xhs-contract",
+    profile_ref: "harbor://profile/xhs-contract",
     provider_ref: "harbor:provider/cloakbrowser",
+    provider_mode: "local_dedicated_profile",
     lifecycle_state: "active",
     created_at: "2026-07-09T12:00:00.000Z",
     last_seen_at: "2026-07-09T12:00:01.000Z",
+    availability: {
+      cdp: "available",
+      viewer: "available",
+      snapshot: "unavailable",
+      evidence: "unavailable",
+    },
     viewer_ref: "harbor:viewer/xhs-contract/readonly",
     current_page: {
       requested_url: url,
       current_url: url,
-      title: "小红书 - smoke",
+      title: "小红书 - contract",
       status: "ready",
+      error_reason: null,
+      observed_at: "2026-07-09T12:00:01.000Z",
     },
     control_owner: "user",
-    control_lock: { owner: "user", state: "held" },
+    control_lock: {
+      owner: "user",
+      state: "held",
+      holder_ref: "app-browser-page",
+      updated_at: "2026-07-09T12:00:01.000Z",
+      conflict_error: null,
+    },
     current_error: null,
+    facts: [{ key: "session.state", source: "observed", value: "active" }],
   };
 }
 

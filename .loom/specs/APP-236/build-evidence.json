@@ -3,40 +3,36 @@
   "item_id": "APP-236",
   "delegations": [],
   "ownership_constraints": {
-    "task_goal": "Let the App explicitly send a user-confirmed manual-authentication completion intent to Harbor and render only Harbor's returned public identity state.",
+    "task_goal": "Make App session recovery consume only validated Harbor public session facts and restore exactly once after Harbor reports the stored session missing.",
     "context_locators": [
       ".",
       "https://github.com/WebEnvoy/App/issues/236",
       "https://github.com/WebEnvoy/Harbor/issues/241",
-      "https://github.com/WebEnvoy/App/pull/278",
-      "https://github.com/WebEnvoy/Harbor/pull/242"
+      "work/app-236-rediscover-active-session"
     ],
     "read_scope": [
       "AGENTS.md",
-      "src/electron/main.ts",
-      "src/electron/manualAuthenticationCompletion.ts",
-      "src/electron/ownerApiRequest.ts",
-      "src/electron/runtimeSupervisor.ts",
-      "src/electron/preload.cts",
       "src/renderer/harborIdentityClient.ts",
+      "src/renderer/harborIdentityTypes.ts",
+      "src/renderer/harborRuntimeSessionFacts.ts",
+      "src/renderer/ownerApiClient.ts",
+      "src/renderer/harborSessionReference.ts",
       "scripts/smoke.mjs",
+      "scripts/smoke-session-restart.mjs",
       ".loom/work-items/APP-236.md",
       ".loom/progress/APP-236.md",
       ".loom/specs/APP-236/**"
     ],
     "write_ownership": [
-      "src/electron/main.ts",
-      "src/electron/manualAuthenticationCompletion.ts",
-      "src/electron/ownerApiRequest.ts",
-      "src/electron/runtimeSupervisor.ts",
-      "src/electron/preload.cts",
       "src/renderer/harborIdentityClient.ts",
-      "src/renderer/vite-env.d.ts",
+      "src/renderer/harborIdentityTypes.ts",
+      "src/renderer/harborRuntimeSessionFacts.ts",
+      "src/renderer/ownerApiClient.ts",
       "scripts/smoke.mjs",
+      "scripts/smoke-session-restart.mjs",
       ".loom/work-items/APP-236.md",
       ".loom/progress/APP-236.md",
-      ".loom/specs/APP-236/**",
-      ".loom/status/current.md"
+      ".loom/specs/APP-236/**"
     ],
     "non_goals": [
       "Harbor or Core implementation changes",
@@ -48,12 +44,12 @@
       "risk-control bypass",
       "GitHub merge or issue closeout"
     ],
-    "validation_expectation": "npm run typecheck; npm run smoke; git diff --check; loom fact-chain --target . --item APP-236 --json; loom suite validate --target . --item APP-236 --json; loom suite carrier validate --target . --item APP-236 --json; loom suite evidence validate --target . --item APP-236 --json",
+    "validation_expectation": "npm run typecheck; node scripts/smoke-session-restart.mjs; npm run smoke; git diff --check; loom fact-chain --target . --item APP-236 --json; loom suite validate --target . --item APP-236 --json; loom suite carrier validate --target . --item APP-236 --json; loom suite evidence validate --target . --item APP-236 --json",
     "output_format": "Controller records the exact branch/head, changed paths, validation results, PR binding, and remaining live-E2E requirement.",
-    "integration_target": "PR #278, merged after Harbor PR #242 because the App consumer depends on Harbor's authorization-protected public endpoint."
+    "integration_target": "No PR until the separate Loom metadata-only repair is merged and this APP-236 carrier validates at the current head."
   },
   "ownership_contract": {
-    "task_goal": "Let the App explicitly send a user-confirmed manual-authentication completion intent to Harbor and render only Harbor's returned public identity state.",
+    "task_goal": "Make App session recovery consume only validated Harbor public session facts and restore exactly once after Harbor reports the stored session missing.",
     "context_locators": [
       ".",
       "https://github.com/WebEnvoy/App/issues/236",
@@ -61,16 +57,22 @@
     ],
     "read_scope": [
       "AGENTS.md",
-      "src/electron/**",
       "src/renderer/harborIdentityClient.ts",
+      "src/renderer/harborIdentityTypes.ts",
+      "src/renderer/harborRuntimeSessionFacts.ts",
+      "src/renderer/ownerApiClient.ts",
+      "src/renderer/harborSessionReference.ts",
       "scripts/smoke.mjs",
+      "scripts/smoke-session-restart.mjs",
       ".loom/**"
     ],
     "write_ownership": [
-      "src/electron/**",
       "src/renderer/harborIdentityClient.ts",
-      "src/renderer/vite-env.d.ts",
+      "src/renderer/harborIdentityTypes.ts",
+      "src/renderer/harborRuntimeSessionFacts.ts",
+      "src/renderer/ownerApiClient.ts",
       "scripts/smoke.mjs",
+      "scripts/smoke-session-restart.mjs",
       ".loom/** for APP-236"
     ],
     "non_goals": [
@@ -80,38 +82,39 @@
       "automatic login or external writes",
       "GitHub merge or issue closeout"
     ],
-    "validation_expectation": "npm run typecheck; npm run smoke; git diff --check; Loom fact-chain and suite validation.",
+    "validation_expectation": "npm run typecheck; node scripts/smoke-session-restart.mjs; npm run smoke; git diff --check; Loom fact-chain and suite validation.",
     "output_format": "Current-head carrier and verification evidence.",
-    "integration_target": "Controller-owned PR #278 review, gate, merge, and packaged App E2E."
+    "integration_target": "Loom metadata-only repair, then controller-owned PR/review and packaged App E2E."
   },
   "integration_evidence": [
     {
-      "id": "main-process-only-manual-authentication-intent",
+      "id": "validated-single-flight-session-recovery",
       "status": "integrated",
-      "summary": "The renderer sends a narrow intent through preload and Electron main; only main holds the per-Harbor-child supervisor credential used for the dedicated Harbor endpoint.",
+      "summary": "The renderer rejects fixture/demo markers in runtime page titles and fact values, accepts only complete non-fixture Harbor runtime session facts, recreates a cached session only after the explicit retryable session-missing response, and shares concurrent recovery requests.",
       "locators": [
-        "src/electron/main.ts",
-        "src/electron/manualAuthenticationCompletion.ts",
-        "src/electron/preload.cts",
-        "src/renderer/harborIdentityClient.ts"
+        "src/renderer/harborIdentityClient.ts",
+        "src/renderer/harborIdentityTypes.ts",
+        "src/renderer/harborRuntimeSessionFacts.ts",
+        "scripts/smoke-session-restart.mjs"
       ],
       "validation": [
         "npm run typecheck",
+        "node scripts/smoke-session-restart.mjs",
         "npm run smoke"
       ]
     },
     {
-      "id": "fail-closed-public-identity-projection",
+      "id": "fail-closed-session-lookup",
       "status": "integrated",
-      "summary": "The generic owner API cannot call the confirmation endpoint; the IPC validates the renderer and intent, accepts only an allowlisted public response, and refreshes Harbor owner facts without treating page signals as authentication truth.",
+      "summary": "Only session hydration receives the parsed error body needed to validate a 404 session-missing response; transport, authorization, server, malformed, fixture, and incomplete lookup responses remain fail closed and do not start a Harbor session.",
       "locators": [
-        "src/electron/ownerApiRequest.ts",
-        "src/electron/manualAuthenticationCompletion.ts",
         "src/renderer/harborIdentityClient.ts",
-        "scripts/smoke.mjs"
+        "src/renderer/ownerApiClient.ts",
+        "scripts/smoke-session-restart.mjs"
       ],
       "validation": [
         "npm run typecheck",
+        "node scripts/smoke-session-restart.mjs",
         "npm run smoke"
       ]
     }

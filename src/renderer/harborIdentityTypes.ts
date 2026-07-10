@@ -102,20 +102,38 @@ export type HarborRuntimeSession =
   | {
       schema_version: "harbor-runtime-facts/v0";
       runtime_session_ref: string;
+      identity_environment_ref: string;
+      profile_ref: string;
       provider_ref: string;
+      provider_mode: "local_dedicated_profile";
       lifecycle_state: "starting" | "active" | "idle" | "locked" | "disconnected" | "expired" | "failed" | "closed";
       created_at: string;
       last_seen_at: string;
+      availability: {
+        cdp: "available" | "unavailable" | "policy_denied" | "unsupported";
+        viewer: "available" | "unavailable" | "policy_denied" | "unsupported";
+        snapshot: "available" | "unavailable" | "policy_denied" | "unsupported";
+        evidence: "available" | "unavailable" | "policy_denied" | "unsupported";
+      };
       viewer_ref?: string;
       current_page: {
         requested_url: string;
         current_url: string | null;
         title: string | null;
         status: "ready" | "unavailable" | "unknown";
+        error_reason: { code: string; message: string; retryable: boolean } | null;
+        observed_at: string;
       };
       control_owner: "system" | "user" | "agent" | "core_task" | "app" | "provider" | "none" | "unknown";
-      control_lock: { owner: string; state: "held" | "released" | "closed" };
+      control_lock: {
+        owner: string;
+        state: "held" | "released" | "closed";
+        holder_ref: string | null;
+        updated_at: string;
+        conflict_error: { code: string; message: string; retryable: boolean } | null;
+      };
       current_error: { message: string; retryable: boolean } | null;
+      facts: Array<{ key: string; source: "configured" | "observed" | "provider_claim" | "validation_evidence"; value: string; evidence_ref?: string }>;
     }
   | {
       status: "unavailable";

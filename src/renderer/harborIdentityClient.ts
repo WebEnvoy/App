@@ -1,5 +1,6 @@
 import { projectHarborIdentity, projectHarborSession, projectLocalDraft } from "./harborIdentityProjection";
 import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
+import { isHarborRuntimeSessionFacts, isHarborSessionMissingAfterRestart } from "./harborRuntimeSessionFacts";
 import {
   type HarborIdentityFacts,
   type HarborIdentityLoadState,
@@ -22,6 +23,8 @@ import {
 export type ManualAuthenticationCompletionResult =
   | { ok: true; identity: HarborIdentityFacts }
   | { ok: false; error: string };
+
+const sessionRecoveryFlights = new Map<string, Promise<IdentityEnvironmentProjection>>();
 
 export async function fetchHarborIdentityState(
   harborEndpoint: string,
@@ -49,6 +52,7 @@ export async function fetchHarborIdentityState(
   );
   const localIdentities = localDrafts.map((draft) => projectLocalDraft(draft, catalog, fetchedAt));
   const identities = [...hydratedLiveIdentities, ...localIdentities];
+  const catalogError = catalogResult.ok ? "" : ` ${catalogResult.error}`;
 
   if (catalog || liveIdentities.length > 0) {
     return {
@@ -62,7 +66,7 @@ export async function fetchHarborIdentityState(
   return {
     status: "offline",
     fetchedAt,
-    summary: `Harbor endpoint 未返回可消费的 provider/identity JSON；本页保留 App 本地允许配置和离线 fixture。${catalogResult.error ? ` ${catalogResult.error}` : ""}`,
+    summary: `Harbor endpoint 未返回可消费的 provider/identity JSON；本页保留 App 本地允许配置和离线 fixture。${catalogError}`,
     identities,
   };
 }
@@ -188,25 +192,43 @@ async function hydrateHarborSession(
   const runtimeSessionRef = storedHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef);
   if (!runtimeSessionRef) return identity;
 
-  const result = await fetchFirstJson<HarborRuntimeSession>(harborEndpoint, [
-    `/runtime/sessions/${encodeURIComponent(runtimeSessionRef)}`,
-    `/sessions/${encodeURIComponent(runtimeSessionRef)}`,
-  ]);
-  if (result.ok && !fixtureOrDemoPayloadReason(result.value) && isCurrentIdentitySession(result.value, identity.identityEnvironmentRef)) {
-    if (!isResumableHarborSession(result.value)) {
+  const result = await fetchHarborSession(harborEndpoint, runtimeSessionRef);
+  const session = result.ok ? result.value : result.status === 404 ? result.body : null;
+  if (isCurrentIdentitySession(session, identity.identityEnvironmentRef)) {
+    if (!isResumableHarborSession(session)) {
       forgetHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef);
     }
-    return withHarborSession(identity, result.value);
+    return withHarborSession(identity, session);
+  }
+  if (!isHarborSessionMissingAfterRestart(session)) return identity;
+
+  if (storedHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef) !== runtimeSessionRef) {
+    return hydrateHarborSession(harborEndpoint, identity);
   }
 
-  // A supervised Harbor process may restart with durable identity facts but no
-  // in-memory session. Recreate only a previously user-started, ready identity
-  // session; never infer authentication or use page/profile material.
+  const recoveryKey = `${normalizeHarborEndpoint(harborEndpoint)}:${identity.identityEnvironmentRef}:${runtimeSessionRef}`;
+  const inFlight = sessionRecoveryFlights.get(recoveryKey);
+  if (inFlight) return inFlight;
+
+  const recovery = restoreHarborSession(harborEndpoint, identity);
+  sessionRecoveryFlights.set(recoveryKey, recovery);
+  try {
+    return await recovery;
+  } finally {
+    sessionRecoveryFlights.delete(recoveryKey);
+  }
+}
+
+async function restoreHarborSession(
+  harborEndpoint: string,
+  identity: IdentityEnvironmentProjection,
+): Promise<IdentityEnvironmentProjection> {
   if (!canRestoreHarborIdentitySession(identity)) return identity;
 
   const target = identity.browser.targets.find((candidate) => candidate.id === identity.siteId);
   if (!target) return identity;
 
+  forgetHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef);
   const restored = await openHarborIdentitySession(harborEndpoint, identity, target);
   if (!isCurrentIdentitySession(restored, identity.identityEnvironmentRef) || !isResumableHarborSession(restored)) {
     return identity;
@@ -228,7 +250,18 @@ function withHarborSession(identity: IdentityEnvironmentProjection, session: Har
 
 async function postHarborSession(harborEndpoint: string, paths: string[], body: unknown): Promise<HarborRuntimeSession> {
   const result = await postFirstJson<HarborRuntimeSession>(harborEndpoint, paths, body);
-  return result.ok ? result.value : { status: "unavailable", message: result.error, retryable: true };
+  return result.ok && isHarborRuntimeSessionFacts(result.value)
+    ? result.value
+    : { status: "unavailable", message: result.ok ? "Harbor returned invalid session public facts." : result.error, retryable: true };
+}
+
+async function fetchHarborSession(harborEndpoint: string, runtimeSessionRef: string) {
+  return requestJson<HarborRuntimeSession>(
+    harborEndpoint,
+    `/runtime/sessions/${encodeURIComponent(runtimeSessionRef)}`,
+    { method: "GET" },
+    true,
+  );
 }
 
 async function fetchFirstJson<T>(base: string, paths: string[]) {
@@ -255,17 +288,25 @@ async function postFirstJson<T>(
   return { ok: false as const, error: fallbackError };
 }
 
-async function requestJson<T>(base: string, path: string, init: RequestInit) {
+async function requestJson<T>(base: string, path: string, init: RequestInit, includeErrorBody = false) {
   const payload = await requestOwnerJson(base, path, {
     method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
     body: typeof init.body === "string" ? parseJson(init.body) : undefined,
+    includeErrorBody,
     timeoutMs: 2500,
   });
-  if (isOkFailure(payload)) return { ok: false as const, error: payload.error };
+  if (isOkFailure(payload)) {
+    return {
+      ok: false as const,
+      error: payload.error,
+      ...(typeof payload.status === "number" ? { status: payload.status } : {}),
+      ...(includeErrorBody && payload.body !== undefined ? { body: payload.body } : {}),
+    };
+  }
   return { ok: true as const, value: payload as T };
 }
 
-function isOkFailure(value: unknown): value is { ok: false; error: string } {
+function isOkFailure(value: unknown): value is { ok: false; error: string; status?: unknown; body?: unknown } {
   return isRecord(value) && value.ok === false && typeof value.error === "string";
 }
 
@@ -347,14 +388,10 @@ function sessionPaths(sessionRef: string, action: "lock" | "release" | "stop") {
 }
 
 function isCurrentIdentitySession(
-  result: HarborRuntimeSession,
+  result: unknown,
   identityEnvironmentRef: string,
 ): result is Exclude<HarborRuntimeSession, { status: "unavailable" }> {
-  if ("status" in result || !isRecord(result)) return false;
-  const publicFacts = result as unknown as Record<string, unknown>;
-  return result.schema_version === "harbor-runtime-facts/v0" &&
-    result.runtime_session_ref.length > 0 &&
-    publicFacts.identity_environment_ref === identityEnvironmentRef;
+  return isHarborRuntimeSessionFacts(result) && result.identity_environment_ref === identityEnvironmentRef;
 }
 
 function isResumableHarborSession(result: Exclude<HarborRuntimeSession, { status: "unavailable" }>) {
@@ -366,6 +403,10 @@ function canRestoreHarborIdentitySession(identity: IdentityEnvironmentProjection
     identity.readiness.state === "ready" &&
     identity.provider.state === "ready" &&
     !identity.login.recoveryRequired;
+}
+
+function normalizeHarborEndpoint(value: string) {
+  return value.trim().replace(/\/+$/, "");
 }
 
 function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts | null {

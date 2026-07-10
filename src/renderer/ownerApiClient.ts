@@ -3,6 +3,7 @@ export type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
 export type OwnerApiRequestOptions = {
   method?: OwnerApiMethod;
   body?: unknown;
+  includeErrorBody?: boolean;
   timeoutMs?: number;
 };
 
@@ -19,7 +20,7 @@ export async function requestOwnerJson(
       method: options.method ?? "GET",
       ...(options.body === undefined ? {} : { body: options.body }),
     });
-    return unwrapOwnerApiResponse(result, path);
+    return unwrapOwnerApiResponse(result, path, options.includeErrorBody === true);
   }
 
   return requestOwnerJsonWithFetch(base, path, options);
@@ -44,7 +45,14 @@ async function requestOwnerJsonWithFetch(
       signal: controller.signal,
     });
     const payload = await responsePayload(response);
-    if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: responseStatusError(path, response.status, payload),
+        ...(options.includeErrorBody ? { body: payload } : {}),
+      };
+    }
     return payload ?? {};
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -53,7 +61,7 @@ async function requestOwnerJsonWithFetch(
   }
 }
 
-function unwrapOwnerApiResponse(value: unknown, path: string): unknown {
+function unwrapOwnerApiResponse(value: unknown, path: string, includeErrorBody: boolean): unknown {
   if (!isRecord(value)) return { ok: false, error: `${path} returned invalid owner API response.` };
   if (value.ok === true) return "body" in value ? value.body : {};
 
@@ -62,7 +70,7 @@ function unwrapOwnerApiResponse(value: unknown, path: string): unknown {
     ok: false,
     ...(typeof value.status === "number" ? { status: value.status } : {}),
     error,
-    ...(value.body === undefined ? {} : { body: value.body }),
+    ...(includeErrorBody && value.body !== undefined ? { body: value.body } : {}),
   };
 }
 
