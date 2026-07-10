@@ -346,15 +346,19 @@ export function RecoveryPanel({
   manualAuthenticationBusy,
   manualAuthenticationMessage,
   onCompleteManualAuthentication,
+  onOpenAuthenticationSite,
   onRefresh,
   session,
+  sessionBusy,
 }: {
   identity: IdentityEnvironmentProjection;
   manualAuthenticationBusy: boolean;
   manualAuthenticationMessage: string;
   onCompleteManualAuthentication: () => void;
+  onOpenAuthenticationSite: () => void;
   onRefresh: () => void;
   session: BrowserSessionProjection;
+  sessionBusy: string;
 }) {
   const manualAuthenticationBlockReason = manualAuthenticationCompletionBlockReason(identity, session);
   return (
@@ -372,7 +376,7 @@ export function RecoveryPanel({
         />
       </dl>
       <div className="identity-action-row">
-        <button type="button" disabled={!identity.login.recoveryRequired}>
+        <button type="button" disabled={!identity.login.recoveryRequired || Boolean(sessionBusy)} onClick={onOpenAuthenticationSite}>
           <KeyRound size={15} />
           打开认证现场
         </button>

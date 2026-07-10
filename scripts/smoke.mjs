@@ -25,6 +25,8 @@ const connectionConfigSource = await readFile("src/renderer/localConnectionConfi
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
 const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
+const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
+const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -121,6 +123,14 @@ if (rendererHtml.includes('src="/assets/') || rendererHtml.includes('href="/asse
 
 if (!rendererHtml.includes("WebEnvoy App")) {
   throw new Error("Renderer smoke failed: WebEnvoy title is missing.");
+}
+
+if (!identityEnvironmentDetailsSource.includes("onOpenAuthenticationSite") || !identityEnvironmentDetailsSource.includes("onClick={onOpenAuthenticationSite}")) {
+  throw new Error("Identity recovery smoke failed: authentication site button is not wired to a session launch handler.");
+}
+
+if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !identityEnvironmentsPageSource.includes("candidate.id === selected.siteId")) {
+  throw new Error("Identity recovery smoke failed: authentication site launch does not prefer the selected identity site target.");
 }
 
 for (const expectedText of [
