@@ -1,5 +1,8 @@
 # APP-236 Evidence Map
 
+- Suite path: minimal
+- This evidence is not live login synchronization evidence and cannot close the user story until merged packaged-App readback.
+
 | evidence_id | evidence_type | source_locator | consumes | binding | freshness | consumer_boundary | remediation_direction |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | EV-001 | behavior_evidence | .loom/specs/APP-236/spec.md | Active user-controlled managed-session precondition, exact bodyless POST, owner provenance/state validation, refresh, and fail-closed diagnostic | APP-236 Harbor manual-authentication consumer behavior | present | App renderer contract only; Harbor remains the identity/session truth owner | Refresh after Harbor #241 route, public response, eligibility, or privacy boundary changes. |

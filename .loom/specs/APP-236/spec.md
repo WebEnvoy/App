@@ -1,5 +1,10 @@
 # APP-236 Specification
 
+## Suite Path
+
+- Suite path: minimal
+- suite-index.md, research.md, contracts.md, and readiness-checklist.md are not_applicable. Rationale: APP-236 is a narrow App IPC consumer of the already-defined Harbor #241 endpoint; it does not introduce a runtime owner, storage model, external site action, or contract delta. Consumer boundary: suite validation and review consume this specification, plan, evidence map, and task carrier without requiring those four full-suite artifacts. Recheck condition: upgrade to a full suite if the App starts owning identity truth, stores sensitive material, changes Harbor's endpoint contract, or includes real task execution or external page behavior.
+
 ## User Story
 
 After completing a manual login in a Harbor-managed browser, a user can explicitly confirm completion in App. App submits the session-bound intent and displays only the returned Harbor public identity fact.
