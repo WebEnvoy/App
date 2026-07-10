@@ -59,6 +59,10 @@ type WebEnvoyOwnerApiJsonRequest = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
 };
+type WebEnvoyManualAuthenticationCompletionIntent = {
+  base: string;
+  runtimeSessionRef: string;
+};
 
 interface Window {
   webenvoyShell?: {
@@ -67,6 +71,7 @@ interface Window {
       config: WebEnvoyRuntimeEndpointConfig,
     ) => Promise<WebEnvoyRuntimeSupervisorState>;
     requestOwnerJson?: (request: WebEnvoyOwnerApiJsonRequest) => Promise<unknown>;
+    completeHarborManualAuthentication?: (intent: WebEnvoyManualAuthenticationCompletionIntent) => Promise<unknown>;
     subscribeToSystemThemeVariant?: (
       listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
     ) => () => void;
