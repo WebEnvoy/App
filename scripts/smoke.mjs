@@ -28,6 +28,7 @@ const harborIdentityClientSource = await readFile("src/renderer/harborIdentityCl
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
+const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
 const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
 const rendererAssets = await readFile(
@@ -53,12 +54,20 @@ if (!mainSource.includes("webenvoy:runtime-supervisor-state")) {
   throw new Error("Electron main smoke failed: runtime supervisor IPC is missing.");
 }
 
+if (!mainSource.includes("webenvoy:owner-api-json")) {
+  throw new Error("Electron main smoke failed: owner API IPC is missing.");
+}
+
 if (!preloadSource.includes("webenvoyShell")) {
   throw new Error("Preload smoke failed: shell bridge is missing.");
 }
 
 if (!preloadSource.includes("getRuntimeSupervisorState")) {
   throw new Error("Preload smoke failed: runtime supervisor bridge is missing.");
+}
+
+if (!preloadSource.includes("requestOwnerJson")) {
+  throw new Error("Preload smoke failed: owner API bridge is missing.");
 }
 
 if (rendererHtml.includes('src="/assets/') || rendererHtml.includes('href="/assets/')) {
@@ -365,6 +374,29 @@ const ownerPayloadGuardsModule = await import(ownerPayloadGuardsModuleUrl);
 if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({ evidence_refs: ["harbor:evidence/x/smoke"] })) {
   throw new Error("Owner payload guard smoke failed: smoke refs in arrays were not rejected.");
 }
+if (ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({
+  schema_version: "harbor-browser-provider-status/v0",
+  providers: [
+    {
+      provider_id: "chrome_official",
+      display_name: "Google Chrome",
+      role: "restricted_fallback",
+      install: { status: "installed", path: "/Applications/Google Chrome.app", version: "149.0.7827.201", launchability: "launchable", reason: null },
+      limitations: ["仅在 CloakBrowser 缺失或不可用时作为受限后备。"],
+      download_guide: { missing_impacts: ["本地 smoke 不能把官方 Chrome 用作备用 runtime。"] },
+    },
+  ],
+  excluded_providers: [{ provider: "chromium", reason: "Chromium 仅保留为开发/测试内部实现，不进入用户可选 provider 管理。" }],
+})) {
+  throw new Error("Owner payload guard smoke failed: descriptive provider guidance was rejected as fixture evidence.");
+}
+const { outputText: ownerApiClientModuleSource } = ts.transpileModule(ownerApiClientSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const ownerApiClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerApiClientModuleSource)}`;
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -404,6 +436,10 @@ const harborIdentityClientModule = await import(
       .replace(
         'from "./ownerPayloadGuards";',
         `from "${ownerPayloadGuardsModuleUrl}";`,
+      )
+      .replace(
+        'from "./ownerApiClient";',
+        `from "${ownerApiClientModuleUrl}";`,
       ),
   )}`
 );
@@ -430,6 +466,9 @@ const { outputText: coreReadTaskClientModuleSource } = ts.transpileModule(coreRe
 const coreReadTaskClientModuleRewritten = coreReadTaskClientModuleSource.replace(
   'from "./ownerPayloadGuards";',
   `from "${ownerPayloadGuardsModuleUrl}";`,
+).replace(
+  'from "./ownerApiClient";',
+  `from "${ownerApiClientModuleUrl}";`,
 );
 const coreReadTaskClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`
@@ -458,6 +497,10 @@ const coreTaskSubmitClientModule = await import(
       .replace(
         'from "./runtimeSupervisorState";',
         `from "${runtimeSupervisorStateModuleUrl}";`,
+      )
+      .replace(
+        'from "./ownerApiClient";',
+        `from "${ownerApiClientModuleUrl}";`,
       ),
   )}`
 );

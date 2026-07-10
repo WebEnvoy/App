@@ -53,6 +53,12 @@ type WebEnvoyRuntimeSupervisorState = {
   failClosed: boolean;
   summary: string;
 };
+type WebEnvoyOwnerApiJsonRequest = {
+  base: string;
+  path: string;
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  body?: unknown;
+};
 
 interface Window {
   webenvoyShell?: {
@@ -60,6 +66,7 @@ interface Window {
     getRuntimeSupervisorState?: (
       config: WebEnvoyRuntimeEndpointConfig,
     ) => Promise<WebEnvoyRuntimeSupervisorState>;
+    requestOwnerJson?: (request: WebEnvoyOwnerApiJsonRequest) => Promise<unknown>;
     subscribeToSystemThemeVariant?: (
       listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
     ) => () => void;

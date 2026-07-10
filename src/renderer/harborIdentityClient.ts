@@ -12,6 +12,7 @@ import {
   isRecord,
 } from "./harborIdentityTypes";
 import type { BrowserSessionProjection, BrowserTargetProjection, IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
+import { requestOwnerJson } from "./ownerApiClient";
 
 export async function fetchHarborIdentityState(
   harborEndpoint: string,
@@ -141,21 +142,24 @@ async function postFirstJson<T>(
 }
 
 async function requestJson<T>(base: string, path: string, init: RequestInit) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 2500);
+  const payload = await requestOwnerJson(base, path, {
+    method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
+    body: typeof init.body === "string" ? parseJson(init.body) : undefined,
+    timeoutMs: 2500,
+  });
+  if (isOkFailure(payload)) return { ok: false as const, error: payload.error };
+  return { ok: true as const, value: payload as T };
+}
+
+function isOkFailure(value: unknown): value is { ok: false; error: string } {
+  return isRecord(value) && value.ok === false && typeof value.error === "string";
+}
+
+function parseJson(value: string): unknown {
   try {
-    const response = await fetch(`${base}${path}`, {
-      ...init,
-      credentials: "omit",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) return { ok: false as const, error: `${path} returned ${response.status}` };
-    return { ok: true as const, value: (await response.json()) as T };
-  } catch (error) {
-    return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
-  } finally {
-    window.clearTimeout(timeout);
+    return value ? JSON.parse(value) : undefined;
+  } catch {
+    return undefined;
   }
 }
 

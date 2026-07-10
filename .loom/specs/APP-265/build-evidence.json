@@ -1,10 +1,10 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-265",
-  "generated_at": "2026-07-10T03:23:04Z",
-  "branch": "work/app-265-live-runtime-e2e",
+  "generated_at": "2026-07-10T04:17:17Z",
+  "branch": "work/app-265-owner-api-ipc",
   "implementation_head": "pending_pr_head_sha",
-  "task_goal": "Prepare the APP-265 fixture/smoke fail-closed correction without promoting fixture/demo/smoke state to live availability.",
+  "task_goal": "Prepare the APP-265 owner API IPC and live blocker surfacing correction without promoting fixture/demo/smoke state or needs-auth identities to live task availability.",
   "delegations": [
     {
       "id": "app-265-harbor-runtime-api-readback",
@@ -114,19 +114,23 @@
     "passed": [
       {
         "command": "npm run typecheck",
-        "evidence": "Passed at 2026-07-10T03:23Z UTC."
+        "evidence": "Passed at 2026-07-10T04:13Z UTC."
       },
       {
         "command": "npm run smoke",
-        "evidence": "Passed at 2026-07-10T03:19Z UTC; full App build plus local renderer/Core/Harbor/Lode contract smoke completed and fixture/demo/smoke owner payload guards were exercised."
+        "evidence": "Passed at 2026-07-10T04:13Z UTC; full App build plus local renderer/Core/Harbor/Lode contract smoke completed, owner API IPC bridge checks passed, and fixture/demo/smoke owner payload guards accepted real-shaped Harbor provider guidance while rejecting smoke evidence refs."
       },
       {
         "command": "npm run smoke:packaged:readonly",
-        "evidence": "Passed at 2026-07-10T03:23Z UTC; packaged Electron launched packaged Core/Harbor runtime processes and kept Harbor fixture provider fail-closed. Screenshot: artifacts/app-265-packaged-readonly-smoke.png."
+        "evidence": "Passed at 2026-07-10T04:14Z UTC; packaged Electron launched packaged Core/Harbor runtime processes and kept Harbor fixture provider fail-closed. Screenshot: artifacts/app-265-packaged-readonly-smoke.png."
       },
       {
         "command": "npm run smoke:packaged:runtime",
-        "evidence": "Passed at 2026-07-10T03:23Z UTC; packaged Core/Harbor runtime launched from packaged paths and owner health/admission was ready."
+        "evidence": "Passed at 2026-07-10T04:14Z UTC; packaged Core/Harbor runtime launched from packaged paths and owner health/admission was ready."
+      },
+      {
+        "command": "Computer Use App E2E plus local curl readback",
+        "evidence": "Passed up to the account/profile blocker at 2026-07-10T04:15Z UTC. App showed Core admission ready, Harbor ready, and Lode ready; Harbor detected CloakBrowser missing and official Chrome launchable; App created/read a Harbor live Xiaohongshu identity environment; App launched a dedicated-profile official Chrome session to https://www.xiaohongshu.com/explore and Harbor returned session_7766aac0-9ed7-4832-bb94-52482aa4de5c, viewer_dd9cf7ec-41d6-4d06-ba3c-55469668a0bb, and page title 小红书 - 你的生活兴趣社区. Core submit stayed disabled because login_state=unknown and manual_authentication_state=required."
       },
       {
         "command": "npm run smoke:packaged:vertical",
@@ -196,11 +200,10 @@
     }
   ],
   "runtime_boundary": {
-    "runtime_evidence_kind": "local App packaged contract smoke and packaged owner-runtime build path",
-    "live_site_evidence": "not_attempted",
-    "profile": "none opened by this App lane",
+    "runtime_evidence_kind": "local App packaged contract smoke, packaged owner-runtime build path, and user-authorized App/Harbor live session blocker evidence",
+    "live_site_evidence": "Dedicated-profile official Chrome opened https://www.xiaohongshu.com/explore read-only; no login, publish, submit, send, write, bulk collection, or risk-control bypass occurred.",
+    "profile": "Harbor dedicated profile ref only; raw profile storage was not read or exported.",
     "forbidden_actions": [
-      "login",
       "submit",
       "publish",
       "apply",
@@ -211,8 +214,8 @@
     ]
   },
   "remaining_limitations": [
-    "This PR does not perform real Xiaohongshu/BOSS site access or browser profile actions.",
+    "This PR does not complete real Xiaohongshu/BOSS task execution because no ready/logged-in Harbor live identity/profile was available.",
     "This PR does not prove final App #14 live E2E and must not close App #265.",
-    "Final closeout still needs user-authorized Computer Use E2E with real provider detection, identity browser session, Xiaohongshu/BOSS read-only tasks, evidence refs, and write-precheck submitted=false."
+    "Final closeout still needs a user-provided or user-authenticated Harbor identity/profile for Xiaohongshu and BOSS, followed by App-driven read-only task evidence refs and write-precheck submitted=false."
   ]
 }

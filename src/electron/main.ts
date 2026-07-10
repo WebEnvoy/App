@@ -17,6 +17,15 @@ const packagedSmokeUserDataDir = process.env.WEBENVOY_PACKAGED_SMOKE_USER_DATA_D
 const localConnectionStorageKey = "webenvoy.localConnectionConfig.v1";
 let runtimeSupervisor = createRuntimeSupervisor();
 const mainWindows = new Set<BrowserWindow>();
+type OwnerApiJsonRequest = {
+  base?: unknown;
+  path?: unknown;
+  method?: unknown;
+  body?: unknown;
+};
+const ownerApiAllowedHosts = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+const sensitiveOwnerApiFragment =
+  /\b(token|cookie|secret|bearer|profile|credential|password|authorization)\b|raw[\s_-]*evidence/i;
 
 app.setName("WebEnvoy App");
 
@@ -421,6 +430,9 @@ app.whenReady().then(() => {
   ipcMain.handle("webenvoy:runtime-supervisor-state", (_event, config) =>
     runtimeSupervisor.readState(config),
   );
+  ipcMain.handle("webenvoy:owner-api-json", (_event, request) =>
+    requestOwnerApiJson(request),
+  );
 
   nativeTheme.on("updated", () => {
     const colorScheme = getSystemColorScheme();
@@ -447,3 +459,91 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   runtimeSupervisor.stop();
 });
+
+async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
+  const parsed = parseOwnerApiRequest(request);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(parsed.url, {
+      method: parsed.method,
+      credentials: "omit",
+      headers: {
+        Accept: "application/json",
+        ...(parsed.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(parsed.body === undefined ? {} : { body: JSON.stringify(parsed.body) }),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const json = parseJson(text);
+    if (!response.ok) {
+      return { ok: false, status: response.status, error: `${parsed.path} returned ${response.status}`, body: json };
+    }
+    return { ok: true, status: response.status, body: json ?? {} };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseOwnerApiRequest(request: OwnerApiJsonRequest):
+  | { ok: true; url: string; path: string; method: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown }
+  | { ok: false; error: string } {
+  if (typeof request?.base !== "string" || typeof request.path !== "string") {
+    return { ok: false, error: "Owner API request requires base and path strings." };
+  }
+  const method = ownerApiMethod(request.method);
+  if (!method) return { ok: false, error: "Owner API method is not allowed." };
+  if (!request.path.startsWith("/") || request.path.startsWith("//")) {
+    return { ok: false, error: "Owner API path must be an absolute local path." };
+  }
+  if (sensitiveOwnerApiFragment.test(request.base) || sensitiveOwnerApiFragment.test(request.path)) {
+    return { ok: false, error: "Owner API URL cannot include sensitive fragments." };
+  }
+
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(request.base);
+  } catch {
+    return { ok: false, error: "Owner API base must be a valid URL." };
+  }
+  if (baseUrl.protocol !== "http:") {
+    return { ok: false, error: "Owner API base must use http on the local machine." };
+  }
+  if (!ownerApiAllowedHosts.has(baseUrl.hostname)) {
+    return { ok: false, error: "Owner API host must be localhost or loopback." };
+  }
+  if (baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
+    return { ok: false, error: "Owner API base cannot include credentials, query, or hash." };
+  }
+
+  const url = new URL(request.path, `${baseUrl.origin}${baseUrl.pathname.replace(/\/+$/, "")}/`);
+  if (url.origin !== baseUrl.origin) {
+    return { ok: false, error: "Owner API path must stay on the configured local origin." };
+  }
+  return {
+    ok: true,
+    url: url.toString(),
+    path: `${url.pathname}${url.search}`,
+    method,
+    ...(request.body === undefined ? {} : { body: request.body }),
+  };
+}
+
+function ownerApiMethod(value: unknown): "GET" | "POST" | "PATCH" | "DELETE" | null {
+  if (value === undefined) return "GET";
+  return value === "GET" || value === "POST" || value === "PATCH" || value === "DELETE" ? value : null;
+}
+
+function parseJson(text: string) {
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
