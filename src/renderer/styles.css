@@ -2287,11 +2287,15 @@ h3 {
   background: var(--we-surface-primary);
 }
 
-.identity-connection-strip,
-.core-read-source-strip,
-.runtime-supervisor-strip {
+.identity-connection-strip {
   grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1fr) auto;
   align-items: center;
+}
+
+.core-read-source-strip,
+.runtime-supervisor-strip {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
 }
 
 .identity-connection-ready,
@@ -2325,7 +2329,7 @@ h3 {
 
 .identity-connection-strip div,
 .core-read-source-strip div,
-.runtime-supervisor-strip div:first-child,
+.runtime-supervisor-strip > div:first-child,
 .identity-management-heading {
   display: flex;
   min-width: 0;

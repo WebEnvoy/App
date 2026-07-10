@@ -1,10 +1,10 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-265",
-  "generated_at": "2026-07-09T15:46:00Z",
-  "branch": "work/app-265-live-readonly-e2e",
+  "generated_at": "2026-07-10T03:23:04Z",
+  "branch": "work/app-265-live-runtime-e2e",
   "implementation_head": "pending_pr_head_sha",
-  "task_goal": "Prepare the App-only live-safe readonly submit slice for APP-265 without promoting fixture/demo state to live availability.",
+  "task_goal": "Prepare the APP-265 fixture/smoke fail-closed correction without promoting fixture/demo/smoke state to live availability.",
   "delegations": [
     {
       "id": "app-265-harbor-runtime-api-readback",
@@ -74,14 +74,13 @@
   ],
   "ownership_constraints": {
     "write_ownership": [
-      "package.json",
       "scripts/smoke-packaged-readonly.mjs",
       "src/electron/main.ts",
-      "src/renderer/App.tsx",
-      "src/renderer/SiteSkillPages.tsx",
-      "src/renderer/TaskThreadComposer.tsx",
-      "src/renderer/TaskThreadPage.tsx",
-      "src/renderer/taskThreadFixtures.ts",
+      "src/electron/runtimeSupervisor.ts",
+      "src/renderer/coreReadTaskClient.ts",
+      "src/renderer/harborIdentityClient.ts",
+      "src/renderer/ownerPayloadGuards.ts",
+      "src/renderer/styles.css",
       "artifacts/app-265-packaged-readonly-smoke.png",
       "artifacts/app-265-packaged-runtime-smoke.png",
       "artifacts/app-261-packaged-vertical-smoke.png",
@@ -115,35 +114,31 @@
     "passed": [
       {
         "command": "npm run typecheck",
-        "evidence": "Passed at 2026-07-09T15:39Z UTC."
+        "evidence": "Passed at 2026-07-10T03:23Z UTC."
       },
       {
         "command": "npm run smoke",
-        "evidence": "Passed at 2026-07-09T15:39Z UTC; full App build plus local renderer/Core/Harbor/Lode contract smoke completed."
+        "evidence": "Passed at 2026-07-10T03:19Z UTC; full App build plus local renderer/Core/Harbor/Lode contract smoke completed and fixture/demo/smoke owner payload guards were exercised."
       },
       {
         "command": "npm run smoke:packaged:readonly",
-        "evidence": "Passed at 2026-07-09T15:52Z UTC; packaged Electron edited Xiaohongshu same-origin input, submitted to Core /tasks, rendered run id app-xiaohongshu-mrdounvl, session ref harbor:runtime-session/app265/readonly, evidence ref harbor:evidence/app265/readonly, and screenshot artifacts/app-265-packaged-readonly-smoke.png."
+        "evidence": "Passed at 2026-07-10T03:23Z UTC; packaged Electron launched packaged Core/Harbor runtime processes and kept Harbor fixture provider fail-closed. Screenshot: artifacts/app-265-packaged-readonly-smoke.png."
       },
       {
-        "command": "WEBENVOY_CORE_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-app-admission-e2e WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-main-packaged-smoke npm run smoke:packaged:runtime",
-        "evidence": "Passed at 2026-07-09T15:43Z UTC; packaged Core/Harbor runtime launched from packaged paths and owner health/admission was ready."
+        "command": "npm run smoke:packaged:runtime",
+        "evidence": "Passed at 2026-07-10T03:23Z UTC; packaged Core/Harbor runtime launched from packaged paths and owner health/admission was ready."
       },
       {
-        "command": "WEBENVOY_CORE_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/WebEnvoy.worktrees/core-244-app-admission-e2e WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR=/Volumes/2T/dev/WebEnvoy/Harbor.worktrees/harbor-main-packaged-smoke npm run smoke:packaged:vertical",
-        "evidence": "Passed at 2026-07-09T15:44Z UTC; packaged vertical health/admission/Lode assets and fixture fail-closed checks passed."
-      },
-      {
-        "command": "npm run smoke:packaged",
-        "evidence": "Passed at 2026-07-09T15:45Z UTC; default packaged smoke remains compatible with the new optional readonly_submit smoke hook."
+        "command": "npm run smoke:packaged:vertical",
+        "evidence": "Passed at 2026-07-10T03:23Z UTC; packaged vertical health/admission/Lode assets and fixture fail-closed checks passed."
       },
       {
         "command": "git diff --check",
-        "evidence": "Passed at 2026-07-09T15:45Z UTC."
+        "evidence": "Passed at 2026-07-10T03:23Z UTC."
       },
       {
-        "command": "loom status --target . --json; loom fact-chain --target . --json",
-        "evidence": "Passed at 2026-07-09T15:46Z UTC with no active item and readable fact-chain."
+        "command": "loom fact-chain --target . --json; loom suite carrier validate --target . --item APP-265 --json; loom suite evidence validate --target . --item APP-265 --json",
+        "evidence": "Passed at 2026-07-10T03:22Z UTC with readable fact-chain and valid APP-265 carrier/evidence maps."
       },
       {
         "command": "tools/skills_surface.py check; tools/loom_check.py --profile source --source-surface contract-only; tools/check_release_surface.py; tools/version_surface_check.py; tools/check_npm_package.py",

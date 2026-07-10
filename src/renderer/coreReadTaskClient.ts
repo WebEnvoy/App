@@ -1,4 +1,5 @@
 import type { OutcomeKind, OwnerSource, RunProjection, TaskProjection } from "./taskThreadFixtures";
+import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 
 type CoreReadStatus = "loading" | "ready" | "offline";
 type JsonRecord = Record<string, unknown>;
@@ -343,6 +344,10 @@ async function fetchCapabilityRuns(
   });
   const response = await requestJson(endpoint, `/capability-runs?${params.toString()}`);
   const body = okPayload(response, "capability_runs");
+  const fixtureReason = fixtureOrDemoPayloadReason(body ?? response);
+  if (fixtureReason) {
+    return { ok: false, error: `${capability.capabilityRef} returned fixture/demo/smoke payload: ${fixtureReason}` };
+  }
   const runsValue = body == null ? [] : arrayValue(body.runs);
   const latestRun = body == null ? null : recordValue(body.latest_run);
   const runSummaries = runsValue.length > 0 ? runsValue : latestRun == null ? [] : [latestRun];
@@ -398,6 +403,10 @@ async function fetchRunProjection(
   const evidence = evidencePayload.payload;
   const failure = failurePayload.payload as CoreFailureEnvelope;
   const session = sessionPayload.payload as CoreSessionRefsEnvelope;
+  const fixtureReason = fixtureOrDemoPayloadReason({ run, result, evidence, failure, session });
+  if (fixtureReason) {
+    return { ok: false, error: `/runs/${runId} returned fixture/demo/smoke payload: ${fixtureReason}` };
+  }
   const envelope = result?.result?.result_envelope;
   const isWritePrecheck = spec.mode === "write-precheck";
   const previewResult = corePreviewResult(envelope?.preview_result ?? result?.result?.preview_result);
@@ -522,6 +531,10 @@ export async function fetchCoreRunProjectionById(
   const encodedRunId = encodeURIComponent(runId);
   const response = await requestJson(endpoint, `/runs/${encodedRunId}`);
   const body = okPayload(response, "run") ?? okPayload(response, "run_record") ?? recordValue(response);
+  const fixtureReason = fixtureOrDemoPayloadReason(body);
+  if (fixtureReason) {
+    return { ok: false, error: `/runs/${encodedRunId} returned fixture/demo/smoke payload: ${fixtureReason}` };
+  }
   const run = coreRunSummary(body);
 
   if (run == null) {

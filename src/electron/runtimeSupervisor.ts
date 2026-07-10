@@ -179,7 +179,14 @@ async function readServiceState(
     runtimeProcessEnvironment(id, config, lodeAssets, runtimeDataDir),
     endpoint,
   );
-  const health = await probeFirst(endpoint, serviceHealthPaths[id]);
+  let health = await probeFirst(endpoint, serviceHealthPaths[id]);
+  if (id === "harbor" && process.env.HARBOR_RUNTIME_PROVIDER === "fixture") {
+    health = {
+      ...health,
+      state: "unavailable",
+      summary: "Harbor fixture runtime provider is contract-only and cannot be used as live browser evidence.",
+    };
+  }
   const admission = id === "core" ? await probeFirst(endpoint, coreAdmissionPaths) : undefined;
   const processState = health.state === "ready" && snapshot.processState === "not_configured" ? "running" : snapshot.processState;
 

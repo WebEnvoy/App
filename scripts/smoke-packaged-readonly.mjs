@@ -9,10 +9,6 @@ const screenshotPath = path.resolve(
   process.env.WEBENVOY_PACKAGED_READONLY_SMOKE_SCREENSHOT ?? "artifacts/app-265-packaged-readonly-smoke.png",
 );
 
-const readonlyInput =
-  process.env.WEBENVOY_PACKAGED_SMOKE_READONLY_INPUT ??
-  "关键词：AI 工具；笔记：https://www.xiaohongshu.com/explore/app265-readonly-smoke";
-
 const corePort = await reservePort();
 const harborPort = await reservePort();
 const userDataDir = await mkdtemp(path.join(tmpdir(), "webenvoy-app-packaged-readonly-"));
@@ -29,35 +25,31 @@ try {
   const services = result.runtimeSupervisorState?.services ?? [];
   const core = services.find((service) => service.id === "core");
   const harbor = services.find((service) => service.id === "harbor");
-  const readonlySubmit = result.readonlySubmitSmoke;
 
-  if (!result.runtimeSupervisorState?.canUseLiveRuntime || result.runtimeSupervisorState?.failClosed) {
-    throw new Error(`Packaged readonly smoke failed: live gate was not ready. ${JSON.stringify(result.runtimeSupervisorState)}`);
+  if (result.runtimeSupervisorState?.canUseLiveRuntime || !result.runtimeSupervisorState?.failClosed) {
+    throw new Error(`Packaged readonly smoke failed: fixture launcher opened live gate. ${JSON.stringify(result.runtimeSupervisorState)}`);
   }
   if (core?.launchSource !== "packaged-path" || harbor?.launchSource !== "packaged-path") {
     throw new Error(`Packaged readonly smoke failed: runtimes were not launched from packaged paths. ${JSON.stringify(services)}`);
   }
-  if (core?.admission?.state !== "ready" || harbor?.health?.state !== "ready") {
-    throw new Error(`Packaged readonly smoke failed: owner health/admission is not ready. ${JSON.stringify(services)}`);
+  if (core?.processState !== "running" || harbor?.health?.state !== "unavailable") {
+    throw new Error(`Packaged readonly smoke failed: fixture Harbor was not fail-closed after packaged runtime launch. ${JSON.stringify(services)}`);
   }
-  if (!readonlySubmit?.canSubmitBeforeClick || !readonlySubmit.ready) {
-    throw new Error(`Packaged readonly smoke failed: App did not submit through Core owner refs. ${JSON.stringify(readonlySubmit)}`);
-  }
-  if (!/Core accepted \/tasks/.test(readonlySubmit.text) || !/(harbor:(evidence|validation)|evidence_)/.test(readonlySubmit.text)) {
-    throw new Error(`Packaged readonly smoke failed: submitted run did not expose Core/Harbor owner refs. ${JSON.stringify(readonlySubmit)}`);
+  if (!/fixture runtime provider/.test(harbor.health.summary)) {
+    throw new Error(`Packaged readonly smoke failed: fixture Harbor blocker was not explained. ${JSON.stringify(harbor.health)}`);
   }
 
   console.log(
     [
-      "Packaged readonly smoke passed.",
+      "Packaged readonly fixture-block smoke passed.",
       `Core endpoint: http://127.0.0.1:${corePort}`,
       `Harbor endpoint: http://127.0.0.1:${harborPort}`,
       `Core pid: ${core.pid}`,
       `Harbor pid: ${harbor.pid}`,
       `Lode asset source: ${result.runtimeSupervisorState.lodeAssets.source}`,
       `Screenshot: ${screenshotPath}`,
-      "Evidence: Electron App launched packaged Core/Harbor runtime processes, seeded Harbor public identity facts, submitted read-only task through App UI to Core /tasks, and displayed Harbor/Core refs.",
-      "Boundary: Harbor used fixture launcher for safe local smoke; no real account/profile/Cookie/production page/browser launch and no submit/publish/send.",
+      "Evidence: Electron App launched packaged Core/Harbor runtime processes and kept fixture Harbor fail-closed.",
+      "Boundary: no real account/profile/Cookie/production page/browser launch and no submit/publish/send.",
     ].join("\n"),
   );
 } finally {
@@ -69,13 +61,11 @@ async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath, 
     env: {
       ...process.env,
       WEBENVOY_PACKAGED_SMOKE: "1",
-      WEBENVOY_PACKAGED_SMOKE_ACTION: "readonly_submit",
-      WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION: "live_ready",
+      WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION: "fail_closed",
       WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT: coreEndpoint,
       WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT: harborEndpoint,
       WEBENVOY_PACKAGED_SMOKE_USER_DATA_DIR: userDataDir,
       WEBENVOY_PACKAGED_SMOKE_SCREENSHOT: screenshotPath,
-      WEBENVOY_PACKAGED_SMOKE_READONLY_INPUT: readonlyInput,
       HARBOR_RUNTIME_PROVIDER: "fixture",
       HARBOR_CLOAKBROWSER_PATH: process.execPath,
     },
