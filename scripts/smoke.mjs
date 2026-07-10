@@ -34,6 +34,7 @@ const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTyp
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
 const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
 const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
+const harborSessionReferenceSource = await readFile("src/renderer/harborSessionReference.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
 const manualAuthenticationCompletionModule = await import(
   pathToFileURL(path.resolve("dist-electron/manualAuthenticationCompletion.js")).href,
@@ -456,6 +457,13 @@ const { outputText: ownerApiClientModuleSource } = ts.transpileModule(ownerApiCl
   },
 });
 const ownerApiClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerApiClientModuleSource)}`;
+const { outputText: harborSessionReferenceModuleSource } = ts.transpileModule(harborSessionReferenceSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const harborSessionReferenceModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(harborSessionReferenceModuleSource)}`;
 const ownerApiClientModule = await import(ownerApiClientModuleUrl);
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
   compilerOptions: {
@@ -500,6 +508,14 @@ const harborIdentityClientModule = await import(
       .replace(
         'from "./ownerApiClient";',
         `from "${ownerApiClientModuleUrl}";`,
+      )
+      .replace(
+        'from "./harborSessionReference";',
+        `from "${harborSessionReferenceModuleUrl}";`,
+      )
+      .replace(
+        'from "./harborSessionReference";',
+        `from "${harborSessionReferenceModuleUrl}";`,
       ),
   )}`
 );

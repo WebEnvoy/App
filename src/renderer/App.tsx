@@ -410,6 +410,18 @@ export function App() {
     }
   }
 
+  function applyHarborIdentityState(state: HarborIdentityLoadState) {
+    setHarborIdentityState(state);
+    setCoreSubmitStatesByKey((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([key, value]) => [
+          key,
+          value.status === "blocked" ? initialCoreTaskSubmitState : value,
+        ]),
+      ),
+    );
+  }
+
   function openTaskThread() {
     setActiveView("task-thread");
   }
@@ -727,6 +739,7 @@ export function App() {
               harborEndpoint={connectionConfig.harborEndpoint}
               runtimeSupervisorState={runtimeSupervisorState}
               onOpenTask={openTaskById}
+              onHarborIdentityStateChange={applyHarborIdentityState}
             />
           </ThreadWorkspace>
         ) : isSiteSkillView ? (

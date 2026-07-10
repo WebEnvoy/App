@@ -18,6 +18,7 @@ import {
 import {
   completeHarborManualAuthentication,
   createHarborIdentityEnvironment,
+  forgetHarborRuntimeSessionReference,
   fetchHarborIdentityState,
   lockHarborSession,
   openHarborIdentitySession,
@@ -58,10 +59,12 @@ export function IdentityEnvironmentsPage({
   harborEndpoint,
   runtimeSupervisorState,
   onOpenTask,
+  onHarborIdentityStateChange,
 }: {
   harborEndpoint: string;
   runtimeSupervisorState: RuntimeSupervisorState;
   onOpenTask: (taskId: string) => void;
+  onHarborIdentityStateChange: (state: HarborIdentityLoadState) => void;
 }) {
   const [selectedId, setSelectedId] = useState(
     () => window.localStorage.getItem(localIdentitySelectionStorageKey) ?? identityEnvironmentFixtures[0].id,
@@ -99,7 +102,10 @@ export function IdentityEnvironmentsPage({
 
   async function refreshHarborState() {
     setHarborState((current) => ({ ...current, status: "loading" }));
-    setHarborState(await fetchHarborIdentityState(harborEndpoint, localDrafts));
+    const nextState = await fetchHarborIdentityState(harborEndpoint, localDrafts);
+    setHarborState(nextState);
+    onHarborIdentityStateChange(nextState);
+    return nextState;
   }
 
   function selectIdentity(id: string) {
@@ -120,13 +126,15 @@ export function IdentityEnvironmentsPage({
   }
 
   function rememberSelectedSession(nextSession: BrowserSessionProjection) {
-    if (nextSession.state !== "failed" && nextSession.browserSessionRef && nextSession.browserSessionRef !== "无") {
+    if ((nextSession.state === "running" || nextSession.state === "takeover") && nextSession.browserSessionRef && nextSession.browserSessionRef !== "无") {
       rememberHarborRuntimeSessionReference(
         harborEndpoint,
         selected.identityEnvironmentRef,
         nextSession.browserSessionRef,
       );
+      return;
     }
+    forgetHarborRuntimeSessionReference(harborEndpoint, selected.identityEnvironmentRef);
   }
 
   async function startManualBrowser(target: BrowserTargetProjection) {

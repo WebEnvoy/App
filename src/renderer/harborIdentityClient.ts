@@ -13,6 +13,11 @@ import {
 } from "./harborIdentityTypes";
 import type { BrowserSessionProjection, BrowserTargetProjection, IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
 import { requestOwnerJson } from "./ownerApiClient";
+import {
+  forgetHarborRuntimeSessionReference,
+  rememberHarborRuntimeSessionReference,
+  storedHarborRuntimeSessionReference,
+} from "./harborSessionReference";
 
 export type ManualAuthenticationCompletionResult =
   | { ok: true; identity: HarborIdentityFacts }
@@ -62,22 +67,7 @@ export async function fetchHarborIdentityState(
   };
 }
 
-export function rememberHarborRuntimeSessionReference(
-  harborEndpoint: string,
-  identityEnvironmentRef: string,
-  runtimeSessionRef: string,
-) {
-  if (!isPublicReference(identityEnvironmentRef) || !isPublicReference(runtimeSessionRef)) return;
-
-  try {
-    window.localStorage.setItem(
-      harborSessionStorageKey(harborEndpoint, identityEnvironmentRef),
-      runtimeSessionRef,
-    );
-  } catch {
-    // Storage is an optional display cache. Harbor remains the source of session truth.
-  }
-}
+export { forgetHarborRuntimeSessionReference, rememberHarborRuntimeSessionReference } from "./harborSessionReference";
 
 export async function openHarborIdentitySession(
   harborEndpoint: string,
@@ -202,19 +192,36 @@ async function hydrateHarborSession(
     `/runtime/sessions/${encodeURIComponent(runtimeSessionRef)}`,
     `/sessions/${encodeURIComponent(runtimeSessionRef)}`,
   ]);
-  if (
-    !result.ok ||
-    fixtureOrDemoPayloadReason(result.value) ||
-    !isCurrentIdentitySession(result.value, identity.identityEnvironmentRef)
-  ) {
+  if (result.ok && !fixtureOrDemoPayloadReason(result.value) && isCurrentIdentitySession(result.value, identity.identityEnvironmentRef)) {
+    if (!isResumableHarborSession(result.value)) {
+      forgetHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef);
+    }
+    return withHarborSession(identity, result.value);
+  }
+
+  // A supervised Harbor process may restart with durable identity facts but no
+  // in-memory session. Recreate only a previously user-started, ready identity
+  // session; never infer authentication or use page/profile material.
+  if (!canRestoreHarborIdentitySession(identity)) return identity;
+
+  const target = identity.browser.targets.find((candidate) => candidate.id === identity.siteId);
+  if (!target) return identity;
+
+  const restored = await openHarborIdentitySession(harborEndpoint, identity, target);
+  if (!isCurrentIdentitySession(restored, identity.identityEnvironmentRef) || !isResumableHarborSession(restored)) {
     return identity;
   }
 
+  rememberHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef, restored.runtime_session_ref);
+  return withHarborSession(identity, restored);
+}
+
+function withHarborSession(identity: IdentityEnvironmentProjection, session: HarborRuntimeSession): IdentityEnvironmentProjection {
   return {
     ...identity,
     browser: {
       ...identity.browser,
-      session: projectHarborSession(result.value, identity.browser.session),
+      session: projectHarborSession(session, identity.browser.session),
     },
   };
 }
@@ -339,33 +346,26 @@ function sessionPaths(sessionRef: string, action: "lock" | "release" | "stop") {
   return [`/runtime/sessions/${encoded}/${action}`, `/sessions/${encoded}/${action}`];
 }
 
-function storedHarborRuntimeSessionReference(harborEndpoint: string, identityEnvironmentRef: string) {
-  try {
-    const value = window.localStorage.getItem(harborSessionStorageKey(harborEndpoint, identityEnvironmentRef));
-    return isPublicReference(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function harborSessionStorageKey(harborEndpoint: string, identityEnvironmentRef: string) {
-  return `webenvoy.harbor.runtime-session-ref.v1:${normalizeEndpoint(harborEndpoint)}:${identityEnvironmentRef}`;
-}
-
-function normalizeEndpoint(value: string) {
-  return value.trim().replace(/\/+$/, "");
-}
-
-function isPublicReference(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 512;
-}
-
-function isCurrentIdentitySession(result: HarborRuntimeSession, identityEnvironmentRef: string) {
+function isCurrentIdentitySession(
+  result: HarborRuntimeSession,
+  identityEnvironmentRef: string,
+): result is Exclude<HarborRuntimeSession, { status: "unavailable" }> {
   if ("status" in result || !isRecord(result)) return false;
   const publicFacts = result as unknown as Record<string, unknown>;
   return result.schema_version === "harbor-runtime-facts/v0" &&
     result.runtime_session_ref.length > 0 &&
     publicFacts.identity_environment_ref === identityEnvironmentRef;
+}
+
+function isResumableHarborSession(result: Exclude<HarborRuntimeSession, { status: "unavailable" }>) {
+  return result.lifecycle_state === "starting" || result.lifecycle_state === "active" || result.lifecycle_state === "locked";
+}
+
+function canRestoreHarborIdentitySession(identity: IdentityEnvironmentProjection) {
+  return identity.source === "Harbor live" &&
+    identity.readiness.state === "ready" &&
+    identity.provider.state === "ready" &&
+    !identity.login.recoveryRequired;
 }
 
 function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts | null {

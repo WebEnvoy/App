@@ -160,28 +160,55 @@ export function projectHarborSession(
   if ("status" in result) {
     return { ...fallback, state: "failed", statusLabel: "不可用", message: result.message };
   }
+  const unavailable =
+    result.lifecycle_state === "failed" ||
+    result.lifecycle_state === "disconnected" ||
+    result.lifecycle_state === "expired" ||
+    result.current_page.status === "unavailable" ||
+    result.current_error != null;
+  const activeUserTakeover =
+    result.lifecycle_state === "active" &&
+    result.current_page.status === "ready" &&
+    result.control_owner === "user" &&
+    result.current_error == null;
   const state =
     result.lifecycle_state === "closed"
       ? "stopped"
-      : result.lifecycle_state === "failed"
+      : unavailable
       ? "failed"
       : result.lifecycle_state === "idle" || result.control_owner === "none"
       ? "idle"
-      : result.control_owner === "user"
+      : activeUserTakeover
       ? "takeover"
       : "running";
+  const controller =
+    state === "failed" || state === "stopped" || state === "idle"
+      ? "空闲"
+      : result.control_owner === "user"
+      ? "用户接管"
+      : result.control_owner === "core_task"
+      ? "Core 任务运行"
+      : "手动浏览";
   return {
     provider: fallback.provider,
     state,
     statusLabel: state === "takeover" ? "用户接管" : state === "stopped" ? "已停止" : state === "failed" ? "失败" : state === "idle" ? "已释放" : "已启动",
-    controller: result.control_owner === "none" ? "空闲" : result.control_owner === "user" ? "用户接管" : result.control_owner === "core_task" ? "Core 任务运行" : "手动浏览",
+    controller,
     browserSessionRef: result.runtime_session_ref,
     viewerRef: result.viewer_ref ?? fallback.viewerRef,
     currentUrl: result.current_page.current_url ?? result.current_page.requested_url,
     title: result.current_page.title ?? "无标题",
     startedAt: result.created_at,
-    message: result.current_error?.message ?? "Harbor 已返回真实本地身份浏览器会话事实。",
+    message: result.current_error?.message ?? sessionLifecycleMessage(result.lifecycle_state),
   };
+}
+
+function sessionLifecycleMessage(
+  lifecycleState: Exclude<HarborRuntimeSession, { status: "unavailable" }>["lifecycle_state"],
+) {
+  if (lifecycleState === "disconnected") return "Harbor 报告会话已断开；App 不将其显示为用户接管或认证成功。";
+  if (lifecycleState === "expired") return "Harbor 报告会话已过期；请刷新或重新打开受控身份浏览器。";
+  return "Harbor 已返回真实本地身份浏览器会话事实。";
 }
 
 export function identityInputFromProjection(identity: IdentityEnvironmentProjection) {
