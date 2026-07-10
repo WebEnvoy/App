@@ -25,10 +25,12 @@ export function isHarborRuntimeSessionFacts(value: unknown): value is Exclude<Ha
     (value.viewer_ref === undefined || publicReference(value.viewer_ref));
 }
 
-export function isHarborSessionMissingAfterRestart(value: unknown) {
+export function isHarborSessionMissingAfterRestart(value: unknown, expectedRuntimeSessionRef: string) {
   if (!isRecord(value) || fixtureOrDemoPayloadReason(value)) return false;
-  return value.status === "unavailable" &&
-    value.failure_class === "session_missing" &&
+  return value.schema_version === "harbor-runtime-facts/v0" &&
+    value.runtime_session_ref === expectedRuntimeSessionRef &&
+    value.status === "unavailable" &&
+    (value.failure_class === "session_missing" || value.failure_class === "session_lost") &&
     publicMessage(value.message) &&
     value.retryable === true &&
     isRuntimeError(value.current_error) &&

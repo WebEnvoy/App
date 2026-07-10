@@ -193,14 +193,17 @@ async function hydrateHarborSession(
   if (!runtimeSessionRef) return identity;
 
   const result = await fetchHarborSession(harborEndpoint, runtimeSessionRef);
-  const session = result.ok ? result.value : result.status === 404 ? result.body : null;
-  if (isCurrentIdentitySession(session, identity.identityEnvironmentRef)) {
-    if (!isResumableHarborSession(session)) {
+  if (result.ok && isCurrentIdentitySession(result.value, identity.identityEnvironmentRef)) {
+    if (!isResumableHarborSession(result.value)) {
       forgetHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef);
     }
-    return withHarborSession(identity, session);
+    return withHarborSession(identity, result.value);
   }
-  if (!isHarborSessionMissingAfterRestart(session)) return identity;
+  if (
+    result.ok ||
+    result.status !== 404 ||
+    !isHarborSessionMissingAfterRestart(result.body, runtimeSessionRef)
+  ) return identity;
 
   if (storedHarborRuntimeSessionReference(harborEndpoint, identity.identityEnvironmentRef) !== runtimeSessionRef) {
     return hydrateHarborSession(harborEndpoint, identity);
