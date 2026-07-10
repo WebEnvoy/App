@@ -20,11 +20,14 @@ for (const file of requiredFiles) {
 const mainSource = await readFile("dist-electron/main.js", "utf8");
 const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const runtimeSupervisorSource = await readFile("dist-electron/runtimeSupervisor.js", "utf8");
+const packagedHarborRuntimeSource = await readFile("dist-electron/runtime/harbor/start-runtime.mjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
 const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
+const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
+const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -76,6 +79,10 @@ if (!runtimeSupervisorSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || 
   throw new Error("Electron supervisor smoke failed: per-launch Harbor manual-auth token is missing.");
 }
 
+if (!packagedHarborRuntimeSource.includes("manual_authentication_supervisor_token: process.env.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
+  throw new Error("Packaged Harbor runtime smoke failed: manual-auth supervisor token was not forwarded to Harbor.");
+}
+
 const splitOutputToken = "smoke-split-supervisor-token";
 const splitOutputRedactor = runtimeSupervisorModule.createRuntimeOutputRedactor(splitOutputToken);
 const splitOutputParts = [
@@ -121,6 +128,14 @@ if (rendererHtml.includes('src="/assets/') || rendererHtml.includes('href="/asse
 
 if (!rendererHtml.includes("WebEnvoy App")) {
   throw new Error("Renderer smoke failed: WebEnvoy title is missing.");
+}
+
+if (!identityEnvironmentDetailsSource.includes("onOpenAuthenticationSite") || !identityEnvironmentDetailsSource.includes("onClick={onOpenAuthenticationSite}")) {
+  throw new Error("Identity recovery smoke failed: authentication site button is not wired to a session launch handler.");
+}
+
+if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !identityEnvironmentsPageSource.includes("candidate.id === selected.siteId")) {
+  throw new Error("Identity recovery smoke failed: authentication site launch does not prefer the selected identity site target.");
 }
 
 for (const expectedText of [

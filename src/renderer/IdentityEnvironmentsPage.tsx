@@ -130,6 +130,20 @@ export function IdentityEnvironmentsPage({
     setSessionBusy("");
   }
 
+  function startAuthenticationBrowser() {
+    const target = selected.browser.targets.find((candidate) => candidate.id === selected.siteId) ?? selected.browser.targets[0];
+    if (!target) {
+      updateSelectedSession({
+        ...session,
+        state: "failed",
+        statusLabel: "不可用",
+        message: "当前身份环境没有可打开的站点入口；请刷新 Harbor 状态后重试。",
+      });
+      return;
+    }
+    void startManualBrowser(target);
+  }
+
   function viewSession() {
     updateSelectedSession({
       ...session,
@@ -314,8 +328,10 @@ export function IdentityEnvironmentsPage({
             manualAuthenticationMessage={manualAuthenticationMessage}
             manualAuthenticationBusy={sessionBusy === "manual-authentication-completed"}
             onCompleteManualAuthentication={completeManualAuthentication}
+            onOpenAuthenticationSite={startAuthenticationBrowser}
             onRefresh={refreshHarborState}
             session={session}
+            sessionBusy={sessionBusy}
           />
           <BoundaryPanel identity={selected} />
         </section>
