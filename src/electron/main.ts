@@ -1,9 +1,15 @@
 import { app, BrowserWindow, ipcMain, nativeTheme } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
+import {
+  isExpectedManualAuthenticationRendererUrl,
+  parseManualAuthenticationCompletionIntent,
+  requestManualAuthenticationCompletion,
+} from "./manualAuthenticationCompletion.js";
+import { parseOwnerApiRequest, type OwnerApiJsonRequest } from "./ownerApiRequest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
@@ -17,16 +23,6 @@ const packagedSmokeUserDataDir = process.env.WEBENVOY_PACKAGED_SMOKE_USER_DATA_D
 const localConnectionStorageKey = "webenvoy.localConnectionConfig.v1";
 let runtimeSupervisor = createRuntimeSupervisor();
 const mainWindows = new Set<BrowserWindow>();
-type OwnerApiJsonRequest = {
-  base?: unknown;
-  path?: unknown;
-  method?: unknown;
-  body?: unknown;
-};
-const ownerApiAllowedHosts = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
-const sensitiveOwnerApiFragment =
-  /\b(token|cookie|secret|bearer|profile|credential|password|authorization)\b|raw[\s_-]*evidence/i;
-
 app.setName("WebEnvoy App");
 
 if (packagedSmoke && packagedSmokeUserDataDir) {
@@ -433,6 +429,9 @@ app.whenReady().then(() => {
   ipcMain.handle("webenvoy:owner-api-json", (_event, request) =>
     requestOwnerApiJson(request),
   );
+  ipcMain.handle("webenvoy:harbor-manual-authentication-completed", (event, intent) =>
+    requestHarborManualAuthenticationCompletion(event, intent),
+  );
 
   nativeTheme.on("updated", () => {
     const colorScheme = getSystemColorScheme();
@@ -490,53 +489,29 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
   }
 }
 
-function parseOwnerApiRequest(request: OwnerApiJsonRequest):
-  | { ok: true; url: string; path: string; method: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown }
-  | { ok: false; error: string } {
-  if (typeof request?.base !== "string" || typeof request.path !== "string") {
-    return { ok: false, error: "Owner API request requires base and path strings." };
+async function requestHarborManualAuthenticationCompletion(event: Electron.IpcMainInvokeEvent, intent: unknown) {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (
+    !window ||
+    window.isDestroyed() ||
+    !mainWindows.has(window) ||
+    !isExpectedManualAuthenticationRendererUrl(event.sender.getURL(), expectedRendererUrl())
+  ) {
+    return { ok: false, error: "Manual authentication completion is unavailable." };
   }
-  const method = ownerApiMethod(request.method);
-  if (!method) return { ok: false, error: "Owner API method is not allowed." };
-  if (!request.path.startsWith("/") || request.path.startsWith("//")) {
-    return { ok: false, error: "Owner API path must be an absolute local path." };
-  }
-  if (sensitiveOwnerApiFragment.test(request.base) || sensitiveOwnerApiFragment.test(request.path)) {
-    return { ok: false, error: "Owner API URL cannot include sensitive fragments." };
-  }
-
-  let baseUrl: URL;
-  try {
-    baseUrl = new URL(request.base);
-  } catch {
-    return { ok: false, error: "Owner API base must be a valid URL." };
-  }
-  if (baseUrl.protocol !== "http:") {
-    return { ok: false, error: "Owner API base must use http on the local machine." };
-  }
-  if (!ownerApiAllowedHosts.has(baseUrl.hostname)) {
-    return { ok: false, error: "Owner API host must be localhost or loopback." };
-  }
-  if (baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
-    return { ok: false, error: "Owner API base cannot include credentials, query, or hash." };
-  }
-
-  const url = new URL(request.path, `${baseUrl.origin}${baseUrl.pathname.replace(/\/+$/, "")}/`);
-  if (url.origin !== baseUrl.origin) {
-    return { ok: false, error: "Owner API path must stay on the configured local origin." };
-  }
-  return {
-    ok: true,
-    url: url.toString(),
-    path: `${url.pathname}${url.search}`,
-    method,
-    ...(request.body === undefined ? {} : { body: request.body }),
-  };
+  const parsedIntent = parseManualAuthenticationCompletionIntent(intent);
+  if (!parsedIntent) return { ok: false, error: "Manual authentication completion is unavailable." };
+  const supervisorToken = runtimeSupervisor.getHarborManualAuthSupervisorToken(parsedIntent.base);
+  if (!supervisorToken) return { ok: false, error: "Manual authentication completion is unavailable." };
+  const result = await requestManualAuthenticationCompletion({
+    ...parsedIntent,
+    supervisorToken,
+  });
+  return result.ok ? result.body : result;
 }
 
-function ownerApiMethod(value: unknown): "GET" | "POST" | "PATCH" | "DELETE" | null {
-  if (value === undefined) return "GET";
-  return value === "GET" || value === "POST" || value === "PATCH" || value === "DELETE" ? value : null;
+function expectedRendererUrl() {
+  return rendererDevUrl ?? pathToFileURL(path.join(__dirname, "../dist/renderer/index.html")).toString();
 }
 
 function parseJson(text: string) {

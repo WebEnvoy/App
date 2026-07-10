@@ -16,6 +16,10 @@ type OwnerApiJsonRequest = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
 };
+type ManualAuthenticationCompletionIntent = {
+  base: string;
+  runtimeSessionRef: string;
+};
 
 const shellApi = {
   getShellContext: () =>
@@ -24,6 +28,8 @@ const shellApi = {
     ipcRenderer.invoke("webenvoy:runtime-supervisor-state", config),
   requestOwnerJson: (request: OwnerApiJsonRequest) =>
     ipcRenderer.invoke("webenvoy:owner-api-json", request),
+  completeHarborManualAuthentication: (intent: ManualAuthenticationCompletionIntent) =>
+    ipcRenderer.invoke("webenvoy:harbor-manual-authentication-completed", intent),
   subscribeToSystemThemeVariant: (listener: (colorScheme: WebEnvoyColorScheme) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, colorScheme: WebEnvoyColorScheme) => {
       listener(colorScheme);

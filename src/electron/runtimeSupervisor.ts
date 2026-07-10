@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +71,9 @@ type ProcessSnapshot = {
   processState: RuntimeProcessState;
   child?: ChildProcess;
   endpoint?: string;
+  manualAuthSupervisorToken?: string;
+  outputRedactor?: RuntimeOutputRedactor;
+  errorRedactor?: RuntimeOutputRedactor;
   lastExitCode?: number | null;
   lastError?: string;
   lastOutput?: string;
@@ -86,6 +90,12 @@ const serviceHealthPaths: Record<RuntimeServiceId, string[]> = {
 };
 
 const coreAdmissionPaths = ["/admission/health", "/admission/ready", "/tasks/admission/health"];
+const runtimeOutputRedactionCarryLength = 1024;
+
+type RuntimeOutputRedactor = {
+  write(chunk: string): string;
+  flush(): string;
+};
 
 export function resolveRuntimeServiceLaunchConfig(
   id: RuntimeServiceId,
@@ -158,6 +168,10 @@ export function createRuntimeSupervisor(options: RuntimeSupervisorOptions = {}) 
       for (const snapshot of processSnapshots.values()) {
         snapshot.child?.kill();
       }
+    },
+    getHarborManualAuthSupervisorToken(harborEndpoint: string) {
+      const snapshot = processSnapshots.get("harbor");
+      return snapshot?.endpoint === normalizeEndpoint(harborEndpoint) && snapshot.child ? snapshot.manualAuthSupervisorToken : undefined;
     },
   };
 }
@@ -232,17 +246,27 @@ function ensureProcess(
   }
 
   try {
+    const manualAuthSupervisorToken = id === "harbor" ? randomBytes(32).toString("base64url") : undefined;
+    const { HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: _ignoredSupervisorToken, ...parentEnv } = process.env;
     const child = spawn(launch.command, launch.args ?? [], {
       cwd: launch.cwd,
       env: {
-        ...process.env,
+        ...parentEnv,
         ...(launch.source === "packaged-path" ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
         ...extraEnv,
+        ...(manualAuthSupervisorToken ? { HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: manualAuthSupervisorToken } : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
-    const snapshot: ProcessSnapshot = { child, endpoint, processState: "starting" };
+    const snapshot: ProcessSnapshot = {
+      child,
+      endpoint,
+      processState: "starting",
+      manualAuthSupervisorToken,
+      outputRedactor: createRuntimeOutputRedactor(manualAuthSupervisorToken),
+      errorRedactor: createRuntimeOutputRedactor(manualAuthSupervisorToken),
+    };
     processSnapshots.set(id, snapshot);
     child.on("spawn", () => {
       snapshot.processState = "running";
@@ -252,12 +276,14 @@ function ensureProcess(
       snapshot.lastError = error.message;
     });
     child.stdout?.on("data", (chunk) => {
-      snapshot.lastOutput = trimRuntimeOutput(`${snapshot.lastOutput ?? ""}${chunk.toString()}`);
+      snapshot.lastOutput = appendRuntimeOutput(snapshot.lastOutput, snapshot.outputRedactor?.write(chunk.toString()) ?? "");
     });
     child.stderr?.on("data", (chunk) => {
-      snapshot.lastError = trimRuntimeOutput(`${snapshot.lastError ?? ""}${chunk.toString()}`);
+      snapshot.lastError = appendRuntimeOutput(snapshot.lastError, snapshot.errorRedactor?.write(chunk.toString()) ?? "");
     });
-    child.on("exit", (code) => {
+    child.on("close", (code) => {
+      snapshot.lastOutput = appendRuntimeOutput(snapshot.lastOutput, snapshot.outputRedactor?.flush() ?? "");
+      snapshot.lastError = appendRuntimeOutput(snapshot.lastError, snapshot.errorRedactor?.flush() ?? "");
       snapshot.processState = code === 0 ? "exited" : "failed";
       snapshot.lastExitCode = code;
       snapshot.child = undefined;
@@ -271,6 +297,39 @@ function ensureProcess(
     processSnapshots.set(id, snapshot);
     return snapshot;
   }
+}
+
+export function createRuntimeOutputRedactor(sensitiveValue?: string): RuntimeOutputRedactor {
+  let carry = "";
+  const carryLength = Math.max(runtimeOutputRedactionCarryLength, (sensitiveValue?.length ?? 0) + 1);
+
+  const drain = (flush: boolean) => {
+    let output = "";
+    while (carry.length > (flush ? 0 : carryLength)) {
+      if (sensitiveValue && carry.startsWith(sensitiveValue)) {
+        output += "[redacted]";
+        carry = carry.slice(sensitiveValue.length);
+      } else {
+        output += carry[0];
+        carry = carry.slice(1);
+      }
+    }
+    return output;
+  };
+
+  return {
+    write(chunk) {
+      carry += chunk;
+      return drain(false);
+    },
+    flush() {
+      return drain(true);
+    },
+  };
+}
+
+function appendRuntimeOutput(current: string | undefined, next: string): string {
+  return trimRuntimeOutput(`${current ?? ""}${next}`);
 }
 
 function trimRuntimeOutput(value: string): string {

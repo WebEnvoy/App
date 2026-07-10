@@ -19,6 +19,7 @@ for (const file of requiredFiles) {
 
 const mainSource = await readFile("dist-electron/main.js", "utf8");
 const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
+const runtimeSupervisorSource = await readFile("dist-electron/runtimeSupervisor.js", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
@@ -31,6 +32,15 @@ const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvir
 const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
 const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
+const manualAuthenticationCompletionModule = await import(
+  pathToFileURL(path.resolve("dist-electron/manualAuthenticationCompletion.js")).href,
+);
+const ownerApiRequestModule = await import(
+  pathToFileURL(path.resolve("dist-electron/ownerApiRequest.js")).href,
+);
+const runtimeSupervisorModule = await import(
+  pathToFileURL(path.resolve("dist-electron/runtimeSupervisor.js")).href,
+);
 const rendererAssets = await readFile(
   "dist/renderer/assets/index.js",
   "utf8",
@@ -58,6 +68,33 @@ if (!mainSource.includes("webenvoy:owner-api-json")) {
   throw new Error("Electron main smoke failed: owner API IPC is missing.");
 }
 
+if (!mainSource.includes("webenvoy:harbor-manual-authentication-completed")) {
+  throw new Error("Electron main smoke failed: manual authentication IPC is missing.");
+}
+
+if (!runtimeSupervisorSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || !runtimeSupervisorSource.includes("randomBytes(32)")) {
+  throw new Error("Electron supervisor smoke failed: per-launch Harbor manual-auth token is missing.");
+}
+
+const splitOutputToken = "smoke-split-supervisor-token";
+const splitOutputRedactor = runtimeSupervisorModule.createRuntimeOutputRedactor(splitOutputToken);
+const splitOutputParts = [
+  splitOutputRedactor.write(`before ${splitOutputToken.slice(0, 11)}`),
+  splitOutputRedactor.write(`${splitOutputToken.slice(11)} after`),
+  splitOutputRedactor.flush(),
+];
+const splitOutput = splitOutputParts.join("");
+if (splitOutputParts.some((part) => part.includes(splitOutputToken)) || splitOutput !== "before [redacted] after") {
+  throw new Error("Electron supervisor smoke failed: token split across runtime output chunks was exposed.");
+}
+
+const rotatedOutputToken = "smoke-rotated-supervisor-token";
+const restartedOutputRedactor = runtimeSupervisorModule.createRuntimeOutputRedactor(rotatedOutputToken);
+const restartedOutput = `${restartedOutputRedactor.write(`restart ${rotatedOutputToken}`)}${restartedOutputRedactor.flush()}`;
+if (restartedOutput.includes(rotatedOutputToken) || restartedOutput !== "restart [redacted]") {
+  throw new Error("Electron supervisor smoke failed: rotated supervisor token was exposed after restart.");
+}
+
 if (!preloadSource.includes("webenvoyShell")) {
   throw new Error("Preload smoke failed: shell bridge is missing.");
 }
@@ -68,6 +105,14 @@ if (!preloadSource.includes("getRuntimeSupervisorState")) {
 
 if (!preloadSource.includes("requestOwnerJson")) {
   throw new Error("Preload smoke failed: owner API bridge is missing.");
+}
+
+if (!preloadSource.includes("completeHarborManualAuthentication")) {
+  throw new Error("Preload smoke failed: narrow manual-authentication bridge is missing.");
+}
+
+if (preloadSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || preloadSource.includes("Authorization") || rendererAssets.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
+  throw new Error("Manual authentication smoke failed: supervisor token or authorization plumbing reached preload or renderer assets.");
 }
 
 if (rendererHtml.includes('src="/assets/') || rendererHtml.includes('href="/assets/')) {
@@ -235,9 +280,6 @@ for (const expectedText of [
   }
 }
 
-const runtimeSupervisorModule = await import(
-  pathToFileURL(path.resolve("dist-electron/runtimeSupervisor.js")).href
-);
 const lodeAssetBundleModule = await import(
   pathToFileURL(path.resolve("dist-electron/lodeAssetBundle.js")).href
 );
@@ -399,6 +441,7 @@ const { outputText: ownerApiClientModuleSource } = ts.transpileModule(ownerApiCl
   },
 });
 const ownerApiClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerApiClientModuleSource)}`;
+const ownerApiClientModule = await import(ownerApiClientModuleUrl);
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -689,6 +732,42 @@ try {
   }
 
   const controlledSession = harborIdentityClientModule.projectHarborSession(harborRuntimeSession, readyXhsIdentity.browser.session);
+  const missingAuthorization = await manualAuthenticationCompletionModule.requestManualAuthenticationCompletion({
+    base: harborContract.endpoint,
+    runtimeSessionRef: controlledSession.browserSessionRef,
+    supervisorToken: undefined,
+  });
+  if (missingAuthorization.ok || harborContract.manualAuthenticationRequests() !== 0) {
+    throw new Error("Harbor manual authentication smoke failed: missing supervisor authorization did not fail closed before the request.");
+  }
+
+  const wrongAuthorization = await manualAuthenticationCompletionModule.requestManualAuthenticationCompletion({
+    base: harborContract.endpoint,
+    runtimeSessionRef: controlledSession.browserSessionRef,
+    supervisorToken: "wrong-supervisor-token",
+  });
+  if (wrongAuthorization.ok || wrongAuthorization.status !== 403 || harborContract.manualAuthenticationRequests() !== 1) {
+    throw new Error("Harbor manual authentication smoke failed: wrong supervisor authorization was accepted.");
+  }
+
+  const nonLocalAuthorization = await manualAuthenticationCompletionModule.requestManualAuthenticationCompletion({
+    base: "http://example.test",
+    runtimeSessionRef: controlledSession.browserSessionRef,
+    supervisorToken: harborContract.manualAuthenticationToken,
+  });
+  if (nonLocalAuthorization.ok || harborContract.manualAuthenticationRequests() !== 1) {
+    throw new Error("Harbor manual authentication smoke failed: non-local Harbor base was not rejected before the request.");
+  }
+
+  const priorShell = globalThis.window.webenvoyShell;
+  globalThis.window.webenvoyShell = {
+    completeHarborManualAuthentication: ({ base, runtimeSessionRef }) =>
+      manualAuthenticationCompletionModule.requestManualAuthenticationCompletion({
+        base,
+        runtimeSessionRef,
+        supervisorToken: harborContract.manualAuthenticationToken,
+      }).then((result) => result.ok ? result.body : result),
+  };
   const completedAuthentication = await harborIdentityClientModule.completeHarborManualAuthentication(
     harborContract.endpoint,
     readyXhsIdentity,
@@ -696,6 +775,14 @@ try {
   );
   if (!completedAuthentication.ok || completedAuthentication.identity.login_state.manual_authentication_state !== "completed") {
     throw new Error(`Harbor manual authentication smoke failed: completion response was not accepted: ${JSON.stringify(completedAuthentication)}`);
+  }
+  if (
+    harborContract.manualAuthenticationRequests() !== 2 ||
+    harborContract.manualAuthenticationAuthorization() !== `Bearer ${harborContract.manualAuthenticationToken}` ||
+    harborContract.manualAuthenticationBodyLength() !== 0 ||
+    JSON.stringify(completedAuthentication).includes("credential-must-not-leak")
+  ) {
+    throw new Error("Harbor manual authentication smoke failed: completion request scope or response redaction was violated.");
   }
 
   const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
@@ -713,9 +800,31 @@ try {
     { ...readyXhsIdentity, source: "App local-only" },
     controlledSession,
   );
-  if (rejectedManualAuthentication.ok || harborContract.manualAuthenticationRequests() !== 1) {
+  if (rejectedManualAuthentication.ok || harborContract.manualAuthenticationRequests() !== 2) {
     throw new Error("Harbor manual authentication smoke failed: local-only identity did not fail closed before the owner request.");
   }
+
+  globalThis.window.webenvoyShell = {
+    requestOwnerJson: (request) => ownerApiRequestModule.parseOwnerApiRequest(request),
+  };
+  const fallbackCompletion = await harborIdentityClientModule.completeHarborManualAuthentication(
+    harborContract.endpoint,
+    readyXhsIdentity,
+    controlledSession,
+  );
+  if (fallbackCompletion.ok || harborContract.manualAuthenticationRequests() !== 2) {
+    throw new Error("Harbor manual authentication smoke failed: renderer fallback could mark authentication completed.");
+  }
+
+  const genericCompletion = await ownerApiClientModule.requestOwnerJson(
+    harborContract.endpoint,
+    `/runtime/sessions/${encodeURIComponent(controlledSession.browserSessionRef)}/manual%2Dauthentication%2Dcompleted`,
+    { method: "POST" },
+  );
+  if (genericCompletion.ok !== false || harborContract.manualAuthenticationRequests() !== 2) {
+    throw new Error("Harbor manual authentication smoke failed: encoded generic owner API bypass sent a request.");
+  }
+  globalThis.window.webenvoyShell = priorShell;
 
   let localOnlySessionFetchCalled = false;
   const previousFetch = globalThis.fetch;
@@ -2025,6 +2134,9 @@ async function startHarborIdentityContractServer() {
   let created = false;
   let manualAuthenticationCompleted = false;
   let manualAuthenticationRequests = 0;
+  let manualAuthenticationAuthorization = "";
+  let manualAuthenticationBodyLength = 0;
+  const manualAuthenticationToken = "smoke-manual-auth-supervisor-token";
   const identity = harborIdentityFacts();
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -2065,13 +2177,17 @@ async function startHarborIdentityContractServer() {
     }
 
     if (request.method === "POST" && pathname === "/runtime/sessions/harbor%3Aruntime-session%2Fxhs-contract%2Freadonly/manual-authentication-completed") {
-      const body = await readRequestJson(request);
+      const body = await readRequestBody(request);
       manualAuthenticationRequests += 1;
-      manualAuthenticationCompleted = created && body == null;
+      manualAuthenticationAuthorization = request.headers.authorization ?? "";
+      manualAuthenticationBodyLength = body.length;
+      manualAuthenticationCompleted = created && body.length === 0 && manualAuthenticationAuthorization === `Bearer ${manualAuthenticationToken}`;
       sendJson(
         response,
-        manualAuthenticationCompleted ? 200 : 409,
-        manualAuthenticationCompleted ? harborManualAuthenticationCompletedRecord() : { status: "unavailable", failure_class: "identity_environment_unmanaged" },
+        manualAuthenticationCompleted ? 200 : 403,
+        manualAuthenticationCompleted
+          ? harborManualAuthenticationCompletedRecord()
+          : { status: "unavailable", failure_class: "manual_authentication_unauthorized", credential: "credential-must-not-leak" },
       );
       return;
     }
@@ -2091,7 +2207,10 @@ async function startHarborIdentityContractServer() {
 
   return {
     endpoint: `http://127.0.0.1:${address.port}`,
+    manualAuthenticationToken,
     manualAuthenticationRequests: () => manualAuthenticationRequests,
+    manualAuthenticationAuthorization: () => manualAuthenticationAuthorization,
+    manualAuthenticationBodyLength: () => manualAuthenticationBodyLength,
     close: () =>
       new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
@@ -2208,6 +2327,7 @@ function harborManualAuthenticationCompletedRecord() {
       raw_material: "not_exposed",
       not_exposed: ["password", "verification_code", "cookie", "token", "profile_storage", "raw_evidence"],
     },
+    credential: "credential-must-not-leak",
   };
 }
 
@@ -2242,6 +2362,12 @@ async function readRequestJson(request) {
   } catch {
     return null;
   }
+}
+
+async function readRequestBody(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 function sendJson(response, statusCode, body) {

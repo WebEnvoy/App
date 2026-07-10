@@ -138,12 +138,13 @@ export async function completeHarborManualAuthentication(
   const blockedReason = manualAuthenticationCompletionBlockReason(identity, session);
   if (blockedReason) return { ok: false, error: blockedReason };
 
+  const completeWithShell = window.webenvoyShell?.completeHarborManualAuthentication;
+  if (!completeWithShell) {
+    return { ok: false, error: "认证完成确认只能在受监督的桌面 App 中执行。" };
+  }
+
   try {
-    const payload = await requestOwnerJson(
-      harborEndpoint,
-      `/runtime/sessions/${encodeURIComponent(session.browserSessionRef)}/manual-authentication-completed`,
-      { method: "POST", timeoutMs: 2500 },
-    );
+    const payload = await completeWithShell({ base: harborEndpoint, runtimeSessionRef: session.browserSessionRef });
     if (isOkFailure(payload)) return { ok: false, error: manualAuthenticationCompletionFailure(payload) };
     if (fixtureOrDemoPayloadReason(payload)) {
       return { ok: false, error: "Harbor 未返回可验证的公开身份状态；App 未改变登录状态。" };
