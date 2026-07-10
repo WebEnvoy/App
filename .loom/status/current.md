@@ -14,7 +14,7 @@
 - Current Checkpoint: merge
 - Current Stop: PR #278 awaits current-head semantic review, hosted merge-gate consumption, and Harbor #241 merge; these are controller-owned integration steps, not user blockers.
 - Next Step: Run the current-head review and merge gate, merge Harbor #241 and App #236 in dependency order, then consume the returned public confirmation state in packaged App E2E.
-- Blockers: None.
+- Blockers: None
 - Latest Validation Summary: 2026-07-10 UTC, npm run typecheck, npm run smoke, and git diff --check passed. Smoke covers bodyless confirmation, invalid/missing authorization, generic owner API denial, public response redaction, token rotation and chunk-safe runtime output redaction.
 - Recovery Boundary: Revert work/app-236-manual-auth-sync; do not mutate identity status through generic PATCH or expose supervisor credentials.
 - Current Lane: App #236 manual authentication confirmation consumer.
