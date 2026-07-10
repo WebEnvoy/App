@@ -28,6 +28,7 @@ const harborIdentityClientSource = await readFile("src/renderer/harborIdentityCl
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
 const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
+const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
 const rendererAssets = await readFile(
   "dist/renderer/assets/index.js",
@@ -353,6 +354,17 @@ const { outputText: harborIdentityTypesModuleSource } = ts.transpileModule(harbo
   },
 });
 const harborIdentityTypesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(harborIdentityTypesModuleSource)}`;
+const { outputText: ownerPayloadGuardsModuleSource } = ts.transpileModule(ownerPayloadGuardsSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const ownerPayloadGuardsModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerPayloadGuardsModuleSource)}`;
+const ownerPayloadGuardsModule = await import(ownerPayloadGuardsModuleUrl);
+if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({ evidence_refs: ["harbor:evidence/x/smoke"] })) {
+  throw new Error("Owner payload guard smoke failed: smoke refs in arrays were not rejected.");
+}
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -388,6 +400,10 @@ const harborIdentityClientModule = await import(
       .replace(
         'from "./harborIdentityTypes";',
         `from "${harborIdentityTypesModuleUrl}";`,
+      )
+      .replace(
+        'from "./ownerPayloadGuards";',
+        `from "${ownerPayloadGuardsModuleUrl}";`,
       ),
   )}`
 );
@@ -411,8 +427,12 @@ const { outputText: coreReadTaskClientModuleSource } = ts.transpileModule(coreRe
     target: ts.ScriptTarget.ES2022,
   },
 });
+const coreReadTaskClientModuleRewritten = coreReadTaskClientModuleSource.replace(
+  'from "./ownerPayloadGuards";',
+  `from "${ownerPayloadGuardsModuleUrl}";`,
+);
 const coreReadTaskClientModule = await import(
-  `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleSource)}`
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`
 );
 const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(runtimeSupervisorStateSource, {
   compilerOptions: {
@@ -421,7 +441,7 @@ const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(ru
   },
 });
 const runtimeSupervisorStateModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(runtimeSupervisorStateModuleSource)}`;
-const coreReadTaskClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleSource)}`;
+const coreReadTaskClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`;
 const { outputText: coreTaskSubmitClientModuleSource } = ts.transpileModule(coreTaskSubmitClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -583,33 +603,33 @@ let readyXhsIdentity;
 let harborRuntimeSession;
 try {
   const createPayload = await harborIdentityClientModule.createHarborIdentityEnvironment(harborContract.endpoint, {
-    id: "harbor://identity-environment/xhs-smoke",
+    id: "harbor://identity-environment/xhs-contract",
     name: "小红书 smoke",
     siteId: "xiaohongshu",
     accountLabel: "运营号 smoke",
-    identityEnvironmentRef: "harbor://identity-environment/xhs-smoke",
-    executionIdentityRef: "harbor://execution-identity/xhs-smoke",
-    profileRef: "harbor://profile/xhs-smoke",
+    identityEnvironmentRef: "harbor://identity-environment/xhs-contract",
+    executionIdentityRef: "harbor://execution-identity/xhs-contract",
+    profileRef: "harbor://profile/xhs-contract",
     requestedProviderId: "cloakbrowser",
     loginState: "logged_in",
     manualAuthenticationState: "not_required",
-    profileStorageRef: "harbor://profile-storage/xhs-smoke",
-    credentialRef: "credential:smoke-ref",
-    proxyRef: "proxy:smoke",
+    profileStorageRef: "harbor://profile-storage/xhs-contract",
+    credentialRef: "credential:contract-ref",
+    proxyRef: "proxy:contract",
     proxyLabel: "local contract proxy ref",
     region: "CN-SH",
     language: "zh-CN",
     timezone: "Asia/Shanghai",
     userAgentSummary: "Chrome family smoke",
     viewport: "1440 x 900",
-    fingerprintSummary: "provider_claim_smoke",
+    fingerprintSummary: "provider_claim_contract",
   });
   if (createPayload.ok !== true) {
     throw new Error(`Harbor identity contract smoke failed: create was not accepted: ${JSON.stringify(createPayload)}`);
   }
 
   const harborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
-  readyXhsIdentity = harborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-smoke");
+  readyXhsIdentity = harborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
   if (harborReadback.status !== "ready" || readyXhsIdentity?.source !== "Harbor live" || readyXhsIdentity.readiness.state !== "ready") {
     throw new Error(`Harbor identity contract smoke failed: readback did not return ready Harbor live identity: ${JSON.stringify(harborReadback)}`);
   }
@@ -643,6 +663,22 @@ try {
   }
 } finally {
   await harborContract.close();
+}
+
+const fixtureIdentityHarbor = await startJsonServer((pathname) =>
+  pathname === "/runtime/browser-providers"
+    ? { ...harborProviderCatalog(), source: "fixture" }
+    : pathname === "/runtime/identity-environments"
+      ? { items: [{ ...harborIdentityFacts(), source: "fixture" }] }
+      : null,
+);
+try {
+  const fixtureState = await harborIdentityClientModule.fetchHarborIdentityState(fixtureIdentityHarbor.endpoint, []);
+  if (fixtureState.status !== "offline" || fixtureState.identities.some((identity) => identity.source === "Harbor live")) {
+    throw new Error(`Harbor identity smoke failed: fixture identity payload was accepted as live. ${JSON.stringify(fixtureState)}`);
+  }
+} finally {
+  await fixtureIdentityHarbor.close();
 }
 
 const liveRuntimeForSubmit = {
@@ -745,7 +781,7 @@ if (crossOriginReadiness.ok) {
 const originalFetch = globalThis.fetch;
 const fakeRun = {
   schema_version: "webenvoy.run-query.v0",
-  run_id: "run_smoke_real_site_xhs_001",
+  run_id: "run_owner_real_site_xhs_001",
   status: "succeeded",
   timeline: {
     created_at: "2026-07-06T10:00:00.000Z",
@@ -774,11 +810,11 @@ const fakeRun = {
   terminal_summary: {
     terminal: true,
     status: "succeeded",
-    result_ref: "result:core/xiaohongshu/search-notes/smoke",
+    result_ref: "result:core/xiaohongshu/search-notes/contract",
     post_check: {
       schema_version: "webenvoy.post-check-result.v0",
       status: "passed",
-      summary: "Smoke result refs are queryable.",
+      summary: "Owner contract result refs are queryable.",
     },
   },
 };
@@ -819,7 +855,7 @@ globalThis.fetch = async (url, init = {}) => {
           evidence_refs: [
             {
               ref: "harbor:evidence/xiaohongshu/search-notes/submitted",
-              source: "submit_smoke",
+              source: "submit_contract",
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:01:03.000Z",
@@ -842,7 +878,7 @@ globalThis.fetch = async (url, init = {}) => {
           },
         },
       }
-    : { ok: false, error: { code: "unexpected_submit_smoke_path" } };
+    : { ok: false, error: { code: "unexpected_submit_contract_path" } };
   return {
     ok: true,
     status: 200,
@@ -921,10 +957,10 @@ globalThis.fetch = async (url) => {
           result: {
             envelope_state: "available",
             payload_state: "not_persisted_in_core",
-            result_ref: "result:core/xiaohongshu/search-notes/smoke",
+            result_ref: "result:core/xiaohongshu/search-notes/contract",
             result_envelope: {
               result_kind: "xhs_note_search",
-              result_ref: "result:core/xiaohongshu/search-notes/smoke",
+              result_ref: "result:core/xiaohongshu/search-notes/contract",
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
               evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/snapshot"],
             },
@@ -994,9 +1030,48 @@ if (coreReadState.tasks[0].runs[0].actionIntent.includes("none")) {
   throw new Error("Core read task smoke failed: app_action none rendered as an action intent.");
 }
 
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const fixtureRun = { ...fakeRun, run_id: "run_fixture_rejected_001" };
+  const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
+    ? { ok: true, capability_runs: { runs: [fixtureRun], latest_run: fixtureRun } }
+    : pathname.includes("/capability-runs")
+      ? { ok: true, capability_runs: { runs: [] } }
+      : { ok: false, error: { code: "fixture_payload_should_not_be_queried" } };
+  return {
+    ok: true,
+    json: async () => json,
+  };
+};
+const fixtureCoreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
+  {
+    id: "task-xhs-real-read",
+    title: "小红书搜索与笔记读取",
+    accountIdentity: "小红书运营号 A",
+    siteSkill: "小红书搜索和笔记读取",
+    businessInput: "关键词：AI 工具",
+    source: "Core fixture",
+    packageSource: {
+      name: "@lode/xiaohongshu-read-only",
+      version: "0.1.0",
+      capabilityRef: "lode:capability/search-notes",
+      sourceRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+      fetchedAt: "fixture",
+      source: "Lode fixture",
+      boundary: "fixture",
+    },
+    runs: [],
+  },
+]);
+globalThis.fetch = originalFetch;
+
+if (fixtureCoreReadState.status !== "offline" || fixtureCoreReadState.liveTaskIds.length !== 0) {
+  throw new Error("Core read task smoke failed: fixture-shaped Core payload was accepted as live.");
+}
+
 const bossFakeRun = {
   schema_version: "webenvoy.run-query.v0",
-  run_id: "run_smoke_real_site_boss_001",
+  run_id: "run_owner_real_site_boss_001",
   status: "manual_recovery_required",
   timeline: {
     created_at: "2026-07-06T10:20:00.000Z",
@@ -1025,7 +1100,7 @@ const bossFakeRun = {
   terminal_summary: {
     terminal: true,
     status: "manual_recovery_required",
-    result_ref: "result:core/boss/job-search/smoke",
+    result_ref: "result:core/boss/job-search/contract",
     post_check: {
       schema_version: "webenvoy.post-check-result.v0",
       status: "failed",
@@ -1059,10 +1134,10 @@ globalThis.fetch = async (url) => {
           result: {
             envelope_state: "available",
             payload_state: "not_persisted_in_core",
-            result_ref: "result:core/boss/job-search/smoke",
+            result_ref: "result:core/boss/job-search/contract",
             result_envelope: {
               result_kind: "boss_job_search",
-              result_ref: "result:core/boss/job-search/smoke",
+              result_ref: "result:core/boss/job-search/contract",
               package_ref: "lode://site-capability/boss/job-search@0.1.0",
               evidence_refs: ["harbor:evidence/boss/job-search/login-required"],
             },
@@ -1288,7 +1363,7 @@ if (mixedDetailState.status !== "offline" || mixedDetailState.liveTaskIds.length
 const writePreviewRuns = [
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_real_site_xiaohongshu_write_preview_001",
+    run_id: "run_owner_real_site_xiaohongshu_write_preview_001",
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:00:04.000Z", terminal_at: "2026-07-06T11:00:04.000Z" },
     task: {
@@ -1304,7 +1379,7 @@ const writePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_real_site_write_preview_cancelled_001",
+    run_id: "run_owner_real_site_write_preview_cancelled_001",
     status: "cancelled",
     timeline: { updated_at: "2026-07-06T11:03:02.000Z", terminal_at: "2026-07-06T11:03:02.000Z" },
     task: {
@@ -1317,7 +1392,7 @@ const writePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_real_site_write_preview_expired_001",
+    run_id: "run_owner_real_site_write_preview_expired_001",
     status: "expired",
     timeline: { updated_at: "2026-07-06T11:14:01.000Z", terminal_at: "2026-07-06T11:14:01.000Z" },
     task: {
@@ -1330,7 +1405,7 @@ const writePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_real_site_write_preview_page_changed_001",
+    run_id: "run_owner_real_site_write_preview_page_changed_001",
     status: "failed",
     timeline: { updated_at: "2026-07-06T11:15:01.000Z", terminal_at: "2026-07-06T11:15:01.000Z" },
     task: {
@@ -1345,7 +1420,7 @@ const writePreviewRuns = [
 const bossWritePreviewRuns = [
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_preview_unavailable_001",
+    run_id: "run_owner_boss_preview_unavailable_001",
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:20:01.000Z", terminal_at: "2026-07-06T11:20:01.000Z" },
     task: {
@@ -1358,7 +1433,7 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_blocked_available_missing_action_request_001",
+    run_id: "run_owner_boss_blocked_available_missing_action_request_001",
     status: "blocked",
     timeline: { updated_at: "2026-07-06T11:19:30.000Z", terminal_at: "2026-07-06T11:19:30.000Z" },
     task: {
@@ -1371,7 +1446,7 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_available_unknown_submitted_001",
+    run_id: "run_owner_boss_available_unknown_submitted_001",
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:19:01.000Z", terminal_at: "2026-07-06T11:19:01.000Z" },
     task: {
@@ -1384,7 +1459,7 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_available_true_submitted_001",
+    run_id: "run_owner_boss_available_true_submitted_001",
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:18:01.000Z", terminal_at: "2026-07-06T11:18:01.000Z" },
     task: {
@@ -1397,7 +1472,7 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_generic_blocked_001",
+    run_id: "run_owner_boss_generic_blocked_001",
     status: "blocked",
     timeline: { updated_at: "2026-07-06T11:17:01.000Z", terminal_at: "2026-07-06T11:17:01.000Z" },
     task: {
@@ -1410,7 +1485,7 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_failed_available_false_submitted_001",
+    run_id: "run_owner_boss_failed_available_false_submitted_001",
     status: "failed",
     timeline: { updated_at: "2026-07-06T11:16:30.000Z", terminal_at: "2026-07-06T11:16:30.000Z" },
     task: {
@@ -1423,7 +1498,7 @@ const bossWritePreviewRuns = [
   },
   {
     schema_version: "webenvoy.run-query.v0",
-    run_id: "run_fixture_boss_generic_failed_001",
+    run_id: "run_owner_boss_generic_failed_001",
     status: "failed",
     timeline: { updated_at: "2026-07-06T11:16:01.000Z", terminal_at: "2026-07-06T11:16:01.000Z" },
     task: {
@@ -1961,9 +2036,9 @@ function harborProviderCatalog() {
 function harborIdentityFacts() {
   return {
     schema_version: "harbor-local-identity-environment/v0",
-    identity_environment_ref: "harbor://identity-environment/xhs-smoke",
-    execution_identity_ref: "harbor://execution-identity/xhs-smoke",
-    profile_ref: "harbor://profile/xhs-smoke",
+    identity_environment_ref: "harbor://identity-environment/xhs-contract",
+    execution_identity_ref: "harbor://execution-identity/xhs-contract",
+    profile_ref: "harbor://profile/xhs-contract",
     site_binding: {
       site_id: "xiaohongshu",
       origin: "https://www.xiaohongshu.com",
@@ -1978,30 +2053,30 @@ function harborIdentityFacts() {
       human_verification: [],
     },
     browser_storage: {
-      profile_storage_ref: "harbor://profile-storage/xhs-smoke",
+      profile_storage_ref: "harbor://profile-storage/xhs-contract",
       state: "present",
       cookies_session_state: "present",
     },
     environment: {
-      proxy: { state: "configured", proxy_ref: "proxy:smoke", label: "local contract proxy ref" },
+      proxy: { state: "configured", proxy_ref: "proxy:contract", label: "local contract proxy ref" },
       region: "CN-SH",
       language: "zh-CN",
       timezone: "Asia/Shanghai",
       browser_family: "cloakbrowser",
       user_agent_summary: "Chrome family smoke",
       viewport: "1440 x 900",
-      fingerprint_summary: "provider_claim_smoke",
+      fingerprint_summary: "provider_claim_contract",
     },
     provider_binding: {
       selected_provider_id: "cloakbrowser",
-      selection_reason: "smoke_create_readback",
+      selection_reason: "contract_create_readback",
       requires_user_notice: false,
       selected_provider: harborProviderCatalog().providers[0],
       warnings: [],
       unavailable_reason: null,
     },
     credential_recovery: {
-      credential_ref: "credential:smoke-ref",
+      credential_ref: "credential:contract-ref",
       recovery_actions: [],
     },
     diagnostics: [],
@@ -2012,12 +2087,12 @@ function harborRuntimeSessionFacts(requestedUrl) {
   const url = typeof requestedUrl === "string" ? requestedUrl : "https://www.xiaohongshu.com/explore";
   return {
     schema_version: "harbor-runtime-facts/v0",
-    runtime_session_ref: "harbor:runtime-session/xhs-smoke/readonly",
+    runtime_session_ref: "harbor:runtime-session/xhs-contract/readonly",
     provider_ref: "harbor:provider/cloakbrowser",
     lifecycle_state: "active",
     created_at: "2026-07-09T12:00:00.000Z",
     last_seen_at: "2026-07-09T12:00:01.000Z",
-    viewer_ref: "harbor:viewer/xhs-smoke/readonly",
+    viewer_ref: "harbor:viewer/xhs-contract/readonly",
     current_page: {
       requested_url: url,
       current_url: url,

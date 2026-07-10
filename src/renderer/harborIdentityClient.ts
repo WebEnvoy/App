@@ -1,4 +1,5 @@
 import { projectHarborIdentity, projectHarborSession, projectLocalDraft } from "./harborIdentityProjection";
+import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 import {
   type HarborIdentityFacts,
   type HarborIdentityLoadState,
@@ -29,8 +30,10 @@ export async function fetchHarborIdentityState(
       "/runtime/local-identity-environments",
     ]),
   ]);
-  const catalog = catalogResult.ok && isProviderCatalog(catalogResult.value) ? catalogResult.value : null;
-  const liveIdentities = identityResult.ok ? parseIdentityList(identityResult.value, catalog).map((item) => projectHarborIdentity(item, catalog, fetchedAt)) : [];
+  const catalog = catalogResult.ok && isProviderCatalog(catalogResult.value) && !fixtureOrDemoPayloadReason(catalogResult.value) ? catalogResult.value : null;
+  const liveIdentities = identityResult.ok && !fixtureOrDemoPayloadReason(identityResult.value)
+    ? parseIdentityList(identityResult.value, catalog).map((item) => projectHarborIdentity(item, catalog, fetchedAt))
+    : [];
   const localIdentities = localDrafts.map((draft) => projectLocalDraft(draft, catalog, fetchedAt));
   const identities = [...liveIdentities, ...localIdentities];
 

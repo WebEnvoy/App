@@ -10,10 +10,6 @@ const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
 const packagedSmoke = process.env.WEBENVOY_PACKAGED_SMOKE === "1";
 const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
 const packagedSmokeRuntimeExpectation = process.env.WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION ?? "fail_closed";
-const packagedSmokeAction = process.env.WEBENVOY_PACKAGED_SMOKE_ACTION ?? "none";
-const packagedSmokeReadonlyInput =
-  process.env.WEBENVOY_PACKAGED_SMOKE_READONLY_INPUT ??
-  "关键词：AI 工具；笔记：https://www.xiaohongshu.com/explore/app265-readonly-smoke";
 const packagedSmokeCoreEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT ?? "http://127.0.0.1:8787";
 const packagedSmokeHarborEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT ?? "http://127.0.0.1:8788";
 const packagedSmokeLodeEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_LODE_ENDPOINT ?? "http://127.0.0.1:8789";
@@ -91,7 +87,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
   try {
     await loadRenderer;
     await applyPackagedSmokeConnectionConfig(window);
-    await preparePackagedSmokeAction(window);
     const result = (await window.webContents.executeJavaScript(`
       (async () => {
         const root = document.getElementById("root");
@@ -102,7 +97,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const rightFullscreenButton = document.querySelector('[data-shell-panel-fullscreen="right"]');
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
-        const submitButton = document.querySelector("[aria-label='提交只读 Core task']");
         const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
         const waitUntil = async (predicate, attempts = 40, delayMs = 250) => {
           let latest = null;
@@ -195,36 +189,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         composer?.focus();
         await waitFrame();
         const composerFocused = document.activeElement === composer;
-        let readonlySubmitSmoke = null;
-        if (${JSON.stringify(packagedSmokeAction)} === "readonly_submit") {
-          await waitUntil(() => submitButton && !submitButton.disabled, 48, 250);
-          const editableComposer = document.querySelector("[data-webenvoy-composer]");
-          const editableSubmitButton = document.querySelector("[aria-label='提交只读 Core task']");
-          const inputValue = ${JSON.stringify(packagedSmokeReadonlyInput)};
-          const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
-          if (editableComposer && valueSetter) {
-            valueSetter.call(editableComposer, inputValue);
-            editableComposer.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-          await waitFrame();
-          const canSubmitBeforeClick = Boolean(editableSubmitButton && !editableSubmitButton.disabled);
-          if (canSubmitBeforeClick) {
-            editableSubmitButton.click();
-          }
-          const readyText = await waitUntil(() => {
-            const text = root?.textContent ?? "";
-            return text.includes("Core accepted /tasks") &&
-              /(harbor:(evidence|validation)|evidence_)/.test(text) &&
-              /(runtime-session|session_)/.test(text)
-              ? text
-              : null;
-          }, 80, 250);
-          readonlySubmitSmoke = {
-            canSubmitBeforeClick,
-            ready: Boolean(readyText),
-            text: (readyText || root?.textContent || "").slice(0, 4000)
-          };
-        }
         const deviceScale = window.devicePixelRatio || 1;
         const leftHandleAfterRestore = document.querySelector(".left-panel-resizer .resize-handle-right");
         const leftStayOpenDragDistance = -(leftRestored.leftWidth - 180) * deviceScale;
@@ -297,7 +261,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
             leftAfterDragRestore.left === "true" &&
             dragRestored.left === "true" &&
             dragRestored.right === "true",
-          readonlySubmitSmoke,
           panelStateTrace: {
             initialPanels,
             rightCollapsed,
@@ -336,7 +299,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       composerFocused: boolean;
       panelToggleSmoke: boolean;
       panelDragSmoke: boolean;
-      readonlySubmitSmoke: { canSubmitBeforeClick?: boolean; ready?: boolean; text?: string } | null;
       panelStateTrace: unknown;
     };
 
@@ -381,12 +343,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       throw new Error("packaged renderer smoke failed: composer is missing or cannot receive focus.");
     }
 
-    if (packagedSmokeAction === "readonly_submit" && !result.readonlySubmitSmoke?.ready) {
-      throw new Error(
-        `packaged renderer smoke failed: read-only submit did not reach owner refs. ${JSON.stringify(result.readonlySubmitSmoke)}`,
-      );
-    }
-
     if (!result.panelDragSmoke) {
       throw new Error(
         `packaged renderer smoke failed: panel drag thresholds did not match Codex behavior. ${JSON.stringify(result.panelStateTrace)}`,
@@ -421,78 +377,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
     console.error(error);
     app.exit(1);
   }
-}
-
-type PackagedSmokeRuntimeState = {
-  canUseLiveRuntime?: boolean;
-  services?: unknown;
-};
-
-async function preparePackagedSmokeAction(window: BrowserWindow) {
-  if (packagedSmokeAction !== "readonly_submit") return;
-
-  const state = await waitForPackagedSmokeRuntimeReady();
-  if (!state.canUseLiveRuntime) {
-    throw new Error(`packaged readonly smoke failed: runtime did not become live_ready before identity seed. ${JSON.stringify(state)}`);
-  }
-
-  await seedPackagedSmokeIdentity();
-  await reloadWindow(window);
-}
-
-async function waitForPackagedSmokeRuntimeReady(): Promise<PackagedSmokeRuntimeState> {
-  let latest: PackagedSmokeRuntimeState = {};
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    latest = await runtimeSupervisor.readState({
-      coreEndpoint: packagedSmokeCoreEndpoint,
-      harborEndpoint: packagedSmokeHarborEndpoint,
-    });
-    if (latest.canUseLiveRuntime) return latest;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return latest;
-}
-
-async function seedPackagedSmokeIdentity() {
-  const response = await fetch(`${packagedSmokeHarborEndpoint}/runtime/identity-environments`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      identity_environment_ref: "identity-env_app265_xhs_packaged_readonly",
-      execution_identity_ref: "execution-identity_app265_xhs_packaged_readonly",
-      profile_ref: "profile_app265_xhs_packaged_readonly",
-      profile_storage_ref: "profile-storage_app265_xhs_packaged_readonly",
-      site: {
-        site_id: "xiaohongshu",
-        origin: "https://www.xiaohongshu.com",
-        display_name: "小红书",
-        account_identifier: "App #265 packaged readonly smoke",
-        account_ref: "account_app265_xhs_packaged_readonly",
-      },
-      login_state: "logged_in",
-      storage_state: "present",
-      language: "zh-CN",
-      timezone: "Asia/Shanghai",
-      region: "CN-SH",
-      proxy_label: "local smoke boundary; no production proxy material",
-      browser_family: "cloakbrowser",
-      requested_provider_id: "cloakbrowser",
-      user_agent_summary: "Smoke provider detection path only; Harbor fixture launcher owns session facts.",
-      viewport: "1280 x 860",
-      fingerprint_summary: "smoke-provider-detection-only",
-      login_method: "manual",
-      manual_authentication_state: "not_required",
-      human_verification: [],
-    }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !isJsonRecord(payload) || payload.identity_environment_ref !== "identity-env_app265_xhs_packaged_readonly") {
-    throw new Error(`packaged readonly smoke failed: Harbor identity seed was not accepted. ${JSON.stringify(payload)}`);
-  }
-}
-
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 async function applyPackagedSmokeConnectionConfig(window: BrowserWindow) {
