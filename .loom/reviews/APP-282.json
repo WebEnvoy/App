@@ -1,0 +1,33 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-282",
+  "decision": "allow",
+  "kind": "code_review",
+  "summary": "No P0-P3 findings: the shared classifier exactly separates Core task, protected Harbor session, and ordinary owner request timeouts without changing authorization or fallback behavior.",
+  "reviewer": "codex-main-controller",
+  "authored_at": "2026-07-11T17:45:00Z",
+  "reviewed_head": "0ab131368490c877949ec3a6230efb3583bf66b3",
+  "reviewed_validation_summary": "2026-07-11T17:38Z: `npm run typecheck`, `npm run smoke`, and `git diff --check` passed. Timeout classification is 65 seconds for Core task submit, 20 seconds for protected Harbor session lifecycle, and 5 seconds for ordinary owner requests. No live site action occurred in this validation.",
+  "reviewed_validation_summary_hash": "40904ea2e5980e9d27d6a82a5169d17f2933105f4bf4b330cd71edcf348fe432",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-282.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": ["Run packaged first-launch E2E after merge."],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-282.md",
+    "recovery_entry": ".loom/progress/APP-282.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "suite_index": ".loom/specs/APP-282/suite-index.md",
+    "suite_evidence_validation": "loom suite evidence validate --target . --item APP-282 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target . --item APP-282 --json",
+    "suite_evidence_map": ".loom/specs/APP-282/evidence-map.md",
+    "suite_task_carriers": [".loom/specs/APP-282/task-carrier.md"]
+  },
+  "semantic_review_disposition": {
+    "status": "passed",
+    "reason": "Current product head preserves fail-closed owner API behavior and adds bounded Harbor launch wait coverage."
+  }
+}
