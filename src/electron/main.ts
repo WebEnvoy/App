@@ -464,7 +464,8 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
   if (!parsed.ok) return { ok: false, error: parsed.error };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeoutMs = parsed.method === "POST" && parsed.path === "/tasks" ? 65_000 : 5_000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(parsed.url, {
       method: parsed.method,
