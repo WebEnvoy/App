@@ -6,7 +6,7 @@
   "summary": "Current-head review found no P0-P3 after the BOSS target type and exact mock Core contract were fixed; UI and fail-closed identity boundaries remain intact.",
   "reviewer": "codex-main-controller",
   "authored_at": "2026-07-11T17:01:07Z",
-  "reviewed_head": "249043820f0fca14b676b847b1e580c40b2935d8",
+  "reviewed_head": "8ee7189913e0027e5095c7a4176c24c091556429",
   "reviewed_validation_summary": "2026-07-11T16:56Z: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged:readonly`, and `git diff --check` passed. Exact BOSS mock POST `/tasks` requires capability/source, `scope.target_type=boss_job_search`, `{query,city_code,page:1,limit}`, and canonical Harbor URL before returning 202; wrong target type returns 400. XHS remains `target_type=site`. No live account/site action occurred.",
   "reviewed_validation_summary_hash": "ad0a7d3dcf9502067abbf1455c6ed83d28ff331b7870d591e69b08a42022c36b",
   "validation_summary_source": "recovery.latest_validation_summary",
