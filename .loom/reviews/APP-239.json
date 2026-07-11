@@ -3,12 +3,12 @@
   "item_id": "APP-239",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Closeout-retained approval for APP-239 after PR #251 merge commit 713a968: the App surface consumes Core-owned read-only run, result, evidence reference, failure, and session facts for issues #238-#242 without owning raw evidence, credentials, cookies, browser profiles, true writes, hosted browser, marketplace, bulk collection, risk bypass, Core/Harbor/Lode changes, or App #243-#247 write-precheck display.",
-  "reviewer": "controller-authored",
-  "authored_at": "2026-07-07T07:21:08Z",
-  "reviewed_head": "713a96843ef9046bdf21c56ca84a87df9430ffb5",
-  "reviewed_validation_summary": "2026-07-07T06:42:46Z App PR #251 delivery dry-run consumed PR metadata readback/preflight for APP-239, current-head spec and implementation review records, suite evidence/carrier validation, and local checks (`npm run typecheck`, `npm run smoke`, `git diff --check`). Hosted run 28846787015 passed `py-compile`, `demo-bootstrap`, `repo-local-cli`, and `loom-check`; `loom-pr-merge-gate` fell back only because this carrier still advertised the build checkpoint before this sync. Smoke covers XHS Core live projection, BOSS Core live projection, raw evidence boundary, non-none failure recovery, app_action none suppression, mixed run detail failure fallback, and read-only-only Library task launch CTA.",
-  "reviewed_validation_summary_hash": "9c2d422a99a529723d143a2df07df446dce1b5fc08338169fdef2610c6962f77",
+  "summary": "Current-head review at 200ff87 found no P0-P3. Official Chrome remains a narrow XHS-only restricted fallback, BOSS stays fail-closed, supervisor bearer remains main-process-only, task input is structured, live refs are strictly validated, fixture history is excluded, and persistent risk warning remains visible. Final-head and merged-head Computer Use replay remain required.",
+  "reviewer": "codex-main-controller",
+  "authored_at": "2026-07-11T14:32:32Z",
+  "reviewed_head": "200ff872fb5c2fe71bb2ec62804451edded15018",
+  "reviewed_validation_summary": "2026-07-11 at 200ff872fb5c2fe71bb2ec62804451edded15018: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged:readonly`, and `git diff --check` passed; cross-review found no P0-P3. Earlier branch run app-xiaohongshu-mrgcpit5 proved supervised official-Chrome read-only execution and five public refs. Final-head Computer Use replay is pending unlock; merged-head replay remains required.",
+  "reviewed_validation_summary_hash": "f21a933c06aa0235cffb90693b3841044c19a466059c87fbd8208dc7a2ee3f3a",
   "validation_summary_source": "recovery.latest_validation_summary",
   "validation_summary_locator": ".loom/progress/APP-239.md",
   "fallback_to": null,
@@ -36,8 +36,8 @@
     "engine_adapter": null,
     "engine_evidence": null,
     "normalized_findings": null,
-    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results --item APP-239 --json",
-    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results --item APP-239 --json",
+    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-official-chrome-readonly --item APP-239 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-official-chrome-readonly --item APP-239 --json",
     "suite_evidence_map": ".loom/specs/APP-239/evidence-map.md",
     "suite_consistency_analysis": null,
     "suite_task_carriers": [
@@ -55,14 +55,6 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored closeout review approved only APP-239 terminal carrier metadata; implementation behavior was already reviewed and merged in PR #251."
-  },
-  "implementation_review_disposition": {
-    "status": "passed",
-    "reason": "Implementation behavior was reviewed before PR #251 merge; this carrier-only review covers only post-merge closeout metadata."
-  },
-  "carrier_only_closeout_review": {
-    "status": "passed",
-    "reason": "Closeout changes are limited to APP-239 terminal metadata, issue/PR/merge evidence, and current pointer closeout state for #238-#242."
+    "reason": "Authored implementation review approved the current head for merge checkpoint consumption."
   }
 }
