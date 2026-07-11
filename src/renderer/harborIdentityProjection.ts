@@ -273,7 +273,7 @@ function emptySession(provider: BrowserSessionProjection["provider"], identityRe
 function taskEntries(siteId: SiteId) {
   return siteId === "boss"
     ? [
-        { id: "task-entry-boss-real-read", label: "启动 BOSS 职位搜索", taskId: "task-boss-real-read", inputSummary: 'query=前端工程师；city_code=101020100；page=1；limit=15。', readiness: "真实搜索结果来自 Core owner API；职位详情等待真实 detail_ref。", source: "Core fixture" as const },
+        { id: "task-entry-boss-real-read", label: "启动 BOSS 职位搜索", taskId: "task-boss-real-read", inputSummary: "职位关键词：前端工程师；城市：上海；结果数：15。", readiness: "真实搜索结果来自 Core owner API；职位详情等待真实 detail_ref。", source: "Core fixture" as const },
         { id: "task-entry-boss-write-preview", label: "查看 BOSS 打招呼写前验证", taskId: "task-boss-greeting-write-preview", inputSummary: "目标职位、候选人消息框和打招呼文案的真实页面写前验证。", readiness: "只展示 submitted=false / 未发送 的写前投影；不发送消息。", source: "Core fixture" as const },
       ]
     : [

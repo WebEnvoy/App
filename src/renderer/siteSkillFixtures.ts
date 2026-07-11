@@ -107,7 +107,7 @@ export const siteSkillFixtures: SiteSkill[] = [
     fetchedAt: "2026-07-06T09:22:00Z",
     sourceHealth: { label: "identity needs auth", status: "needs-identity", detail: "BOSS 招聘号需要人工认证时，Task Thread 显示未登录失败。" },
     tags: ["BOSS", "招聘", "职位搜索", "只读"],
-    inputTemplates: ["query", "city_code", "page=1", "limit<=15", "BOSS 身份环境"],
+    inputTemplates: ["职位关键词", "城市", "结果数量", "BOSS 身份环境"],
     readiness: [
       { label: "Lode metadata", status: "fixture", detail: "BOSS job-search capability ref fixture 已锁定；职位详情等待 Core #270" },
       { label: "Harbor identity", status: "needs-identity", detail: "招聘号 fixture 可能需要扫码或二次验证" },

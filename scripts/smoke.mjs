@@ -1178,6 +1178,7 @@ const bossSearchTask = {
   siteSkill: "BOSS 职位搜索",
   businessInput: JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 15 }),
   searchQuery: undefined,
+  packageSource: { lockRef: "lode://lock/site-capability/boss/job-search@0.1.0" },
 };
 const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   bossSearchTask,
@@ -1187,15 +1188,20 @@ const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
 if (
   !bossReadiness.ok ||
   bossReadiness.payload.public_query?.query !== "前端工程师" ||
-  bossReadiness.payload.public_query?.city_code !== "101020100" ||
-  bossReadiness.payload.public_query?.page !== 1 ||
-  bossReadiness.payload.public_query?.limit !== 15 ||
+  Object.keys(bossReadiness.payload.public_query ?? {}).length !== 1 ||
   bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
   bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
   JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
   JSON.stringify(bossReadiness.payload).includes("read-job-detail")
 ) {
   throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
+}
+for (const [length, accepted] of [[80, true], [81, false]]) {
+  const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
+  const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]);
+  if (readiness.ok !== accepted) {
+    throw new Error(`Core BOSS submit smoke failed: ${length}-character query acceptance was ${readiness.ok}.`);
+  }
 }
 
 const invalidBossInputs = [
@@ -1461,6 +1467,35 @@ globalThis.fetch = originalFetch;
 
 if (pendingRun.status !== "polling" || pendingRun.runId !== "run_submit_pending_001") {
   throw new Error(`Core submit smoke failed: accepted-but-not-ready run was not kept in polling state: ${JSON.stringify(pendingRun)}`);
+}
+
+let submittedBossPayload;
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  if (pathname.endsWith("/tasks")) {
+    submittedBossPayload = JSON.parse(init.body);
+    const body = { ok: true, run_id: "run_submit_boss_001" };
+    return { ok: true, status: 202, json: async () => body, text: async () => JSON.stringify(body) };
+  }
+  const body = { ok: false, error: { code: "run_not_queryable_yet" } };
+  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
+};
+const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  bossSearchTask,
+  liveRuntimeForSubmit,
+  [readyBossIdentity],
+  { pollAttempts: 1, pollIntervalMs: 0 },
+);
+globalThis.fetch = originalFetch;
+if (
+  acceptedBossRun.status !== "polling" ||
+  acceptedBossRun.runId !== "run_submit_boss_001" ||
+  submittedBossPayload?.public_query?.query !== "前端工程师" ||
+  Object.keys(submittedBossPayload?.public_query ?? {}).length !== 1 ||
+  submittedBossPayload?.harbor?.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100"
+) {
+  throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core-main-compatible payload: ${JSON.stringify({ acceptedBossRun, submittedBossPayload })}`);
 }
 
 globalThis.fetch = async (url) => {

@@ -19,7 +19,7 @@ type SubmitReadiness =
 type CoreTaskPayload = {
   run_id: string;
   package_ref: string;
-  public_query: { query: string; city_code?: string; page?: 1; limit?: number };
+  public_query: { query: string };
   task_intent: {
     schema_version: "webenvoy.task-intent.v0";
     intent_id: string;
@@ -112,8 +112,9 @@ export function coreTaskSubmitReadiness(
     return { ok: false, reason: bossQuery?.reason ?? "BOSS 搜索输入无效；已 fail closed。" };
   }
   const query = bossQuery?.ok ? bossQuery.value.query : task.searchQuery;
-  if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > 256) {
-    return { ok: false, reason: "当前任务缺少明确、已修剪且不超过 256 字符的公开搜索 query；不发送自由格式业务输入。" };
+  const maxQueryLength = site === "boss" ? 80 : 256;
+  if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > maxQueryLength) {
+    return { ok: false, reason: `当前任务缺少明确、已修剪且不超过 ${maxQueryLength} 字符的公开搜索 query；不发送自由格式业务输入。` };
   }
 
   const capability = spec.capabilities[0];
@@ -129,7 +130,7 @@ export function coreTaskSubmitReadiness(
   const payload: CoreTaskPayload = {
     run_id: runId,
     package_ref: capability.packageRef,
-    public_query: bossQuery?.ok ? bossQuery.value : { query },
+    public_query: { query },
     task_intent: {
       schema_version: "webenvoy.task-intent.v0",
       intent_id: `intent_${runId}`,
@@ -189,8 +190,8 @@ export function parseBossJobSearchInput(value: string):
     return { ok: false, reason: "BOSS 搜索包含未知 filter；仅允许 query、city_code、page、limit。" };
   }
   const query = record.query;
-  if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > 256) {
-    return { ok: false, reason: "BOSS query 必须明确、已修剪且不超过 256 字符。" };
+  if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > 80) {
+    return { ok: false, reason: "BOSS query 必须明确、已修剪且不超过 80 字符。" };
   }
   if (typeof record.city_code !== "string" || !supportedBossCityCodes.has(record.city_code)) {
     return { ok: false, reason: "BOSS city_code 未明确或不在当前支持列表；自由文本城市和未知城市代码均被拒绝。" };
