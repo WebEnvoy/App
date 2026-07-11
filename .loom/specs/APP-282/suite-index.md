@@ -13,6 +13,7 @@
 | spec | .loom/specs/APP-282/spec.md | present | build and review |
 | plan | .loom/specs/APP-282/plan.md | present | build and validation |
 | contracts | .loom/specs/APP-282/contracts.md | present | timeout boundary |
+| implementation contract | .loom/specs/APP-282/implementation-contract.md | present | ownership and invariants |
 | readiness checklist | .loom/specs/APP-282/readiness-checklist.md | present | PR readiness |
 | execution breakdown | .loom/specs/APP-282/execution-breakdown.md | present | task mapping |
 | task carrier | .loom/specs/APP-282/task-carrier.md | present | GitHub binding |
