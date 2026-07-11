@@ -11,9 +11,9 @@
 - Review Entry: .loom/reviews/APP-240.json
 - Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged:readonly; git diff --check
 - Closing Condition: PR Ready only. Keep #240 open until Core #270 delivers real `detail_ref`-based job detail.
-- Current Checkpoint: pre-review
-- Current Stop: Product and carrier head `c7a3473` passed focused validation and independent semantic review; #240 remains open for live and detail evidence.
-- Next Step: Record current-head spec and implementation reviews, then run the hosted merge gate.
+- Current Checkpoint: merge
+- Current Stop: Product head `c7a3473` and current-head spec/implementation reviews passed; review carrier committed at `77e1351`.
+- Next Step: Consume the hosted merge gate and perform controlled merge; keep #240 open pending live BOSS and detail evidence.
 - Blockers: Core #270 is a detail-only follow-up and does not block this job-search slice.
 - Latest Validation Summary: 2026-07-11T16:56Z: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged:readonly`, and `git diff --check` passed. Exact BOSS mock POST `/tasks` requires capability/source, `scope.target_type=boss_job_search`, `{query,city_code,page:1,limit}`, and canonical Harbor URL before returning 202; wrong target type returns 400. XHS remains `target_type=site`. No live account/site action occurred.
 - Recovery Boundary: Revert this branch. Do not modify Core, Harbor, Lode, merge a PR, close an issue, or perform a real account/site action.
