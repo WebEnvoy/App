@@ -129,7 +129,7 @@ export function coreTaskSubmitReadiness(
     public_query: { query },
     task_intent: {
       schema_version: "webenvoy.task-intent.v0",
-      intent_id: `intent:${runId}`,
+      intent_id: `intent_${runId}`,
       entrypoint: "app",
       user_intent: {
         summary: task.title,

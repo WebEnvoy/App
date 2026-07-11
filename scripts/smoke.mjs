@@ -225,6 +225,10 @@ if (
   throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
 
+if (!coreTaskSubmitClientSource.includes("intent_id: `intent_\${runId}`")) {
+  throw new Error("Core task submit smoke failed: intent_id must remain a result-ref-safe opaque identifier.");
+}
+
 for (const expectedText of [
   "Task Thread",
   "source-health",
