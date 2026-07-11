@@ -19,7 +19,7 @@ type SubmitReadiness =
 type CoreTaskPayload = {
   run_id: string;
   package_ref: string;
-  public_query: { query: string };
+  public_query: { query: string; city_code?: string; page?: 1; limit?: number };
   task_intent: {
     schema_version: "webenvoy.task-intent.v0";
     intent_id: string;
@@ -130,7 +130,7 @@ export function coreTaskSubmitReadiness(
   const payload: CoreTaskPayload = {
     run_id: runId,
     package_ref: capability.packageRef,
-    public_query: { query },
+    public_query: bossQuery?.ok ? bossQuery.value : { query },
     task_intent: {
       schema_version: "webenvoy.task-intent.v0",
       intent_id: `intent_${runId}`,

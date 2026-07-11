@@ -7,7 +7,7 @@ The App accepts one explicit BOSS job search, submits it through Core, and displ
 ## Acceptance Criteria
 
 - [ ] BOSS UI collects a keyword, city selection, and limit while keeping `city_code` internal and page fixed to 1.
-- [ ] Core HTTP `public_query` contains only `query`, matching Core `origin/main`; city/page/limit remain in the canonical target URL and App-side single-search guard unless a future Core #227 PR explicitly extends the parser.
+- [ ] Core HTTP `public_query` contains exact `{query,city_code,page:1,limit}` for BOSS, matching Core PR #273 head `09203469`; Xiaohongshu remains query-only.
 - [ ] Target is canonical `https://www.zhipin.com/web/geek/job?query=...&city=...`.
 - [ ] Free-text city, unknown filters/city codes, cross-domain input, pagination, bulk limits, fixture identity, and unlogged identity fail closed.
 - [ ] Runtime health/admission behavior and owner-ref polling remain fail closed.

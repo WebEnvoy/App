@@ -1188,7 +1188,10 @@ const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
 if (
   !bossReadiness.ok ||
   bossReadiness.payload.public_query?.query !== "前端工程师" ||
-  Object.keys(bossReadiness.payload.public_query ?? {}).length !== 1 ||
+  bossReadiness.payload.public_query?.city_code !== "101020100" ||
+  bossReadiness.payload.public_query?.page !== 1 ||
+  bossReadiness.payload.public_query?.limit !== 15 ||
+  Object.keys(bossReadiness.payload.public_query ?? {}).length !== 4 ||
   bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
   bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
   JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
@@ -1492,10 +1495,13 @@ if (
   acceptedBossRun.status !== "polling" ||
   acceptedBossRun.runId !== "run_submit_boss_001" ||
   submittedBossPayload?.public_query?.query !== "前端工程师" ||
-  Object.keys(submittedBossPayload?.public_query ?? {}).length !== 1 ||
+  submittedBossPayload?.public_query?.city_code !== "101020100" ||
+  submittedBossPayload?.public_query?.page !== 1 ||
+  submittedBossPayload?.public_query?.limit !== 15 ||
+  Object.keys(submittedBossPayload?.public_query ?? {}).length !== 4 ||
   submittedBossPayload?.harbor?.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100"
 ) {
-  throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core-main-compatible payload: ${JSON.stringify({ acceptedBossRun, submittedBossPayload })}`);
+  throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core #273 payload: ${JSON.stringify({ acceptedBossRun, submittedBossPayload })}`);
 }
 
 globalThis.fetch = async (url) => {
