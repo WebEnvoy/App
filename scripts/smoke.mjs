@@ -826,6 +826,34 @@ try {
   ) {
     throw new Error("Harbor manual authentication smoke failed: packaged opaque refs were rejected or unsafe refs were accepted.");
   }
+  const legacyRuntimeRefs = manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+    ...packagedRuntimeRefs,
+    identity_environment_ref: "harbor://identity-environment/xhs-legacy",
+    refs: {
+      execution_identity_ref: "harbor://execution-identity/xhs-legacy",
+      profile_ref: "harbor://profile/xhs-legacy",
+    },
+  }));
+  if (!legacyRuntimeRefs) {
+    throw new Error("Harbor manual authentication smoke failed: legacy typed public refs were rejected.");
+  }
+  for (const [label, change] of [
+    ["identity wrong namespace", { identity_environment_ref: "profile-wrong" }],
+    ["identity URL", { identity_environment_ref: "https://example.test/identity-env-live" }],
+    ["identity sensitive fragment", { identity_environment_ref: "identity-env-token-secret" }],
+    ["execution wrong namespace", { refs: { ...packagedRuntimeRefs.refs, execution_identity_ref: "execution-live-xhs" } }],
+    ["execution sensitive fragment", { refs: { ...packagedRuntimeRefs.refs, execution_identity_ref: "identity-env-cookie:execution" } }],
+    ["profile wrong namespace", { refs: { ...packagedRuntimeRefs.refs, profile_ref: "identity-env-live" } }],
+    ["profile sensitive fragment", { refs: { ...packagedRuntimeRefs.refs, profile_ref: "profile-raw_evidence" } }],
+  ]) {
+    const rejected = manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+      ...packagedRuntimeRefs,
+      ...change,
+    }));
+    if (rejected !== null) {
+      throw new Error(`Harbor manual authentication smoke failed: ${label} was accepted.`);
+    }
+  }
 
   const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
   readyXhsIdentity = refreshedHarborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
@@ -1004,6 +1032,20 @@ const chromeFallbackReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadine
 );
 if (!chromeFallbackReadiness.ok || chromeFallbackReadiness.identity.readiness.state !== "warning") {
   throw new Error("Core submit smoke failed: proven restricted Chrome fallback was not narrowly admitted with warning preserved.");
+}
+
+const promotedTask = coreTaskSubmitClientModule.promoteSubmittedCoreTask(
+  { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", runs: [{ id: "fixture-run", source: "Core fixture" }] },
+  { id: "live-run", source: "Core live" },
+);
+if (
+  promotedTask.source !== "Core live" ||
+  promotedTask.identitySource !== "Harbor live" ||
+  promotedTask.runs.length !== 1 ||
+  promotedTask.runs[0]?.id !== "live-run" ||
+  promotedTask.packageSource.lockRef !== readonlySubmitTask.packageSource.lockRef
+) {
+  throw new Error(`Core submit smoke failed: live promotion retained fixture history or rewrote Lode provenance: ${JSON.stringify(promotedTask)}`);
 }
 
 const restrictedChromeNegativeMatrix = [

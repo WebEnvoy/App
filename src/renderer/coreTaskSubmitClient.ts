@@ -229,6 +229,15 @@ export async function submitCoreReadOnlyTask(
       };
 }
 
+export function promoteSubmittedCoreTask(task: TaskProjection, run: RunProjection): TaskProjection {
+  return {
+    ...task,
+    source: "Core live",
+    identitySource: "Harbor live",
+    runs: [run],
+  };
+}
+
 function siteForTask(task: TaskProjection): "xiaohongshu" | "boss" {
   return task.id.includes("boss") || task.siteSkill.toLowerCase().includes("boss") ? "boss" : "xiaohongshu";
 }

@@ -28,6 +28,7 @@ import {
 import {
   coreTaskSubmitReadiness,
   initialCoreTaskSubmitState,
+  promoteSubmittedCoreTask,
   submitCoreReadOnlyTask,
   type CoreTaskSubmitState,
 } from "./coreTaskSubmitClient";
@@ -492,12 +493,7 @@ export function App() {
         [submitKey]: {
           endpoint: submitEndpoint,
           taskId: submitTask.id,
-          task: {
-            ...submitTask,
-            source: "Core live",
-            identitySource: "Harbor live",
-            runs: [result.run, ...submitTask.runs.filter((run) => run.id !== result.run.id)],
-          },
+          task: promoteSubmittedCoreTask(submitTask, result.run),
         },
       }));
       if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
