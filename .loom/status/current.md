@@ -2,34 +2,34 @@
 
 ## Derived Fact Chain View
 
-- Item ID: APP-265
-- Goal: Repair the App/Core/Harbor runtime admission contract so the packaged App can supervise local owner runtimes, detect real browser providers, and submit a read-only Core task that returns run/result/evidence/session refs instead of fixture/UI projection.
-- Scope: App #265 owner API IPC and live blocker surfacing keeps packaged Core/Harbor runtime supervision intact while allowing Electron-rendered App pages to consume local Core/Harbor owner APIs without browser CORS false negatives. It prevents fixture/demo/smoke owner payloads and needs-auth/local/fixture identities from opening live task controls. Ownership constraints are limited to App owner API IPC, Core/Harbor renderer client ingestion, owner payload guards, identity task gating, packaged smoke scripts, screenshot artifacts, and APP-265 Loom carriers; Core, Harbor, Lode, raw credentials, raw evidence, browser profile storage contents, and external write actions are forbidden.
-- Execution Path: work/app-265-manual-auth-launch
+- Item ID: APP-239
+- Goal: Correct APP-239 so the packaged App can execute one supervised official-Chrome Xiaohongshu read-only task and display only Core-owned live run/result/evidence/session refs.
+- Scope: App restricted-Chrome admission, structured public query submit, supervised Core/Harbor bearer distribution, typed owner refs, fixture isolation, runtime timeout, packaged smoke, and APP-239 carriers. BOSS and write-precheck remain excluded.
+- Execution Path: work/app-239-official-chrome-readonly
 - Workspace Entry: .
-- Recovery Entry: .loom/progress/APP-265.md
-- Review Entry: .loom/reviews/APP-265.json
-- Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; npm run smoke:packaged:runtime; npm run smoke:packaged:vertical; git diff --check; loom status --target . --json; loom fact-chain --target . --json; loom suite carrier validate --target . --item APP-265 --json; loom suite evidence validate --target . --item APP-265 --json
-- Closing Condition: PR Ready for the App-only live-safe readonly submit slice after validation proves editable same-origin business input flows through Core `/tasks`, returned owner-shaped run/result/evidence/session refs render in the packaged App, existing packaged runtime/preflight smoke remains green, and no fixture/demo result is promoted to live.
+- Recovery Entry: .loom/progress/APP-239.md
+- Review Entry: .loom/reviews/APP-239.json
+- Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged:readonly; git diff --check; packaged App Computer Use E2E
+- Closing Condition: PR #280 merged and merged-head packaged App Computer Use E2E proves the XHS live run/result/evidence/session path. Keep BOSS and write-precheck issues open.
 - Current Checkpoint: merge
-- Current Stop: PR #277 was rebased onto App main so it includes the separate App #236 manual-authentication confirmation boundary. It needs a current-head review record and hosted merge-gate consumption. This is controller-owned merge work, not a user blocker.
-- Next Step: Merge PR #277 after the gate passes, launch the packaged App at the merged head, open the selected live Xiaohongshu identity's Harbor-managed authentication scene, and use the explicit confirmation action only after the user has completed manual authentication in that active session. Keep App #265 and App #14 open until a real Core read-only run returns owner refs.
-- Blockers: none
-- Latest Validation Summary: 2026-07-10T10:01Z local validation passed on implementation head `e88aa428b60163cb9414a192eb54c7006f30ef3d`: `npm run typecheck`, `npm run smoke`, and `git diff --check`. The correction gives `打开认证现场` an actual Harbor session launcher and forwards its per-launch supervisor token only into the packaged Harbor runtime, so the existing main-process-only confirmation route can authenticate locally. It does not expose the token to renderer/preload, make login state writable through generic APIs, create a Core task, or promote fixture data to live. No real login, submit, publish, send, sensitive cleartext save, bulk collection, hosted browser, marketplace, full account cloud hosting or risk-control bypass occurred in this validation.
-- Recovery Boundary: Revert branch `work/app-265-owner-api-ipc`; stop any Harbor session from the E2E; remove `/tmp/webenvoy-live-e2e-20260710-owner-api-fixed` only if the local test identity/profile state must be discarded.
-- Current Lane: App #265 owner API IPC and live identity blocker surfacing.
+- Current Stop: PR #280 product head 27c7dd8d36d6fc13dc3e21c81724040e030477f0 passed final-head packaged-App Computer Use E2E with succeeded run app-xiaohongshu-mrghtw1l and five public refs.
+- Next Step: Consume hosted checks, merge Harbor/Core/App in dependency order, rebuild from merged heads, and repeat packaged-App Computer Use E2E before closing #245/#267/#239.
+- Blockers: None recorded.
+- Latest Validation Summary: 2026-07-11 at product head 27c7dd8d36d6fc13dc3e21c81724040e030477f0: `npm run typecheck`, `npm run smoke`, exact-head packaged runtime build, and `git diff --check` passed. Computer Use opened and confirmed session_c9795336-ee01-46d1-a07e-6b41dd70f304, released it for Core, and completed run app-xiaohongshu-mrghtw1l as search-notes.read_result with evidence_e97634d4-8152-4804-b7fa-99fbf6cdcf6f, evidence_e7b3c9b7-6637-4960-b7ab-f15b780702cf, evidence_d4845acd-1af4-438a-b710-895d7f89e4a2, screenshot_1de2bda2-d252-46bd-a4a1-0e3516d6dc13, and post_check_62f65cf6-830e-4cd1-b0be-4e7659494153. No raw evidence or prohibited action occurred; merged-head replay remains required.
+- Recovery Boundary: Revert PR #251 branch `work/app-239-real-read-results`; no Core/Harbor/Lode repo changes, external site access, real account/profile/Cookie use, raw evidence storage, host merge, issue closeout, or live write occurred. Core #230 / PR #240 write-precheck facts remain excluded scope and are not consumed by this read-only display batch.
+- Current Lane: App #239 official-Chrome Xiaohongshu live read-only corrective delivery.
 
 ## Runtime Evidence
 
-- Run Entry: artifacts/app-265-packaged-runtime-smoke.png
+- Run Entry: app-xiaohongshu-mrgcpit5 branch evidence; final-head and merged-head replay pending.
 - Logs Entry: scripts/smoke.mjs
 - Diagnostics Entry: src/renderer/IdentityEnvironmentsPage.tsx; src/renderer/IdentityEnvironmentDetails.tsx; src/renderer/harborIdentityClient.ts
-- Verification Entry: .loom/progress/APP-265.md
-- Lane Entry: .loom/specs/APP-265/plan.md
+- Verification Entry: .loom/progress/APP-239.md
+- Lane Entry: .loom/specs/APP-239/plan.md
 
 ## Sources
 
-- Static Truth: .loom/work-items/APP-265.md
-- Dynamic Truth: .loom/progress/APP-265.md
+- Static Truth: .loom/work-items/APP-239.md
+- Dynamic Truth: .loom/progress/APP-239.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json

@@ -103,6 +103,7 @@ export type TaskProjection = {
   identitySource?: OwnerSource;
   siteSkill: string;
   businessInput: string;
+  searchQuery?: string;
   source: OwnerSource;
   packageSource: {
     name: string;
@@ -167,6 +168,7 @@ export const taskThreadFixtures: TaskProjection[] = [
     accountIdentity: "小红书运营号 A",
     siteSkill: "小红书搜索和笔记读取",
     businessInput: "关键词：AI 工具；笔记：https://www.xiaohongshu.com/explore/real-note-2026",
+    searchQuery: "AI 工具",
     source: "Core fixture",
     packageSource: {
       name: "@lode/xiaohongshu-read-only",
@@ -381,6 +383,7 @@ export const taskThreadFixtures: TaskProjection[] = [
     accountIdentity: "BOSS 招聘号",
     siteSkill: "BOSS 搜索和职位详情读取",
     businessInput: "职位：前端工程师；城市：上海；筛选：近三天",
+    searchQuery: "前端工程师",
     source: "Core fixture",
     packageSource: {
       name: "@lode/boss-read-only",

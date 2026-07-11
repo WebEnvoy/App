@@ -1,6 +1,6 @@
 const fixtureToken = /(^|[\s:._/-])(demo|fixture|smoke)([\s:._/-]|$)/i;
 const metadataKey =
-  /(^|_)(capture_method|environment|id|kind|locator|mode|provenance|ref|refs|runtime|schema|source|type)($|_)/i;
+  /(^|_)(capture_method|environment|id|kind|locator|metadata|mode|provenance|ref|refs|runtime|schema|source|type)($|_)/i;
 const metadataContainerKey = /(^|_)(locator|locators|provenance|ref|refs|source|sources)($|_)/i;
 
 export function fixtureOrDemoPayloadReason(value: unknown): string | null {
@@ -8,10 +8,10 @@ export function fixtureOrDemoPayloadReason(value: unknown): string | null {
 }
 
 function fixtureOrDemoReason(value: unknown, path: string, depth: number, metadataContext: boolean): string | null {
+  if (depth > 8) return `${path}=maximum metadata inspection depth exceeded`;
   if (typeof value === "string" && metadataContext && fixtureToken.test(value)) {
     return `${path}=${value}`;
   }
-  if (depth > 8) return null;
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
       const reason = fixtureOrDemoReason(value[index], `${path}[${index}]`, depth + 1, metadataContext);
@@ -25,7 +25,7 @@ function fixtureOrDemoReason(value: unknown, path: string, depth: number, metada
     if ((key === "demo" || key === "fixture" || key === "is_demo" || key === "is_fixture") && field === true) {
       return `${path}.${key}=true`;
     }
-    const childMetadataContext = metadataContext || metadataContainerKey.test(key);
+    const childMetadataContext = metadataContext || metadataKey.test(key) || metadataContainerKey.test(key);
     if (typeof field === "string" && childMetadataContext && fixtureToken.test(field)) {
       return `${path}.${key}=${field}`;
     }

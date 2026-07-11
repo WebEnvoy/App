@@ -58,6 +58,12 @@ export function TaskThreadComposer({
   );
   const isBusy = coreSubmitState.status === "submitting" || coreSubmitState.status === "polling";
   const canSubmit = submitReadiness.ok && !isBusy;
+  const isRestrictedFallback = submitReadiness.ok && submitReadiness.identity.readiness.state === "warning";
+  const submitSummary = submitReadiness.ok
+    ? isRestrictedFallback
+      ? `Warning：官方 Chrome 受限后备，仅允许单次小红书只读任务。${coreSubmitState.summary}`
+      : coreSubmitState.summary
+    : submitReadiness.reason;
 
   useEffect(() => {
     const composerInput = inputRef.current;
@@ -186,16 +192,14 @@ export function TaskThreadComposer({
             type="submit"
             aria-label="提交只读 Core task"
             disabled={!canSubmit}
-            title={submitReadiness.ok ? coreSubmitState.summary : submitReadiness.reason}
+            title={submitSummary}
           >
             <ArrowUp size={16} />
           </button>
         </div>
       </div>
-      <p className={canSubmit ? "composer-submit-status ready" : "composer-submit-status blocked"}>
-        {submitReadiness.ok
-          ? coreSubmitState.summary
-          : submitReadiness.reason}
+      <p className={isRestrictedFallback ? "composer-submit-status warning" : canSubmit ? "composer-submit-status ready" : "composer-submit-status blocked"}>
+        {submitSummary}
       </p>
     </form>
   );

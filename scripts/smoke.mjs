@@ -28,6 +28,7 @@ const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitCl
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
+const appSource = await readFile("src/renderer/App.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -75,12 +76,84 @@ if (!mainSource.includes("webenvoy:harbor-manual-authentication-completed")) {
   throw new Error("Electron main smoke failed: manual authentication IPC is missing.");
 }
 
-if (!runtimeSupervisorSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || !runtimeSupervisorSource.includes("randomBytes(32)")) {
-  throw new Error("Electron supervisor smoke failed: per-launch Harbor manual-auth token is missing.");
+if (!runtimeSupervisorSource.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") || !runtimeSupervisorSource.includes("randomBytes(32)")) {
+  throw new Error("Electron supervisor smoke failed: shared Harbor/Core runtime supervisor token is missing.");
 }
 
 if (!packagedHarborRuntimeSource.includes("manual_authentication_supervisor_token: process.env.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
   throw new Error("Packaged Harbor runtime smoke failed: manual-auth supervisor token was not forwarded to Harbor.");
+}
+
+const sharedSupervisorToken = "smoke-shared-runtime-supervisor-token";
+const parentTokenEnvironment = {
+  SAFE_PARENT_VALUE: "kept",
+  HARBOR_RUNTIME_SUPERVISOR_TOKEN: "parent-runtime-token-must-not-win",
+  HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: "parent-manual-token-must-not-win",
+};
+const harborChildEnvironment = runtimeSupervisorModule.runtimeSupervisorChildEnvironment(
+  "harbor",
+  "packaged-path",
+  { HARBOR_RUNTIME_PORT: "8788" },
+  sharedSupervisorToken,
+  parentTokenEnvironment,
+);
+const coreChildEnvironment = runtimeSupervisorModule.runtimeSupervisorChildEnvironment(
+  "core",
+  "packaged-path",
+  { PORT: "8787" },
+  sharedSupervisorToken,
+  parentTokenEnvironment,
+);
+if (
+  harborChildEnvironment.HARBOR_RUNTIME_SUPERVISOR_TOKEN !== sharedSupervisorToken ||
+  coreChildEnvironment.HARBOR_RUNTIME_SUPERVISOR_TOKEN !== sharedSupervisorToken ||
+  harborChildEnvironment.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN !== sharedSupervisorToken ||
+  coreChildEnvironment.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN !== undefined ||
+  harborChildEnvironment.SAFE_PARENT_VALUE !== "kept" ||
+  coreChildEnvironment.SAFE_PARENT_VALUE !== "kept"
+) {
+  throw new Error("Electron supervisor smoke failed: Harbor/Core did not receive the same isolated supervisor token environment.");
+}
+
+for (const path of [
+  "/runtime/identity-environment-sessions",
+  "/runtime/sessions/identity-environment",
+  "/identity-environment-sessions",
+  "/runtime/sessions/session_opaque/lock",
+  "/runtime/sessions/session_opaque/release",
+  "/runtime/sessions/session_opaque/stop",
+  "/runtime/sessions/session_opaque/read-operations",
+  "/runtime/sessions/session_opaque/snapshot",
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({
+    base: "http://127.0.0.1:8788",
+    path,
+    method: "POST",
+  });
+  if (
+    !parsed.ok ||
+    !ownerApiRequestModule.isHarborSupervisorProtectedRequest(parsed) ||
+    ownerApiRequestModule.harborSupervisorAuthorizationHeader(parsed, sharedSupervisorToken) !== `Bearer ${sharedSupervisorToken}`
+  ) {
+    throw new Error(`Owner API supervisor smoke failed: protected Harbor path did not receive bearer authorization: ${path}`);
+  }
+}
+
+for (const request of [
+  { path: "/tasks", method: "POST" },
+  { path: "/runtime/identity-environments", method: "POST" },
+  { path: "/runtime/identity-environment-sessions", method: "GET" },
+  { path: "/runtime/sessions/session_opaque", method: "GET" },
+  { path: "/runtime/sessions/session_opaque/snapshots", method: "POST" },
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
+  if (
+    !parsed.ok ||
+    ownerApiRequestModule.isHarborSupervisorProtectedRequest(parsed) ||
+    ownerApiRequestModule.harborSupervisorAuthorizationHeader(parsed, sharedSupervisorToken) !== undefined
+  ) {
+    throw new Error(`Owner API supervisor smoke failed: unprotected path received bearer authorization: ${request.method} ${request.path}`);
+  }
 }
 
 const splitOutputToken = "smoke-split-supervisor-token";
@@ -118,7 +191,14 @@ if (!preloadSource.includes("completeHarborManualAuthentication")) {
   throw new Error("Preload smoke failed: narrow manual-authentication bridge is missing.");
 }
 
-if (preloadSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || preloadSource.includes("Authorization") || rendererAssets.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
+if (
+  preloadSource.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") ||
+  preloadSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") ||
+  preloadSource.includes("Authorization") ||
+  rendererAssets.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") ||
+  rendererAssets.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") ||
+  rendererAssets.includes(sharedSupervisorToken)
+) {
   throw new Error("Manual authentication smoke failed: supervisor token or authorization plumbing reached preload or renderer assets.");
 }
 
@@ -136,6 +216,17 @@ if (!identityEnvironmentDetailsSource.includes("onOpenAuthenticationSite") || !i
 
 if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !identityEnvironmentsPageSource.includes("candidate.id === selected.siteId")) {
   throw new Error("Identity recovery smoke failed: authentication site launch does not prefer the selected identity site target.");
+}
+
+if (
+  !identityEnvironmentsPageSource.includes("onHarborStateChange(nextState)") ||
+  !appSource.includes("onHarborStateChange={setHarborIdentityState}")
+) {
+  throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
+}
+
+if (!coreTaskSubmitClientSource.includes("intent_id: `intent_\${runId}`")) {
+  throw new Error("Core task submit smoke failed: intent_id must remain a result-ref-safe opaque identifier.");
 }
 
 for (const expectedText of [
@@ -433,6 +524,20 @@ const ownerPayloadGuardsModule = await import(ownerPayloadGuardsModuleUrl);
 if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({ evidence_refs: ["harbor:evidence/x/smoke"] })) {
   throw new Error("Owner payload guard smoke failed: smoke refs in arrays were not rejected.");
 }
+for (const payload of [
+  { runtime: "smoke" },
+  { ordinary: { source_ref: "fixture" } },
+  { metadata: "demo" },
+]) {
+  if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason(payload)) {
+    throw new Error(`Owner payload guard smoke failed: metadata fixture marker was accepted: ${JSON.stringify(payload)}`);
+  }
+}
+let overDepthPayload = { source: "live" };
+for (let depth = 0; depth < 9; depth += 1) overDepthPayload = { nested: overDepthPayload };
+if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason(overDepthPayload)?.includes("maximum metadata inspection depth exceeded")) {
+  throw new Error("Owner payload guard smoke failed: payload beyond inspection depth was accepted.");
+}
 if (ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({
   schema_version: "harbor-browser-provider-status/v0",
   providers: [
@@ -529,10 +634,36 @@ const coreReadTaskClientModuleRewritten = coreReadTaskClientModuleSource.replace
 ).replace(
   'from "./ownerApiClient";',
   `from "${ownerApiClientModuleUrl}";`,
-);
+) + "\nexport { typedCoreRefValueReason };";
 const coreReadTaskClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`
 );
+for (const [value, kind] of [
+  ["source_wrong_type", "session"],
+  ["https://example.test/session_live", "session"],
+  ["evidence_cookie_dump", "evidence"],
+  ["evidence_raw_dom", "evidence"],
+  ["evidence_har_capture", "evidence"],
+  ["screenshot_token", "evidence"],
+  ["result:core/xiaohongshu/password", "result"],
+  [42, "source"],
+]) {
+  if (!coreReadTaskClientModule.typedCoreRefValueReason(value, kind, "smoke.ref", true)) {
+    throw new Error(`Core ref guard smoke failed: unsafe or wrongly typed ${kind} ref was accepted: ${String(value)}`);
+  }
+}
+for (const [value, kind] of [
+  ["session_f76393db-e74f-4bec-88be-63754f7a5d00", "session"],
+  ["source_6f45e8c0", "source"],
+  ["evidence_6f45e8c0", "evidence"],
+  ["screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76", "evidence"],
+  ["post_check_1c29bb68-10e4-458f-b384-97f249e711e9", "post-check"],
+  ["result:core/xiaohongshu/search-notes/live", "result"],
+]) {
+  if (coreReadTaskClientModule.typedCoreRefValueReason(value, kind, "smoke.ref", true)) {
+    throw new Error(`Core ref guard smoke failed: valid ${kind} ref was rejected: ${value}`);
+  }
+}
 const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(runtimeSupervisorStateSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -723,7 +854,7 @@ try {
     region: "CN-SH",
     language: "zh-CN",
     timezone: "Asia/Shanghai",
-    userAgentSummary: "Chrome family smoke",
+    userAgentSummary: "Chrome family contract",
     viewport: "1440 x 900",
     fingerprintSummary: "provider_claim_contract",
   });
@@ -799,12 +930,68 @@ try {
   ) {
     throw new Error("Harbor manual authentication smoke failed: completion request scope or response redaction was violated.");
   }
+  const packagedRuntimeRefs = manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+    schema_version: "harbor-local-identity-environment-store/v0",
+    identity_environment_ref: "identity-env-live-xhs-chrome-20260710",
+    site: { site_id: "xiaohongshu" },
+    refs: {
+      execution_identity_ref: "identity-env-live-xhs-chrome-20260710:execution",
+      profile_ref: "profile-live-xhs-chrome-20260710",
+    },
+    status: {
+      readiness: "ready",
+      login_state: "logged_in",
+      authentication_provenance: "user_confirmed_managed_session",
+      browser_storage_state: "present",
+      manual_authentication_state: "completed",
+      recovery_required: false,
+    },
+  }));
+  if (
+    packagedRuntimeRefs?.identity_environment_ref !== "identity-env-live-xhs-chrome-20260710" ||
+    packagedRuntimeRefs.refs?.execution_identity_ref !== "identity-env-live-xhs-chrome-20260710:execution" ||
+    manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+      ...packagedRuntimeRefs,
+      identity_environment_ref: "identity env with spaces",
+    })) !== null
+  ) {
+    throw new Error("Harbor manual authentication smoke failed: packaged opaque refs were rejected or unsafe refs were accepted.");
+  }
+  const legacyRuntimeRefs = manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+    ...packagedRuntimeRefs,
+    identity_environment_ref: "harbor://identity-environment/xhs-legacy",
+    refs: {
+      execution_identity_ref: "harbor://execution-identity/xhs-legacy",
+      profile_ref: "harbor://profile/xhs-legacy",
+    },
+  }));
+  if (!legacyRuntimeRefs) {
+    throw new Error("Harbor manual authentication smoke failed: legacy typed public refs were rejected.");
+  }
+  for (const [label, change] of [
+    ["identity wrong namespace", { identity_environment_ref: "profile-wrong" }],
+    ["identity URL", { identity_environment_ref: "https://example.test/identity-env-live" }],
+    ["identity sensitive fragment", { identity_environment_ref: "identity-env-token-secret" }],
+    ["execution wrong namespace", { refs: { ...packagedRuntimeRefs.refs, execution_identity_ref: "execution-live-xhs" } }],
+    ["execution sensitive fragment", { refs: { ...packagedRuntimeRefs.refs, execution_identity_ref: "identity-env-cookie:execution" } }],
+    ["profile wrong namespace", { refs: { ...packagedRuntimeRefs.refs, profile_ref: "identity-env-live" } }],
+    ["profile sensitive fragment", { refs: { ...packagedRuntimeRefs.refs, profile_ref: "profile-raw_evidence" } }],
+  ]) {
+    const rejected = manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+      ...packagedRuntimeRefs,
+      ...change,
+    }));
+    if (rejected !== null) {
+      throw new Error(`Harbor manual authentication smoke failed: ${label} was accepted.`);
+    }
+  }
 
   const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
   readyXhsIdentity = refreshedHarborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
   if (
     readyXhsIdentity?.readiness.state !== "ready" ||
     readyXhsIdentity.login.manualAuthenticationState !== "已完成" ||
+    readyXhsIdentity.admissionFacts?.authenticationProvenance !== "user_confirmed_managed_session" ||
     !readyXhsIdentity.login.reason.includes("用户在 Harbor 受控会话中明确确认")
   ) {
     throw new Error(`Harbor manual authentication smoke failed: refreshed public identity was not ready: ${JSON.stringify(refreshedHarborReadback)}`);
@@ -892,6 +1079,7 @@ const readonlySubmitTask = {
   accountIdentity: "小红书运营号 A",
   siteSkill: "小红书搜索和笔记读取",
   businessInput: "读取 https://www.xiaohongshu.com/explore/abc?xsec_token=url-ref-only",
+  searchQuery: "AI 工具",
   packageSource: {
     lockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
   },
@@ -914,11 +1102,16 @@ if (Object.prototype.hasOwnProperty.call(submitReadiness.payload, "entrypoint"))
 if (
   submitReadiness.payload.task_intent.schema_version !== "webenvoy.task-intent.v0" ||
   submitReadiness.payload.task_intent.entrypoint !== "app" ||
-  submitReadiness.payload.task_intent.scope.target_ref !== "https://www.xiaohongshu.com/explore/abc?xsec_token=url-ref-only" ||
+  submitReadiness.payload.task_intent.scope.target_ref !== "https://www.xiaohongshu.com/search_result?keyword=AI+%E5%B7%A5%E5%85%B7" ||
+  submitReadiness.payload.public_query?.query !== "AI 工具" ||
+  submitReadiness.payload.task_intent.input.summary !== readonlySubmitTask.title ||
   submitReadiness.payload.task_intent.resource_requirement_refs[0] !== "xiaohongshu.search-notes.resources" ||
   submitReadiness.payload.task_intent.evidence_policy_ref !== "evidence-policy:refs-only"
 ) {
   throw new Error(`Core submit smoke failed: task intent payload is malformed: ${JSON.stringify(submitReadiness.payload)}`);
+}
+if (JSON.stringify(submitReadiness.payload).includes(readonlySubmitTask.businessInput)) {
+  throw new Error("Core submit smoke failed: free-form businessInput leaked into the payload.");
 }
 
 const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -948,19 +1141,78 @@ for (const source of ["App local-only", "Harbor fixture"]) {
   }
 }
 
+const restrictedChromeIdentity = {
+  ...readyXhsIdentity,
+  provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", role: "受限后备", state: "warning", reason: "provider_conflict" },
+  readiness: { state: "warning", label: "受限后备", reasons: ["provider_conflict"] },
+  admissionFacts: {
+    providerId: "chrome_official",
+    providerRole: "restricted_fallback",
+    authenticationProvenance: "user_confirmed_managed_session",
+    loginState: "logged_in",
+    manualAuthenticationState: "completed",
+    recoveryRequired: false,
+    browserStorageState: "present",
+    warningReasonCodes: ["provider_conflict", "fingerprint_conflict"],
+  },
+};
 const chromeFallbackReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   readonlySubmitTask,
   liveRuntimeForSubmit,
-  [
-    {
-      ...readyXhsIdentity,
-      provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", state: "warning" },
-      readiness: { ...readyXhsIdentity.readiness, state: "warning" },
-    },
-  ],
+  [restrictedChromeIdentity],
 );
-if (chromeFallbackReadiness.ok) {
-  throw new Error("Core submit smoke failed: Chrome restricted fallback was accepted for Core task submit.");
+if (!chromeFallbackReadiness.ok || chromeFallbackReadiness.identity.readiness.state !== "warning") {
+  throw new Error("Core submit smoke failed: proven restricted Chrome fallback was not narrowly admitted with warning preserved.");
+}
+
+const promotedTask = coreTaskSubmitClientModule.promoteSubmittedCoreTask(
+  { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", runs: [{ id: "fixture-run", source: "Core fixture" }] },
+  { id: "live-run", source: "Core live" },
+);
+if (
+  promotedTask.source !== "Core live" ||
+  promotedTask.identitySource !== "Harbor live" ||
+  promotedTask.runs.length !== 1 ||
+  promotedTask.runs[0]?.id !== "live-run" ||
+  promotedTask.packageSource.lockRef !== readonlySubmitTask.packageSource.lockRef
+) {
+  throw new Error(`Core submit smoke failed: live promotion retained fixture history or rewrote Lode provenance: ${JSON.stringify(promotedTask)}`);
+}
+
+const restrictedChromeNegativeMatrix = [
+  ["site", { siteId: "boss" }],
+  ["provider", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, providerId: "cloakbrowser" } }],
+  ["role", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, providerRole: "primary" } }],
+  ["provenance", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, authenticationProvenance: "unknown" } }],
+  ["login", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, loginState: "unknown" } }],
+  ["manual auth", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, manualAuthenticationState: "required" } }],
+  ["recovery", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, recoveryRequired: true } }],
+  ["storage", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, browserStorageState: "unknown" } }],
+  ["empty warning", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, warningReasonCodes: [] } }],
+  ["unexpected warning", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, warningReasonCodes: ["provider_conflict", "other"] } }],
+  ["generally ready", { provider: { ...restrictedChromeIdentity.provider, state: "ready" } }],
+];
+for (const [label, change] of restrictedChromeNegativeMatrix) {
+  const candidate = { ...restrictedChromeIdentity, ...change };
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveRuntimeForSubmit, [candidate]).ok) {
+    throw new Error(`Core submit smoke failed: restricted Chrome ${label} negative case was accepted.`);
+  }
+}
+
+for (const [label, searchQuery] of [["missing", undefined], ["empty", ""], ["untrimmed", " AI 工具"], ["too long", "x".repeat(257)], ["ambiguous", ["AI 工具", "咖啡"]]]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...readonlySubmitTask, searchQuery }, liveRuntimeForSubmit, [restrictedChromeIdentity]).ok) {
+    throw new Error(`Core submit smoke failed: ${label} public query was accepted.`);
+  }
+}
+
+for (const task of [
+  { ...readonlySubmitTask, id: "task-boss-real-read", searchQuery: "前端工程师" },
+  { ...readonlySubmitTask, id: "task-xhs-write-preview" },
+  { ...readonlySubmitTask, id: "task-xhs-bulk-search" },
+]) {
+  if (task && coreTaskSubmitClientModule.coreTaskSubmitReadiness(task, liveRuntimeForSubmit, [restrictedChromeIdentity]).ok) {
+    throw new Error(`Core submit smoke failed: unsupported BOSS/write/bulk task was admitted: ${task.id}`);
+  }
 }
 
 const crossOriginReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -999,7 +1251,7 @@ const fakeRun = {
   },
   runtime_refs: {
     session_binding: {
-      runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+      runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
       control_owner: "core_task",
       lifecycle_state: "active",
       session_use: "core_task_run",
@@ -1018,9 +1270,17 @@ const fakeRun = {
 };
 
 const submitFetchCalls = [];
+let submittedTaskPayload;
+const ownerRequestTimeouts = [];
+const originalWindowSetTimeout = globalThis.window.setTimeout;
+globalThis.window.setTimeout = (callback, timeout) => {
+  ownerRequestTimeouts.push(timeout);
+  return originalWindowSetTimeout(callback, timeout);
+};
 globalThis.fetch = async (url, init = {}) => {
   const pathname = String(url);
   submitFetchCalls.push(`${init.method ?? "GET"} ${pathname}`);
+  if (pathname.endsWith("/tasks")) submittedTaskPayload = JSON.parse(init.body);
   const submitRun = { ...fakeRun, run_id: "run_submit_xhs_001" };
   const json = pathname.endsWith("/tasks")
     ? { ok: true, run_id: submitRun.run_id }
@@ -1092,9 +1352,20 @@ const submittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   { pollAttempts: 1, pollIntervalMs: 0 },
 );
 globalThis.fetch = originalFetch;
+globalThis.window.setTimeout = originalWindowSetTimeout;
 
 if (submittedRun.status !== "ready" || submittedRun.runId !== "run_submit_xhs_001") {
   throw new Error(`Core submit smoke failed: submit/poll did not return ready run: ${JSON.stringify(submittedRun)}`);
+}
+if (
+  submitFetchCalls.filter((entry) => entry.startsWith("POST ") && entry.endsWith("/tasks")).length !== 1 ||
+  submittedTaskPayload?.public_query?.query !== "AI 工具" ||
+  JSON.stringify(submittedTaskPayload).includes(readonlySubmitTask.businessInput)
+) {
+  throw new Error(`Core submit smoke failed: one-shot POST or exact public query contract was violated: ${JSON.stringify(submittedTaskPayload)}`);
+}
+if (ownerRequestTimeouts[0] !== 65_000 || ownerRequestTimeouts.slice(1).some((timeout) => timeout !== 2500)) {
+  throw new Error(`Core submit smoke failed: /tasks and owner read timeouts diverged from IPC boundaries: ${ownerRequestTimeouts.join(",")}`);
 }
 
 for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/evidence-refs", "/failure", "/session-refs"]) {
@@ -1160,17 +1431,33 @@ globalThis.fetch = async (url) => {
               result_kind: "xhs_note_search",
               result_ref: "result:core/xiaohongshu/search-notes/contract",
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/snapshot"],
+              source_refs: ["source_6f45e8c0"],
+              evidence_refs: [
+                "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
+                "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+              ],
+              post_check: {
+                ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+                status: "passed",
+              },
             },
           },
           evidence_refs: [
             {
-              ref: "harbor:evidence/xiaohongshu/search-notes/snapshot",
+              ref: "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
               source: "admission_and_terminal",
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:00:03.000Z",
-              runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+              runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
+            },
+            {
+              ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+              source: "terminal_post_check",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:00:03.000Z",
+              runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
             },
           ],
         },
@@ -1184,7 +1471,7 @@ globalThis.fetch = async (url) => {
       }
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
-    : { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref } } };
+    : { ok: true, session_refs: { session_refs: { runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00" } } };
   return {
     ok: true,
     json: async () => json,
@@ -2286,7 +2573,7 @@ function harborIdentityFacts() {
       language: "zh-CN",
       timezone: "Asia/Shanghai",
       browser_family: "cloakbrowser",
-      user_agent_summary: "Chrome family smoke",
+      user_agent_summary: "Chrome family contract",
       viewport: "1440 x 900",
       fingerprint_summary: "provider_claim_contract",
     },

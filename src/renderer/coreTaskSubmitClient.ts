@@ -19,6 +19,7 @@ type SubmitReadiness =
 type CoreTaskPayload = {
   run_id: string;
   package_ref: string;
+  public_query: { query: string };
   task_intent: {
     schema_version: "webenvoy.task-intent.v0";
     intent_id: string;
@@ -62,6 +63,7 @@ type CoreTaskSubmitOptions = {
 
 const sensitivePayloadPattern =
   /\b(token|cookie|secret|bearer|credential|password|authorization|profile_storage|raw_evidence|dom|har|trace)\b/i;
+const allowedRestrictedFallbackWarnings = new Set(["provider_conflict", "fingerprint_conflict"]);
 
 export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
   status: "idle",
@@ -94,30 +96,40 @@ export function coreTaskSubmitReadiness(
   }
 
   const site = siteForTask(task);
+  if (site !== "xiaohongshu") {
+    return { ok: false, reason: "当前批次只放行小红书公开 query；BOSS 城市、时间等结构化筛选合同完成前保持 fail-closed。" };
+  }
   const identity = identities.find(
     (item) =>
       item.source === "Harbor live" &&
       item.siteId === site &&
-      item.readiness.state === "ready" &&
-      item.provider.state === "ready" &&
-      !item.login.recoveryRequired,
+      isReadOnlyIdentityAdmitted(item),
   );
   if (!identity) {
-    return { ok: false, reason: "缺少 ready 的 Harbor live identity；needs-auth/warning/fixture/local identity 不可提交真实任务。" };
+    return { ok: false, reason: "缺少符合只读 admission 的 Harbor live identity；未证明的 warning、needs-auth、fixture/local identity 不可提交真实任务。" };
+  }
+
+  const query = task.searchQuery;
+  if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > 256) {
+    return { ok: false, reason: "当前任务缺少明确、已修剪且不超过 256 字符的公开搜索 query；不发送自由格式业务输入。" };
   }
 
   const capability = spec.capabilities[0];
   const runId = `app-${site}-${Date.now().toString(36)}`;
-  const targetRef = targetRefForTask(task.businessInput, identity);
-  if (targetRef == null) {
+  const inputTargetRef = targetRefForTask(task.businessInput, identity);
+  if (inputTargetRef == null) {
     return { ok: false, reason: "业务输入中的 URL 不属于所选 Harbor identity origin；已 fail closed。" };
   }
+  const targetUrl = new URL("/search_result", identity.origin);
+  targetUrl.searchParams.set("keyword", query);
+  const targetRef = targetUrl.toString();
   const payload: CoreTaskPayload = {
     run_id: runId,
     package_ref: capability.packageRef,
+    public_query: { query },
     task_intent: {
       schema_version: "webenvoy.task-intent.v0",
-      intent_id: `intent:${runId}`,
+      intent_id: `intent_${runId}`,
       entrypoint: "app",
       user_intent: {
         summary: task.title,
@@ -129,7 +141,7 @@ export function coreTaskSubmitReadiness(
         ...(task.packageSource.lockRef === undefined ? {} : { lock_ref: task.packageSource.lockRef }),
       },
       input: {
-        summary: task.businessInput,
+        summary: task.title,
         ...(targetRef === identity.origin ? {} : { refs: [targetRef] }),
       },
       scope: {
@@ -154,6 +166,30 @@ export function coreTaskSubmitReadiness(
   return containsSensitiveField(payload)
     ? { ok: false, reason: "Core task payload 含敏感字段；已 fail closed。" }
     : { ok: true, spec, identity, payload };
+}
+
+function isReadOnlyIdentityAdmitted(identity: IdentityEnvironmentProjection) {
+  if (
+    identity.readiness.state === "ready" &&
+    identity.provider.state === "ready" &&
+    !identity.login.recoveryRequired
+  ) {
+    return true;
+  }
+  const facts = identity.admissionFacts;
+  return (
+    identity.readiness.state === "warning" &&
+    identity.provider.state === "warning" &&
+    facts?.providerId === "chrome_official" &&
+    facts.providerRole === "restricted_fallback" &&
+    facts.authenticationProvenance === "user_confirmed_managed_session" &&
+    facts.loginState === "logged_in" &&
+    facts.manualAuthenticationState === "completed" &&
+    facts.recoveryRequired === false &&
+    facts.browserStorageState === "present" &&
+    facts.warningReasonCodes.length > 0 &&
+    facts.warningReasonCodes.every((code) => allowedRestrictedFallbackWarnings.has(code))
+  );
 }
 
 export async function submitCoreReadOnlyTask(
@@ -191,6 +227,15 @@ export async function submitCoreReadOnlyTask(
         runId,
         summary: `Core accepted /tasks as ${runId}; owner refs are not queryable yet. ${projected.error}`,
       };
+}
+
+export function promoteSubmittedCoreTask(task: TaskProjection, run: RunProjection): TaskProjection {
+  return {
+    ...task,
+    source: "Core live",
+    identitySource: "Harbor live",
+    runs: [run],
+  };
 }
 
 function siteForTask(task: TaskProjection): "xiaohongshu" | "boss" {
@@ -246,7 +291,7 @@ async function requestJson(base: string, path: string, init: RequestInit): Promi
   return requestOwnerJson(base, path, {
     method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
     body: typeof init.body === "string" ? parseJson(init.body) : undefined,
-    timeoutMs: 3500,
+    timeoutMs: path === "/tasks" && init.method === "POST" ? 65_000 : 3500,
   });
 }
 

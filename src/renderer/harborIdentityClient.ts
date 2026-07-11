@@ -366,6 +366,7 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
       recovery_actions: status?.recovery_required === true ? ["manual_login"] : [],
     },
     diagnostics: blockingReasons,
+    authentication_provenance: authenticationProvenance ?? null,
   };
 }
 

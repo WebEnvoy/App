@@ -28,6 +28,7 @@ import {
 import {
   coreTaskSubmitReadiness,
   initialCoreTaskSubmitState,
+  promoteSubmittedCoreTask,
   submitCoreReadOnlyTask,
   type CoreTaskSubmitState,
 } from "./coreTaskSubmitClient";
@@ -127,6 +128,7 @@ function applyLocalTaskContext(
   harborIdentityState: HarborIdentityLoadState,
 ): TaskProjection {
   const businessInput = businessInputOverrides[task.id] ?? task.businessInput;
+  const searchQuery = businessInputOverrides[task.id] === undefined ? task.searchQuery : undefined;
   const liveIdentity = harborIdentityState.identities.find(
     (identity) => identity.source === "Harbor live" && identity.siteId === siteForTask(task),
   );
@@ -134,6 +136,7 @@ function applyLocalTaskContext(
   return {
     ...task,
     businessInput,
+    searchQuery,
     ...(liveIdentity == null
       ? {}
       : {
@@ -490,12 +493,7 @@ export function App() {
         [submitKey]: {
           endpoint: submitEndpoint,
           taskId: submitTask.id,
-          task: {
-            ...submitTask,
-            source: "Core live",
-            identitySource: "Harbor live",
-            runs: [result.run, ...submitTask.runs.filter((run) => run.id !== result.run.id)],
-          },
+          task: promoteSubmittedCoreTask(submitTask, result.run),
         },
       }));
       if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
@@ -726,6 +724,7 @@ export function App() {
             <IdentityEnvironmentsPage
               harborEndpoint={connectionConfig.harborEndpoint}
               runtimeSupervisorState={runtimeSupervisorState}
+              onHarborStateChange={setHarborIdentityState}
               onOpenTask={openTaskById}
             />
           </ThreadWorkspace>

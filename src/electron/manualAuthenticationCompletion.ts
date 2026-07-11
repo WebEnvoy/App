@@ -4,11 +4,22 @@ const publicSiteOrigins = {
   boss: "https://www.zhipin.com",
   xiaohongshu: "https://www.xiaohongshu.com",
 } as const;
+const sensitivePublicReferenceFragment =
+  /(token|cookie|secret|password|credential|authorization|bearer)|raw[\s_-]*evidence/i;
 const publicReferencePatterns = {
-  identity_environment_ref: /^harbor:\/\/identity-environment\/[A-Za-z0-9._/-]{1,240}$/,
-  execution_identity_ref: /^harbor:\/\/execution-identity\/[A-Za-z0-9._/-]{1,240}$/,
-  profile_ref: /^harbor:\/\/profile\/[A-Za-z0-9._/-]{1,240}$/,
-};
+  identity_environment_ref: [
+    /^harbor:\/\/identity-environment\/[A-Za-z0-9._/-]{1,240}$/,
+    /^identity-env-[A-Za-z0-9._-]{1,499}$/,
+  ],
+  execution_identity_ref: [
+    /^harbor:\/\/execution-identity\/[A-Za-z0-9._/-]{1,240}$/,
+    /^identity-env-[A-Za-z0-9._-]{1,489}:execution$/,
+  ],
+  profile_ref: [
+    /^harbor:\/\/profile\/[A-Za-z0-9._/-]{1,240}$/,
+    /^profile-[A-Za-z0-9._-]{1,503}$/,
+  ],
+} as const;
 
 export type ManualAuthenticationCompletionIntent = {
   base: string;
@@ -176,8 +187,15 @@ function publicSiteId(value: unknown): keyof typeof publicSiteOrigins | null {
   return value === "boss" || value === "xiaohongshu" ? value : null;
 }
 
-function publicReference(value: unknown, key: keyof typeof publicReferencePatterns) {
-  return typeof value === "string" && publicReferencePatterns[key].test(value) ? value : null;
+function publicReference(value: unknown, kind: keyof typeof publicReferencePatterns) {
+  if (
+    typeof value !== "string" ||
+    /^https?:\/\//i.test(value) ||
+    sensitivePublicReferenceFragment.test(value)
+  ) {
+    return null;
+  }
+  return publicReferencePatterns[kind].some((pattern) => pattern.test(value)) ? value : null;
 }
 
 function hasOnlyKeys(record: Record<string, unknown>, keys: string[]) {

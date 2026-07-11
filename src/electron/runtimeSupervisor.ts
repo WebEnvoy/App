@@ -71,7 +71,7 @@ type ProcessSnapshot = {
   processState: RuntimeProcessState;
   child?: ChildProcess;
   endpoint?: string;
-  manualAuthSupervisorToken?: string;
+  supervisorToken?: string;
   outputRedactor?: RuntimeOutputRedactor;
   errorRedactor?: RuntimeOutputRedactor;
   lastExitCode?: number | null;
@@ -144,6 +144,13 @@ export function summarizeRuntimeReadiness(services: RuntimeServiceState[], lodeA
 export function createRuntimeSupervisor(options: RuntimeSupervisorOptions = {}) {
   const processSnapshots = new Map<RuntimeServiceId, ProcessSnapshot>();
   const runtimeDataDir = options.dataDir ?? process.env.WEBENVOY_RUNTIME_DATA_DIR;
+  const supervisorToken = randomBytes(32).toString("base64url");
+  const getHarborSupervisorToken = (harborEndpoint: string) => {
+    const snapshot = processSnapshots.get("harbor");
+    return snapshot?.endpoint === normalizeEndpoint(harborEndpoint) && snapshot.child
+      ? snapshot.supervisorToken
+      : undefined;
+  };
 
   return {
     async readState(config: RuntimeEndpointConfig): Promise<RuntimeSupervisorState> {
@@ -151,7 +158,7 @@ export function createRuntimeSupervisor(options: RuntimeSupervisorOptions = {}) 
       const lodeAssets = resolveLodeAssetBundle();
       const services = await Promise.all(
         (["core", "harbor"] as const).map((id) =>
-          readServiceState(id, config, checkedAt, processSnapshots, lodeAssets, runtimeDataDir),
+          readServiceState(id, config, checkedAt, processSnapshots, lodeAssets, runtimeDataDir, supervisorToken),
         ),
       );
       const readiness = summarizeRuntimeReadiness(services, lodeAssets);
@@ -169,10 +176,8 @@ export function createRuntimeSupervisor(options: RuntimeSupervisorOptions = {}) 
         snapshot.child?.kill();
       }
     },
-    getHarborManualAuthSupervisorToken(harborEndpoint: string) {
-      const snapshot = processSnapshots.get("harbor");
-      return snapshot?.endpoint === normalizeEndpoint(harborEndpoint) && snapshot.child ? snapshot.manualAuthSupervisorToken : undefined;
-    },
+    getHarborRuntimeSupervisorToken: getHarborSupervisorToken,
+    getHarborManualAuthSupervisorToken: getHarborSupervisorToken,
   };
 }
 
@@ -183,6 +188,7 @@ async function readServiceState(
   processSnapshots: Map<RuntimeServiceId, ProcessSnapshot>,
   lodeAssets: LodeAssetBundleState,
   runtimeDataDir: string | undefined,
+  supervisorToken: string,
 ): Promise<RuntimeServiceState> {
   const endpoint = endpointFor(id, config);
   const launch = resolveRuntimeServiceLaunchConfig(id);
@@ -192,6 +198,7 @@ async function readServiceState(
     processSnapshots,
     runtimeProcessEnvironment(id, config, lodeAssets, runtimeDataDir),
     endpoint,
+    supervisorToken,
   );
   let health = await probeFirst(endpoint, serviceHealthPaths[id]);
   if (id === "harbor" && process.env.HARBOR_RUNTIME_PROVIDER === "fixture") {
@@ -229,6 +236,7 @@ function ensureProcess(
   processSnapshots: Map<RuntimeServiceId, ProcessSnapshot>,
   extraEnv: NodeJS.ProcessEnv = {},
   endpoint?: string,
+  supervisorToken?: string,
 ): ProcessSnapshot {
   const current = processSnapshots.get(id);
   if (current?.child && current.endpoint === endpoint && current.processState !== "exited" && current.processState !== "failed") {
@@ -246,16 +254,9 @@ function ensureProcess(
   }
 
   try {
-    const manualAuthSupervisorToken = id === "harbor" ? randomBytes(32).toString("base64url") : undefined;
-    const { HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: _ignoredSupervisorToken, ...parentEnv } = process.env;
     const child = spawn(launch.command, launch.args ?? [], {
       cwd: launch.cwd,
-      env: {
-        ...parentEnv,
-        ...(launch.source === "packaged-path" ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
-        ...extraEnv,
-        ...(manualAuthSupervisorToken ? { HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: manualAuthSupervisorToken } : {}),
-      },
+      env: runtimeSupervisorChildEnvironment(id, launch.source, extraEnv, supervisorToken),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -263,9 +264,9 @@ function ensureProcess(
       child,
       endpoint,
       processState: "starting",
-      manualAuthSupervisorToken,
-      outputRedactor: createRuntimeOutputRedactor(manualAuthSupervisorToken),
-      errorRedactor: createRuntimeOutputRedactor(manualAuthSupervisorToken),
+      supervisorToken,
+      outputRedactor: createRuntimeOutputRedactor(supervisorToken),
+      errorRedactor: createRuntimeOutputRedactor(supervisorToken),
     };
     processSnapshots.set(id, snapshot);
     child.on("spawn", () => {
@@ -297,6 +298,27 @@ function ensureProcess(
     processSnapshots.set(id, snapshot);
     return snapshot;
   }
+}
+
+export function runtimeSupervisorChildEnvironment(
+  id: RuntimeServiceId,
+  launchSource: RuntimeServiceLaunchConfig["source"],
+  extraEnv: NodeJS.ProcessEnv,
+  supervisorToken: string | undefined,
+  parentEnvironment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const {
+    HARBOR_RUNTIME_SUPERVISOR_TOKEN: _ignoredRuntimeSupervisorToken,
+    HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: _ignoredManualAuthSupervisorToken,
+    ...parentEnv
+  } = parentEnvironment;
+  return {
+    ...parentEnv,
+    ...(launchSource === "packaged-path" ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+    ...extraEnv,
+    ...(supervisorToken ? { HARBOR_RUNTIME_SUPERVISOR_TOKEN: supervisorToken } : {}),
+    ...(id === "harbor" && supervisorToken ? { HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: supervisorToken } : {}),
+  };
 }
 
 export function createRuntimeOutputRedactor(sensitiveValue?: string): RuntimeOutputRedactor {

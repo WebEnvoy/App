@@ -10,7 +10,7 @@ export type OwnerApiJsonRequest = {
 type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export type ParsedOwnerApiRequest =
-  | { ok: true; url: string; path: string; method: OwnerApiMethod; body?: unknown }
+  | { ok: true; base: string; url: string; path: string; method: OwnerApiMethod; body?: unknown }
   | { ok: false; error: string };
 
 const ownerApiAllowedHosts = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
@@ -55,11 +55,34 @@ export function parseOwnerApiRequest(request: OwnerApiJsonRequest): ParsedOwnerA
   }
   return {
     ok: true,
+    base: baseUrl.toString(),
     url: url.toString(),
     path: `${url.pathname}${url.search}`,
     method,
     ...(request.body === undefined ? {} : { body: request.body }),
   };
+}
+
+export function isHarborSupervisorProtectedRequest(request: Extract<ParsedOwnerApiRequest, { ok: true }>) {
+  if (request.method !== "POST") return false;
+  const pathname = new URL(request.url).pathname;
+  if ([
+    "/runtime/identity-environment-sessions",
+    "/runtime/sessions/identity-environment",
+    "/identity-environment-sessions",
+  ].includes(pathname)) {
+    return true;
+  }
+  return /^\/(?:runtime\/)?sessions\/[^/]+\/(?:lock|release|stop|read-operations|snapshot)$/.test(pathname);
+}
+
+export function harborSupervisorAuthorizationHeader(
+  request: Extract<ParsedOwnerApiRequest, { ok: true }>,
+  supervisorToken: string | undefined,
+) {
+  return isHarborSupervisorProtectedRequest(request) && supervisorToken
+    ? `Bearer ${supervisorToken}`
+    : undefined;
 }
 
 function ownerApiMethod(value: unknown): OwnerApiMethod | null {

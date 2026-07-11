@@ -88,7 +88,7 @@ type CoreResultEnvelope = {
       source_refs?: string[];
       evidence_refs?: string[];
       preview_result?: CorePreviewResult;
-      post_check?: { status?: string; summary?: string };
+      post_check?: { ref?: string; post_check_ref?: string; status?: string; summary?: string };
       failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
     };
     preview_result?: CorePreviewResult;
@@ -96,6 +96,8 @@ type CoreResultEnvelope = {
   failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
   evidence_refs?: CoreEvidenceRef[];
 };
+
+type CoreResultEnvelopeBody = NonNullable<NonNullable<CoreResultEnvelope["result"]>["result_envelope"]>;
 
 type CorePreviewState = "available" | "preview_unavailable" | "page_changed" | "user_cancelled" | "expired";
 
@@ -139,6 +141,8 @@ type CoreSessionRefsEnvelope = {
     session_use?: string;
   };
 };
+
+type CoreRefKind = "session" | "source" | "evidence" | "post-check" | "result";
 
 export type CoreReadTaskLoadState = {
   status: CoreReadStatus;
@@ -409,6 +413,10 @@ async function fetchRunProjection(
     return { ok: false, error: `/runs/${runId} returned fixture/demo/smoke payload: ${fixtureReason}` };
   }
   const envelope = result?.result?.result_envelope;
+  const refReason = coreProjectionRefReason(run, result, evidence, session, envelope);
+  if (refReason) {
+    return { ok: false, error: `/runs/${runId} returned invalid typed ref: ${refReason}` };
+  }
   const isWritePrecheck = spec.mode === "write-precheck";
   const previewResult = corePreviewResult(envelope?.preview_result ?? result?.result?.preview_result);
   const postCheck = run.terminal_summary?.post_check ?? envelope?.post_check;
@@ -632,6 +640,83 @@ function coreEvidenceRefs(value: unknown): CoreEvidenceRef[] {
     const ref = stringValue(record?.ref);
     return ref ? [{ ...record, ref } as CoreEvidenceRef] : [];
   });
+}
+
+function coreProjectionRefReason(
+  run: CoreRunSummary,
+  result: CoreResultEnvelope,
+  evidence: JsonRecord,
+  session: CoreSessionRefsEnvelope,
+  envelope: CoreResultEnvelopeBody | undefined,
+): string | null {
+  const checks: Array<[unknown, CoreRefKind, string]> = [
+    [run.runtime_refs?.session_binding?.runtime_session_ref, "session", "run.runtime_refs.session_binding.runtime_session_ref"],
+    [session.session_refs?.runtime_session_ref, "session", "session.session_refs.runtime_session_ref"],
+    [run.terminal_summary?.result_ref, "result", "run.terminal_summary.result_ref"],
+    [result.result?.result_ref, "result", "result.result.result_ref"],
+    [envelope?.result_ref, "result", "result.result.result_envelope.result_ref"],
+    [envelope?.source_refs, "source", "result.result.result_envelope.source_refs"],
+    [envelope?.evidence_refs, "evidence", "result.result.result_envelope.evidence_refs"],
+    [result.result?.preview_result?.evidence_refs, "evidence", "result.result.preview_result.evidence_refs"],
+    [envelope?.preview_result?.evidence_refs, "evidence", "result.result.result_envelope.preview_result.evidence_refs"],
+  ];
+  const postCheck = envelope?.post_check;
+  checks.push(
+    [postCheck?.ref, "post-check", "result.result.result_envelope.post_check.ref"],
+    [postCheck?.post_check_ref, "post-check", "result.result.result_envelope.post_check.post_check_ref"],
+  );
+
+  for (const [value, kind, path] of checks) {
+    const reason = typedCoreRefValueReason(value, kind, path);
+    if (reason) return reason;
+  }
+  for (const [index, item] of arrayValue(evidence.evidence_refs).entries()) {
+    const record = recordValue(item);
+    if (record == null) return `evidence.evidence_refs[${index}] must be an object`;
+    const refReason = typedCoreRefValueReason(record.ref, "evidence", `evidence.evidence_refs[${index}].ref`, true);
+    if (refReason) return refReason;
+    const sessionReason = typedCoreRefValueReason(
+      record.runtime_session_ref,
+      "session",
+      `evidence.evidence_refs[${index}].runtime_session_ref`,
+    );
+    if (sessionReason) return sessionReason;
+  }
+  for (const [index, item] of arrayValue(result.evidence_refs).entries()) {
+    const record = recordValue(item);
+    if (record == null) return `result.evidence_refs[${index}] must be an object`;
+    const refReason = typedCoreRefValueReason(record.ref, "evidence", `result.evidence_refs[${index}].ref`, true);
+    if (refReason) return refReason;
+    const sessionReason = typedCoreRefValueReason(record.runtime_session_ref, "session", `result.evidence_refs[${index}].runtime_session_ref`);
+    if (sessionReason) return sessionReason;
+  }
+  return null;
+}
+
+function typedCoreRefValueReason(value: unknown, kind: CoreRefKind, path: string, required = false): string | null {
+  if (value === undefined) return required ? `${path} is required` : null;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const reason = typedCoreRefValueReason(value[index], kind, `${path}[${index}]`, true);
+      if (reason) return reason;
+    }
+    return null;
+  }
+  if (typeof value !== "string" || !coreRefPattern(kind).test(value) || unsafeCoreRef.test(value)) {
+    return `${path} is not a safe ${kind} ref`;
+  }
+  return null;
+}
+
+const unsafeCoreRef =
+  /^https?:\/\/|(?:^|[:._/-])(?:token|cookie|secret|password|credential|authorization|bearer|raw[\s_-]*evidence|raw[\s_-]*dom|har)(?:$|[:._/-])/i;
+
+function coreRefPattern(kind: CoreRefKind): RegExp {
+  if (kind === "session") return /^(?:session_[A-Za-z0-9._-]+|harbor:runtime-session\/[A-Za-z0-9._/-]+)$/;
+  if (kind === "source") return /^(?:source_[A-Za-z0-9._-]+|harbor:source-trace\/[A-Za-z0-9._/-]+)$/;
+  if (kind === "evidence") return /^(?:(?:evidence|screenshot|post_check)_[A-Za-z0-9._-]+|harbor:evidence\/[A-Za-z0-9._/-]+)$/;
+  if (kind === "post-check") return /^post_check_[A-Za-z0-9._-]+$/;
+  return /^result:core\/[A-Za-z0-9._/-]+$/;
 }
 
 function corePreviewResult(value: unknown): CorePreviewResult | undefined {
