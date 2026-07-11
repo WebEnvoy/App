@@ -799,6 +799,33 @@ try {
   ) {
     throw new Error("Harbor manual authentication smoke failed: completion request scope or response redaction was violated.");
   }
+  const packagedRuntimeRefs = manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+    schema_version: "harbor-local-identity-environment-store/v0",
+    identity_environment_ref: "identity-env-live-xhs-chrome-20260710",
+    site: { site_id: "xiaohongshu" },
+    refs: {
+      execution_identity_ref: "identity-env-live-xhs-chrome-20260710:execution",
+      profile_ref: "profile-live-xhs-chrome-20260710",
+    },
+    status: {
+      readiness: "ready",
+      login_state: "logged_in",
+      authentication_provenance: "user_confirmed_managed_session",
+      browser_storage_state: "present",
+      manual_authentication_state: "completed",
+      recovery_required: false,
+    },
+  }));
+  if (
+    packagedRuntimeRefs?.identity_environment_ref !== "identity-env-live-xhs-chrome-20260710" ||
+    packagedRuntimeRefs.refs?.execution_identity_ref !== "identity-env-live-xhs-chrome-20260710:execution" ||
+    manualAuthenticationCompletionModule.redactPublicManualAuthenticationResponse(JSON.stringify({
+      ...packagedRuntimeRefs,
+      identity_environment_ref: "identity env with spaces",
+    })) !== null
+  ) {
+    throw new Error("Harbor manual authentication smoke failed: packaged opaque refs were rejected or unsafe refs were accepted.");
+  }
 
   const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
   readyXhsIdentity = refreshedHarborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
