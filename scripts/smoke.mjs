@@ -122,6 +122,7 @@ for (const path of [
   "/runtime/sessions/session_opaque/release",
   "/runtime/sessions/session_opaque/stop",
   "/runtime/sessions/session_opaque/read-operations",
+  "/runtime/sessions/session_opaque/snapshot",
 ]) {
   const parsed = ownerApiRequestModule.parseOwnerApiRequest({
     base: "http://127.0.0.1:8788",
@@ -142,6 +143,7 @@ for (const request of [
   { path: "/runtime/identity-environments", method: "POST" },
   { path: "/runtime/identity-environment-sessions", method: "GET" },
   { path: "/runtime/sessions/session_opaque", method: "GET" },
+  { path: "/runtime/sessions/session_opaque/snapshots", method: "POST" },
 ]) {
   const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
   if (
@@ -510,6 +512,20 @@ const ownerPayloadGuardsModule = await import(ownerPayloadGuardsModuleUrl);
 if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({ evidence_refs: ["harbor:evidence/x/smoke"] })) {
   throw new Error("Owner payload guard smoke failed: smoke refs in arrays were not rejected.");
 }
+for (const payload of [
+  { runtime: "smoke" },
+  { ordinary: { source_ref: "fixture" } },
+  { metadata: "demo" },
+]) {
+  if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason(payload)) {
+    throw new Error(`Owner payload guard smoke failed: metadata fixture marker was accepted: ${JSON.stringify(payload)}`);
+  }
+}
+let overDepthPayload = { source: "live" };
+for (let depth = 0; depth < 9; depth += 1) overDepthPayload = { nested: overDepthPayload };
+if (!ownerPayloadGuardsModule.fixtureOrDemoPayloadReason(overDepthPayload)?.includes("maximum metadata inspection depth exceeded")) {
+  throw new Error("Owner payload guard smoke failed: payload beyond inspection depth was accepted.");
+}
 if (ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({
   schema_version: "harbor-browser-provider-status/v0",
   providers: [
@@ -606,10 +622,36 @@ const coreReadTaskClientModuleRewritten = coreReadTaskClientModuleSource.replace
 ).replace(
   'from "./ownerApiClient";',
   `from "${ownerApiClientModuleUrl}";`,
-);
+) + "\nexport { typedCoreRefValueReason };";
 const coreReadTaskClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`
 );
+for (const [value, kind] of [
+  ["source_wrong_type", "session"],
+  ["https://example.test/session_live", "session"],
+  ["evidence_cookie_dump", "evidence"],
+  ["evidence_raw_dom", "evidence"],
+  ["evidence_har_capture", "evidence"],
+  ["screenshot_token", "evidence"],
+  ["result:core/xiaohongshu/password", "result"],
+  [42, "source"],
+]) {
+  if (!coreReadTaskClientModule.typedCoreRefValueReason(value, kind, "smoke.ref", true)) {
+    throw new Error(`Core ref guard smoke failed: unsafe or wrongly typed ${kind} ref was accepted: ${String(value)}`);
+  }
+}
+for (const [value, kind] of [
+  ["session_f76393db-e74f-4bec-88be-63754f7a5d00", "session"],
+  ["source_6f45e8c0", "source"],
+  ["evidence_6f45e8c0", "evidence"],
+  ["screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76", "evidence"],
+  ["post_check_1c29bb68-10e4-458f-b384-97f249e711e9", "post-check"],
+  ["result:core/xiaohongshu/search-notes/live", "result"],
+]) {
+  if (coreReadTaskClientModule.typedCoreRefValueReason(value, kind, "smoke.ref", true)) {
+    throw new Error(`Core ref guard smoke failed: valid ${kind} ref was rejected: ${value}`);
+  }
+}
 const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(runtimeSupervisorStateSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -800,7 +842,7 @@ try {
     region: "CN-SH",
     language: "zh-CN",
     timezone: "Asia/Shanghai",
-    userAgentSummary: "Chrome family smoke",
+    userAgentSummary: "Chrome family contract",
     viewport: "1440 x 900",
     fingerprintSummary: "provider_claim_contract",
   });
@@ -1197,7 +1239,7 @@ const fakeRun = {
   },
   runtime_refs: {
     session_binding: {
-      runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+      runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
       control_owner: "core_task",
       lifecycle_state: "active",
       session_use: "core_task_run",
@@ -1217,6 +1259,12 @@ const fakeRun = {
 
 const submitFetchCalls = [];
 let submittedTaskPayload;
+const ownerRequestTimeouts = [];
+const originalWindowSetTimeout = globalThis.window.setTimeout;
+globalThis.window.setTimeout = (callback, timeout) => {
+  ownerRequestTimeouts.push(timeout);
+  return originalWindowSetTimeout(callback, timeout);
+};
 globalThis.fetch = async (url, init = {}) => {
   const pathname = String(url);
   submitFetchCalls.push(`${init.method ?? "GET"} ${pathname}`);
@@ -1292,6 +1340,7 @@ const submittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   { pollAttempts: 1, pollIntervalMs: 0 },
 );
 globalThis.fetch = originalFetch;
+globalThis.window.setTimeout = originalWindowSetTimeout;
 
 if (submittedRun.status !== "ready" || submittedRun.runId !== "run_submit_xhs_001") {
   throw new Error(`Core submit smoke failed: submit/poll did not return ready run: ${JSON.stringify(submittedRun)}`);
@@ -1302,6 +1351,9 @@ if (
   JSON.stringify(submittedTaskPayload).includes(readonlySubmitTask.businessInput)
 ) {
   throw new Error(`Core submit smoke failed: one-shot POST or exact public query contract was violated: ${JSON.stringify(submittedTaskPayload)}`);
+}
+if (ownerRequestTimeouts[0] !== 65_000 || ownerRequestTimeouts.slice(1).some((timeout) => timeout !== 2500)) {
+  throw new Error(`Core submit smoke failed: /tasks and owner read timeouts diverged from IPC boundaries: ${ownerRequestTimeouts.join(",")}`);
 }
 
 for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/evidence-refs", "/failure", "/session-refs"]) {
@@ -1367,17 +1419,33 @@ globalThis.fetch = async (url) => {
               result_kind: "xhs_note_search",
               result_ref: "result:core/xiaohongshu/search-notes/contract",
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/snapshot"],
+              source_refs: ["source_6f45e8c0"],
+              evidence_refs: [
+                "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
+                "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+              ],
+              post_check: {
+                ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+                status: "passed",
+              },
             },
           },
           evidence_refs: [
             {
-              ref: "harbor:evidence/xiaohongshu/search-notes/snapshot",
+              ref: "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
               source: "admission_and_terminal",
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:00:03.000Z",
-              runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+              runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
+            },
+            {
+              ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+              source: "terminal_post_check",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:00:03.000Z",
+              runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
             },
           ],
         },
@@ -1391,7 +1459,7 @@ globalThis.fetch = async (url) => {
       }
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
-    : { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref } } };
+    : { ok: true, session_refs: { session_refs: { runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00" } } };
   return {
     ok: true,
     json: async () => json,
@@ -2493,7 +2561,7 @@ function harborIdentityFacts() {
       language: "zh-CN",
       timezone: "Asia/Shanghai",
       browser_family: "cloakbrowser",
-      user_agent_summary: "Chrome family smoke",
+      user_agent_summary: "Chrome family contract",
       viewport: "1440 x 900",
       fingerprint_summary: "provider_claim_contract",
     },

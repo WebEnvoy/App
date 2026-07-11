@@ -291,7 +291,7 @@ async function requestJson(base: string, path: string, init: RequestInit): Promi
   return requestOwnerJson(base, path, {
     method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
     body: typeof init.body === "string" ? parseJson(init.body) : undefined,
-    timeoutMs: 3500,
+    timeoutMs: path === "/tasks" && init.method === "POST" ? 65_000 : 3500,
   });
 }
 
