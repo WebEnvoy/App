@@ -127,6 +127,7 @@ function applyLocalTaskContext(
   harborIdentityState: HarborIdentityLoadState,
 ): TaskProjection {
   const businessInput = businessInputOverrides[task.id] ?? task.businessInput;
+  const searchQuery = businessInputOverrides[task.id] === undefined ? task.searchQuery : undefined;
   const liveIdentity = harborIdentityState.identities.find(
     (identity) => identity.source === "Harbor live" && identity.siteId === siteForTask(task),
   );
@@ -134,6 +135,7 @@ function applyLocalTaskContext(
   return {
     ...task,
     businessInput,
+    searchQuery,
     ...(liveIdentity == null
       ? {}
       : {

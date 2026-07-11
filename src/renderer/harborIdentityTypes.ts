@@ -96,6 +96,7 @@ export type HarborIdentityFacts = {
     recovery_actions: string[];
   };
   diagnostics: string[];
+  authentication_provenance?: string | null;
 };
 
 export type HarborRuntimeSession =

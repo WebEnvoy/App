@@ -805,6 +805,7 @@ try {
   if (
     readyXhsIdentity?.readiness.state !== "ready" ||
     readyXhsIdentity.login.manualAuthenticationState !== "已完成" ||
+    readyXhsIdentity.admissionFacts?.authenticationProvenance !== "user_confirmed_managed_session" ||
     !readyXhsIdentity.login.reason.includes("用户在 Harbor 受控会话中明确确认")
   ) {
     throw new Error(`Harbor manual authentication smoke failed: refreshed public identity was not ready: ${JSON.stringify(refreshedHarborReadback)}`);
@@ -892,6 +893,7 @@ const readonlySubmitTask = {
   accountIdentity: "小红书运营号 A",
   siteSkill: "小红书搜索和笔记读取",
   businessInput: "读取 https://www.xiaohongshu.com/explore/abc?xsec_token=url-ref-only",
+  searchQuery: "AI 工具",
   packageSource: {
     lockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
   },
@@ -914,11 +916,16 @@ if (Object.prototype.hasOwnProperty.call(submitReadiness.payload, "entrypoint"))
 if (
   submitReadiness.payload.task_intent.schema_version !== "webenvoy.task-intent.v0" ||
   submitReadiness.payload.task_intent.entrypoint !== "app" ||
-  submitReadiness.payload.task_intent.scope.target_ref !== "https://www.xiaohongshu.com/explore/abc?xsec_token=url-ref-only" ||
+  submitReadiness.payload.task_intent.scope.target_ref !== "https://www.xiaohongshu.com/search_result?keyword=AI+%E5%B7%A5%E5%85%B7" ||
+  submitReadiness.payload.public_query?.query !== "AI 工具" ||
+  submitReadiness.payload.task_intent.input.summary !== readonlySubmitTask.title ||
   submitReadiness.payload.task_intent.resource_requirement_refs[0] !== "xiaohongshu.search-notes.resources" ||
   submitReadiness.payload.task_intent.evidence_policy_ref !== "evidence-policy:refs-only"
 ) {
   throw new Error(`Core submit smoke failed: task intent payload is malformed: ${JSON.stringify(submitReadiness.payload)}`);
+}
+if (JSON.stringify(submitReadiness.payload).includes(readonlySubmitTask.businessInput)) {
+  throw new Error("Core submit smoke failed: free-form businessInput leaked into the payload.");
 }
 
 const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -948,19 +955,64 @@ for (const source of ["App local-only", "Harbor fixture"]) {
   }
 }
 
+const restrictedChromeIdentity = {
+  ...readyXhsIdentity,
+  provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", role: "受限后备", state: "warning", reason: "provider_conflict" },
+  readiness: { state: "warning", label: "受限后备", reasons: ["provider_conflict"] },
+  admissionFacts: {
+    providerId: "chrome_official",
+    providerRole: "restricted_fallback",
+    authenticationProvenance: "user_confirmed_managed_session",
+    loginState: "logged_in",
+    manualAuthenticationState: "completed",
+    recoveryRequired: false,
+    browserStorageState: "present",
+    warningReasonCodes: ["provider_conflict", "fingerprint_conflict"],
+  },
+};
 const chromeFallbackReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   readonlySubmitTask,
   liveRuntimeForSubmit,
-  [
-    {
-      ...readyXhsIdentity,
-      provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", state: "warning" },
-      readiness: { ...readyXhsIdentity.readiness, state: "warning" },
-    },
-  ],
+  [restrictedChromeIdentity],
 );
-if (chromeFallbackReadiness.ok) {
-  throw new Error("Core submit smoke failed: Chrome restricted fallback was accepted for Core task submit.");
+if (!chromeFallbackReadiness.ok || chromeFallbackReadiness.identity.readiness.state !== "warning") {
+  throw new Error("Core submit smoke failed: proven restricted Chrome fallback was not narrowly admitted with warning preserved.");
+}
+
+const restrictedChromeNegativeMatrix = [
+  ["site", { siteId: "boss" }],
+  ["provider", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, providerId: "cloakbrowser" } }],
+  ["role", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, providerRole: "primary" } }],
+  ["provenance", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, authenticationProvenance: "unknown" } }],
+  ["login", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, loginState: "unknown" } }],
+  ["manual auth", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, manualAuthenticationState: "required" } }],
+  ["recovery", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, recoveryRequired: true } }],
+  ["storage", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, browserStorageState: "unknown" } }],
+  ["empty warning", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, warningReasonCodes: [] } }],
+  ["unexpected warning", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, warningReasonCodes: ["provider_conflict", "other"] } }],
+  ["generally ready", { provider: { ...restrictedChromeIdentity.provider, state: "ready" } }],
+];
+for (const [label, change] of restrictedChromeNegativeMatrix) {
+  const candidate = { ...restrictedChromeIdentity, ...change };
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveRuntimeForSubmit, [candidate]).ok) {
+    throw new Error(`Core submit smoke failed: restricted Chrome ${label} negative case was accepted.`);
+  }
+}
+
+for (const [label, searchQuery] of [["missing", undefined], ["empty", ""], ["untrimmed", " AI 工具"], ["too long", "x".repeat(257)], ["ambiguous", ["AI 工具", "咖啡"]]]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...readonlySubmitTask, searchQuery }, liveRuntimeForSubmit, [restrictedChromeIdentity]).ok) {
+    throw new Error(`Core submit smoke failed: ${label} public query was accepted.`);
+  }
+}
+
+for (const task of [
+  { ...readonlySubmitTask, id: "task-boss-real-read", searchQuery: "前端工程师" },
+  { ...readonlySubmitTask, id: "task-xhs-write-preview" },
+  { ...readonlySubmitTask, id: "task-xhs-bulk-search" },
+]) {
+  if (task && coreTaskSubmitClientModule.coreTaskSubmitReadiness(task, liveRuntimeForSubmit, [restrictedChromeIdentity]).ok) {
+    throw new Error(`Core submit smoke failed: unsupported BOSS/write/bulk task was admitted: ${task.id}`);
+  }
 }
 
 const crossOriginReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -1018,9 +1070,11 @@ const fakeRun = {
 };
 
 const submitFetchCalls = [];
+let submittedTaskPayload;
 globalThis.fetch = async (url, init = {}) => {
   const pathname = String(url);
   submitFetchCalls.push(`${init.method ?? "GET"} ${pathname}`);
+  if (pathname.endsWith("/tasks")) submittedTaskPayload = JSON.parse(init.body);
   const submitRun = { ...fakeRun, run_id: "run_submit_xhs_001" };
   const json = pathname.endsWith("/tasks")
     ? { ok: true, run_id: submitRun.run_id }
@@ -1095,6 +1149,13 @@ globalThis.fetch = originalFetch;
 
 if (submittedRun.status !== "ready" || submittedRun.runId !== "run_submit_xhs_001") {
   throw new Error(`Core submit smoke failed: submit/poll did not return ready run: ${JSON.stringify(submittedRun)}`);
+}
+if (
+  submitFetchCalls.filter((entry) => entry.startsWith("POST ") && entry.endsWith("/tasks")).length !== 1 ||
+  submittedTaskPayload?.public_query?.query !== "AI 工具" ||
+  JSON.stringify(submittedTaskPayload).includes(readonlySubmitTask.businessInput)
+) {
+  throw new Error(`Core submit smoke failed: one-shot POST or exact public query contract was violated: ${JSON.stringify(submittedTaskPayload)}`);
 }
 
 for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/evidence-refs", "/failure", "/session-refs"]) {

@@ -56,6 +56,16 @@ export type IdentityEnvironmentProjection = {
   identityEnvironmentRef: string;
   executionIdentityRef: string;
   profileRef: string;
+  admissionFacts?: {
+    providerId: "cloakbrowser" | "chrome_official" | null;
+    providerRole: "primary" | "restricted_fallback" | null;
+    authenticationProvenance: string | null;
+    loginState: string;
+    manualAuthenticationState: string;
+    recoveryRequired: boolean;
+    browserStorageState: string;
+    warningReasonCodes: string[];
+  };
   provider: {
     selected: "CloakBrowser" | "官方 Chrome" | "未可用";
     role: "默认主力" | "受限后备" | "不可启动";

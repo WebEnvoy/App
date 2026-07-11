@@ -48,6 +48,16 @@ export function projectHarborIdentity(
     identityEnvironmentRef: facts.identity_environment_ref,
     executionIdentityRef: facts.execution_identity_ref,
     profileRef: facts.profile_ref,
+    admissionFacts: {
+      providerId: facts.provider_binding.selected_provider_id,
+      providerRole: facts.provider_binding.selected_provider?.role ?? null,
+      authenticationProvenance: facts.authentication_provenance ?? null,
+      loginState: facts.login_state.state,
+      manualAuthenticationState: facts.login_state.manual_authentication_state,
+      recoveryRequired: facts.login_state.recovery_required,
+      browserStorageState: facts.browser_storage.state,
+      warningReasonCodes: [...facts.provider_binding.warnings],
+    },
     provider: {
       selected,
       role: selected === "CloakBrowser" ? "默认主力" : selected === "官方 Chrome" ? "受限后备" : "不可启动",
