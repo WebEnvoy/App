@@ -19,7 +19,7 @@ type SubmitReadiness =
 type CoreTaskPayload = {
   run_id: string;
   package_ref: string;
-  public_query: { query: string };
+  public_query: { query: string; city_code?: string; page?: 1; limit?: number };
   task_intent: {
     schema_version: "webenvoy.task-intent.v0";
     intent_id: string;
@@ -64,6 +64,7 @@ type CoreTaskSubmitOptions = {
 const sensitivePayloadPattern =
   /\b(token|cookie|secret|bearer|credential|password|authorization|profile_storage|raw_evidence|dom|har|trace)\b/i;
 const allowedRestrictedFallbackWarnings = new Set(["provider_conflict", "fingerprint_conflict"]);
+const supportedBossCityCodes = new Set(["101020100"]);
 
 export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
   status: "idle",
@@ -96,9 +97,6 @@ export function coreTaskSubmitReadiness(
   }
 
   const site = siteForTask(task);
-  if (site !== "xiaohongshu") {
-    return { ok: false, reason: "当前批次只放行小红书公开 query；BOSS 城市、时间等结构化筛选合同完成前保持 fail-closed。" };
-  }
   const identity = identities.find(
     (item) =>
       item.source === "Harbor live" &&
@@ -109,7 +107,11 @@ export function coreTaskSubmitReadiness(
     return { ok: false, reason: "缺少符合只读 admission 的 Harbor live identity；未证明的 warning、needs-auth、fixture/local identity 不可提交真实任务。" };
   }
 
-  const query = task.searchQuery;
+  const bossQuery = site === "boss" ? parseBossJobSearchInput(task.businessInput) : null;
+  if (site === "boss" && !bossQuery?.ok) {
+    return { ok: false, reason: bossQuery?.reason ?? "BOSS 搜索输入无效；已 fail closed。" };
+  }
+  const query = bossQuery?.ok ? bossQuery.value.query : task.searchQuery;
   if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > 256) {
     return { ok: false, reason: "当前任务缺少明确、已修剪且不超过 256 字符的公开搜索 query；不发送自由格式业务输入。" };
   }
@@ -120,13 +122,14 @@ export function coreTaskSubmitReadiness(
   if (inputTargetRef == null) {
     return { ok: false, reason: "业务输入中的 URL 不属于所选 Harbor identity origin；已 fail closed。" };
   }
-  const targetUrl = new URL("/search_result", identity.origin);
-  targetUrl.searchParams.set("keyword", query);
+  const targetUrl = new URL(site === "boss" ? "/web/geek/job" : "/search_result", identity.origin);
+  targetUrl.searchParams.set(site === "boss" ? "query" : "keyword", query);
+  if (bossQuery?.ok) targetUrl.searchParams.set("city", bossQuery.value.city_code);
   const targetRef = targetUrl.toString();
   const payload: CoreTaskPayload = {
     run_id: runId,
     package_ref: capability.packageRef,
-    public_query: { query },
+    public_query: bossQuery?.ok ? bossQuery.value : { query },
     task_intent: {
       schema_version: "webenvoy.task-intent.v0",
       intent_id: `intent_${runId}`,
@@ -166,6 +169,38 @@ export function coreTaskSubmitReadiness(
   return containsSensitiveField(payload)
     ? { ok: false, reason: "Core task payload 含敏感字段；已 fail closed。" }
     : { ok: true, spec, identity, payload };
+}
+
+export function parseBossJobSearchInput(value: string):
+  | { ok: true; value: { query: string; city_code: string; page: 1; limit: number } }
+  | { ok: false; reason: string } {
+  let input: unknown;
+  try {
+    input = JSON.parse(value);
+  } catch {
+    return { ok: false, reason: "BOSS 搜索只接受 JSON 结构化输入，不接受自由文本城市。" };
+  }
+  if (typeof input !== "object" || input == null || Array.isArray(input)) {
+    return { ok: false, reason: "BOSS 搜索输入必须是单个 JSON object。" };
+  }
+  const record = input as Record<string, unknown>;
+  const allowedKeys = new Set(["query", "city_code", "page", "limit"]);
+  if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
+    return { ok: false, reason: "BOSS 搜索包含未知 filter；仅允许 query、city_code、page、limit。" };
+  }
+  const query = record.query;
+  if (typeof query !== "string" || query.length === 0 || query !== query.trim() || query.length > 256) {
+    return { ok: false, reason: "BOSS query 必须明确、已修剪且不超过 256 字符。" };
+  }
+  if (typeof record.city_code !== "string" || !supportedBossCityCodes.has(record.city_code)) {
+    return { ok: false, reason: "BOSS city_code 未明确或不在当前支持列表；自由文本城市和未知城市代码均被拒绝。" };
+  }
+  const page = record.page ?? 1;
+  const limit = record.limit ?? 15;
+  if (page !== 1 || !Number.isInteger(limit) || typeof limit !== "number" || limit < 1 || limit > 15) {
+    return { ok: false, reason: "BOSS 单次搜索仅允许 page=1 且 limit 为 1..15。" };
+  }
+  return { ok: true, value: { query, city_code: record.city_code, page: 1, limit } };
 }
 
 function isReadOnlyIdentityAdmitted(identity: IdentityEnvironmentProjection) {

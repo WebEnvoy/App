@@ -61,7 +61,7 @@ export function TaskThreadComposer({
   const isRestrictedFallback = submitReadiness.ok && submitReadiness.identity.readiness.state === "warning";
   const submitSummary = submitReadiness.ok
     ? isRestrictedFallback
-      ? `Warning：官方 Chrome 受限后备，仅允许单次小红书只读任务。${coreSubmitState.summary}`
+      ? `Warning：官方 Chrome 受限后备，仅允许单次 ${selectedTask.id.includes("boss") ? "BOSS 职位搜索" : "小红书"}只读任务。${coreSubmitState.summary}`
       : coreSubmitState.summary
     : submitReadiness.reason;
 
@@ -137,7 +137,7 @@ export function TaskThreadComposer({
         value={businessInput}
         rows={2}
         onChange={(event) => onBusinessInputChange(event.currentTarget.value)}
-        placeholder="当前任务的结构化业务输入"
+        placeholder={selectedTask.id.includes("boss") ? '{"query":"前端工程师","city_code":"101020100","page":1,"limit":15}' : "当前任务的结构化业务输入"}
       />
       <div className="composer-toolbar" ref={toolbarRef}>
         <div className="composer-inline-controls">

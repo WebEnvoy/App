@@ -1165,6 +1165,61 @@ if (!chromeFallbackReadiness.ok || chromeFallbackReadiness.identity.readiness.st
   throw new Error("Core submit smoke failed: proven restricted Chrome fallback was not narrowly admitted with warning preserved.");
 }
 
+const readyBossIdentity = {
+  ...readyXhsIdentity,
+  siteId: "boss",
+  origin: "https://www.zhipin.com",
+  identityEnvironmentRef: "harbor://identity-environment/boss-contract",
+};
+const bossSearchTask = {
+  ...readonlySubmitTask,
+  id: "task-boss-real-read",
+  title: "BOSS 职位搜索",
+  siteSkill: "BOSS 职位搜索",
+  businessInput: JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 15 }),
+  searchQuery: undefined,
+};
+const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  bossSearchTask,
+  liveRuntimeForSubmit,
+  [readyBossIdentity],
+);
+if (
+  !bossReadiness.ok ||
+  bossReadiness.payload.public_query?.query !== "前端工程师" ||
+  bossReadiness.payload.public_query?.city_code !== "101020100" ||
+  bossReadiness.payload.public_query?.page !== 1 ||
+  bossReadiness.payload.public_query?.limit !== 15 ||
+  bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
+  bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
+  JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
+  JSON.stringify(bossReadiness.payload).includes("read-job-detail")
+) {
+  throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
+}
+
+const invalidBossInputs = [
+  ["free-text city", "职位：前端工程师；城市：上海"],
+  ["missing city_code", JSON.stringify({ query: "前端工程师", page: 1, limit: 15 })],
+  ["unknown city_code", JSON.stringify({ query: "前端工程师", city_code: "999999999", page: 1, limit: 15 })],
+  ["unknown filter", JSON.stringify({ query: "前端工程师", city_code: "101020100", salary: "20-30K", page: 1, limit: 15 })],
+  ["pagination", JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 2, limit: 15 })],
+  ["bulk limit", JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 16 })],
+];
+for (const [label, businessInput] of invalidBossInputs) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]).ok) {
+    throw new Error(`Core BOSS submit smoke failed: ${label} was accepted.`);
+  }
+}
+for (const identity of [
+  { ...readyBossIdentity, source: "Harbor fixture" },
+  { ...readyBossIdentity, login: { recoveryRequired: true }, readiness: { state: "needs-auth" } },
+]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error("Core BOSS submit smoke failed: fixture or unlogged identity was accepted.");
+  }
+}
+
 const promotedTask = coreTaskSubmitClientModule.promoteSubmittedCoreTask(
   { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", runs: [{ id: "fixture-run", source: "Core fixture" }] },
   { id: "live-run", source: "Core live" },
@@ -1206,7 +1261,6 @@ for (const [label, searchQuery] of [["missing", undefined], ["empty", ""], ["unt
 }
 
 for (const task of [
-  { ...readonlySubmitTask, id: "task-boss-real-read", searchQuery: "前端工程师" },
   { ...readonlySubmitTask, id: "task-xhs-write-preview" },
   { ...readonlySubmitTask, id: "task-xhs-bulk-search" },
 ]) {
