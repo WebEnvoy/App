@@ -724,6 +724,7 @@ export function App() {
             <IdentityEnvironmentsPage
               harborEndpoint={connectionConfig.harborEndpoint}
               runtimeSupervisorState={runtimeSupervisorState}
+              onHarborStateChange={setHarborIdentityState}
               onOpenTask={openTaskById}
             />
           </ThreadWorkspace>

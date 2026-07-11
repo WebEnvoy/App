@@ -56,10 +56,12 @@ const initialHarborState: HarborIdentityLoadState = {
 export function IdentityEnvironmentsPage({
   harborEndpoint,
   runtimeSupervisorState,
+  onHarborStateChange,
   onOpenTask,
 }: {
   harborEndpoint: string;
   runtimeSupervisorState: RuntimeSupervisorState;
+  onHarborStateChange: (state: HarborIdentityLoadState) => void;
   onOpenTask: (taskId: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState(
@@ -99,7 +101,9 @@ export function IdentityEnvironmentsPage({
 
   async function refreshHarborState() {
     setHarborState((current) => ({ ...current, status: "loading" }));
-    setHarborState(await fetchHarborIdentityState(harborEndpoint, localDrafts));
+    const nextState = await fetchHarborIdentityState(harborEndpoint, localDrafts);
+    setHarborState(nextState);
+    onHarborStateChange(nextState);
   }
 
   function selectIdentity(id: string) {

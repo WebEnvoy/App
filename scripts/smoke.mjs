@@ -28,6 +28,7 @@ const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitCl
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
+const appSource = await readFile("src/renderer/App.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -215,6 +216,13 @@ if (!identityEnvironmentDetailsSource.includes("onOpenAuthenticationSite") || !i
 
 if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !identityEnvironmentsPageSource.includes("candidate.id === selected.siteId")) {
   throw new Error("Identity recovery smoke failed: authentication site launch does not prefer the selected identity site target.");
+}
+
+if (
+  !identityEnvironmentsPageSource.includes("onHarborStateChange(nextState)") ||
+  !appSource.includes("onHarborStateChange={setHarborIdentityState}")
+) {
+  throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
 
 for (const expectedText of [
