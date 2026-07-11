@@ -6,7 +6,7 @@
 - Goal: Enable one real read-only BOSS `job-search` submit and display Core-owned run/result/evidence/session refs.
 - Scope: Structured `query` plus explicit `city_code`, canonical BOSS search URL, page 1, limit at most 15, strict live identity/runtime admission, owner-ref result display, focused smoke coverage, and APP-240 carriers.
 - Execution Path: work/app-240-boss-job-search
-- Workspace Entry: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-240-boss-job-search
+- Workspace Entry: .
 - Recovery Entry: .loom/progress/APP-240.md
 - Review Entry: .loom/reviews/APP-240.json
 - Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged:readonly; git diff --check

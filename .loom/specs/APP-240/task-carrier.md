@@ -2,7 +2,7 @@
 
 - Item: APP-240
 - Branch: work/app-240-boss-job-search
-- Workspace: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-240-boss-job-search
+- Workspace: .
 - Checkpoint: implementation
 - Next: validate, commit, push, and open a ready PR without merge or issue closeout.
 - Boundary: search only; Core #270 owns the future real `detail_ref` detail path.
