@@ -1,0 +1,29 @@
+{
+  "schema_version": "loom-review/v1",
+  "item_id": "APP-240",
+  "decision": "allow",
+  "kind": "spec_review",
+  "summary": "APP-240 spec is bounded to a human-usable BOSS job-search form, exact Core #273 structured payload and canonical Harbor URL, live identity admission, and no detail/write/live-account claim.",
+  "reviewer": "codex-main-controller",
+  "authored_at": "2026-07-11T17:01:07Z",
+  "reviewed_head": "249043820f0fca14b676b847b1e580c40b2935d8",
+  "reviewed_validation_summary": "2026-07-11T16:56Z: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged:readonly`, and `git diff --check` passed. Exact BOSS mock POST `/tasks` requires capability/source, `scope.target_type=boss_job_search`, `{query,city_code,page:1,limit}`, and canonical Harbor URL before returning 202; wrong target type returns 400. XHS remains `target_type=site`. No live account/site action occurred.",
+  "reviewed_validation_summary_hash": "ad0a7d3dcf9502067abbf1455c6ed83d28ff331b7870d591e69b08a42022c36b",
+  "validation_summary_source": "recovery.latest_validation_summary",
+  "validation_summary_locator": ".loom/progress/APP-240.md",
+  "fallback_to": null,
+  "findings": [],
+  "blocking_issues": [],
+  "follow_ups": [],
+  "consumed_inputs": {
+    "work_item": ".loom/work-items/APP-240.md",
+    "recovery_entry": ".loom/progress/APP-240.md",
+    "status_surface": ".loom/status/current.md",
+    "build_checkpoint": "pass",
+    "suite_validation": "loom suite validate --target . --item APP-240 --json",
+    "suite_spec": ".loom/specs/APP-240/spec.md",
+    "suite_plan": ".loom/specs/APP-240/plan.md",
+    "suite_evidence_map": ".loom/specs/APP-240/evidence-map.md",
+    "suite_task_carriers": [".loom/specs/APP-240/task-carrier.md"]
+  }
+}
