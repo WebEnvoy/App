@@ -75,12 +75,82 @@ if (!mainSource.includes("webenvoy:harbor-manual-authentication-completed")) {
   throw new Error("Electron main smoke failed: manual authentication IPC is missing.");
 }
 
-if (!runtimeSupervisorSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || !runtimeSupervisorSource.includes("randomBytes(32)")) {
-  throw new Error("Electron supervisor smoke failed: per-launch Harbor manual-auth token is missing.");
+if (!runtimeSupervisorSource.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") || !runtimeSupervisorSource.includes("randomBytes(32)")) {
+  throw new Error("Electron supervisor smoke failed: shared Harbor/Core runtime supervisor token is missing.");
 }
 
 if (!packagedHarborRuntimeSource.includes("manual_authentication_supervisor_token: process.env.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
   throw new Error("Packaged Harbor runtime smoke failed: manual-auth supervisor token was not forwarded to Harbor.");
+}
+
+const sharedSupervisorToken = "smoke-shared-runtime-supervisor-token";
+const parentTokenEnvironment = {
+  SAFE_PARENT_VALUE: "kept",
+  HARBOR_RUNTIME_SUPERVISOR_TOKEN: "parent-runtime-token-must-not-win",
+  HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN: "parent-manual-token-must-not-win",
+};
+const harborChildEnvironment = runtimeSupervisorModule.runtimeSupervisorChildEnvironment(
+  "harbor",
+  "packaged-path",
+  { HARBOR_RUNTIME_PORT: "8788" },
+  sharedSupervisorToken,
+  parentTokenEnvironment,
+);
+const coreChildEnvironment = runtimeSupervisorModule.runtimeSupervisorChildEnvironment(
+  "core",
+  "packaged-path",
+  { PORT: "8787" },
+  sharedSupervisorToken,
+  parentTokenEnvironment,
+);
+if (
+  harborChildEnvironment.HARBOR_RUNTIME_SUPERVISOR_TOKEN !== sharedSupervisorToken ||
+  coreChildEnvironment.HARBOR_RUNTIME_SUPERVISOR_TOKEN !== sharedSupervisorToken ||
+  harborChildEnvironment.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN !== sharedSupervisorToken ||
+  coreChildEnvironment.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN !== undefined ||
+  harborChildEnvironment.SAFE_PARENT_VALUE !== "kept" ||
+  coreChildEnvironment.SAFE_PARENT_VALUE !== "kept"
+) {
+  throw new Error("Electron supervisor smoke failed: Harbor/Core did not receive the same isolated supervisor token environment.");
+}
+
+for (const path of [
+  "/runtime/identity-environment-sessions",
+  "/runtime/sessions/identity-environment",
+  "/identity-environment-sessions",
+  "/runtime/sessions/session_opaque/lock",
+  "/runtime/sessions/session_opaque/release",
+  "/runtime/sessions/session_opaque/stop",
+  "/runtime/sessions/session_opaque/read-operations",
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({
+    base: "http://127.0.0.1:8788",
+    path,
+    method: "POST",
+  });
+  if (
+    !parsed.ok ||
+    !ownerApiRequestModule.isHarborSupervisorProtectedRequest(parsed) ||
+    ownerApiRequestModule.harborSupervisorAuthorizationHeader(parsed, sharedSupervisorToken) !== `Bearer ${sharedSupervisorToken}`
+  ) {
+    throw new Error(`Owner API supervisor smoke failed: protected Harbor path did not receive bearer authorization: ${path}`);
+  }
+}
+
+for (const request of [
+  { path: "/tasks", method: "POST" },
+  { path: "/runtime/identity-environments", method: "POST" },
+  { path: "/runtime/identity-environment-sessions", method: "GET" },
+  { path: "/runtime/sessions/session_opaque", method: "GET" },
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
+  if (
+    !parsed.ok ||
+    ownerApiRequestModule.isHarborSupervisorProtectedRequest(parsed) ||
+    ownerApiRequestModule.harborSupervisorAuthorizationHeader(parsed, sharedSupervisorToken) !== undefined
+  ) {
+    throw new Error(`Owner API supervisor smoke failed: unprotected path received bearer authorization: ${request.method} ${request.path}`);
+  }
 }
 
 const splitOutputToken = "smoke-split-supervisor-token";
@@ -118,7 +188,14 @@ if (!preloadSource.includes("completeHarborManualAuthentication")) {
   throw new Error("Preload smoke failed: narrow manual-authentication bridge is missing.");
 }
 
-if (preloadSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") || preloadSource.includes("Authorization") || rendererAssets.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
+if (
+  preloadSource.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") ||
+  preloadSource.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") ||
+  preloadSource.includes("Authorization") ||
+  rendererAssets.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") ||
+  rendererAssets.includes("HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN") ||
+  rendererAssets.includes(sharedSupervisorToken)
+) {
   throw new Error("Manual authentication smoke failed: supervisor token or authorization plumbing reached preload or renderer assets.");
 }
 

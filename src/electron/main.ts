@@ -9,7 +9,12 @@ import {
   parseManualAuthenticationCompletionIntent,
   requestManualAuthenticationCompletion,
 } from "./manualAuthenticationCompletion.js";
-import { parseOwnerApiRequest, type OwnerApiJsonRequest } from "./ownerApiRequest.js";
+import {
+  harborSupervisorAuthorizationHeader,
+  isHarborSupervisorProtectedRequest,
+  parseOwnerApiRequest,
+  type OwnerApiJsonRequest,
+} from "./ownerApiRequest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
@@ -462,6 +467,13 @@ app.on("before-quit", () => {
 async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
   const parsed = parseOwnerApiRequest(request);
   if (!parsed.ok) return { ok: false, error: parsed.error };
+  const supervisorToken = isHarborSupervisorProtectedRequest(parsed)
+    ? runtimeSupervisor.getHarborRuntimeSupervisorToken(parsed.base)
+    : undefined;
+  const supervisorAuthorization = harborSupervisorAuthorizationHeader(parsed, supervisorToken);
+  if (isHarborSupervisorProtectedRequest(parsed) && !supervisorAuthorization) {
+    return { ok: false, error: "Protected Harbor owner API request requires the supervised runtime." };
+  }
 
   const controller = new AbortController();
   const timeoutMs = parsed.method === "POST" && parsed.path === "/tasks" ? 65_000 : 5_000;
@@ -473,6 +485,7 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
       headers: {
         Accept: "application/json",
         ...(parsed.body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(supervisorAuthorization ? { Authorization: supervisorAuthorization } : {}),
       },
       ...(parsed.body === undefined ? {} : { body: JSON.stringify(parsed.body) }),
       signal: controller.signal,
