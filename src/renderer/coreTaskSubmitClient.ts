@@ -38,7 +38,7 @@ type CoreTaskPayload = {
       refs?: string[];
     };
     scope: {
-      target_type: "site";
+      target_type: "site" | "boss_job_search";
       target_ref: string;
     };
     policy: {
@@ -149,7 +149,7 @@ export function coreTaskSubmitReadiness(
         ...(targetRef === identity.origin ? {} : { refs: [targetRef] }),
       },
       scope: {
-        target_type: "site",
+        target_type: site === "boss" ? "boss_job_search" : "site",
         target_ref: targetRef,
       },
       policy: {
