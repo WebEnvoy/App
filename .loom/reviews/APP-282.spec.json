@@ -5,8 +5,8 @@
   "kind": "spec_review",
   "summary": "APP-282 is bounded to owner API timeout classification and preserves authorization, response validation, fail-closed behavior, and the post-merge live evidence requirement.",
   "reviewer": "codex-main-controller",
-  "authored_at": "2026-07-11T17:45:00Z",
-  "reviewed_head": "0ab131368490c877949ec3a6230efb3583bf66b3",
+  "authored_at": "2026-07-11T17:49:00Z",
+  "reviewed_head": "d6a4b7b0b6e9c6984615bfd595f5d945f50d4111",
   "reviewed_validation_summary": "2026-07-11T17:38Z: `npm run typecheck`, `npm run smoke`, and `git diff --check` passed. Timeout classification is 65 seconds for Core task submit, 20 seconds for protected Harbor session lifecycle, and 5 seconds for ordinary owner requests. No live site action occurred in this validation.",
   "reviewed_validation_summary_hash": "40904ea2e5980e9d27d6a82a5169d17f2933105f4bf4b330cd71edcf348fe432",
   "validation_summary_source": "recovery.latest_validation_summary",
@@ -23,6 +23,7 @@
     "suite_index": ".loom/specs/APP-282/suite-index.md",
     "suite_spec": ".loom/specs/APP-282/spec.md",
     "suite_plan": ".loom/specs/APP-282/plan.md",
+    "implementation_contract": ".loom/specs/APP-282/implementation-contract.md",
     "suite_evidence_map": ".loom/specs/APP-282/evidence-map.md",
     "suite_task_carriers": [".loom/specs/APP-282/task-carrier.md"]
   }
