@@ -12,6 +12,7 @@ import {
 import {
   harborSupervisorAuthorizationHeader,
   isHarborSupervisorProtectedRequest,
+  ownerApiTimeoutMs,
   parseOwnerApiRequest,
   type OwnerApiJsonRequest,
 } from "./ownerApiRequest.js";
@@ -476,7 +477,7 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
   }
 
   const controller = new AbortController();
-  const timeoutMs = parsed.method === "POST" && parsed.path === "/tasks" ? 65_000 : 5_000;
+  const timeoutMs = ownerApiTimeoutMs(parsed);
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(parsed.url, {

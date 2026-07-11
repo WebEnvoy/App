@@ -85,6 +85,12 @@ export function harborSupervisorAuthorizationHeader(
     : undefined;
 }
 
+export function ownerApiTimeoutMs(request: Extract<ParsedOwnerApiRequest, { ok: true }>) {
+  if (request.method === "POST" && request.path === "/tasks") return 65_000;
+  if (isHarborSupervisorProtectedRequest(request)) return 20_000;
+  return 5_000;
+}
+
 function ownerApiMethod(value: unknown): OwnerApiMethod | null {
   if (value === undefined) return "GET";
   return value === "GET" || value === "POST" || value === "PATCH" || value === "DELETE" ? value : null;

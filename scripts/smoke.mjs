@@ -156,6 +156,18 @@ for (const request of [
   }
 }
 
+for (const [request, expectedTimeout] of [
+  [{ path: "/tasks", method: "POST" }, 65_000],
+  [{ path: "/runtime/identity-environment-sessions", method: "POST" }, 20_000],
+  [{ path: "/runtime/sessions/session_public/release", method: "POST" }, 20_000],
+  [{ path: "/runtime/identity-environments", method: "GET" }, 5_000],
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
+  if (!parsed.ok || ownerApiRequestModule.ownerApiTimeoutMs(parsed) !== expectedTimeout) {
+    throw new Error(`Electron owner API timeout smoke failed for ${request.method} ${request.path}.`);
+  }
+}
+
 const splitOutputToken = "smoke-split-supervisor-token";
 const splitOutputRedactor = runtimeSupervisorModule.createRuntimeOutputRedactor(splitOutputToken);
 const splitOutputParts = [
