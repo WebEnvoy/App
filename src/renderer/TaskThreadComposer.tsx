@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { coreTaskSubmitReadiness, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
+import { coreTaskSubmitReadiness, parseBossJobSearchInput, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { registerComposerInput } from "./focusComposer";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
@@ -34,6 +34,7 @@ export function TaskThreadComposer({
   onBusinessInputChange: (value: string) => void;
   onSubmitCoreTask: () => void;
 }) {
+  const bossQueryRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const actionsRef = useRef<HTMLDivElement | null>(null);
@@ -56,17 +57,25 @@ export function TaskThreadComposer({
     runtimeSupervisorState,
     harborIdentityState.identities,
   );
+  const isBossSearch = selectedTask.id === "task-boss-real-read";
+  const bossInput = isBossSearch ? parseBossJobSearchInput(businessInput) : null;
+  const bossValues = bossInput?.ok
+    ? bossInput.value
+    : { query: "", city_code: "101020100", page: 1 as const, limit: 15 };
+  const updateBossInput = (change: Partial<typeof bossValues>) => {
+    onBusinessInputChange(JSON.stringify({ ...bossValues, ...change, page: 1 }));
+  };
   const isBusy = coreSubmitState.status === "submitting" || coreSubmitState.status === "polling";
   const canSubmit = submitReadiness.ok && !isBusy;
   const isRestrictedFallback = submitReadiness.ok && submitReadiness.identity.readiness.state === "warning";
   const submitSummary = submitReadiness.ok
     ? isRestrictedFallback
-      ? `Warning：官方 Chrome 受限后备，仅允许单次小红书只读任务。${coreSubmitState.summary}`
+      ? `Warning：官方 Chrome 受限后备，仅允许单次 ${selectedTask.id.includes("boss") ? "BOSS 职位搜索" : "小红书"}只读任务。${coreSubmitState.summary}`
       : coreSubmitState.summary
     : submitReadiness.reason;
 
   useEffect(() => {
-    const composerInput = inputRef.current;
+    const composerInput = isBossSearch ? bossQueryRef.current : inputRef.current;
     if (composerInput == null) {
       return;
     }
@@ -75,7 +84,7 @@ export function TaskThreadComposer({
       composerId: "task-thread-primary",
       isPrimaryComposer: true,
     });
-  }, []);
+  }, [isBossSearch]);
 
   useEffect(() => {
     const toolbar = toolbarRef.current;
@@ -131,14 +140,47 @@ export function TaskThreadComposer({
         if (canSubmit) onSubmitCoreTask();
       }}
     >
-      <textarea
-        ref={inputRef}
-        data-webenvoy-composer=""
-        value={businessInput}
-        rows={2}
-        onChange={(event) => onBusinessInputChange(event.currentTarget.value)}
-        placeholder="当前任务的结构化业务输入"
-      />
+      {isBossSearch ? (
+        <div className="composer-toolbar" aria-label="BOSS 职位搜索条件">
+          <label style={{ display: "grid", minWidth: 0, flex: "1 1 220px", gap: 2 }}>
+            <span>职位关键词</span>
+            <input
+              ref={bossQueryRef}
+              data-webenvoy-composer=""
+              type="text"
+              value={bossValues.query}
+              maxLength={80}
+              onChange={(event) => updateBossInput({ query: event.currentTarget.value })}
+            />
+          </label>
+          <label style={{ display: "grid", flex: "0 0 96px", gap: 2 }}>
+            <span>城市</span>
+            <select value={bossValues.city_code} onChange={(event) => updateBossInput({ city_code: event.currentTarget.value })}>
+              <option value="101020100">上海</option>
+            </select>
+          </label>
+          <label style={{ display: "grid", flex: "0 0 72px", gap: 2 }}>
+            <span>结果数</span>
+            <input
+              type="number"
+              min={1}
+              max={15}
+              step={1}
+              value={bossValues.limit}
+              onChange={(event) => updateBossInput({ limit: Math.min(15, Math.max(1, Number(event.currentTarget.value) || 1)) })}
+            />
+          </label>
+        </div>
+      ) : (
+        <textarea
+          ref={inputRef}
+          data-webenvoy-composer=""
+          value={businessInput}
+          rows={2}
+          onChange={(event) => onBusinessInputChange(event.currentTarget.value)}
+          placeholder="当前任务的结构化业务输入"
+        />
+      )}
       <div className="composer-toolbar" ref={toolbarRef}>
         <div className="composer-inline-controls">
           <button className="composer-icon-button" type="button" aria-label="添加上下文">

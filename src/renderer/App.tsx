@@ -127,14 +127,18 @@ function applyLocalTaskContext(
   businessInputOverrides: Record<string, string>,
   harborIdentityState: HarborIdentityLoadState,
 ): TaskProjection {
-  const businessInput = businessInputOverrides[task.id] ?? task.businessInput;
-  const searchQuery = businessInputOverrides[task.id] === undefined ? task.searchQuery : undefined;
+  const isBossSearch = task.id === "task-boss-real-read";
+  const businessInput = businessInputOverrides[task.id] ?? (isBossSearch
+    ? '{"query":"前端工程师","city_code":"101020100","page":1,"limit":15}'
+    : task.businessInput);
+  const searchQuery = businessInputOverrides[task.id] === undefined && !isBossSearch ? task.searchQuery : undefined;
   const liveIdentity = harborIdentityState.identities.find(
     (identity) => identity.source === "Harbor live" && identity.siteId === siteForTask(task),
   );
 
   return {
     ...task,
+    ...(isBossSearch ? { title: "BOSS 职位搜索", siteSkill: "BOSS 职位搜索" } : {}),
     businessInput,
     searchQuery,
     ...(liveIdentity == null

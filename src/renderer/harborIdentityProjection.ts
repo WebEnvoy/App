@@ -273,7 +273,7 @@ function emptySession(provider: BrowserSessionProjection["provider"], identityRe
 function taskEntries(siteId: SiteId) {
   return siteId === "boss"
     ? [
-        { id: "task-entry-boss-real-read", label: "启动 BOSS 搜索/职位详情读取", taskId: "task-boss-real-read", inputSummary: "职位：前端工程师；城市：上海；筛选：近三天。", readiness: "真实任务结果来自 Core owner API；离线时显示 fallback projection。", source: "Core fixture" as const },
+        { id: "task-entry-boss-real-read", label: "启动 BOSS 职位搜索", taskId: "task-boss-real-read", inputSummary: "职位关键词：前端工程师；城市：上海；结果数：15。", readiness: "真实搜索结果来自 Core owner API；职位详情等待真实 detail_ref。", source: "Core fixture" as const },
         { id: "task-entry-boss-write-preview", label: "查看 BOSS 打招呼写前验证", taskId: "task-boss-greeting-write-preview", inputSummary: "目标职位、候选人消息框和打招呼文案的真实页面写前验证。", readiness: "只展示 submitted=false / 未发送 的写前投影；不发送消息。", source: "Core fixture" as const },
       ]
     : [
@@ -283,7 +283,7 @@ function taskEntries(siteId: SiteId) {
 }
 
 function siteBindings(siteId: SiteId) {
-  return siteId === "boss" ? ["BOSS 搜索和职位详情读取", "BOSS 打招呼写前预览"] : ["小红书搜索和笔记读取", "小红书发布草稿写前预览"];
+  return siteId === "boss" ? ["BOSS 职位搜索", "BOSS 打招呼写前预览"] : ["小红书搜索和笔记读取", "小红书发布草稿写前预览"];
 }
 
 function normalizeSiteId(value: string): SiteId {

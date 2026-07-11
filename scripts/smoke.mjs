@@ -1102,6 +1102,7 @@ if (Object.prototype.hasOwnProperty.call(submitReadiness.payload, "entrypoint"))
 if (
   submitReadiness.payload.task_intent.schema_version !== "webenvoy.task-intent.v0" ||
   submitReadiness.payload.task_intent.entrypoint !== "app" ||
+  submitReadiness.payload.task_intent.scope.target_type !== "site" ||
   submitReadiness.payload.task_intent.scope.target_ref !== "https://www.xiaohongshu.com/search_result?keyword=AI+%E5%B7%A5%E5%85%B7" ||
   submitReadiness.payload.public_query?.query !== "AI 工具" ||
   submitReadiness.payload.task_intent.input.summary !== readonlySubmitTask.title ||
@@ -1165,6 +1166,71 @@ if (!chromeFallbackReadiness.ok || chromeFallbackReadiness.identity.readiness.st
   throw new Error("Core submit smoke failed: proven restricted Chrome fallback was not narrowly admitted with warning preserved.");
 }
 
+const readyBossIdentity = {
+  ...readyXhsIdentity,
+  siteId: "boss",
+  origin: "https://www.zhipin.com",
+  identityEnvironmentRef: "harbor://identity-environment/boss-contract",
+};
+const bossSearchTask = {
+  ...readonlySubmitTask,
+  id: "task-boss-real-read",
+  title: "BOSS 职位搜索",
+  siteSkill: "BOSS 职位搜索",
+  businessInput: JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 15 }),
+  searchQuery: undefined,
+  packageSource: { lockRef: "lode://lock/site-capability/boss/job-search@0.1.0" },
+};
+const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  bossSearchTask,
+  liveRuntimeForSubmit,
+  [readyBossIdentity],
+);
+if (
+  !bossReadiness.ok ||
+  bossReadiness.payload.public_query?.query !== "前端工程师" ||
+  bossReadiness.payload.public_query?.city_code !== "101020100" ||
+  bossReadiness.payload.public_query?.page !== 1 ||
+  bossReadiness.payload.public_query?.limit !== 15 ||
+  Object.keys(bossReadiness.payload.public_query ?? {}).length !== 4 ||
+  bossReadiness.payload.task_intent.scope.target_type !== "boss_job_search" ||
+  bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
+  bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
+  JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
+  JSON.stringify(bossReadiness.payload).includes("read-job-detail")
+) {
+  throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
+}
+for (const [length, accepted] of [[80, true], [81, false]]) {
+  const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
+  const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]);
+  if (readiness.ok !== accepted) {
+    throw new Error(`Core BOSS submit smoke failed: ${length}-character query acceptance was ${readiness.ok}.`);
+  }
+}
+
+const invalidBossInputs = [
+  ["free-text city", "职位：前端工程师；城市：上海"],
+  ["missing city_code", JSON.stringify({ query: "前端工程师", page: 1, limit: 15 })],
+  ["unknown city_code", JSON.stringify({ query: "前端工程师", city_code: "999999999", page: 1, limit: 15 })],
+  ["unknown filter", JSON.stringify({ query: "前端工程师", city_code: "101020100", salary: "20-30K", page: 1, limit: 15 })],
+  ["pagination", JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 2, limit: 15 })],
+  ["bulk limit", JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 16 })],
+];
+for (const [label, businessInput] of invalidBossInputs) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]).ok) {
+    throw new Error(`Core BOSS submit smoke failed: ${label} was accepted.`);
+  }
+}
+for (const identity of [
+  { ...readyBossIdentity, source: "Harbor fixture" },
+  { ...readyBossIdentity, login: { recoveryRequired: true }, readiness: { state: "needs-auth" } },
+]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error("Core BOSS submit smoke failed: fixture or unlogged identity was accepted.");
+  }
+}
+
 const promotedTask = coreTaskSubmitClientModule.promoteSubmittedCoreTask(
   { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", runs: [{ id: "fixture-run", source: "Core fixture" }] },
   { id: "live-run", source: "Core live" },
@@ -1206,7 +1272,6 @@ for (const [label, searchQuery] of [["missing", undefined], ["empty", ""], ["unt
 }
 
 for (const task of [
-  { ...readonlySubmitTask, id: "task-boss-real-read", searchQuery: "前端工程师" },
   { ...readonlySubmitTask, id: "task-xhs-write-preview" },
   { ...readonlySubmitTask, id: "task-xhs-bulk-search" },
 ]) {
@@ -1407,6 +1472,67 @@ globalThis.fetch = originalFetch;
 
 if (pendingRun.status !== "polling" || pendingRun.runId !== "run_submit_pending_001") {
   throw new Error(`Core submit smoke failed: accepted-but-not-ready run was not kept in polling state: ${JSON.stringify(pendingRun)}`);
+}
+
+let submittedBossPayload;
+const acceptsCore273BossPayload = (payload) =>
+  payload?.task_intent?.capability?.ref === "lode:capability/job-search" &&
+  payload?.task_intent?.capability?.source_ref === "lode://site-capability/boss/job-search@0.1.0" &&
+  payload?.task_intent?.scope?.target_type === "boss_job_search" &&
+  payload?.task_intent?.scope?.target_ref === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" &&
+  payload?.public_query?.query === "前端工程师" &&
+  payload?.public_query?.city_code === "101020100" &&
+  payload?.public_query?.page === 1 &&
+  payload?.public_query?.limit === 15 &&
+  Object.keys(payload.public_query).length === 4 &&
+  payload?.harbor?.url === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100";
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  if (pathname.endsWith("/tasks")) {
+    submittedBossPayload = JSON.parse(init.body);
+    const accepted = acceptsCore273BossPayload(submittedBossPayload);
+    const body = accepted
+      ? { ok: true, run_id: "run_submit_boss_001" }
+      : { ok: false, error: { code: "public_query_invalid" } };
+    return { ok: accepted, status: accepted ? 202 : 400, json: async () => body, text: async () => JSON.stringify(body) };
+  }
+  const body = { ok: false, error: { code: "run_not_queryable_yet" } };
+  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
+};
+const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  bossSearchTask,
+  liveRuntimeForSubmit,
+  [readyBossIdentity],
+  { pollAttempts: 1, pollIntervalMs: 0 },
+);
+const acceptedBossPayload = submittedBossPayload;
+const wrongTargetTypeResponse = await globalThis.fetch("http://core.test/tasks", {
+  method: "POST",
+  body: JSON.stringify({
+    ...acceptedBossPayload,
+    task_intent: {
+      ...acceptedBossPayload.task_intent,
+      scope: { ...acceptedBossPayload.task_intent.scope, target_type: "site" },
+    },
+  }),
+});
+globalThis.fetch = originalFetch;
+if (
+  acceptedBossRun.status !== "polling" ||
+  acceptedBossRun.runId !== "run_submit_boss_001" ||
+  acceptedBossPayload?.public_query?.query !== "前端工程师" ||
+  acceptedBossPayload?.public_query?.city_code !== "101020100" ||
+  acceptedBossPayload?.public_query?.page !== 1 ||
+  acceptedBossPayload?.public_query?.limit !== 15 ||
+  Object.keys(acceptedBossPayload?.public_query ?? {}).length !== 4 ||
+  acceptedBossPayload?.task_intent?.scope?.target_type !== "boss_job_search" ||
+  acceptedBossPayload?.harbor?.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100"
+) {
+  throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core #273 payload: ${JSON.stringify({ acceptedBossRun, acceptedBossPayload })}`);
+}
+if (wrongTargetTypeResponse.status !== 400) {
+  throw new Error("Core BOSS submit smoke failed: wrong target_type was not rejected by the Core #273 contract handler.");
 }
 
 globalThis.fetch = async (url) => {
