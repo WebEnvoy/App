@@ -3,12 +3,12 @@
   "item_id": "APP-240",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Independent current-head review found no P0-P3 after the proxy_missing exception was restricted to authenticated Harbor-live BOSS job search with the existing restricted-fallback facts.",
+  "summary": "Independent current-head review found no P0-P3 after the identity detail task entry was made to consume the same narrowly scoped read-only admission as Core submit.",
   "reviewer": "codex-main-controller",
-  "authored_at": "2026-07-12T04:56:00Z",
-  "reviewed_head": "c3bc0cd12dcd3da487bfff8af98ba9fddff13161",
-  "reviewed_validation_summary": "2026-07-12T04:56Z: At head `c3bc0cd12dcd3da487bfff8af98ba9fddff13161`, `npm run typecheck`, `npm run smoke`, `npm run build`, and `git diff --check` passed. Independent review confirmed only authenticated Harbor-live BOSS job search may tolerate `proxy_missing` in addition to required `provider_conflict` and `fingerprint_conflict`; proxy-only, XHS, unknown-warning, needs-auth, fixture/local/offline, write/precheck, and batch paths remain denied. No external write occurred.",
-  "reviewed_validation_summary_hash": "f3b8be7672c85a318c9048ab6daa9eca813276703ecd22f55483695db76edcad",
+  "authored_at": "2026-07-12T06:37:00Z",
+  "reviewed_head": "4751f3ef448a00380ed0f3009c4227f560e3135f",
+  "reviewed_validation_summary": "2026-07-12T06:37Z: At product head `4751f3ef448a00380ed0f3009c4227f560e3135f`, `npm run typecheck`, `npm run smoke`, and `git diff --check` passed. Independent current-head review returned ALLOW after confirming per-entry shared admission: authenticated Harbor-live BOSS restricted Chrome job search is enabled, while write-precheck, unknown task, needs-auth, non-live, XHS proxy_missing, proxy-only, and unknown-warning paths remain fail closed. Computer Use pre-validation exposed the corrected BOSS entry and submitted run `app-boss-mrhf6p7h`; Core returned the precise downstream blocker `resource_fact_missing:page.boss_spa.ready`, and Harbor released session `session_d11738b7-5d23-4a4b-88bf-48e070207cb4`. No external write occurred.",
+  "reviewed_validation_summary_hash": "12a62bf2bf738d49db56e226899ac4a736c6869429cccaad57ba0ed9cb64d880",
   "validation_summary_source": "recovery.latest_validation_summary",
   "validation_summary_locator": ".loom/progress/APP-240.md",
   "fallback_to": null,
@@ -28,6 +28,6 @@
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Independent current-head review approved the narrowly scoped BOSS restricted-Chrome admission correction; merged-package live E2E remains required."
+    "reason": "Independent current-head review approved the shared per-entry BOSS restricted-Chrome read-only admission correction; merged-package live success remains required."
   }
 }
