@@ -1224,6 +1224,28 @@ if (
 ) {
   throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
 }
+for (const [label, warningReasonCodes] of [
+  ["proxy-only", ["proxy_missing"]],
+  ["unknown warning", ["provider_conflict", "proxy_missing", "fingerprint_conflict", "other"]],
+]) {
+  const identity = {
+    ...restrictedChromeBossIdentity,
+    admissionFacts: { ...restrictedChromeBossIdentity.admissionFacts, warningReasonCodes },
+  };
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error(`Core BOSS submit smoke failed: restricted Chrome ${label} case was accepted.`);
+  }
+}
+const xhsMissingProxyIdentity = {
+  ...restrictedChromeIdentity,
+  admissionFacts: {
+    ...restrictedChromeIdentity.admissionFacts,
+    warningReasonCodes: ["provider_conflict", "proxy_missing", "fingerprint_conflict"],
+  },
+};
+if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveRuntimeForSubmit, [xhsMissingProxyIdentity]).ok) {
+  throw new Error("Core submit smoke failed: Xiaohongshu restricted Chrome with proxy_missing was accepted.");
+}
 for (const [length, accepted] of [[80, true], [81, false]]) {
   const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
   const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]);
