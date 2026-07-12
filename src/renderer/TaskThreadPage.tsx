@@ -68,6 +68,7 @@ export function TaskThreadPage({
               run={run}
               onReadDetail={onReadDetail}
               detailSubmitStates={detailSubmitStates}
+              mainTaskBusy={coreSubmitState.status === "submitting" || coreSubmitState.status === "polling"}
             />
           ))}
         </div>
@@ -243,7 +244,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
   );
 }
 
-function RunTurn({ run, isSelected, onReadDetail, detailSubmitStates }: { run: RunProjection; isSelected: boolean; onReadDetail: (detailRef: string) => void; detailSubmitStates: Record<string, CoreTaskSubmitState> }) {
+function RunTurn({ run, isSelected, onReadDetail, detailSubmitStates, mainTaskBusy }: { run: RunProjection; isSelected: boolean; onReadDetail: (detailRef: string) => void; detailSubmitStates: Record<string, CoreTaskSubmitState>; mainTaskBusy: boolean }) {
   return (
     <article
       className={isSelected ? "run-turn selected" : "run-turn"}
@@ -278,10 +279,11 @@ function RunTurn({ run, isSelected, onReadDetail, detailSubmitStates }: { run: R
             </div>
             {run.detailTargets.map((detailRef, index) => {
               const state = detailSubmitStates[detailRef];
-              const disabled = state?.status === "submitting";
+              const detailSubmitting = state?.status === "submitting";
+              const disabled = mainTaskBusy || detailSubmitting;
               return <button className="cancel-intent-button" disabled={disabled} key={detailRef} type="button" onClick={() => onReadDetail(detailRef)}>
                 <BookOpen size={15} />
-                {disabled ? `详情 ${index + 1} 提交中` : state?.status === "polling" ? `继续查询详情 ${index + 1}` : `读取详情 ${index + 1}`}
+                {mainTaskBusy ? "搜索任务进行中" : detailSubmitting ? `详情 ${index + 1} 提交中` : state?.status === "polling" ? `继续查询详情 ${index + 1}` : `读取详情 ${index + 1}`}
               </button>;
             })}
           </section>
