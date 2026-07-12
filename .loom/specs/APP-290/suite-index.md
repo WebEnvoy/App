@@ -16,6 +16,7 @@
 | Execution breakdown | `.loom/specs/APP-290/execution-breakdown.md` | present | task mapping |
 | Task carrier | `.loom/specs/APP-290/task-carrier.md` | present | GitHub binding |
 | Evidence map | `.loom/specs/APP-290/evidence-map.md` | present | validation evidence |
+| Build evidence | `.loom/specs/APP-290/build-evidence.json` | present | merge checkpoint |
 
 ## Recheck Conditions
 

@@ -9,7 +9,7 @@
 - Workspace Entry: .
 - Recovery Entry: .loom/progress/APP-290.md
 - Review Entry: .loom/reviews/APP-290.json
-- Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; git diff --check
+- Validation Entry: .loom/specs/APP-290/build-evidence.json; npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; git diff --check
 - Closing Condition: PR #291 merged after current-head review and hosted gate; close #290 only after Core #281 is merged and packaged App confirms the disabled state.
 - Current Checkpoint: merge
 - Current Stop: Head `f23cf29f4e56d1432277ead5d88b1b57c1e037e9` passed authoritative smoke and independent final re-review with no findings after two review fixes.
@@ -24,7 +24,7 @@
 - Run Entry: no live run; automated zero-request deferred regression only
 - Logs Entry: scripts/smoke.mjs
 - Diagnostics Entry: src/renderer/coreTaskSubmitClient.ts
-- Verification Entry: .loom/progress/APP-290.md
+- Verification Entry: .loom/specs/APP-290/build-evidence.json
 - Lane Entry: .loom/specs/APP-290/plan.md
 
 ## Sources
