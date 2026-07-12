@@ -60,6 +60,7 @@ export type RunProjection = {
       | "input"
       | "login_required"
       | "runtime"
+      | "runtime_admission_disabled"
       | "site_changed"
       | "none";
     summary: string;

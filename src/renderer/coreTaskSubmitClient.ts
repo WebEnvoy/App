@@ -77,7 +77,17 @@ export function projectDeferredBossTask(task: TaskProjection): TaskProjection {
   if (!isBossDeferredTask(task.id)) return task;
   const historicalFailures = task.runs.filter(
     (run) => run.source === "Core live" && (run.failureRecovery != null || run.outcome === "failure-safe" || run.outcome === "unavailable"),
-  ).map((run) => ({ ...run, label: `历史失败 · ${run.label}`, lifecycle: "blocked" as const }));
+  ).map((run) => {
+    const ownerUpdatedAt = run.evidenceCards.find((card) => card.freshness && card.freshness !== "unknown")?.freshness;
+    return {
+      ...run,
+      label: `历史失败 · ${run.label}`,
+      lifecycle: "blocked" as const,
+      resultRows: ownerUpdatedAt && !run.resultRows.some((row) => row.label === "Owner updated at")
+        ? [{ label: "Owner updated at", value: ownerUpdatedAt, source: "Core live" as const }, ...run.resultRows]
+        : run.resultRows,
+    };
+  });
   const deferredRun: RunProjection = {
     id: `boss-deferred-${task.id}`,
     label: "访问受限",
@@ -96,7 +106,7 @@ export function projectDeferredBossTask(task: TaskProjection): TaskProjection {
       capabilityRef: task.packageSource.capabilityRef,
       version: task.packageSource.version,
       sourceRef: task.packageSource.sourceRef,
-      failureClass: "site_changed",
+      failureClass: "runtime_admission_disabled",
       summary: "保留 capability metadata 仅供历史诊断；不代表当前可运行。",
     },
     failureRecovery: {

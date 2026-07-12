@@ -1232,10 +1232,19 @@ const deferredSubmit = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   liveRuntimeForSubmit,
   [restrictedChromeBossIdentity],
 );
-globalThis.fetch = fetchBeforeDeferredSubmit;
 if (deferredSubmit.status !== "blocked" || deferredSubmit.summary !== bossDeferredReason || bossSubmitRequests !== 0) {
   throw new Error(`Core BOSS submit smoke failed: deferred command reached POST /tasks: ${JSON.stringify(deferredSubmit)}`);
 }
+const deferredWritePrecheckSubmit = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://127.0.0.1:9",
+  { ...bossSearchTask, id: "task-boss-greeting-write-preview", title: "BOSS 打招呼写前验证" },
+  liveRuntimeForSubmit,
+  [readyBossIdentity],
+);
+if (deferredWritePrecheckSubmit.status !== "blocked" || deferredWritePrecheckSubmit.summary !== bossDeferredReason || bossSubmitRequests !== 0) {
+  throw new Error(`Core BOSS submit smoke failed: deferred write-precheck reached POST /tasks: ${JSON.stringify(deferredWritePrecheckSubmit)}`);
+}
+globalThis.fetch = fetchBeforeDeferredSubmit;
 
 const historicalFailure = {
   id: "run-boss-history-failure",
@@ -1243,7 +1252,7 @@ const historicalFailure = {
   lifecycle: "completed",
   outcome: "failure-safe",
   source: "Core live",
-  resultRows: [{ label: "Owner updated at", value: "2026-07-12T00:00:00.000Z", source: "Core live" }],
+  resultRows: [{ label: "Failure reason", value: "access_limited", source: "Core live" }],
   evidenceCards: [{ provenance: "Core failure query", freshness: "2026-07-12T00:00:00.000Z" }],
   capabilityAttribution: { failureClass: "site_changed" },
   failureRecovery: { reason: "access_limited", source: "Core live" },
@@ -1274,6 +1283,9 @@ if (
   projectedBossTask.runs[1]?.capabilityAttribution?.failureClass !== "site_changed"
 ) {
   throw new Error(`BOSS deferred projection smoke failed: current success or history diagnostics were misrepresented. ${JSON.stringify(projectedBossTask)}`);
+}
+if (projectedBossTask.runs[0]?.capabilityAttribution?.failureClass !== "runtime_admission_disabled") {
+  throw new Error("BOSS deferred projection smoke failed: product deferral was misclassified as a site change.");
 }
 if (coreTaskSubmitClientModule.projectDeferredBossTask(readonlySubmitTask) !== readonlySubmitTask) {
   throw new Error("BOSS deferred projection smoke failed: Xiaohongshu task was changed.");

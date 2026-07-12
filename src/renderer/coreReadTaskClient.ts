@@ -449,11 +449,9 @@ async function fetchRunProjection(
   const outcome = isWritePrecheck && writeState != null
     ? outcomeFromWritePrecheck(run.status, writeState)
     : outcomeFromStatus(run.status);
-  const ownerUpdatedAt = { label: "Owner updated at", value: run.timeline?.updated_at ?? run.timeline?.terminal_at ?? "not reported", source: coreLiveSource };
   const resultRows = isWritePrecheck && writeState != null
-    ? [ownerUpdatedAt, ...writePrecheckResultRows(run, resultKind, payloadState, previewResult, writeState, runtimeSessionRef)]
+    ? writePrecheckResultRows(run, resultKind, payloadState, previewResult, writeState, runtimeSessionRef)
     : [
-        ownerUpdatedAt,
         { label: "Run status", value: run.status, source: coreLiveSource },
         { label: "Result kind", value: resultKind, source: coreLiveSource },
         { label: "Payload state", value: payloadState, source: coreLiveSource },
