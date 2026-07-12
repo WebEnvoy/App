@@ -1585,6 +1585,44 @@ if (!submittedRun.run.resultRows.some((row) => row.value === harborRuntimeSessio
   throw new Error("Core submit smoke failed: Harbor session ref from create/readback/session chain was not projected.");
 }
 
+const failedRun = {
+  ...fakeRun,
+  run_id: "run_submit_xhs_login_required_001",
+  status: "requires_user_action",
+  terminal_summary: {
+    terminal: true,
+    status: "requires_user_action",
+    failure: { category: "resource_admission", code: "not_logged_in", phase: "runtime_binding", attribution: "runtime" },
+  },
+};
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.endsWith("/tasks")
+    ? { ok: false, run_id: failedRun.run_id, error: { code: "not_logged_in" } }
+    : pathname.endsWith(`/runs/${failedRun.run_id}`)
+    ? { ok: true, run: failedRun }
+    : pathname.endsWith("/result")
+    ? { ok: true, result: { schema_version: "webenvoy.result-query.v0", run_id: failedRun.run_id, status: "requires_user_action", terminal: true } }
+    : pathname.endsWith("/evidence-refs")
+    ? { ok: true, evidence: { evidence_refs: [] } }
+    : pathname.endsWith("/failure")
+    ? { ok: true, failure_reason: { reason_class: "not_logged_in", app_action: "manual_handoff", retryable: true } }
+    : pathname.endsWith("/session-refs")
+    ? { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref, control_owner: "none", lifecycle_state: "idle", session_use: "core_task_run" } } }
+    : { ok: false, error: { code: "unexpected_failed_submit_path" } };
+  return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) };
+};
+const failedSubmittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+globalThis.fetch = originalFetch;
+if (failedSubmittedRun.status !== "failed" || failedSubmittedRun.run?.failureRecovery?.reason !== "not_logged_in") {
+  throw new Error(`Core submit failure smoke failed: persisted owner failure was not projected: ${JSON.stringify(failedSubmittedRun)}`);
+}
+
 const detailRef = "detail_ref_11111111-1111-4111-8111-111111111111";
 let detailPayload;
 let detailPostCount = 0;

@@ -499,17 +499,18 @@ export function App() {
       harborIdentityState.identities,
     );
     setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
-    if (result.status === "ready") {
+    if ("run" in result && result.run) {
+      const run = result.run;
       setSubmittedTaskOverrides((current) => ({
         ...current,
         [submitKey]: {
           endpoint: submitEndpoint,
           taskId: submitTask.id,
-          task: promoteSubmittedCoreTask(submitTask, result.run),
+          task: promoteSubmittedCoreTask(submitTask, run),
         },
       }));
       if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
-        setSelectedRunId(result.run.id);
+        setSelectedRunId(run.id);
       }
     }
   }

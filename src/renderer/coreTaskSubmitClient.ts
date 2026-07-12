@@ -10,7 +10,7 @@ export type CoreTaskSubmitState =
   | { status: "submitting"; summary: string }
   | { status: "polling"; summary: string; runId: string }
   | { status: "ready"; summary: string; runId: string; run: RunProjection }
-  | { status: "failed"; summary: string; runId?: string };
+  | { status: "failed"; summary: string; runId?: string; run?: RunProjection };
 
 type SubmitReadiness =
   | { ok: true; spec: CoreReadTaskSpec; identity: IdentityEnvironmentProjection; payload: CoreTaskPayload }
@@ -347,7 +347,13 @@ export async function submitCoreReadOnlyTask(
   const runId = runIdFromSubmitResponse(submitResponse) ?? readiness.payload.run_id;
 
   if (!isOkResponse(submitResponse)) {
-    return { status: "failed", runId, summary: responseError(submitResponse, "Core /tasks did not accept the read-only task.") };
+    const projection = await fetchCoreRunProjectionById(endpoint, runId, readiness.spec);
+    return {
+      status: "failed",
+      runId,
+      ...(projection.ok ? { run: projection.run } : {}),
+      summary: responseError(submitResponse, "Core /tasks did not accept the read-only task."),
+    };
   }
 
   const projected = await pollSubmittedRun(endpoint, runId, readiness.spec, options);
