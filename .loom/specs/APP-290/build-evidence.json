@@ -1,6 +1,16 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-290",
+  "ownership_contract": {
+    "task_goal": "Disable BOSS task commands and preserve truthful identity/manual-browser and historical failure diagnostics.",
+    "context_locators": ["src/renderer", "scripts/smoke.mjs", "https://github.com/WebEnvoy/App/issues/290"],
+    "read_scope": ["App task submission, Library projection, Task Thread, identity/manual browser, smoke tests"],
+    "write_ownership": ["src/renderer/**#APP-290", "scripts/smoke.mjs#APP-290", ".loom/**#APP-290"],
+    "non_goals": ["Core/Harbor/Lode edits", "production pages", "profile or sensitive material", "external actions"],
+    "validation_expectation": "npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; git diff --check",
+    "output_format": "Worktree, head, changed paths, validation, PR and risks.",
+    "integration_target": "Main controller review, carrier convergence, hosted gate and merge."
+  },
   "delegations": [
     {
       "id": "turing-app-290-implementation",
