@@ -482,6 +482,7 @@ async function fetchRunProjection(
           : actionIntentFromCoreRun(run, failure),
         owner: "Core",
         source: coreLiveSource,
+        ownerUpdatedAt: run.timeline?.updated_at ?? run.timeline?.terminal_at,
         resultRows,
         fieldSources: evidenceRefs.map((entry, index) => ({
           field: `证据引用 ${index + 1}`,

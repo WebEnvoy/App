@@ -1252,10 +1252,11 @@ const historicalFailure = {
   lifecycle: "completed",
   outcome: "failure-safe",
   source: "Core live",
+  ownerUpdatedAt: "2026-07-12T00:00:00.000Z",
   resultRows: [{ label: "Failure reason", value: "access_limited", source: "Core live" }],
-  evidenceCards: [{ provenance: "Core failure query", freshness: "2026-07-12T00:00:00.000Z" }],
-  capabilityAttribution: { failureClass: "site_changed" },
-  failureRecovery: { reason: "access_limited", source: "Core live" },
+  evidenceCards: [],
+  capabilityAttribution: { failureClass: "runtime" },
+  failureRecovery: { reason: "runtime_admission_disabled", source: "Core live" },
 };
 const projectedBossTask = coreTaskSubmitClientModule.projectDeferredBossTask({
   ...bossSearchTask,
@@ -1279,8 +1280,10 @@ if (
   projectedBossTask.runs[1]?.lifecycle !== "blocked" ||
   !projectedBossTask.runs[1]?.label.startsWith("历史失败 · ") ||
   projectedBossTask.runs[1]?.resultRows?.[0]?.value !== "2026-07-12T00:00:00.000Z" ||
-  projectedBossTask.runs[1]?.evidenceCards?.[0]?.provenance !== "Core failure query" ||
-  projectedBossTask.runs[1]?.capabilityAttribution?.failureClass !== "site_changed"
+  projectedBossTask.runs[1]?.resultRows?.[0]?.source !== "Core live" ||
+  projectedBossTask.runs[1]?.evidenceCards?.length !== 0 ||
+  projectedBossTask.runs[1]?.failureRecovery?.source !== "Core live" ||
+  projectedBossTask.runs[1]?.capabilityAttribution?.failureClass !== "runtime"
 ) {
   throw new Error(`BOSS deferred projection smoke failed: current success or history diagnostics were misrepresented. ${JSON.stringify(projectedBossTask)}`);
 }

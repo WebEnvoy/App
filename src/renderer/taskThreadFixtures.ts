@@ -29,6 +29,7 @@ export type RunProjection = {
   actionIntent: string;
   owner: "Core";
   source: OwnerSource;
+  ownerUpdatedAt?: string;
   resultRows: Array<{ label: string; value: string; source: OwnerSource }>;
   fieldSources?: Array<{
     field: string;

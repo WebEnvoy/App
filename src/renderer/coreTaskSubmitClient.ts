@@ -78,13 +78,12 @@ export function projectDeferredBossTask(task: TaskProjection): TaskProjection {
   const historicalFailures = task.runs.filter(
     (run) => run.source === "Core live" && (run.failureRecovery != null || run.outcome === "failure-safe" || run.outcome === "unavailable"),
   ).map((run) => {
-    const ownerUpdatedAt = run.evidenceCards.find((card) => card.freshness && card.freshness !== "unknown")?.freshness;
     return {
       ...run,
       label: `历史失败 · ${run.label}`,
       lifecycle: "blocked" as const,
-      resultRows: ownerUpdatedAt && !run.resultRows.some((row) => row.label === "Owner updated at")
-        ? [{ label: "Owner updated at", value: ownerUpdatedAt, source: "Core live" as const }, ...run.resultRows]
+      resultRows: run.ownerUpdatedAt && !run.resultRows.some((row) => row.label === "Owner updated at")
+        ? [{ label: "Owner updated at", value: run.ownerUpdatedAt, source: "Core live" as const }, ...run.resultRows]
         : run.resultRows,
     };
   });
