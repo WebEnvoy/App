@@ -205,11 +205,12 @@ export function parseBossJobSearchInput(value: string):
   return { ok: true, value: { query, city_code: record.city_code, page: 1, limit } };
 }
 
-function isReadOnlyIdentityAdmitted(
+export function isReadOnlyIdentityAdmitted(
   identity: IdentityEnvironmentProjection,
   site: "xiaohongshu" | "boss",
   spec: CoreReadTaskSpec,
 ) {
+  if (spec.mode !== "read") return false;
   if (
     identity.readiness.state === "ready" &&
     identity.provider.state === "ready" &&
@@ -236,6 +237,26 @@ function isReadOnlyIdentityAdmitted(
     requiredRestrictedFallbackWarnings.every((code) => warnings.includes(code)) &&
     warnings.every((code) => allowedRestrictedFallbackWarnings.has(code) || (allowsMissingProxy && code === "proxy_missing"))
   );
+}
+
+export function readOnlyIdentityAdmissionBlockReason(
+  identity: IdentityEnvironmentProjection,
+  taskId: string,
+) {
+  if (identity.source !== "Harbor live") {
+    return "缺少 Harbor live identity；fixture/local identity 只能管理或认证，不能启动真实 Core task。";
+  }
+  if (identity.login.recoveryRequired || identity.readiness.state === "needs-auth") {
+    return "需要先在 Harbor 身份浏览器完成登录/人工认证；未登录身份不能启动真实 Core task。";
+  }
+  const readSpec = coreReadTaskSpecs.find((spec) => spec.taskId === taskId && spec.mode === "read");
+  if (!readSpec) {
+    return "当前入口不是已登记的真实只读任务；保持 fail closed。";
+  }
+  if (isReadOnlyIdentityAdmitted(identity, identity.siteId, readSpec)) {
+    return null;
+  }
+  return "身份环境尚未 ready；受限或告警状态不能直接启动真实 Core task。";
 }
 
 export async function submitCoreReadOnlyTask(

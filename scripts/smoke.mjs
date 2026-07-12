@@ -1177,6 +1177,9 @@ const chromeFallbackReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadine
 if (!chromeFallbackReadiness.ok || chromeFallbackReadiness.identity.readiness.state !== "warning") {
   throw new Error("Core submit smoke failed: proven restricted Chrome fallback was not narrowly admitted with warning preserved.");
 }
+if (!coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(restrictedChromeIdentity, "xiaohongshu", coreReadTaskClientModule.coreReadTaskSpecs[0])) {
+  throw new Error("Core submit smoke failed: exported identity admission disagrees with submit readiness.");
+}
 
 const readyBossIdentity = {
   ...readyXhsIdentity,
@@ -1224,6 +1227,26 @@ if (
 ) {
   throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
 }
+if (!coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(restrictedChromeBossIdentity, "boss", coreReadTaskClientModule.coreReadTaskSpecs[1])) {
+  throw new Error("Core BOSS submit smoke failed: identity task entry disagrees with the accepted restricted Chrome search admission.");
+}
+if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(restrictedChromeBossIdentity, "task-boss-real-read") !== null) {
+  throw new Error("Core BOSS submit smoke failed: identity task entry blocked the accepted restricted Chrome search admission.");
+}
+for (const taskId of ["task-boss-greeting-write-preview", "task-unknown"]) {
+  if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(readyBossIdentity, taskId) === null) {
+    throw new Error(`Core BOSS submit smoke failed: identity task entry admitted non-read task ${taskId}.`);
+  }
+}
+if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(readyBossIdentity, "boss", coreReadTaskClientModule.coreReadTaskSpecs[3])) {
+  throw new Error("Core BOSS submit smoke failed: exported read-only identity admission accepted a write-precheck spec.");
+}
+if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason({ ...readyBossIdentity, source: "App local-only" }, "task-boss-real-read") === null) {
+  throw new Error("Core BOSS submit smoke failed: identity task entry admitted a non-live identity.");
+}
+if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason({ ...readyBossIdentity, login: { ...readyBossIdentity.login, recoveryRequired: true } }, "task-boss-real-read") === null) {
+  throw new Error("Core BOSS submit smoke failed: identity task entry admitted an identity that requires authentication recovery.");
+}
 for (const [label, warningReasonCodes] of [
   ["proxy-only", ["proxy_missing"]],
   ["unknown warning", ["provider_conflict", "proxy_missing", "fingerprint_conflict", "other"]],
@@ -1245,6 +1268,9 @@ const xhsMissingProxyIdentity = {
 };
 if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveRuntimeForSubmit, [xhsMissingProxyIdentity]).ok) {
   throw new Error("Core submit smoke failed: Xiaohongshu restricted Chrome with proxy_missing was accepted.");
+}
+if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(xhsMissingProxyIdentity, "xiaohongshu", coreReadTaskClientModule.coreReadTaskSpecs[0])) {
+  throw new Error("Core submit smoke failed: identity task entry admitted Xiaohongshu restricted Chrome with proxy_missing.");
 }
 for (const [length, accepted] of [[80, true], [81, false]]) {
   const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
