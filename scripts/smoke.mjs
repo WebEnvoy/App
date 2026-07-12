@@ -446,7 +446,13 @@ if (!readiness.failClosed || readiness.canUseLiveRuntime) {
 
 const lodeBundle = lodeAssetBundleModule.resolveLodeAssetBundle({}, undefined);
 
-if (lodeBundle.state !== "ready" || lodeBundle.packageCount < 6 || lodeBundle.missingPackageRefs.length > 0) {
+if (
+  lodeBundle.state !== "ready" ||
+  lodeBundle.packageCount < 3 ||
+  lodeBundle.missingPackageRefs.length > 0 ||
+  lodeBundle.requiredPackageRefs.length !== 3 ||
+  lodeBundle.requiredPackageRefs.some((ref) => !ref.includes("/xiaohongshu/"))
+) {
   throw new Error(`Lode asset bundle smoke failed: ${JSON.stringify(lodeBundle)}`);
 }
 
@@ -1595,8 +1601,10 @@ const failedRun = {
     failure: { category: "resource_admission", code: "not_logged_in", phase: "runtime_binding", attribution: "runtime" },
   },
 };
+const failedSubmitCalls = [];
 globalThis.fetch = async (url) => {
   const pathname = String(url);
+  failedSubmitCalls.push(pathname);
   const json = pathname.endsWith("/tasks")
     ? { ok: false, run_id: failedRun.run_id, error: { code: "not_logged_in" } }
     : pathname.endsWith(`/runs/${failedRun.run_id}`)
@@ -1621,6 +1629,32 @@ const failedSubmittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTa
 globalThis.fetch = originalFetch;
 if (failedSubmittedRun.status !== "failed" || failedSubmittedRun.run?.failureRecovery?.reason !== "not_logged_in") {
   throw new Error(`Core submit failure smoke failed: persisted owner failure was not projected: ${JSON.stringify(failedSubmittedRun)}`);
+}
+if (
+  failedSubmitCalls.filter((path) => path.endsWith("/tasks")).length !== 1 ||
+  ["/runs/", "/result", "/evidence-refs", "/failure", "/session-refs"].some(
+    (suffix) => !failedSubmitCalls.some((path) => path.includes(suffix)),
+  )
+) {
+  throw new Error(`Core submit failure smoke failed: owner readback calls diverged: ${failedSubmitCalls.join(",")}`);
+}
+
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.endsWith("/tasks")
+    ? { ok: false, run_id: "run_submit_xhs_unreadable_001", error: { code: "runtime_unavailable" } }
+    : { ok: false, error: { code: "run_not_queryable" } };
+  return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) };
+};
+const unreadableFailedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+globalThis.fetch = originalFetch;
+if (unreadableFailedRun.status !== "failed" || unreadableFailedRun.run !== undefined) {
+  throw new Error(`Core submit failure smoke failed: unreadable owner projection was promoted: ${JSON.stringify(unreadableFailedRun)}`);
 }
 
 const detailRef = "detail_ref_11111111-1111-4111-8111-111111111111";

@@ -123,7 +123,7 @@ function inspectLodeAssetRoot(
       requiredPackageRefs,
       missingPackageRefs: [],
       checkedAt,
-      summary: "Lode local package registry and required Xiaohongshu/BOSS capability assets are available for Core consumption.",
+      summary: "Lode local package registry and required Xiaohongshu capability assets are available for Core consumption.",
       consumerBoundary,
     };
   } catch (error) {
