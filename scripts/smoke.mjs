@@ -1633,7 +1633,9 @@ if (failedSubmittedRun.status !== "failed" || failedSubmittedRun.run?.failureRec
 if (
   failedSubmitCalls.filter((path) => path.endsWith("/tasks")).length !== 1 ||
   ["/runs/", "/result", "/evidence-refs", "/failure", "/session-refs"].some(
-    (suffix) => !failedSubmitCalls.some((path) => path.includes(suffix)),
+    (suffix) => failedSubmitCalls.filter((path) =>
+      suffix === "/runs/" ? path.endsWith(`/runs/${failedRun.run_id}`) : path.endsWith(suffix),
+    ).length !== 1,
   )
 ) {
   throw new Error(`Core submit failure smoke failed: owner readback calls diverged: ${failedSubmitCalls.join(",")}`);
@@ -1653,7 +1655,11 @@ const unreadableFailedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyT
   [readyXhsIdentity],
 );
 globalThis.fetch = originalFetch;
-if (unreadableFailedRun.status !== "failed" || unreadableFailedRun.run !== undefined) {
+if (
+  unreadableFailedRun.status !== "failed" ||
+  unreadableFailedRun.run !== undefined ||
+  unreadableFailedRun.summary !== "runtime_unavailable"
+) {
   throw new Error(`Core submit failure smoke failed: unreadable owner projection was promoted: ${JSON.stringify(unreadableFailedRun)}`);
 }
 
