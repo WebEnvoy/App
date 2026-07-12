@@ -28,6 +28,8 @@ import {
 import {
   coreTaskSubmitReadiness,
   initialCoreTaskSubmitState,
+  isBossDeferredTask,
+  projectDeferredBossTask,
   promoteSubmittedCoreTask,
   submitCoreReadOnlyTask,
   type CoreTaskSubmitState,
@@ -226,7 +228,7 @@ export function App() {
         effectiveCoreReadTasks,
         runtimeSupervisorState,
         effectiveCoreReadState.liveTaskIds,
-      ),
+      ).map(projectDeferredBossTask),
     [effectiveCoreReadState.liveTaskIds, effectiveCoreReadTasks, runtimeSupervisorState],
   );
   const selectedTask =
@@ -440,6 +442,7 @@ export function App() {
     const taskId = skill.relatedTaskIds[0];
     if (
       taskId != null &&
+      !isBossDeferredTask(taskId) &&
       runtimeSupervisorState.canUseLiveRuntime &&
       (readOnlyTaskId(taskId) || effectiveCoreReadState.liveTaskIds.includes(taskId))
     ) {

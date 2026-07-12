@@ -5,7 +5,7 @@ import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
-import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
+import { BOSS_DEFERRED_REASON, isBossDeferredTask, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
@@ -162,11 +162,14 @@ function CoreReadSourceStrip({
   state: CoreReadTaskLoadState;
 }) {
   const isLiveTask = state.liveTaskIds.includes(selectedTask.id);
+  const isDeferred = isBossDeferredTask(selectedTask.id);
   const isWritePrecheckTask = selectedTask.runs.some((run) => run.writePrecheck);
   const taskKind = isWritePrecheckTask ? "写前验证" : "只读任务结果";
-  const status = state.status === "ready" && !isLiveTask ? "fallback" : state.status;
+  const status = isDeferred ? "deferred" : state.status === "ready" && !isLiveTask ? "fallback" : state.status;
   const label =
-    status === "ready"
+    status === "deferred"
+      ? "访问受限"
+      : status === "ready"
       ? "实时结果"
       : status === "fallback"
       ? "本地展示"
@@ -174,7 +177,9 @@ function CoreReadSourceStrip({
       ? "正在检查"
       : "本地展示";
   const summary =
-    status === "ready"
+    status === "deferred"
+      ? BOSS_DEFERRED_REASON
+      : status === "ready"
       ? isWritePrecheckTask
         ? "已读取 owner 返回的写前验证引用；页面只展示预期变化、证据引用、风险状态和 owner submitted 状态。"
         : "已读取 owner 返回的只读运行结果引用；页面只展示结果、证据引用和恢复状态。"
@@ -191,7 +196,7 @@ function CoreReadSourceStrip({
         <span>{taskKind}</span>
       </div>
       <p>{summary}</p>
-      <span className="badge">{status === "ready" ? "owner refs" : "fallback"}</span>
+      <span className="badge">{status === "deferred" ? "deferred" : status === "ready" ? "owner refs" : "fallback"}</span>
     </section>
   );
 }

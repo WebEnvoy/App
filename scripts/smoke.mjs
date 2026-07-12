@@ -1211,32 +1211,75 @@ const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   liveRuntimeForSubmit,
   [restrictedChromeBossIdentity],
 );
-if (
-  !bossReadiness.ok ||
-  bossReadiness.identity.admissionFacts?.warningReasonCodes.includes("proxy_missing") !== true ||
-  bossReadiness.payload.public_query?.query !== "前端工程师" ||
-  bossReadiness.payload.public_query?.city_code !== "101020100" ||
-  bossReadiness.payload.public_query?.page !== 1 ||
-  bossReadiness.payload.public_query?.limit !== 15 ||
-  Object.keys(bossReadiness.payload.public_query ?? {}).length !== 4 ||
-  bossReadiness.payload.task_intent.scope.target_type !== "boss_job_search" ||
-  bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
-  bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
-  JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
-  JSON.stringify(bossReadiness.payload).includes("read-job-detail")
-) {
-  throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
+const bossDeferredReason = "目标站点当前访问受限，功能延期";
+if (bossReadiness.ok || bossReadiness.reason !== bossDeferredReason) {
+  throw new Error(`Core BOSS submit smoke failed: search was not deferred with the product reason: ${JSON.stringify(bossReadiness)}`);
 }
-if (!coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(restrictedChromeBossIdentity, "boss", coreReadTaskClientModule.coreReadTaskSpecs[1])) {
-  throw new Error("Core BOSS submit smoke failed: identity task entry disagrees with the accepted restricted Chrome search admission.");
-}
-if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(restrictedChromeBossIdentity, "task-boss-real-read") !== null) {
-  throw new Error("Core BOSS submit smoke failed: identity task entry blocked the accepted restricted Chrome search admission.");
-}
-for (const taskId of ["task-boss-greeting-write-preview", "task-unknown"]) {
-  if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(readyBossIdentity, taskId) === null) {
-    throw new Error(`Core BOSS submit smoke failed: identity task entry admitted non-read task ${taskId}.`);
+for (const taskId of ["task-boss-real-read", "task-boss-greeting-write-preview"]) {
+  if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(readyBossIdentity, taskId) !== bossDeferredReason) {
+    throw new Error(`Core BOSS submit smoke failed: identity entry did not expose the deferred reason for ${taskId}.`);
   }
+}
+let bossSubmitRequests = 0;
+const fetchBeforeDeferredSubmit = globalThis.fetch;
+globalThis.fetch = async () => {
+  bossSubmitRequests += 1;
+  throw new Error("BOSS deferred submit must not reach an owner endpoint");
+};
+const deferredSubmit = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://127.0.0.1:9",
+  bossSearchTask,
+  liveRuntimeForSubmit,
+  [restrictedChromeBossIdentity],
+);
+globalThis.fetch = fetchBeforeDeferredSubmit;
+if (deferredSubmit.status !== "blocked" || deferredSubmit.summary !== bossDeferredReason || bossSubmitRequests !== 0) {
+  throw new Error(`Core BOSS submit smoke failed: deferred command reached POST /tasks: ${JSON.stringify(deferredSubmit)}`);
+}
+
+const historicalFailure = {
+  id: "run-boss-history-failure",
+  label: "BOSS historical failure",
+  lifecycle: "completed",
+  outcome: "failure-safe",
+  source: "Core live",
+  resultRows: [{ label: "Owner updated at", value: "2026-07-12T00:00:00.000Z", source: "Core live" }],
+  evidenceCards: [{ provenance: "Core failure query", freshness: "2026-07-12T00:00:00.000Z" }],
+  capabilityAttribution: { failureClass: "site_changed" },
+  failureRecovery: { reason: "access_limited", source: "Core live" },
+};
+const projectedBossTask = coreTaskSubmitClientModule.projectDeferredBossTask({
+  ...bossSearchTask,
+  packageSource: {
+    name: "@lode/boss-read-only",
+    version: "0.1.0",
+    capabilityRef: "lode:capability/job-search",
+    sourceRef: "lode://site-capability/boss/job-search@0.1.0",
+    boundary: "fixture",
+  },
+  runs: [
+    { id: "fixture-success", lifecycle: "completed", outcome: "success", source: "Core fixture" },
+    { id: "live-success", lifecycle: "completed", outcome: "success", source: "Core live" },
+    historicalFailure,
+  ],
+});
+if (
+  projectedBossTask.blocker !== bossDeferredReason ||
+  projectedBossTask.runs[0]?.summary !== bossDeferredReason ||
+  projectedBossTask.runs.some((run) => run.id === "fixture-success" || run.id === "live-success") ||
+  projectedBossTask.runs[1]?.lifecycle !== "blocked" ||
+  !projectedBossTask.runs[1]?.label.startsWith("历史失败 · ") ||
+  projectedBossTask.runs[1]?.resultRows?.[0]?.value !== "2026-07-12T00:00:00.000Z" ||
+  projectedBossTask.runs[1]?.evidenceCards?.[0]?.provenance !== "Core failure query" ||
+  projectedBossTask.runs[1]?.capabilityAttribution?.failureClass !== "site_changed"
+) {
+  throw new Error(`BOSS deferred projection smoke failed: current success or history diagnostics were misrepresented. ${JSON.stringify(projectedBossTask)}`);
+}
+if (coreTaskSubmitClientModule.projectDeferredBossTask(readonlySubmitTask) !== readonlySubmitTask) {
+  throw new Error("BOSS deferred projection smoke failed: Xiaohongshu task was changed.");
+}
+if (!rendererAssets.includes(bossDeferredReason)) {
+  throw new Error("BOSS deferred UI smoke failed: packaged renderer is missing the exact access-limited state.");
 }
 if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(readyBossIdentity, "boss", coreReadTaskClientModule.coreReadTaskSpecs[3])) {
   throw new Error("Core BOSS submit smoke failed: exported read-only identity admission accepted a write-precheck spec.");
@@ -1272,11 +1315,11 @@ if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveR
 if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(xhsMissingProxyIdentity, "xiaohongshu", coreReadTaskClientModule.coreReadTaskSpecs[0])) {
   throw new Error("Core submit smoke failed: identity task entry admitted Xiaohongshu restricted Chrome with proxy_missing.");
 }
-for (const [length, accepted] of [[80, true], [81, false]]) {
+for (const length of [80, 81]) {
   const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
   const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]);
-  if (readiness.ok !== accepted) {
-    throw new Error(`Core BOSS submit smoke failed: ${length}-character query acceptance was ${readiness.ok}.`);
+  if (readiness.ok || readiness.reason !== bossDeferredReason) {
+    throw new Error(`Core BOSS submit smoke failed: ${length}-character query bypassed deferred state.`);
   }
 }
 
@@ -1552,67 +1595,6 @@ globalThis.fetch = originalFetch;
 
 if (pendingRun.status !== "polling" || pendingRun.runId !== "run_submit_pending_001") {
   throw new Error(`Core submit smoke failed: accepted-but-not-ready run was not kept in polling state: ${JSON.stringify(pendingRun)}`);
-}
-
-let submittedBossPayload;
-const acceptsCore273BossPayload = (payload) =>
-  payload?.task_intent?.capability?.ref === "lode:capability/job-search" &&
-  payload?.task_intent?.capability?.source_ref === "lode://site-capability/boss/job-search@0.1.0" &&
-  payload?.task_intent?.scope?.target_type === "boss_job_search" &&
-  payload?.task_intent?.scope?.target_ref === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" &&
-  payload?.public_query?.query === "前端工程师" &&
-  payload?.public_query?.city_code === "101020100" &&
-  payload?.public_query?.page === 1 &&
-  payload?.public_query?.limit === 15 &&
-  Object.keys(payload.public_query).length === 4 &&
-  payload?.harbor?.url === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100";
-globalThis.fetch = async (url, init = {}) => {
-  const pathname = String(url);
-  if (pathname.endsWith("/tasks")) {
-    submittedBossPayload = JSON.parse(init.body);
-    const accepted = acceptsCore273BossPayload(submittedBossPayload);
-    const body = accepted
-      ? { ok: true, run_id: "run_submit_boss_001" }
-      : { ok: false, error: { code: "public_query_invalid" } };
-    return { ok: accepted, status: accepted ? 202 : 400, json: async () => body, text: async () => JSON.stringify(body) };
-  }
-  const body = { ok: false, error: { code: "run_not_queryable_yet" } };
-  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
-};
-const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
-  "http://core.test",
-  bossSearchTask,
-  liveRuntimeForSubmit,
-  [readyBossIdentity],
-  { pollAttempts: 1, pollIntervalMs: 0 },
-);
-const acceptedBossPayload = submittedBossPayload;
-const wrongTargetTypeResponse = await globalThis.fetch("http://core.test/tasks", {
-  method: "POST",
-  body: JSON.stringify({
-    ...acceptedBossPayload,
-    task_intent: {
-      ...acceptedBossPayload.task_intent,
-      scope: { ...acceptedBossPayload.task_intent.scope, target_type: "site" },
-    },
-  }),
-});
-globalThis.fetch = originalFetch;
-if (
-  acceptedBossRun.status !== "polling" ||
-  acceptedBossRun.runId !== "run_submit_boss_001" ||
-  acceptedBossPayload?.public_query?.query !== "前端工程师" ||
-  acceptedBossPayload?.public_query?.city_code !== "101020100" ||
-  acceptedBossPayload?.public_query?.page !== 1 ||
-  acceptedBossPayload?.public_query?.limit !== 15 ||
-  Object.keys(acceptedBossPayload?.public_query ?? {}).length !== 4 ||
-  acceptedBossPayload?.task_intent?.scope?.target_type !== "boss_job_search" ||
-  acceptedBossPayload?.harbor?.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100"
-) {
-  throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core #273 payload: ${JSON.stringify({ acceptedBossRun, acceptedBossPayload })}`);
-}
-if (wrongTargetTypeResponse.status !== 400) {
-  throw new Error("Core BOSS submit smoke failed: wrong target_type was not rejected by the Core #273 contract handler.");
 }
 
 globalThis.fetch = async (url) => {

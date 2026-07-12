@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { BOSS_DEFERRED_REASON, isBossDeferredTask } from "./coreTaskSubmitClient";
 import { type SiteSkill, type SiteSkillStatus, siteSkillFixtures } from "./siteSkillFixtures";
 
 const directoryTabs = ["全部", "电商", "内容平台", "招聘", "内容发布", "账号身份", "诊断"] as const;
@@ -33,6 +34,15 @@ function hasLiveRuntimeEvidence(skill: SiteSkill, canUseLiveRuntime: boolean, li
 }
 
 function projectSiteSkill(skill: SiteSkill, canUseLiveRuntime: boolean, liveTaskIds: string[]): SiteSkill {
+  if (skill.relatedTaskIds.some(isBossDeferredTask)) {
+    return {
+      ...skill,
+      status: "unavailable",
+      readiness: skill.readiness.map((item) => ({ ...item, status: "unavailable", detail: BOSS_DEFERRED_REASON })),
+      boundaries: [BOSS_DEFERRED_REASON, ...skill.boundaries],
+      sourceHealth: { label: "access limited", status: "unavailable", detail: BOSS_DEFERRED_REASON },
+    };
+  }
   const hasLiveEvidence = hasLiveRuntimeEvidence(skill, canUseLiveRuntime, liveTaskIds);
 
   if (hasLiveEvidence) {

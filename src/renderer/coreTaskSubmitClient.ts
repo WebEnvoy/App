@@ -67,6 +67,57 @@ const requiredRestrictedFallbackWarnings = ["provider_conflict", "fingerprint_co
 const allowedRestrictedFallbackWarnings = new Set(requiredRestrictedFallbackWarnings);
 const supportedBossCityCodes = new Set(["101020100"]);
 
+export const BOSS_DEFERRED_REASON = "目标站点当前访问受限，功能延期";
+
+export function isBossDeferredTask(taskId: string) {
+  return taskId === "task-boss-real-read" || taskId === "task-boss-greeting-write-preview";
+}
+
+export function projectDeferredBossTask(task: TaskProjection): TaskProjection {
+  if (!isBossDeferredTask(task.id)) return task;
+  const historicalFailures = task.runs.filter(
+    (run) => run.source === "Core live" && (run.failureRecovery != null || run.outcome === "failure-safe" || run.outcome === "unavailable"),
+  ).map((run) => ({ ...run, label: `历史失败 · ${run.label}`, lifecycle: "blocked" as const }));
+  const deferredRun: RunProjection = {
+    id: `boss-deferred-${task.id}`,
+    label: "访问受限",
+    lifecycle: "blocked",
+    outcome: "unavailable",
+    summary: BOSS_DEFERRED_REASON,
+    actionIntent: "可继续查看身份摘要、手动浏览器现场和历史失败诊断；自动任务命令不可执行。",
+    owner: "Core",
+    source: "App local-only",
+    resultRows: [
+      { label: "当前访问", value: "受限", source: "App local-only" },
+      { label: "自动任务", value: "延期且不可执行", source: "App local-only" },
+    ],
+    evidenceCards: [],
+    capabilityAttribution: {
+      capabilityRef: task.packageSource.capabilityRef,
+      version: task.packageSource.version,
+      sourceRef: task.packageSource.sourceRef,
+      failureClass: "site_changed",
+      summary: "保留 capability metadata 仅供历史诊断；不代表当前可运行。",
+    },
+    failureRecovery: {
+      state: "访问受限",
+      reason: BOSS_DEFERRED_REASON,
+      nextActions: ["保留历史诊断", "等待目标站点恢复评估"],
+      source: "App local-only",
+    },
+    process: ["BOSS production task commands are disabled before Core submission."],
+  };
+  return {
+    ...task,
+    blocker: BOSS_DEFERRED_REASON,
+    packageSource: {
+      ...task.packageSource,
+      boundary: `${BOSS_DEFERRED_REASON}；metadata 和历史失败仅供诊断，不构成当前 capability 可用证明。`,
+    },
+    runs: [deferredRun, ...historicalFailures],
+  };
+}
+
 export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
   status: "idle",
   summary: "真实只读任务尚未提交；按钮只在 Core admission、Harbor live identity 和只读 submit spec 都可用时启用。",
@@ -77,6 +128,7 @@ export function coreTaskSubmitReadiness(
   runtime: RuntimeSupervisorState,
   identities: IdentityEnvironmentProjection[],
 ): SubmitReadiness {
+  if (isBossDeferredTask(task.id)) return { ok: false, reason: BOSS_DEFERRED_REASON };
   const core = runtimeService(runtime, "core");
   const harbor = runtimeService(runtime, "harbor");
   const spec = coreReadTaskSpecs.find((item) => item.taskId === task.id && item.mode === "read");
@@ -243,6 +295,7 @@ export function readOnlyIdentityAdmissionBlockReason(
   identity: IdentityEnvironmentProjection,
   taskId: string,
 ) {
+  if (isBossDeferredTask(taskId)) return BOSS_DEFERRED_REASON;
   if (identity.source !== "Harbor live") {
     return "缺少 Harbor live identity；fixture/local identity 只能管理或认证，不能启动真实 Core task。";
   }
