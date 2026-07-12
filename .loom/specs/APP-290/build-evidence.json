@@ -1,6 +1,16 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-290",
+  "ownership_constraints": {
+    "task_goal": "Disable BOSS task commands and preserve truthful identity/manual-browser and historical failure diagnostics.",
+    "context_locators": [".", "https://github.com/WebEnvoy/App/issues/290", "https://github.com/WebEnvoy/App/pull/291"],
+    "read_scope": ["src/renderer/**", "scripts/smoke.mjs", ".loom/** for APP-290"],
+    "write_ownership": ["src/renderer/**#APP-290", "scripts/smoke.mjs#APP-290", ".loom/**#APP-290"],
+    "non_goals": ["Core/Harbor/Lode edits", "production pages", "profile or sensitive material", "external actions"],
+    "validation_expectation": "npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; git diff --check",
+    "output_format": "Controller records the exact branch/head, changed paths, validation results, PR binding, and remaining packaged-App acceptance requirement.",
+    "integration_target": "PR #291, merged only after current-head review and hosted gate; issue #290 closes only after merged Core #281 and packaged App acceptance."
+  },
   "ownership_contract": {
     "task_goal": "Disable BOSS task commands and preserve truthful identity/manual-browser and historical failure diagnostics.",
     "context_locators": ["src/renderer", "scripts/smoke.mjs", "https://github.com/WebEnvoy/App/issues/290"],
@@ -63,5 +73,16 @@
     }
   ],
   "ownership_overlap": [],
-  "repeated_blockers": []
+  "repeated_blockers": [],
+  "ownership_conflicts": [],
+  "repeated_blocker_signal": {
+    "present": false,
+    "signature": null
+  },
+  "suite_path_consumption": {
+    "path": "minimal",
+    "not_applicable_rationale": "APP-290 is a narrow App fail-closed presentation and submit-boundary change. It does not alter Core, Harbor, Lode, a production page, or external behavior.",
+    "consumer_boundary": "The suite proves BOSS commands are disabled before owner submission and that current success/fixture projections are absent. It does not prove BOSS runtime support.",
+    "recheck_condition": "Before each PR head or metadata change and after Core or Lode admission policy changes."
+  }
 }
