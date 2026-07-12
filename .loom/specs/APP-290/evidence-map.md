@@ -6,3 +6,4 @@
 | EV-002 | display_evidence | src/renderer/App.tsx | EV-001 | Task Thread, Library, and identity entry consumers | present | UI projection only; related consumers are covered by EV-003 | Refresh after entry or source-strip changes. |
 | EV-003 | test_evidence | scripts/smoke.mjs | EV-001 EV-002 | zero POST, history, fixture/live-success exclusion, XHS preservation | present | Automated local evidence; no production page | Rerun after App code or tests change. |
 | EV-004 | fresh_verification_input | .loom/progress/APP-290.md | EV-001 EV-002 EV-003 | typecheck/full/packaged/diff checks | present | PR readiness only | Refresh after commit, PR head, or dependency changes. |
+| EV-005 | build_evidence | .loom/specs/APP-290/build-evidence.json | subagent ownership, integration and review fixes | APP-290 build | present | Merge checkpoint only | Refresh after implementation or review integration changes. |

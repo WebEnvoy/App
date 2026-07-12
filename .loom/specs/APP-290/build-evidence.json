@@ -1,0 +1,57 @@
+{
+  "schema_version": "loom-build-evidence/v1",
+  "item_id": "APP-290",
+  "delegations": [
+    {
+      "id": "turing-app-290-implementation",
+      "status": "integrated",
+      "task_goal": "Disable BOSS task commands and preserve truthful identity/manual-browser and historical failure diagnostics.",
+      "context_locators": ["src/renderer", "scripts/smoke.mjs", "https://github.com/WebEnvoy/App/issues/290"],
+      "read_scope": ["App task submission, Library projection, Task Thread, identity/manual browser, smoke tests"],
+      "write_ownership": ["src/renderer/**#APP-290", "scripts/smoke.mjs#APP-290", ".loom/**#APP-290"],
+      "non_goals": ["Core/Harbor/Lode edits", "production pages", "profile or sensitive material", "external actions"],
+      "validation_expectation": "npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; git diff --check",
+      "output_format": "Worktree, head, changed paths, validation, PR and risks.",
+      "integration_target": "Main controller review, carrier convergence, hosted gate and merge.",
+      "summary": "Implementation and two review fixes were read back and integrated at product head f23cf29f4e56d1432277ead5d88b1b57c1e037e9."
+    },
+    {
+      "id": "curie-app-290-semantic-review",
+      "status": "integrated",
+      "task_goal": "Review fail-closed BOSS entrypoints, XHS non-regression and historical diagnostics provenance.",
+      "context_locators": ["PR #291", "src/renderer/coreTaskSubmitClient.ts", "src/renderer/coreReadTaskClient.ts", "scripts/smoke.mjs"],
+      "read_scope": ["APP-290 diff and tests"],
+      "write_ownership": ["read_only:no_tracked_writes"],
+      "non_goals": ["implementation edits", "merge", "UI or external-page operation"],
+      "validation_expectation": "typecheck, smoke, diff check and semantic review.",
+      "output_format": "Findings with severity/file/line or ALLOW.",
+      "integration_target": "Main controller required both P2 findings fixed before final ALLOW.",
+      "summary": "Final review ALLOW confirmed zero-fetch for both task IDs, runtime_admission_disabled, actual Core owner time, separate evidence freshness and unchanged XHS/shared projection."
+    }
+  ],
+  "integration_evidence": [
+    {
+      "id": "boss-submit-disabled",
+      "status": "integrated",
+      "summary": "Both BOSS task IDs fail before fetch with the exact deferred reason.",
+      "locators": ["src/renderer/coreTaskSubmitClient.ts", "scripts/smoke.mjs"],
+      "validation": ["npm run smoke", "npm run smoke:packaged"]
+    },
+    {
+      "id": "truthful-deferred-projection",
+      "status": "integrated",
+      "summary": "Current BOSS success/fixture readiness is removed; identity/manual browser and historical failure owner time/provenance/class remain.",
+      "locators": ["src/renderer/App.tsx", "src/renderer/SiteSkillPages.tsx", "src/renderer/TaskThreadPage.tsx", "src/renderer/taskThreadFixtures.ts"],
+      "validation": ["npm run typecheck", "npm run smoke"]
+    },
+    {
+      "id": "xhs-non-regression",
+      "status": "integrated",
+      "summary": "Non-BOSS projection returns the original task and shared runtime health remains unchanged.",
+      "locators": ["src/renderer/coreTaskSubmitClient.ts", "src/renderer/coreReadTaskClient.ts", "scripts/smoke.mjs"],
+      "validation": ["npm run smoke", "npm run smoke:packaged:readonly"]
+    }
+  ],
+  "ownership_overlap": [],
+  "repeated_blockers": []
+}
