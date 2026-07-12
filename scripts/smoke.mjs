@@ -1567,7 +1567,7 @@ if (
 ) {
   throw new Error(`Core submit smoke failed: one-shot POST or exact public query contract was violated: ${JSON.stringify(submittedTaskPayload)}`);
 }
-if (ownerRequestTimeouts[0] !== 65_000 || ownerRequestTimeouts.slice(1).some((timeout) => timeout !== 2500)) {
+if (ownerRequestTimeouts[0] !== 65_000 || ownerRequestTimeouts[1] !== 3500 || ownerRequestTimeouts.slice(2).some((timeout) => timeout !== 2500)) {
   throw new Error(`Core submit smoke failed: /tasks and owner read timeouts diverged from IPC boundaries: ${ownerRequestTimeouts.join(",")}`);
 }
 
@@ -1583,6 +1583,90 @@ if (!submittedRun.run.evidenceCards[0]?.summary.includes("harbor:evidence/xiaoho
 
 if (!submittedRun.run.resultRows.some((row) => row.value === harborRuntimeSession.runtime_session_ref)) {
   throw new Error("Core submit smoke failed: Harbor session ref from create/readback/session chain was not projected.");
+}
+
+const detailRef = "detail_ref_11111111-1111-4111-8111-111111111111";
+let detailPayload;
+let detailPostCount = 0;
+const detailJsonResponse = (json) => ({ ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) });
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  if (pathname.endsWith("/tasks")) {
+    detailPostCount += 1;
+    detailPayload = JSON.parse(init.body);
+    return detailJsonResponse({ ok: true, run_id: "run_submit_xhs_detail_001" });
+  }
+  const detailRun = {
+    ...fakeRun,
+    run_id: "run_submit_xhs_detail_001",
+    task: {
+      capability_ref: "lode:capability/read-note-detail",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+      capability_lock_ref: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+    },
+  };
+  if (pathname.endsWith("/runs/run_submit_xhs_detail_001")) return detailJsonResponse({ ok: true, run: detailRun });
+  if (pathname.endsWith("/result")) return detailJsonResponse({ ok: true, result: { result: { envelope_state: "available", payload_state: "not_persisted_in_core", result_envelope: {
+    result_kind: "read-note-detail.read_result",
+    result_ref: "result:core/xhs/detail/001",
+    package_ref: detailRun.task.package_ref,
+    source_refs: ["source_11111111-1111-4111-8111-111111111111", "source_22222222-2222-4222-8222-222222222222", "source_33333333-3333-4333-8333-333333333333"],
+    evidence_refs: ["evidence_11111111-1111-4111-8111-111111111111", "post_check_11111111-1111-4111-8111-111111111111"],
+    post_check: { status: "passed" },
+    data: { projection: { normalized: { public_summary: { normalized: {
+      kind: "xiaohongshu_note_detail", note_id: "0123456789abcdef01234567", canonical_url: "https://www.xiaohongshu.com/explore/0123456789abcdef01234567",
+      title: "公开标题", summary: "公开摘要", body_summary: "公开正文摘要",
+      author: { display_name: "公开作者", author_id: "author-001", profile_url: "https://www.xiaohongshu.com/user/profile/author-001" },
+      interaction_metrics: { likes: "12", collects: "3", comments: "2", shares: "1" },
+      source_citation: { kind: "xhs_note_detail_ref", note_id: "0123456789abcdef01234567", url: "https://www.xiaohongshu.com/explore/0123456789abcdef01234567", field_sources: ["pinia_store_summary", "network_summary", "dom_snapshot_summary"] },
+      source_status: "located",
+    } } } } },
+  } } } });
+  if (pathname.endsWith("/evidence-refs")) return detailJsonResponse({ ok: true, evidence: { evidence_refs: [
+    { ref: "evidence_11111111-1111-4111-8111-111111111111", state: "available" },
+    { ref: "post_check_11111111-1111-4111-8111-111111111111", state: "available" },
+  ] } });
+  if (pathname.endsWith("/failure")) return detailJsonResponse({ ok: true, failure_reason: { reason_class: "none" } });
+  if (pathname.endsWith("/session-refs")) return detailJsonResponse({ ok: true, session_refs: { session_refs: { runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00" } } });
+  return detailJsonResponse({ ok: false, error: { code: "unexpected_detail_path" } });
+};
+const detailRun = await coreTaskSubmitClientModule.submitCoreXhsDetailTask(
+  "http://core.test", readonlySubmitTask, detailRef, liveRuntimeForSubmit, [readyXhsIdentity], { pollAttempts: 1, pollIntervalMs: 0 },
+);
+const originalFieldSources = detailRun.status === "ready" ? detailRun.run.fieldSources : [];
+globalThis.fetch = originalFetch;
+if (
+  detailRun.status !== "ready" || detailPostCount !== 1 ||
+  detailPayload?.task_intent?.scope?.target_ref !== detailRef ||
+  detailPayload?.task_intent?.input?.refs?.[0] !== detailRef ||
+  detailPayload?.task_intent?.capability?.ref !== "lode:capability/read-note-detail" ||
+  detailPayload?.task_intent?.resource_requirement_refs?.[0] !== "xiaohongshu.read-note-detail.resources" ||
+  "public_query" in detailPayload || "url" in detailPayload.harbor ||
+  /https?:|xsec|0123456789abcdef01234567|AI 工具/.test(JSON.stringify(detailPayload))
+) {
+  throw new Error(`XHS detail submit smoke failed: ${JSON.stringify({ detailRun, detailPostCount, detailPayload })}`);
+}
+if (
+  !appSource.includes("detailInFlightRefs.current.has(detailRef)") ||
+  !appSource.includes("current[submitKey]?.task ?? submitTask") ||
+  !appSource.includes("finally {") ||
+  !appSource.includes("detailInFlightRefs.current.delete(detailRef)") ||
+  !coreTaskSubmitClientSource.includes("crypto.randomUUID()")
+) {
+  throw new Error("XHS detail concurrency smoke failed: same-ref guard or functional run merge is missing.");
+}
+if (
+  !detailRun.run.resultRows.some((row) => row.value === "公开标题") ||
+  detailRun.run.fieldSources.filter((row) => row.field.startsWith("来源引用")).length !== 3 ||
+  !detailRun.run.fieldSources.some((row) => row.value.startsWith("post_check_"))
+) {
+  throw new Error(`XHS detail projection smoke failed: ${JSON.stringify(detailRun.run)}`);
+}
+for (const invalidRef of ["", "0123456789abcdef01234567", "https://www.xiaohongshu.com/explore/0123456789abcdef01234567", "xsec_token=forbidden"]) {
+  const blocked = await coreTaskSubmitClientModule.submitCoreXhsDetailTask("http://core.test", readonlySubmitTask, invalidRef, liveRuntimeForSubmit, [readyXhsIdentity]);
+  if (blocked.status !== "blocked") throw new Error(`XHS detail invalid target was admitted: ${invalidRef}`);
 }
 
 globalThis.fetch = async (url, init = {}) => {
@@ -1612,6 +1696,46 @@ if (pendingRun.status !== "polling" || pendingRun.runId !== "run_submit_pending_
   throw new Error(`Core submit smoke failed: accepted-but-not-ready run was not kept in polling state: ${JSON.stringify(pendingRun)}`);
 }
 
+let resumePosts = 0;
+globalThis.fetch = async (url, init = {}) => {
+  if (init.method === "POST") resumePosts += 1;
+  const pathname = String(url);
+  return detailJsonResponse(pathname.endsWith("/runs/run_submit_pending_001")
+    ? { ok: true, run: { ...fakeRun, run_id: "run_submit_pending_001", status: "running" } }
+    : { ok: false });
+};
+const resumedPending = await coreTaskSubmitClientModule.resumeCoreXhsDetailPolling(
+  "http://core.test", "run_submit_pending_001", { pollAttempts: 1, pollIntervalMs: 0 },
+);
+globalThis.fetch = originalFetch;
+if (resumedPending.status !== "polling" || resumePosts !== 0) {
+  throw new Error("XHS detail resume smoke failed: existing run polling issued a new POST.");
+}
+
+let terminalResultQueries = 0;
+const uniqueDetailRunIds = [];
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  if (pathname.endsWith("/tasks")) {
+    uniqueDetailRunIds.push(JSON.parse(init.body).run_id);
+    return detailJsonResponse({ ok: true, run_id: "run_submit_failed_001" });
+  }
+  if (pathname.endsWith("/runs/run_submit_failed_001")) return detailJsonResponse({ ok: true, run: { ...fakeRun, run_id: "run_submit_failed_001", status: "failed" } });
+  terminalResultQueries += 1;
+  return detailJsonResponse({ ok: false });
+};
+const terminalDetail = await coreTaskSubmitClientModule.submitCoreXhsDetailTask(
+  "http://core.test", readonlySubmitTask, detailRef, liveRuntimeForSubmit, [readyXhsIdentity], { pollAttempts: 1, pollIntervalMs: 0 },
+);
+await coreTaskSubmitClientModule.submitCoreXhsDetailTask(
+  "http://core.test", readonlySubmitTask, detailRef, liveRuntimeForSubmit, [readyXhsIdentity], { pollAttempts: 1, pollIntervalMs: 0 },
+);
+globalThis.fetch = originalFetch;
+if (terminalDetail.status !== "failed" || terminalResultQueries !== 0 || originalFieldSources.length === 0 || new Set(uniqueDetailRunIds).size !== 2) {
+  throw new Error("XHS detail terminal smoke failed: failed run queried result refs or lost the positive projection control.");
+}
+
+let ownerSearchDetailRefs = [detailRef];
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
@@ -1631,18 +1755,18 @@ globalThis.fetch = async (url) => {
             payload_state: "not_persisted_in_core",
             result_ref: "result:core/xiaohongshu/search-notes/contract",
             result_envelope: {
-              result_kind: "xhs_note_search",
+              result_kind: "search-notes.read_result",
               result_ref: "result:core/xiaohongshu/search-notes/contract",
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              source_refs: ["source_6f45e8c0"],
+              source_refs: ["source_6f45e8c0", "source_7f45e8c0", "source_8f45e8c0"],
               evidence_refs: [
                 "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
                 "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
               ],
               post_check: {
-                ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
                 status: "passed",
               },
+              data: { projection: { normalized: { public_summary: { detail_refs: ownerSearchDetailRefs } } } },
             },
           },
           evidence_refs: [
@@ -1657,6 +1781,14 @@ globalThis.fetch = async (url) => {
             {
               ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
               source: "terminal_post_check",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:00:03.000Z",
+              runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
+            },
+            {
+              ref: "screenshot_2c29bb68-10e4-458f-b384-97f249e711e9",
+              source: "owner_diagnostic",
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:00:03.000Z",
@@ -1700,10 +1832,17 @@ const coreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("htt
     runs: [],
   },
 ]);
+ownerSearchDetailRefs = [detailRef, detailRef];
+const duplicateTargetProjection = await coreReadTaskClientModule.fetchCoreRunProjectionById(
+  "http://core.test", fakeRun.run_id, coreReadTaskClientModule.coreReadTaskSpecs[0],
+);
 globalThis.fetch = originalFetch;
 
 if (coreReadState.status !== "ready" || coreReadState.tasks[0].runs[0]?.source !== "Core live") {
   throw new Error("Core read task smoke failed: live Core projection was not applied.");
+}
+if (coreReadState.tasks[0].runs[0]?.detailTargets?.[0] !== detailRef || duplicateTargetProjection.ok && duplicateTargetProjection.run.detailTargets) {
+  throw new Error("Core read task smoke failed: bounded unique owner detail targets were not enforced.");
 }
 
 if (!coreReadState.tasks[0].runs[0].evidenceCards[0]?.summary.includes("not_available_from_core")) {

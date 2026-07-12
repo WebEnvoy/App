@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Ban, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
+import { Activity, AlertTriangle, Ban, BookOpen, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
 import { useState } from "react";
 
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
@@ -17,6 +17,8 @@ export function TaskThreadPage({
   selectedRun,
   selectedTask,
   onActiveRunChange,
+  onReadDetail,
+  detailSubmitStates,
 }: {
   coreReadState: CoreReadTaskLoadState;
   coreSubmitState: CoreTaskSubmitState;
@@ -25,6 +27,8 @@ export function TaskThreadPage({
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   onActiveRunChange: (runId: string) => void;
+  onReadDetail: (detailRef: string) => void;
+  detailSubmitStates: Record<string, CoreTaskSubmitState>;
 }) {
   return (
     <div className="thread-body">
@@ -62,6 +66,8 @@ export function TaskThreadPage({
               isSelected={run.id === selectedRun.id}
               key={run.id}
               run={run}
+              onReadDetail={onReadDetail}
+              detailSubmitStates={detailSubmitStates}
             />
           ))}
         </div>
@@ -237,7 +243,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
   );
 }
 
-function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean }) {
+function RunTurn({ run, isSelected, onReadDetail, detailSubmitStates }: { run: RunProjection; isSelected: boolean; onReadDetail: (detailRef: string) => void; detailSubmitStates: Record<string, CoreTaskSubmitState> }) {
   return (
     <article
       className={isSelected ? "run-turn selected" : "run-turn"}
@@ -263,6 +269,23 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           <span className="badge">{outcomeLabel(run.outcome)}</span>
         </div>
         <p>{run.summary}</p>
+        {run.detailTargets?.length ? (
+          <section className="failure-recovery-panel" aria-label="小红书详情读取命令">
+            <div className="card-title compact-title">
+              <BookOpen size={18} />
+              <h3>读取搜索结果详情</h3>
+              <span className="source-chip">Core live</span>
+            </div>
+            {run.detailTargets.map((detailRef, index) => {
+              const state = detailSubmitStates[detailRef];
+              const disabled = state?.status === "submitting";
+              return <button className="cancel-intent-button" disabled={disabled} key={detailRef} type="button" onClick={() => onReadDetail(detailRef)}>
+                <BookOpen size={15} />
+                {disabled ? `详情 ${index + 1} 提交中` : state?.status === "polling" ? `继续查询详情 ${index + 1}` : `读取详情 ${index + 1}`}
+              </button>;
+            })}
+          </section>
+        ) : null}
         {run.writePrecheck ? <WritePrecheckPreview run={run} /> : null}
         {run.approval ? <ApprovalPreview run={run} /> : null}
         <h3 className="subsection-title">提取结果</h3>

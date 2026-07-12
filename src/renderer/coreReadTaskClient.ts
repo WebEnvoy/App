@@ -87,6 +87,15 @@ type CoreResultEnvelope = {
       package_ref?: string;
       source_refs?: string[];
       evidence_refs?: string[];
+      data?: {
+        projection?: {
+          normalized?: {
+            public_summary?: unknown;
+          };
+          source_refs?: unknown[];
+          evidence_refs?: unknown[];
+        };
+      };
       preview_result?: CorePreviewResult;
       post_check?: { ref?: string; post_check_ref?: string; status?: string; summary?: string };
       failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
@@ -408,11 +417,21 @@ async function fetchRunProjection(
   const evidence = evidencePayload.payload;
   const failure = failurePayload.payload as CoreFailureEnvelope;
   const session = sessionPayload.payload as CoreSessionRefsEnvelope;
-  const fixtureReason = fixtureOrDemoPayloadReason({ run, result, evidence, failure, session });
+  const resultEnvelope = result?.result?.result_envelope;
+  const fixtureReason =
+    fixtureOrDemoPayloadReason({ run, evidence, failure, session }) ??
+    fixtureOrDemoPayloadReason({
+      ...result,
+      result: result.result == null ? undefined : {
+        ...result.result,
+        result_envelope: resultEnvelope == null ? undefined : { ...resultEnvelope, data: undefined },
+      },
+    }) ??
+    fixtureOrDemoPayloadReason(resultEnvelope?.data?.projection);
   if (fixtureReason) {
     return { ok: false, error: `/runs/${runId} returned fixture/demo/smoke payload: ${fixtureReason}` };
   }
-  const envelope = result?.result?.result_envelope;
+  const envelope = resultEnvelope;
   const refReason = coreProjectionRefReason(run, result, evidence, session, envelope);
   if (refReason) {
     return { ok: false, error: `/runs/${runId} returned invalid typed ref: ${refReason}` };
@@ -420,6 +439,9 @@ async function fetchRunProjection(
   const isWritePrecheck = spec.mode === "write-precheck";
   const previewResult = corePreviewResult(envelope?.preview_result ?? result?.result?.preview_result);
   const postCheck = run.terminal_summary?.post_check ?? envelope?.post_check;
+  const readProjection = recordValue(envelope?.data?.projection);
+  const publicSummary = recordValue(recordValue(readProjection?.normalized)?.public_summary);
+  const sourceRefs = stringRefs(envelope?.source_refs);
   const runtimeSessionRefFromSession =
     session?.session_refs?.runtime_session_ref ??
     run.runtime_refs?.session_binding?.runtime_session_ref;
@@ -436,6 +458,17 @@ async function fetchRunProjection(
   const runtimeSessionRef =
     runtimeSessionRefFromSession ??
     evidenceRefs.find((ref) => ref.runtime_session_ref)?.runtime_session_ref;
+  const sessionBindingValid = Boolean(
+    runtimeSessionRef &&
+    run.runtime_refs?.session_binding?.runtime_session_ref === runtimeSessionRef &&
+    session.session_refs?.runtime_session_ref === runtimeSessionRef &&
+    evidenceRefs.every((ref) => ref.runtime_session_ref == null || ref.runtime_session_ref === runtimeSessionRef)
+  );
+  const detailTargets = searchDetailTargets(run, envelope, publicSummary, sourceRefs, postCheck, sessionBindingValid);
+  const normalizedDetail = strictXhsDetailResult(run, envelope, publicSummary, sourceRefs, postCheck, sessionBindingValid);
+  if (run.status === "succeeded" && run.task?.capability_ref === "lode:capability/read-note-detail" && normalizedDetail == null) {
+    return { ok: false, error: `/runs/${runId} returned contract-drifted read-note-detail projection` };
+  }
   const failureRecord = failure?.failure ?? result?.failure ?? envelope?.failure ?? run.terminal_summary?.failure;
   const hasFailureRecovery = Boolean(failureRecord || (failure?.reason_class && failure.reason_class !== "none"));
   const resultKind = envelope?.result_kind ?? (isWritePrecheck ? "real_page_write_precheck_projection" : result?.result?.unavailable_reason ?? "not_available");
@@ -451,10 +484,17 @@ async function fetchRunProjection(
     : outcomeFromStatus(run.status);
   const resultRows = isWritePrecheck && writeState != null
     ? writePrecheckResultRows(run, resultKind, payloadState, previewResult, writeState, runtimeSessionRef)
-    : [
+    : normalizedDetail == null ? [
         { label: "Run status", value: run.status, source: coreLiveSource },
         { label: "Result kind", value: resultKind, source: coreLiveSource },
         { label: "Payload state", value: payloadState, source: coreLiveSource },
+        { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
+        ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
+      ] : [
+        { label: "笔记标题", value: normalizedDetail.title, source: coreLiveSource },
+        { label: "作者", value: normalizedDetail.author, source: coreLiveSource },
+        { label: "正文摘要", value: normalizedDetail.bodySummary, source: coreLiveSource },
+        { label: "互动指标", value: normalizedDetail.metrics, source: coreLiveSource },
         { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
         ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
       ];
@@ -483,14 +523,24 @@ async function fetchRunProjection(
         owner: "Core",
         source: coreLiveSource,
         ownerUpdatedAt: run.timeline?.updated_at ?? run.timeline?.terminal_at,
+        ...(detailTargets.length === 0 ? {} : { detailTargets }),
         resultRows,
-        fieldSources: evidenceRefs.map((entry, index) => ({
-          field: `证据引用 ${index + 1}`,
-          value: entry.ref,
-          locator: entry.runtime_session_ref ?? runtimeSessionRef ?? "Core evidence refs query",
-          evidenceRef: entry.ref,
-          source: coreLiveSource,
-        })),
+        fieldSources: [
+          ...sourceRefs.map((ref, index) => ({
+            field: `来源引用 ${index + 1}`,
+            value: ref,
+            locator: "Core result source refs",
+            evidenceRef: ref,
+            source: coreLiveSource,
+          })),
+          ...evidenceRefs.map((entry, index) => ({
+            field: `证据引用 ${index + 1}`,
+            value: entry.ref,
+            locator: entry.runtime_session_ref ?? runtimeSessionRef ?? "Core evidence refs query",
+            evidenceRef: entry.ref,
+            source: coreLiveSource,
+          })),
+        ],
         evidenceCards: evidenceRefs.map((entry, index) => ({
           id: `ev-${run.run_id}-${index}`,
           title: `Core evidence ref ${index + 1}`,
@@ -531,6 +581,88 @@ async function fetchRunProjection(
       },
     },
   };
+}
+
+const opaqueDetailRefPattern = /^detail_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function searchDetailTargets(
+  run: CoreRunSummary,
+  envelope: CoreResultEnvelopeBody | undefined,
+  publicSummary: JsonRecord | null,
+  sourceRefs: string[],
+  postCheck: { status?: string } | undefined,
+  sessionBindingValid: boolean,
+): string[] {
+  if (
+    run.status !== "succeeded" || run.task?.capability_ref !== "lode:capability/search-notes" ||
+    run.task.package_ref !== "lode://site-capability/xiaohongshu/search-notes@0.1.0" ||
+    envelope?.package_ref !== run.task.package_ref || envelope.result_kind !== "search-notes.read_result" ||
+    sourceRefs.length !== 3 || new Set(sourceRefs).size !== 3 ||
+    !exactEnvelopeEvidence(envelope) || postCheck?.status !== "passed" || !sessionBindingValid
+  ) return [];
+  const refs = arrayValue(publicSummary?.detail_refs);
+  if (refs.length === 0 || refs.length > 15 || refs.some((ref) => typeof ref !== "string" || !opaqueDetailRefPattern.test(ref))) return [];
+  const values = refs as string[];
+  return new Set(values).size === values.length ? values : [];
+}
+
+function strictXhsDetailResult(
+  run: CoreRunSummary,
+  envelope: CoreResultEnvelopeBody | undefined,
+  publicSummary: JsonRecord | null,
+  sourceRefs: string[],
+  postCheck: { status?: string } | undefined,
+  sessionBindingValid: boolean,
+) {
+  const packageRef = "lode://site-capability/xiaohongshu/read-note-detail@0.1.0";
+  if (
+    run.status !== "succeeded" || run.task?.capability_ref !== "lode:capability/read-note-detail" ||
+    run.task.package_ref !== packageRef || envelope?.package_ref !== packageRef || envelope.result_kind !== "read-note-detail.read_result" ||
+    sourceRefs.length !== 3 || new Set(sourceRefs).size !== 3 || !exactEnvelopeEvidence(envelope) ||
+    postCheck?.status !== "passed" || !sessionBindingValid
+  ) return null;
+  const normalized = recordValue(publicSummary?.normalized);
+  const author = recordValue(normalized?.author);
+  const metrics = recordValue(normalized?.interaction_metrics);
+  const citation = recordValue(normalized?.source_citation);
+  const noteId = stringValue(normalized?.note_id);
+  const canonicalUrl = stringValue(normalized?.canonical_url);
+  const title = stringValue(normalized?.title);
+  const summary = stringValue(normalized?.summary);
+  const bodySummary = stringValue(normalized?.body_summary);
+  const authorName = stringValue(author?.display_name);
+  const authorId = stringValue(author?.author_id);
+  const fieldSources = arrayValue(citation?.field_sources);
+  if (
+    normalized?.kind !== "xiaohongshu_note_detail" ||
+    !noteId || !/^[a-f0-9]{24}$/i.test(noteId) || canonicalUrl !== `https://www.xiaohongshu.com/explore/${noteId}` ||
+    !boundedString(title, 200) || !boundedString(summary, 2000) || !boundedString(bodySummary, 4000) ||
+    !boundedString(authorName, 100) || !boundedString(authorId, 100) || author?.profile_url !== `https://www.xiaohongshu.com/user/profile/${authorId}` ||
+    !metrics || !["likes", "comments", "collects", "shares"].every((key) => boundedString(metrics[key], 40)) ||
+    citation?.kind !== "xhs_note_detail_ref" || citation.note_id !== noteId || citation.url !== canonicalUrl ||
+    fieldSources.join(",") !== "pinia_store_summary,network_summary,dom_snapshot_summary" ||
+    (normalized.source_status !== "located" && normalized.source_status !== "partially_located")
+  ) return null;
+  const metricText = ["likes", "collects", "comments", "shares"]
+    .flatMap((key) => stringValue(metrics[key]) ? [`${key}: ${stringValue(metrics[key])}`] : [])
+    .join(" / ");
+  return { title, bodySummary, author: authorName, metrics: metricText || "not reported" };
+}
+
+function exactEnvelopeEvidence(envelope: CoreResultEnvelopeBody | undefined) {
+  const refs = stringRefs(envelope?.evidence_refs);
+  return refs.length === 2 && new Set(refs).size === 2 &&
+    refs.filter((ref) => ref.startsWith("post_check_")).length === 1 &&
+    refs.filter((ref) => !ref.startsWith("post_check_")).length === 1;
+}
+
+function boundedString(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= max && value.trim() === value;
+}
+
+function stringRefs(value: unknown): string[] {
+  const refs = arrayValue(value);
+  return refs.every((ref) => typeof ref === "string" && ref.length > 0) ? refs as string[] : [];
 }
 
 export async function fetchCoreRunProjectionById(
