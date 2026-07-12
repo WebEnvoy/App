@@ -63,7 +63,7 @@ type CoreTaskSubmitOptions = {
 
 const sensitivePayloadPattern =
   /\b(token|cookie|secret|bearer|credential|password|authorization|profile_storage|raw_evidence|dom|har|trace)\b/i;
-const allowedRestrictedFallbackWarnings = new Set(["provider_conflict", "fingerprint_conflict"]);
+const allowedRestrictedFallbackWarnings = new Set(["provider_conflict", "proxy_missing", "fingerprint_conflict"]);
 const supportedBossCityCodes = new Set(["101020100"]);
 
 export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
