@@ -3,58 +3,30 @@
   "item_id": "APP-239",
   "decision": "allow",
   "kind": "code_review",
-  "summary": "Current product-head review at 27c7dd8 found no P0-P3. App synchronizes live identity admission, emits result-ref-safe opaque intent IDs without weakening typed-ref guards, and final-head Computer Use completed app-xiaohongshu-mrghtw1l with five public refs. Merged-head replay remains required.",
+  "summary": "Independent review found no blocking correctness, contract, privacy, concurrency, or scope findings after aligning App with the exact Core #270 owner envelope.",
   "reviewer": "codex-main-controller",
-  "authored_at": "2026-07-11T15:04:16Z",
-  "reviewed_head": "27c7dd8d36d6fc13dc3e21c81724040e030477f0",
-  "reviewed_validation_summary": "2026-07-11 at product head 27c7dd8d36d6fc13dc3e21c81724040e030477f0: `npm run typecheck`, `npm run smoke`, exact-head packaged runtime build, and `git diff --check` passed. Computer Use opened and confirmed session_c9795336-ee01-46d1-a07e-6b41dd70f304, released it for Core, and completed run app-xiaohongshu-mrghtw1l as search-notes.read_result with evidence_e97634d4-8152-4804-b7fa-99fbf6cdcf6f, evidence_e7b3c9b7-6637-4960-b7ab-f15b780702cf, evidence_d4845acd-1af4-438a-b710-895d7f89e4a2, screenshot_1de2bda2-d252-46bd-a4a1-0e3516d6dc13, and post_check_62f65cf6-830e-4cd1-b0be-4e7659494153. No raw evidence or prohibited action occurred; merged-head replay remains required.",
-  "reviewed_validation_summary_hash": "90e5da749a40d58c052b7650ab96a38832857c6caa4a57095a4df141e4d41675",
+  "authored_at": "2026-07-12T14:29:20Z",
+  "reviewed_head": "9412b7f9cc921066d404744c079475faf327beb9",
+  "reviewed_validation_summary": "2026-07-12T14:29Z at product head `9412b7f9cc921066d404744c079475faf327beb9`: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged`, `WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 npm run smoke:packaged:readonly`, and `git diff --check` passed using Core #270 and Harbor #252 packaged sources. Independent review returned ALLOW after exact Core envelope, strict detail normalization, resume zero-POST, concurrency, UUID, fixture isolation, and BOSS deferred checks.",
+  "reviewed_validation_summary_hash": "861ded2b3082b871e42b06f5b945319b0f537bf821d2e18a5f4c60017c135f07",
   "validation_summary_source": "recovery.latest_validation_summary",
   "validation_summary_locator": ".loom/progress/APP-239.md",
   "fallback_to": null,
   "findings": [],
   "blocking_issues": [],
-  "follow_ups": [],
+  "follow_ups": ["Keep #239/#241 open until merged packaged App live Xiaohongshu search-to-detail E2E supplies real refs."],
   "consumed_inputs": {
     "work_item": ".loom/work-items/APP-239.md",
     "recovery_entry": ".loom/progress/APP-239.md",
     "status_surface": ".loom/status/current.md",
-    "build_checkpoint": "pass",
-    "budget_risk": {
-      "schema_version": "loom-execution-budget-risk/v1",
-      "status": "not_applicable",
-      "enforcement": "advisory",
-      "highest_risk": "none",
-      "risk_dimensions": [],
-      "summary": "execution budget is not_applicable; budget risk remains advisory and non-blocking",
-      "budget_summary": "execution budget is not collected for this invocation.",
-      "adapter_evidence_locator": "",
-      "provenance": {
-        "source": "github_host"
-      }
-    },
-    "engine_adapter": null,
-    "engine_evidence": null,
-    "normalized_findings": null,
-    "suite_evidence_validation": "loom suite evidence validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-official-chrome-readonly --item APP-239 --json",
-    "suite_carrier_validation": "loom suite carrier validate --target /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-official-chrome-readonly --item APP-239 --json",
+    "build_checkpoint": ".loom/specs/APP-239/build-evidence.json",
+    "suite_validation": "loom suite validate --target . --item APP-239 --json",
+    "suite_carrier_validation": "loom suite carrier validate --target . --item APP-239 --json",
     "suite_evidence_map": ".loom/specs/APP-239/evidence-map.md",
-    "suite_consistency_analysis": null,
-    "suite_task_carriers": [
-      ".loom/specs/APP-239/task-carrier.md"
-    ],
-    "suite_evidence_consumed_contracts": [
-      "docs/methodology/harness/full-spec-suite-cli-surface.md",
-      "docs/methodology/templates/evidence-map.md"
-    ],
-    "suite_carrier_consumed_contracts": [
-      "docs/methodology/harness/task-carrier-contract.md",
-      "docs/methodology/templates/execution-breakdown.md",
-      "docs/methodology/harness/full-spec-suite-cli-surface.md"
-    ]
+    "suite_task_carriers": [".loom/specs/APP-239/task-carrier.md"]
   },
   "semantic_review_disposition": {
     "status": "passed",
-    "reason": "Authored implementation review approved the current head for merge checkpoint consumption."
+    "reason": "Only strict Core-live targets create commands; exact detail outcomes are projected; resume is zero-POST; BOSS remains deferred."
   }
 }

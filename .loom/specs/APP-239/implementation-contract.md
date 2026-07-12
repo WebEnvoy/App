@@ -1,31 +1,8 @@
-# Implementation Contract
+# APP-239 Implementation Contract
 
-## Work Item
-
-- Item: APP-239
-- Anchor Issue: #239
-- Covered Issues: #238, #239, #240, #241, #242
-- Branch: work/app-239-real-read-results
-- Workspace: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results
-
-## Approved Scope
-
-- In Scope: App renderer/client/copy/smoke/carrier changes for real read-only result display.
-- Out Of Scope: Core/Harbor/Lode changes; App #243 write-precheck display; real browser/profile/account operation; sensitive material custody; raw evidence body rendering; push/PR/merge/closeout.
-
-## Validation Plan
-
-- npm run typecheck
-- npm run smoke
-- git diff --check
-
-## Risks And Rollback
-
-- Risk: a running Core endpoint may not yet expose the local file-backed run store expected by `/capability-runs`; App keeps offline fallback and labels it.
-- Risk: Core result payload state is `not_persisted_in_core`, so App displays result envelope/ref facts rather than raw field payloads.
-- Rollback Boundary: revert this branch; no external state, credentials, cookies, tokens, profile storage, raw evidence, Core truth, Harbor truth, or Lode truth is modified by the repository change.
-
-## Host Binding
-
-- Pull Request: not_created
-- Reviewed Head: pending
+- Anchor: App #239; covered closeout candidates: #239 and #241.
+- Branch: `work/app-239-xhs-detail-handoff`; workspace: `.`.
+- Allowed writes: existing App Core read/submit clients, Task Thread state/UI, bounded fixture/type cleanup, focused smoke, and APP-239 item-specific carriers.
+- Preserve: Core/Harbor/Lode ownership, existing polling/result UI, XHS search, APP-290 BOSS deferred zero-fetch behavior, refs-only display, and fail-closed runtime gate.
+- Prohibit: manual target URL/note/xsec synthesis, fixture-ready production state, raw evidence, sensitive material, BOSS production, automatic login, external write, bulk collection, or cross-repository edits.
+- Validation: `npm run typecheck`, `npm run smoke`, packaged smokes, `git diff --check`, independent review, hosted gate, and merged packaged App live E2E.

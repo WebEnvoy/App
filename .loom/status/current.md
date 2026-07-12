@@ -2,34 +2,34 @@
 
 ## Derived Fact Chain View
 
-- Item ID: APP-290
-- Goal: Disable BOSS production task commands by default and present the exact access-limited deferred state without hiding identity/session or historical failure diagnostics.
-- Scope: BOSS search/detail/write-precheck App entry gating, deferred task/Library projection, Core submit fail-closed behavior, historical failure diagnostics, and focused smoke coverage.
-- Execution Path: work/app-290-boss-deferred-ui
+- Item ID: APP-239
+- Goal: Let users select a Core-projected Xiaohongshu opaque search target, run one note-detail task, and inspect Core-owned result/source/evidence/post-check/session refs.
+- Scope: Ownership remains in App for owner-result parsing, bounded opaque target selection, exact detail submit, task polling, existing result/evidence UI projection, and focused smoke coverage for #239/#241.
+- Execution Path: work/app-239-xhs-detail-handoff
 - Workspace Entry: .
-- Recovery Entry: .loom/progress/APP-290.md
-- Review Entry: .loom/reviews/APP-290.json
-- Validation Entry: .loom/specs/APP-290/build-evidence.json; npm run typecheck; npm run smoke; npm run smoke:packaged; npm run smoke:packaged:readonly; git diff --check
-- Closing Condition: PR #291 merged after current-head review and hosted gate; close #290 only after Core #281 is merged and packaged App confirms the disabled state.
-- Current Checkpoint: merge
-- Current Stop: Head `f23cf29f4e56d1432277ead5d88b1b57c1e037e9` passed authoritative smoke and independent final re-review with no findings after two review fixes.
-- Next Step: Commit/push review carrier sync, consume hosted gate, and controlled-merge PR #291. Keep #290 open until Core #281 is merged and packaged App acceptance passes.
-- Blockers: Core #281 remains open for final product closeout. Lode #273 was consumed at merge `f45b17990a6b1451a7a0ff55ec110c310e66f196`.
-- Latest Validation Summary: 2026-07-12T10:25Z: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged`, `npm run smoke:packaged:readonly`, and `git diff --check` passed. BOSS commands return the exact deferred reason and issue zero owner requests; fixture/live success is excluded, historical Core-live failure diagnostics retain provenance/time/class, XHS is unchanged, and no production page/account/profile/sensitive-material action occurred.
-- Recovery Boundary: Revert only APP-290 product/carriers. Do not change Core/Harbor/Lode, access a production site, or claim BOSS runtime usability.
-- Current Lane: APP-290 BOSS deferred App surface.
+- Recovery Entry: .loom/progress/APP-239.md
+- Review Entry: .loom/reviews/APP-239.json
+- Validation Entry: npm run typecheck; npm run smoke; packaged smoke; git diff --check; merged packaged App Computer Use E2E
+- Closing Condition: PR-ready and merged App detail handoff; #239/#241 stay open until merged packaged App proves live Xiaohongshu search-to-detail refs.
+- Current Checkpoint: implementation
+- Current Stop: Product head `9412b7f9cc921066d404744c079475faf327beb9` passed local and packaged validation plus independent semantic review with no blocking findings.
+- Next Step: Commit current-head carriers, create the stacked APP-239 PR, and consume hosted checks. Keep #239/#241 open for merged packaged live E2E.
+- Blockers: APP-290 / PR #291 must merge before this stacked PR can target main. Core #270 implementation is merged as `795059d6ac08df10e26f89789a675614c738c1ca`.
+- Latest Validation Summary: 2026-07-12T14:29Z at product head `9412b7f9cc921066d404744c079475faf327beb9`: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged`, `WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 npm run smoke:packaged:readonly`, and `git diff --check` passed using Core #270 and Harbor #252 packaged sources. Independent review returned ALLOW after exact Core envelope, strict detail normalization, resume zero-POST, concurrency, UUID, fixture isolation, and BOSS deferred checks.
+- Recovery Boundary: Revert only APP-239 detail-handoff code and item-specific carriers. Do not modify Core/Harbor/Lode, access BOSS production, or execute external writes.
+- Current Lane: APP-239 Xiaohongshu opaque-ref detail handoff.
 
 ## Runtime Evidence
 
-- Run Entry: no live run; automated zero-request deferred regression only
-- Logs Entry: scripts/smoke.mjs
-- Diagnostics Entry: src/renderer/coreTaskSubmitClient.ts
-- Verification Entry: .loom/specs/APP-290/build-evidence.json
-- Lane Entry: .loom/specs/APP-290/plan.md
+- Run Entry: no live detail run during implementation; merged packaged App E2E required for closeout
+- Logs Entry: scripts/smoke.mjs; packaged runtime smoke at product head `9412b7f9cc921066d404744c079475faf327beb9`
+- Diagnostics Entry: src/renderer/coreReadTaskClient.ts; src/renderer/coreTaskSubmitClient.ts
+- Verification Entry: .loom/specs/APP-239/build-evidence.json
+- Lane Entry: .loom/specs/APP-239/plan.md
 
 ## Sources
 
-- Static Truth: .loom/work-items/APP-290.md
-- Dynamic Truth: .loom/progress/APP-290.md
+- Static Truth: .loom/work-items/APP-239.md
+- Dynamic Truth: .loom/progress/APP-239.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json
