@@ -22,6 +22,7 @@ import type {
   IdentityStatus,
   IdentityTaskEntryProjection,
 } from "./identityEnvironmentFixtures";
+import { readOnlyIdentityAdmissionBlockReason } from "./coreTaskSubmitClient";
 import { manualAuthenticationCompletionBlockReason } from "./harborIdentityClient";
 
 const controllerModes = [
@@ -55,7 +56,6 @@ export function BrowserLaunchPanel({
   const canControl = session.state === "running" || session.state === "takeover";
   const canView = session.state !== "idle" && session.state !== "stopped";
   const runtimeBlocked = identity.source === "App runtime supervisor";
-  const taskBlockReason = readTaskBlockReason(identity);
 
   return (
     <section className="identity-browser-panel" aria-label="身份浏览器会话">
@@ -79,7 +79,7 @@ export function BrowserLaunchPanel({
         entries={identity.taskEntries}
         isRuntimeBlocked={runtimeBlocked}
         onOpenTask={onOpenTask}
-        taskBlockReason={taskBlockReason}
+        taskBlockReason={(taskId) => readOnlyIdentityAdmissionBlockReason(identity, taskId)}
       />
       <SessionControlPanel
         canControl={canControl && !runtimeBlocked}
@@ -153,42 +153,31 @@ function ReadTaskEntryPanel({
   entries: IdentityTaskEntryProjection[];
   isRuntimeBlocked: boolean;
   onOpenTask: (taskId: string) => void;
-  taskBlockReason: string | null;
+  taskBlockReason: (taskId: string) => string | null;
 }) {
-  const disabledReason = isRuntimeBlocked ? null : taskBlockReason;
   return (
     <div className="identity-read-task-panel" aria-label="真实只读任务入口">
       <div>
         <strong>从身份浏览器会话启动真实只读任务</strong>
         <span>Core task path 才产生 Run / Result / Evidence；App 只读取 Core owner API projection。</span>
       </div>
-      {entries.map((entry) => (
-        <button type="button" disabled={isRuntimeBlocked || disabledReason != null} onClick={() => onOpenTask(entry.taskId)} key={entry.id}>
-          <Play size={15} />
-          <span>
-            {entry.label}
-            <small>{entry.inputSummary}</small>
-            {disabledReason != null ? <small>{disabledReason}</small> : null}
-            <small>{entry.readiness}</small>
-          </span>
-          <em>{entry.source}</em>
-        </button>
-      ))}
+      {entries.map((entry) => {
+        const disabledReason = isRuntimeBlocked ? null : taskBlockReason(entry.taskId);
+        return (
+          <button type="button" disabled={isRuntimeBlocked || disabledReason != null} onClick={() => onOpenTask(entry.taskId)} key={entry.id}>
+            <Play size={15} />
+            <span>
+              {entry.label}
+              <small>{entry.inputSummary}</small>
+              {disabledReason != null ? <small>{disabledReason}</small> : null}
+              <small>{entry.readiness}</small>
+            </span>
+            <em>{entry.source}</em>
+          </button>
+        );
+      })}
     </div>
   );
-}
-
-function readTaskBlockReason(identity: IdentityEnvironmentProjection) {
-  if (identity.source !== "Harbor live") {
-    return "缺少 Harbor live identity；fixture/local identity 只能管理或认证，不能启动真实 Core task。";
-  }
-  if (identity.login.recoveryRequired || identity.readiness.state === "needs-auth") {
-    return "需要先在 Harbor 身份浏览器完成登录/人工认证；未登录身份不能启动真实 Core task。";
-  }
-  if (identity.readiness.state !== "ready" || identity.provider.state !== "ready") {
-    return "身份环境尚未 ready；受限或告警状态不能直接启动真实 Core task。";
-  }
-  return null;
 }
 
 function SessionControlPanel({
