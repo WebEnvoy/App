@@ -1,10 +1,10 @@
 # Task Carrier
 
 - Item: APP-240
-- Branch: work/app-240-boss-job-search
-- Workspace: .
+- Branch: work/app-240-chrome-readonly-admission
+- Workspace: /Volumes/2T/dev/WebEnvoy/App.worktrees/app-240-chrome-readonly-admission
 - Checkpoint: implementation
-- Next: validate, commit, push, and open a ready PR without merge or issue closeout.
+- Next: validate, commit, push, and open a draft PR without merge or issue closeout; controller owns PR metadata and closeout.
 - Boundary: search only; Core #270 owns the future real `detail_ref` detail path.
 
 ## Carrier Rows

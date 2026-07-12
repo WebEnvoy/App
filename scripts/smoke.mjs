@@ -1184,6 +1184,16 @@ const readyBossIdentity = {
   origin: "https://www.zhipin.com",
   identityEnvironmentRef: "harbor://identity-environment/boss-contract",
 };
+const restrictedChromeBossIdentity = {
+  ...restrictedChromeIdentity,
+  siteId: "boss",
+  origin: "https://www.zhipin.com",
+  identityEnvironmentRef: "identity-env-live-boss-chrome-contract",
+  admissionFacts: {
+    ...restrictedChromeIdentity.admissionFacts,
+    warningReasonCodes: ["provider_conflict", "proxy_missing", "fingerprint_conflict"],
+  },
+};
 const bossSearchTask = {
   ...readonlySubmitTask,
   id: "task-boss-real-read",
@@ -1196,10 +1206,11 @@ const bossSearchTask = {
 const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   bossSearchTask,
   liveRuntimeForSubmit,
-  [readyBossIdentity],
+  [restrictedChromeBossIdentity],
 );
 if (
   !bossReadiness.ok ||
+  bossReadiness.identity.admissionFacts?.warningReasonCodes.includes("proxy_missing") !== true ||
   bossReadiness.payload.public_query?.query !== "前端工程师" ||
   bossReadiness.payload.public_query?.city_code !== "101020100" ||
   bossReadiness.payload.public_query?.page !== 1 ||
@@ -1212,6 +1223,28 @@ if (
   JSON.stringify(bossReadiness.payload).includes("read-job-detail")
 ) {
   throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
+}
+for (const [label, warningReasonCodes] of [
+  ["proxy-only", ["proxy_missing"]],
+  ["unknown warning", ["provider_conflict", "proxy_missing", "fingerprint_conflict", "other"]],
+]) {
+  const identity = {
+    ...restrictedChromeBossIdentity,
+    admissionFacts: { ...restrictedChromeBossIdentity.admissionFacts, warningReasonCodes },
+  };
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error(`Core BOSS submit smoke failed: restricted Chrome ${label} case was accepted.`);
+  }
+}
+const xhsMissingProxyIdentity = {
+  ...restrictedChromeIdentity,
+  admissionFacts: {
+    ...restrictedChromeIdentity.admissionFacts,
+    warningReasonCodes: ["provider_conflict", "proxy_missing", "fingerprint_conflict"],
+  },
+};
+if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveRuntimeForSubmit, [xhsMissingProxyIdentity]).ok) {
+  throw new Error("Core submit smoke failed: Xiaohongshu restricted Chrome with proxy_missing was accepted.");
 }
 for (const [length, accepted] of [[80, true], [81, false]]) {
   const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
@@ -1236,10 +1269,19 @@ for (const [label, businessInput] of invalidBossInputs) {
 }
 for (const identity of [
   { ...readyBossIdentity, source: "Harbor fixture" },
+  { ...readyBossIdentity, source: "App local-only" },
   { ...readyBossIdentity, login: { recoveryRequired: true }, readiness: { state: "needs-auth" } },
 ]) {
   if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
     throw new Error("Core BOSS submit smoke failed: fixture or unlogged identity was accepted.");
+  }
+}
+if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, { ...liveRuntimeForSubmit, canUseLiveRuntime: false }, [restrictedChromeBossIdentity]).ok) {
+  throw new Error("Core BOSS submit smoke failed: offline runtime was accepted.");
+}
+for (const id of ["task-boss-greeting-write-preview", "task-boss-job-search-bulk"]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, id }, liveRuntimeForSubmit, [restrictedChromeBossIdentity]).ok) {
+    throw new Error(`Core BOSS submit smoke failed: write/precheck/bulk task was admitted: ${id}`);
   }
 }
 

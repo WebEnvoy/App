@@ -247,9 +247,9 @@
     "mode": "active",
     "read_entry": "loom fact-chain --target . --json",
     "entry_points": {
-      "current_item_id": "APP-282",
-      "work_item": ".loom/work-items/APP-282.md",
-      "recovery_entry": ".loom/progress/APP-282.md",
+      "current_item_id": "APP-240",
+      "work_item": ".loom/work-items/APP-240.md",
+      "recovery_entry": ".loom/progress/APP-240.md",
       "status_surface": ".loom/status/current.md"
     }
   },

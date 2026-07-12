@@ -63,7 +63,8 @@ type CoreTaskSubmitOptions = {
 
 const sensitivePayloadPattern =
   /\b(token|cookie|secret|bearer|credential|password|authorization|profile_storage|raw_evidence|dom|har|trace)\b/i;
-const allowedRestrictedFallbackWarnings = new Set(["provider_conflict", "fingerprint_conflict"]);
+const requiredRestrictedFallbackWarnings = ["provider_conflict", "fingerprint_conflict"];
+const allowedRestrictedFallbackWarnings = new Set(requiredRestrictedFallbackWarnings);
 const supportedBossCityCodes = new Set(["101020100"]);
 
 export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
@@ -101,7 +102,7 @@ export function coreTaskSubmitReadiness(
     (item) =>
       item.source === "Harbor live" &&
       item.siteId === site &&
-      isReadOnlyIdentityAdmitted(item),
+      isReadOnlyIdentityAdmitted(item, site, spec),
   );
   if (!identity) {
     return { ok: false, reason: "缺少符合只读 admission 的 Harbor live identity；未证明的 warning、needs-auth、fixture/local identity 不可提交真实任务。" };
@@ -204,7 +205,11 @@ export function parseBossJobSearchInput(value: string):
   return { ok: true, value: { query, city_code: record.city_code, page: 1, limit } };
 }
 
-function isReadOnlyIdentityAdmitted(identity: IdentityEnvironmentProjection) {
+function isReadOnlyIdentityAdmitted(
+  identity: IdentityEnvironmentProjection,
+  site: "xiaohongshu" | "boss",
+  spec: CoreReadTaskSpec,
+) {
   if (
     identity.readiness.state === "ready" &&
     identity.provider.state === "ready" &&
@@ -213,6 +218,11 @@ function isReadOnlyIdentityAdmitted(identity: IdentityEnvironmentProjection) {
     return true;
   }
   const facts = identity.admissionFacts;
+  const warnings = facts?.warningReasonCodes ?? [];
+  const allowsMissingProxy =
+    site === "boss" &&
+    spec.taskId === "task-boss-real-read" &&
+    spec.capabilities.some((capability) => capability.capabilityRef === "lode:capability/job-search");
   return (
     identity.readiness.state === "warning" &&
     identity.provider.state === "warning" &&
@@ -223,8 +233,8 @@ function isReadOnlyIdentityAdmitted(identity: IdentityEnvironmentProjection) {
     facts.manualAuthenticationState === "completed" &&
     facts.recoveryRequired === false &&
     facts.browserStorageState === "present" &&
-    facts.warningReasonCodes.length > 0 &&
-    facts.warningReasonCodes.every((code) => allowedRestrictedFallbackWarnings.has(code))
+    requiredRestrictedFallbackWarnings.every((code) => warnings.includes(code)) &&
+    warnings.every((code) => allowedRestrictedFallbackWarnings.has(code) || (allowsMissingProxy && code === "proxy_missing"))
   );
 }
 
