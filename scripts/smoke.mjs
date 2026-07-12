@@ -1143,6 +1143,84 @@ if (JSON.stringify(submitReadiness.payload).includes(readonlySubmitTask.business
   throw new Error("Core submit smoke failed: free-form businessInput leaked into the payload.");
 }
 
+const writePrecheckTask = {
+  ...readonlySubmitTask,
+  id: "task-xhs-publish-write-preview",
+  title: "小红书发布草稿写前验证",
+  siteSkill: "小红书发布草稿写前预览",
+  businessInput: "禁止泄漏的真实草稿内容",
+  packageSource: {
+    sourceRef: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+    lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1",
+  },
+};
+const writePrecheckReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  writePrecheckTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+if (
+  !writePrecheckReadiness.ok ||
+  writePrecheckReadiness.payload.package_ref !== "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0" ||
+  writePrecheckReadiness.payload.task_intent.policy.execution_intent !== "validate_only" ||
+  writePrecheckReadiness.payload.task_intent.scope.target_ref !== writePrecheckReadiness.payload.validate_only?.url ||
+  writePrecheckReadiness.payload.task_intent.capability.lock_ref !== "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1" ||
+  writePrecheckReadiness.payload.validate_only?.no_submit_guard !== "active" ||
+  Object.keys(writePrecheckReadiness.payload.validate_only ?? {}).some((key) => !["url", "target_ref", "no_submit_guard", "requested_fields", "include_source_refs", "proposed_input_summary"].includes(key)) ||
+  JSON.stringify(writePrecheckReadiness.payload).includes(writePrecheckTask.businessInput) ||
+  /publish|save|upload|submit|schedule/i.test(Object.keys(writePrecheckReadiness.payload).join(" "))
+) {
+  throw new Error(`Core write-precheck submit smoke failed: ${JSON.stringify(writePrecheckReadiness)}`);
+}
+if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, { ...liveRuntimeForSubmit, canUseLiveRuntime: false }, [readyXhsIdentity]).ok) {
+  throw new Error("Core write-precheck submit smoke failed: unavailable runtime did not fail closed.");
+}
+for (const [label, task] of [
+  ["missing lock", { ...writePrecheckTask, packageSource: { ...writePrecheckTask.packageSource, lockRef: undefined } }],
+  ["drifted lock", { ...writePrecheckTask, packageSource: { ...writePrecheckTask.packageSource, lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.0" } }],
+  ["drifted package", { ...writePrecheckTask, packageSource: { ...writePrecheckTask.packageSource, sourceRef: "lode://site-capability/xiaohongshu/other@0.1.0" } }],
+]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(task, liveRuntimeForSubmit, [readyXhsIdentity]).ok) {
+    throw new Error(`Core write-precheck submit smoke failed: ${label} was accepted.`);
+  }
+}
+for (const [label, identity] of [
+  ["missing admission facts", { ...readyXhsIdentity, admissionFacts: undefined }],
+  ["unconfirmed provenance", { ...readyXhsIdentity, admissionFacts: { ...readyXhsIdentity.admissionFacts, authenticationProvenance: null } }],
+  ["missing storage", { ...readyXhsIdentity, storage: { ...readyXhsIdentity.storage, profileStorage: "缺失" } }],
+  ["missing execution ref", { ...readyXhsIdentity, executionIdentityRef: "" }],
+]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error(`Core write-precheck identity smoke failed: ${label} was accepted.`);
+  }
+}
+const writePrecheckChromeIdentity = {
+  ...readyXhsIdentity,
+  provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", role: "受限后备", state: "warning" },
+  readiness: { ...readyXhsIdentity.readiness, state: "warning" },
+  admissionFacts: {
+    ...readyXhsIdentity.admissionFacts,
+    providerId: "chrome_official",
+    providerRole: "restricted_fallback",
+    warningReasonCodes: ["provider_conflict", "fingerprint_conflict"],
+  },
+};
+if (!coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, liveRuntimeForSubmit, [writePrecheckChromeIdentity]).ok) {
+  throw new Error("Core write-precheck identity smoke failed: proven official Chrome fallback was blocked.");
+}
+for (const [label, warnings] of [
+  ["missing warning", ["provider_conflict"]],
+  ["extra warning", ["provider_conflict", "fingerprint_conflict", "proxy_missing"]],
+]) {
+  const identity = {
+    ...writePrecheckChromeIdentity,
+    admissionFacts: { ...writePrecheckChromeIdentity.admissionFacts, warningReasonCodes: warnings },
+  };
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error(`Core write-precheck official Chrome smoke failed: ${label} was accepted.`);
+  }
+}
+
 const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   readonlySubmitTask,
   liveRuntimeForSubmit,
@@ -1386,7 +1464,7 @@ for (const id of ["task-boss-greeting-write-preview", "task-boss-job-search-bulk
 }
 
 const promotedTask = coreTaskSubmitClientModule.promoteSubmittedCoreTask(
-  { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", runs: [{ id: "fixture-run", source: "Core fixture" }] },
+  { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", blocker: "fixture runtime unavailable", runs: [{ id: "fixture-run", source: "Core fixture" }] },
   { id: "live-run", source: "Core live" },
 );
 if (
@@ -1394,6 +1472,7 @@ if (
   promotedTask.identitySource !== "Harbor live" ||
   promotedTask.runs.length !== 1 ||
   promotedTask.runs[0]?.id !== "live-run" ||
+  promotedTask.blocker !== undefined ||
   promotedTask.packageSource.lockRef !== readonlySubmitTask.packageSource.lockRef
 ) {
   throw new Error(`Core submit smoke failed: live promotion retained fixture history or rewrote Lode provenance: ${JSON.stringify(promotedTask)}`);
@@ -1612,6 +1691,7 @@ const failedRun = {
   },
 };
 const failedSubmitCalls = [];
+let strictBackgroundWriteProjection = true;
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   failedSubmitCalls.push(pathname);
@@ -2282,10 +2362,10 @@ const writePreviewRuns = [
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:00:04.000Z", terminal_at: "2026-07-06T11:00:04.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
     runtime_refs: {
@@ -2298,10 +2378,10 @@ const writePreviewRuns = [
     status: "cancelled",
     timeline: { updated_at: "2026-07-06T11:03:02.000Z", terminal_at: "2026-07-06T11:03:02.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
   },
@@ -2311,10 +2391,10 @@ const writePreviewRuns = [
     status: "expired",
     timeline: { updated_at: "2026-07-06T11:14:01.000Z", terminal_at: "2026-07-06T11:14:01.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
   },
@@ -2324,10 +2404,10 @@ const writePreviewRuns = [
     status: "failed",
     timeline: { updated_at: "2026-07-06T11:15:01.000Z", terminal_at: "2026-07-06T11:15:01.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
   },
@@ -2428,7 +2508,7 @@ const bossWritePreviewRuns = [
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   const runId = decodeURIComponent(pathname.match(/\/runs\/([^/]+)/)?.[1] ?? "");
-  const json = pathname.includes("/capability-runs") && pathname.includes("xiaohongshu-draft-precheck")
+  const json = pathname.includes("/capability-runs") && pathname.includes("publish-note-precheck")
     ? { ok: true, capability_runs: { runs: writePreviewRuns } }
     : pathname.includes("/capability-runs") && pathname.includes("boss-greeting-precheck")
     ? { ok: true, capability_runs: { runs: bossWritePreviewRuns } }
@@ -2648,15 +2728,40 @@ globalThis.fetch = async (url) => {
                 state: "available",
                 submitted: false,
                 expected_change: {
-                  summary: "预览小红书草稿编辑器可写字段和预期草稿变化，不保存、不发布。",
-                  target_ref: "harbor:writable-target/xiaohongshu/draft-editor",
+                  summary: "创作入口已确认，未执行上传、生成、保存或发布。标题、正文和发布控件尚未出现，因此未验证。",
+                  target_ref: "writable-target:xiaohongshu/creator-publish-note",
                   external_submit: false,
+                  identity_ref: "identity-env_xhs_live",
+                  page_ref: "page_ref_xhs_creator",
+                  merged_head_ref: "749aff88309b26013cbd24ce1308ca213804a459",
+                  semantic_sha256: strictBackgroundWriteProjection ? "9852721d7b4f803c9a206ab86cacf8a0ae7b33ff1163d354c0fdeaee79173d2f" : undefined,
+                  run_ref: runId,
+                  classification: "partial_result",
+                  precheck_scope: "entrypoint_only",
+                  composition_state: "composition_not_initialized",
+                  entrypoint_observations: {
+                    route_loaded: true,
+                    user_confirmed_identity: true,
+                    challenge_absent: true,
+                    publish_vue_container_visible: true,
+                    upload_image_tab_active: true,
+                    upload_image_entry_visible: true,
+                    text_image_entry_visible: true,
+                  },
+                  prohibited_actions_observed: { upload: false, generate: false, save: false, publish: false },
+                  field_states: ["title_input", "content_editor", "publish_control"].map((field) => ({
+                    field,
+                    availability: "unavailable",
+                    observation: "not_observed",
+                  })),
+                  harbor_result_ref: "harbor_result_xhs_precheck",
+                  submitted_result_ref: "submitted_result_xhs_false",
                 },
                 action_refs: { action_request_id: "action-request:intent_real_site_xiaohongshu_draft_preview" },
                 capability: {
-                  capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+                  capability_ref: "lode:capability/publish-note-precheck",
                   capability_version: "0.1.0",
-                  capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+                  capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
                 },
                 evidence_refs: [
                   "harbor:evidence/xiaohongshu/draft-editor/precheck",
@@ -2725,7 +2830,13 @@ const writePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState(
     runs: [],
   },
 ]);
+strictBackgroundWriteProjection = false;
+const driftedWritePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", writePreviewState.tasks);
 globalThis.fetch = originalFetch;
+
+if (driftedWritePreviewState.liveTaskIds.includes("task-xhs-publish-write-preview")) {
+  throw new Error("Core write-precheck smoke failed: background refresh promoted a projection without the strict Lode pin.");
+}
 
 const writePreviewTask = writePreviewState.tasks.find((task) => task.id === "task-xhs-publish-write-preview");
 const bossWritePreviewTask = writePreviewState.tasks.find((task) => task.id === "task-boss-greeting-write-preview");
@@ -2738,6 +2849,9 @@ const writePreviewStates = writePreviewTask.runs.map((run) => run.writePrecheck?
 
 if (writePreviewState.status !== "ready" || writePreviewTask.source !== "Core live" || bossWritePreviewTask.source !== "Core live") {
   throw new Error("Core write-precheck smoke failed: live Core projection was not applied.");
+}
+if (writePreviewTask.blocker !== undefined) {
+  throw new Error("Core write-precheck smoke failed: fallback blocker survived a live owner projection.");
 }
 
 for (const expectedState of ["available", "user_cancelled", "expired", "page_changed"]) {
@@ -2753,9 +2867,43 @@ if (!writePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label 
 if (!writePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/xiaohongshu/draft-editor/preview-result-only"))) {
   throw new Error("Core write-precheck smoke failed: preview_result evidence_refs were dropped.");
 }
+if (!writePreviewTask.runs.some((run) => run.writePrecheck?.diffRows.some((row) => row.label === "submitted_result_ref" && row.after === "submitted_result_xhs_false"))) {
+  throw new Error("Core write-precheck smoke failed: expected_change owner refs were not projected.");
+}
+const strictWriteTruth = writePreviewTask.runs.find((run) => run.writePrecheck?.ownerTruth?.status === "succeeded")?.writePrecheck?.ownerTruth;
+if (!strictWriteTruth) throw new Error("Core write-precheck smoke failed: strict owner truth is missing.");
+const strictWriteRun = { writePrecheck: { ownerTruth: strictWriteTruth } };
+if (!coreTaskSubmitClientModule.isStrictWritePrecheckProjection(strictWriteRun, strictWriteTruth.runRef)) {
+  throw new Error(`Core write-precheck smoke failed: complete strict owner truth was rejected: ${JSON.stringify(strictWriteTruth)}`);
+}
+for (const [label, change] of [
+  ["terminal", { terminal: false }],
+  ["status", { status: "running" }],
+  ["submitted", { submitted: true }],
+  ["classification", { classification: "success_result" }],
+  ["precheck_scope", { precheckScope: "field_level" }],
+  ["composition_state", { compositionState: "initialized" }],
+  ["identity_ref", { identityRef: "" }],
+  ["page_ref", { pageRef: "" }],
+  ["merged_head_ref", { mergedHeadRef: "not-a-head" }],
+  ["semantic_sha256", { semanticSha256: "0".repeat(64) }],
+  ["run_ref", { runRef: "other_run" }],
+  ["harbor_result_ref", { harborResultRef: "" }],
+  ["submitted_result_ref", { submittedResultRef: "" }],
+  ["evidence_refs", { evidenceRefs: [] }],
+  ["field_states", { fieldStates: strictWriteTruth.fieldStates.slice(0, 2) }],
+  ["entrypoint_observations", { entrypointObservations: { ...strictWriteTruth.entrypointObservations, uploadImageEntryVisible: false } }],
+  ["prohibited_actions", { prohibitedActionsObserved: { ...strictWriteTruth.prohibitedActionsObserved, upload: true } }],
+]) {
+  const run = { writePrecheck: { ownerTruth: { ...strictWriteTruth, ...change } } };
+  if (coreTaskSubmitClientModule.isStrictWritePrecheckProjection(run, strictWriteTruth.runRef)) {
+    throw new Error(`Core write-precheck strict projection smoke failed: ${label} conflict was accepted.`);
+  }
+}
 
-if (!writePreviewTask.runs.some((run) => run.approval?.statuses.some((status) => status.status === "pending"))) {
-  throw new Error("Core write-precheck smoke failed: pending approval state is missing.");
+const entrypointPartialRun = writePreviewTask.runs.find((run) => run.writePrecheck?.ownerTruth?.classification === "partial_result");
+if (!entrypointPartialRun || entrypointPartialRun.lifecycle !== "completed" || entrypointPartialRun.outcome !== "partial" || entrypointPartialRun.approval || entrypointPartialRun.writePrecheck?.submittedLabel !== "false / 未发布" || entrypointPartialRun.writePrecheck?.stateNote !== "创作入口已确认，未执行上传、生成、保存或发布。标题、正文和发布控件尚未出现，因此未验证。") {
+  throw new Error(`Core write-precheck smoke failed: entrypoint-only partial result was presented as field-level success or approval: ${JSON.stringify(entrypointPartialRun)}`);
 }
 
 if (bossWritePreviewTask.runs.some((run) => run.lifecycle !== "blocked" || run.approval?.statuses.some((status) => status.status === "pending"))) {
@@ -3148,5 +3296,5 @@ async function startJsonServer(bodyForPath) {
   };
 }
 
-console.log("WebEnvoy desktop shell smoke passed.");
+console.log("WebEnvoy source-contract/build smoke passed; packaged runtime assets are not cross-repository integration evidence.");
 process.exit(0);

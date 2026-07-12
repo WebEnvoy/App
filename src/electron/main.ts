@@ -120,16 +120,10 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         };
         const readRuntimeSupervisorState = async () => {
           if (!shell?.getRuntimeSupervisorState) return null;
-          let latest = null;
-          for (let attempt = 0; attempt < 12; attempt += 1) {
-            latest = await shell.getRuntimeSupervisorState({
-              coreEndpoint: ${JSON.stringify(packagedSmokeCoreEndpoint)},
-              harborEndpoint: ${JSON.stringify(packagedSmokeHarborEndpoint)}
-            });
-            if (${JSON.stringify(packagedSmokeRuntimeExpectation)} !== "live_ready" || latest?.canUseLiveRuntime) return latest;
-            await new Promise((resolve) => setTimeout(resolve, 750));
-          }
-          return latest;
+          return shell.getRuntimeSupervisorState({
+            coreEndpoint: ${JSON.stringify(packagedSmokeCoreEndpoint)},
+            harborEndpoint: ${JSON.stringify(packagedSmokeHarborEndpoint)}
+          });
         };
         const runtimeSupervisorState = await readRuntimeSupervisorState();
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
