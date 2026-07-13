@@ -155,13 +155,14 @@ export function TaskThreadComposer({
               data-webenvoy-composer=""
               type="text"
               value={bossValues.query}
+              disabled={isBusy}
               maxLength={80}
               onChange={(event) => updateBossInput({ query: event.currentTarget.value })}
             />
           </label>
           <label style={{ display: "grid", flex: "0 0 96px", gap: 2 }}>
             <span>城市</span>
-            <select value={bossValues.city_code} onChange={(event) => updateBossInput({ city_code: event.currentTarget.value })}>
+            <select disabled={isBusy} value={bossValues.city_code} onChange={(event) => updateBossInput({ city_code: event.currentTarget.value })}>
               <option value="101020100">上海</option>
             </select>
           </label>
@@ -173,6 +174,7 @@ export function TaskThreadComposer({
               max={15}
               step={1}
               value={bossValues.limit}
+              disabled={isBusy}
               onChange={(event) => updateBossInput({ limit: Math.min(15, Math.max(1, Number(event.currentTarget.value) || 1)) })}
             />
           </label>
@@ -184,6 +186,7 @@ export function TaskThreadComposer({
           ref={inputRef}
           data-webenvoy-composer=""
           value={businessInput}
+          disabled={isBusy}
           rows={2}
           onChange={(event) => onBusinessInputChange(event.currentTarget.value)}
           placeholder="当前任务的结构化业务输入"

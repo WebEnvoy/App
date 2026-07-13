@@ -157,6 +157,13 @@ export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
   summary: "真实只读任务尚未提交；按钮只在 Core admission、Harbor live identity 和只读 submit spec 都可用时启用。",
 };
 
+export function coreTaskSubmitFailureState(_error: unknown): CoreTaskSubmitState {
+  return {
+    status: "failed",
+    summary: "Core owner 请求异常；App 未应用未确认的提交结果。",
+  };
+}
+
 export function coreTaskSubmitReadiness(
   task: TaskProjection,
   runtime: RuntimeSupervisorState,
@@ -455,7 +462,7 @@ export async function submitCoreReadOnlyTask(
       status: "failed",
       runId,
       ...(projection.ok ? { run: projection.run } : {}),
-      summary: responseError(submitResponse, "Core /tasks did not accept the read-only task."),
+      summary: "Core /tasks did not accept the read-only task.",
     };
   }
 
@@ -523,7 +530,7 @@ export async function submitCoreXhsDetailTask(
   }
   const response = await requestJson(endpoint, "/tasks", { method: "POST", body: JSON.stringify(payload) });
   const submittedRunId = runIdFromSubmitResponse(response) ?? runId;
-  if (!isOkResponse(response)) return { status: "failed", runId: submittedRunId, summary: responseError(response, "Core /tasks 未接受详情任务。") };
+  if (!isOkResponse(response)) return { status: "failed", runId: submittedRunId, summary: "Core /tasks 未接受详情任务。" };
   const projected = await pollSubmittedRun(endpoint, submittedRunId, {
     ...searchReadiness.spec,
     capabilities: [detailCapability],
@@ -670,13 +677,6 @@ function runIdFromSubmitResponse(value: unknown): string | undefined {
 
 function isOkResponse(value: unknown) {
   return isRecord(value) && value.ok === true;
-}
-
-function responseError(value: unknown, fallback: string) {
-  if (!isRecord(value)) return fallback;
-  const body = recordValue(value.body);
-  const error = recordValue(body?.error) ?? recordValue(body?.failure) ?? recordValue(value.error) ?? recordValue(value.failure);
-  return stringValue(error?.message) ?? stringValue(error?.code) ?? stringValue(value.error) ?? fallback;
 }
 
 function recordValue(value: unknown): Record<string, unknown> | null {

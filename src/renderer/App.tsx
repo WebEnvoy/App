@@ -27,6 +27,7 @@ import {
 } from "./coreReadTaskClient";
 import {
   coreTaskSubmitReadiness,
+  coreTaskSubmitFailureState,
   initialCoreTaskSubmitState,
   isBossDeferredTask,
   projectDeferredBossTask,
@@ -201,6 +202,8 @@ export function App() {
     coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
   );
   const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
+  const coreSubmitInFlightByKey = useRef(new Map<string, number>());
+  const coreSubmitSequence = useRef(0);
   const [detailSubmitStatesByRef, setDetailSubmitStatesByRef] = useState<Record<string, CoreTaskSubmitState>>({});
   const detailInFlightRefs = useRef(new Set<string>());
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
@@ -492,10 +495,12 @@ export function App() {
       ...current,
       [taskId]: value,
     }));
-    setCoreSubmitStatesByKey((current) => ({
-      ...current,
-      [submitKey]: initialCoreTaskSubmitState,
-    }));
+    if (!coreSubmitInFlightByKey.current.has(submitKey)) {
+      setCoreSubmitStatesByKey((current) => ({
+        ...current,
+        [submitKey]: initialCoreTaskSubmitState,
+      }));
+    }
   }
 
   async function submitSelectedCoreTask() {
@@ -514,6 +519,10 @@ export function App() {
       }));
       return;
     }
+    if (coreSubmitInFlightByKey.current.has(submitKey)) return;
+    const submitSequence = coreSubmitSequence.current + 1;
+    coreSubmitSequence.current = submitSequence;
+    coreSubmitInFlightByKey.current.set(submitKey, submitSequence);
 
     setCoreSubmitStatesByKey((current) => ({
       ...current,
@@ -524,25 +533,37 @@ export function App() {
           : "正在向 Core POST /tasks 提交只读 task intent。",
       },
     }));
-    const result = await submitCoreReadOnlyTask(
-      submitEndpoint,
-      submitTask,
-      runtimeSupervisorState,
-      harborIdentityState.identities,
-    );
-    setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
-    if ("run" in result && result.run) {
-      const run = result.run;
-      setSubmittedTaskOverrides((current) => ({
-        ...current,
-        [submitKey]: {
-          endpoint: submitEndpoint,
-          taskId: submitTask.id,
-          task: promoteSubmittedCoreTask(submitTask, run),
-        },
-      }));
-      if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
-        setSelectedRunId(run.id);
+    try {
+      let result: CoreTaskSubmitState;
+      try {
+        result = await submitCoreReadOnlyTask(
+          submitEndpoint,
+          submitTask,
+          runtimeSupervisorState,
+          harborIdentityState.identities,
+        );
+      } catch (error) {
+        result = coreTaskSubmitFailureState(error);
+      }
+      if (coreSubmitInFlightByKey.current.get(submitKey) !== submitSequence) return;
+      setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
+      if ("run" in result && result.run) {
+        const run = result.run;
+        setSubmittedTaskOverrides((current) => ({
+          ...current,
+          [submitKey]: {
+            endpoint: submitEndpoint,
+            taskId: submitTask.id,
+            task: promoteSubmittedCoreTask(submitTask, run),
+          },
+        }));
+        if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
+          setSelectedRunId(run.id);
+        }
+      }
+    } finally {
+      if (coreSubmitInFlightByKey.current.get(submitKey) === submitSequence) {
+        coreSubmitInFlightByKey.current.delete(submitKey);
       }
     }
   }
@@ -566,7 +587,7 @@ export function App() {
         ? await resumeCoreXhsDetailPolling(submitEndpoint, previous.runId)
         : await submitCoreXhsDetailTask(submitEndpoint, submitTask, detailRef, runtimeSupervisorState, harborIdentityState.identities);
     } catch (error) {
-      result = { status: "failed", ...(previous?.status === "polling" ? { runId: previous.runId } : {}), summary: `详情任务请求失败：${error instanceof Error ? error.message : "unknown error"}` };
+      result = { ...coreTaskSubmitFailureState(error), ...(previous?.status === "polling" ? { runId: previous.runId } : {}) };
     } finally {
       detailInFlightRefs.current.delete(detailRef);
     }

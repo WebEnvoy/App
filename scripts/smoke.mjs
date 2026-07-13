@@ -32,6 +32,7 @@ const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEn
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
 const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
+const taskThreadComposerSource = await readFile("src/renderer/TaskThreadComposer.tsx", "utf8");
 const siteSkillPagesSource = await readFile("src/renderer/SiteSkillPages.tsx", "utf8");
 const siteSkillFixturesSource = await readFile("src/renderer/siteSkillFixtures.ts", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
@@ -726,6 +727,22 @@ const coreTaskSubmitClientModuleUrl = `data:text/javascript;charset=utf-8,${enco
       ),
 )}`;
 const coreTaskSubmitClientModule = await import(coreTaskSubmitClientModuleUrl);
+
+const rejectedSubmitState = coreTaskSubmitClientModule.coreTaskSubmitFailureState(
+  new Error("token=must-not-reach-the-ui"),
+);
+if (
+  rejectedSubmitState.status !== "failed" ||
+  rejectedSubmitState.summary.includes("token=must-not-reach-the-ui") ||
+  !appSource.includes("coreSubmitInFlightByKey.current.has(submitKey)") ||
+  !appSource.includes("coreSubmitInFlightByKey.current.get(submitKey) !== submitSequence") ||
+  !appSource.includes("coreSubmitInFlightByKey.current.delete(submitKey)") ||
+  !appSource.includes("result = coreTaskSubmitFailureState(error)") ||
+  !appSource.includes("if (!coreSubmitInFlightByKey.current.has(submitKey))") ||
+  (taskThreadComposerSource.match(/disabled=\{isBusy\}/g) ?? []).length < 4
+) {
+  throw new Error("Core submit state smoke failed: owner rejection or same-key race can leave stale submitting state.");
+}
 
 const { outputText: siteSkillFixturesModuleSource } = ts.transpileModule(siteSkillFixturesSource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
@@ -1871,7 +1888,7 @@ globalThis.fetch = originalFetch;
 if (
   unreadableFailedRun.status !== "failed" ||
   unreadableFailedRun.run !== undefined ||
-  unreadableFailedRun.summary !== "runtime_unavailable"
+  unreadableFailedRun.summary !== "Core /tasks did not accept the read-only task."
 ) {
   throw new Error(`Core submit failure smoke failed: unreadable owner projection was promoted: ${JSON.stringify(unreadableFailedRun)}`);
 }
