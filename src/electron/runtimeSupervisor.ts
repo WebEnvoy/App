@@ -70,6 +70,8 @@ export type RuntimeSupervisorState = {
 type ProcessSnapshot = {
   processState: RuntimeProcessState;
   child?: ChildProcess;
+  awaitingStartupReadiness?: boolean;
+  startupReadiness?: Promise<{ health: RuntimeProbe; admission?: RuntimeProbe }>;
   endpoint?: string;
   supervisorToken?: string;
   outputRedactor?: RuntimeOutputRedactor;
@@ -91,6 +93,8 @@ const serviceHealthPaths: Record<RuntimeServiceId, string[]> = {
 
 const coreAdmissionPaths = ["/admission/health", "/admission/ready", "/tasks/admission/health"];
 const runtimeOutputRedactionCarryLength = 1024;
+const runtimeStartupReadinessTimeoutMs = 10_000;
+const runtimeStartupReadinessRetryDelayMs = 250;
 
 type RuntimeOutputRedactor = {
   write(chunk: string): string;
@@ -200,7 +204,20 @@ async function readServiceState(
     endpoint,
     supervisorToken,
   );
-  let health = await probeFirst(endpoint, serviceHealthPaths[id]);
+  let health: RuntimeProbe;
+  let admission: RuntimeProbe | undefined;
+  if (snapshot.awaitingStartupReadiness && !snapshot.startupReadiness) {
+    snapshot.startupReadiness = waitForStartupReadiness(id, endpoint, snapshot).finally(() => {
+      snapshot.awaitingStartupReadiness = false;
+      snapshot.startupReadiness = undefined;
+    });
+  }
+  if (snapshot.startupReadiness) {
+    ({ health, admission } = await snapshot.startupReadiness);
+  } else {
+    health = await probeFirst(endpoint, serviceHealthPaths[id]);
+    admission = id === "core" ? await probeFirst(endpoint, coreAdmissionPaths) : undefined;
+  }
   if (id === "harbor" && process.env.HARBOR_RUNTIME_PROVIDER === "fixture") {
     health = {
       ...health,
@@ -208,7 +225,6 @@ async function readServiceState(
       summary: "Harbor fixture runtime provider is contract-only and cannot be used as live browser evidence.",
     };
   }
-  const admission = id === "core" ? await probeFirst(endpoint, coreAdmissionPaths) : undefined;
   const processState = health.state === "ready" && snapshot.processState === "not_configured" ? "running" : snapshot.processState;
 
   return {
@@ -264,6 +280,7 @@ function ensureProcess(
       child,
       endpoint,
       processState: "starting",
+      awaitingStartupReadiness: true,
       supervisorToken,
       outputRedactor: createRuntimeOutputRedactor(supervisorToken),
       errorRedactor: createRuntimeOutputRedactor(supervisorToken),
@@ -298,6 +315,41 @@ function ensureProcess(
     processSnapshots.set(id, snapshot);
     return snapshot;
   }
+}
+
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function waitForStartupReadiness(
+  id: RuntimeServiceId,
+  endpoint: string,
+  snapshot: ProcessSnapshot,
+): Promise<{ health: RuntimeProbe; admission?: RuntimeProbe }> {
+  const deadline = Date.now() + runtimeStartupReadinessTimeoutMs;
+  let health: RuntimeProbe;
+  let admission: RuntimeProbe | undefined;
+
+  do {
+    health = await probeFirst(endpoint, serviceHealthPaths[id], deadline);
+    admission = id === "core" ? await probeFirst(endpoint, coreAdmissionPaths, deadline) : undefined;
+    if (
+      (health.state === "ready" && (admission == null || admission.state === "ready")) ||
+      snapshot.processState === "failed" ||
+      snapshot.processState === "exited" ||
+      (id === "harbor" && process.env.HARBOR_RUNTIME_PROVIDER === "fixture") ||
+      Date.now() >= deadline
+    ) break;
+    await delay(Math.min(runtimeStartupReadinessRetryDelayMs, Math.max(0, deadline - Date.now())));
+  } while (true);
+
+  if (Date.now() >= deadline && health.state !== "ready") {
+    health = { ...health, summary: `${health.summary} Managed ${serviceNames[id]} runtime did not reach readiness within ${runtimeStartupReadinessTimeoutMs}ms.` };
+  } else if (id === "core" && Date.now() >= deadline && admission?.state !== "ready") {
+    const unavailableAdmission = admission ?? await probeFirst(endpoint, coreAdmissionPaths, deadline);
+    admission = { ...unavailableAdmission, summary: `${unavailableAdmission.summary} Managed Core admission did not reach readiness within ${runtimeStartupReadinessTimeoutMs}ms.` };
+  }
+  return { health, admission };
 }
 
 export function runtimeSupervisorChildEnvironment(
@@ -388,11 +440,13 @@ function runtimeProcessEnvironment(
   };
 }
 
-async function probeFirst(endpoint: string, paths: string[]): Promise<RuntimeProbe> {
+async function probeFirst(endpoint: string, paths: string[], deadline?: number): Promise<RuntimeProbe> {
   const attempts: RuntimeProbe["attempts"] = [];
 
   for (const probePath of paths) {
-    const result = await probeEndpoint(endpoint, probePath);
+    const remaining = deadline == null ? 1500 : deadline - Date.now();
+    if (remaining <= 0) break;
+    const result = await probeEndpoint(endpoint, probePath, Math.min(1500, remaining));
     attempts.push({ url: result.url, statusCode: result.statusCode, summary: result.summary });
     const { continueFallback, ...probe } = result;
     if (result.state === "ready") return { ...probe, attempts };
@@ -408,9 +462,9 @@ async function probeFirst(endpoint: string, paths: string[]): Promise<RuntimePro
   };
 }
 
-async function probeEndpoint(endpoint: string, probePath: string): Promise<RuntimeProbeAttempt> {
+async function probeEndpoint(endpoint: string, probePath: string, timeoutMs = 1500): Promise<RuntimeProbeAttempt> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1500);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const url = `${endpoint}${probePath}`;
 
   try {

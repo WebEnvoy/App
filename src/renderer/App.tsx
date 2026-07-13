@@ -159,6 +159,36 @@ function readOnlyTaskId(taskId: string) {
   return milestone14TaskIds.has(taskId) && !taskId.includes("write-preview");
 }
 
+function disableFixtureWritePrecheck(task: TaskProjection): TaskProjection {
+  if (task.id !== "task-xhs-publish-write-preview" || task.source === "Core live") return task;
+  return {
+    ...task,
+    businessInput: "固定安全摘要；不会发送草稿内容",
+    blocker: "等待 Core、Harbor 和 Lode live runtime；fixture 写前验证已禁用。",
+    packageSource: {
+      ...task.packageSource,
+      capabilityRef: "lode:capability/publish-note-precheck",
+      sourceRef: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1",
+      source: "App local-only",
+      boundary: "仅用于提交固定 validate_only intent；产品结果必须来自 Core/Harbor/Lode owner refs。",
+    },
+    runs: [{
+      id: "xhs-write-precheck-live-required",
+      label: "等待真实写前验证",
+      lifecycle: "blocked",
+      outcome: "unavailable",
+      summary: "当前没有可展示的真实写前验证；fixture 不作为产品结果。",
+      actionIntent: "连接可用的 Core、Harbor 和 Lode runtime 后运行 validate_only precheck。",
+      owner: "Core",
+      source: "App local-only",
+      resultRows: [{ label: "Owner result", value: "尚无 owner result", source: "App local-only" }],
+      evidenceCards: [],
+      process: ["Fixture write-precheck projection disabled."],
+    }],
+  };
+}
+
 export function App() {
   const [shellContext, setShellContext] = useState<ShellContext | null>(null);
   const [connectionConfig, setConnectionConfig] = useState<LocalConnectionConfig>(
@@ -223,7 +253,7 @@ export function App() {
   const effectiveCoreReadTasks = useMemo(
     () =>
       effectiveCoreReadState.tasks.map((task) =>
-        applyLocalTaskContext(task, taskBusinessInputOverrides, harborIdentityState),
+        applyLocalTaskContext(disableFixtureWritePrecheck(task), taskBusinessInputOverrides, harborIdentityState),
       ),
     [effectiveCoreReadState.tasks, harborIdentityState, taskBusinessInputOverrides],
   );
@@ -489,7 +519,9 @@ export function App() {
       ...current,
       [submitKey]: {
         status: "submitting",
-        summary: "正在向 Core POST /tasks 提交只读 task intent。",
+        summary: submitTask.id === "task-xhs-publish-write-preview"
+          ? "正在向 Core POST /tasks 提交 validate_only 写前验证；不会发送草稿内容。"
+          : "正在向 Core POST /tasks 提交只读 task intent。",
       },
     }));
     const result = await submitCoreReadOnlyTask(
