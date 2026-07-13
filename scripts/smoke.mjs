@@ -4,6 +4,8 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
 const requiredFiles = [
@@ -30,6 +32,8 @@ const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEn
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
 const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
+const siteSkillPagesSource = await readFile("src/renderer/SiteSkillPages.tsx", "utf8");
+const siteSkillFixturesSource = await readFile("src/renderer/siteSkillFixtures.ts", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -706,9 +710,8 @@ const { outputText: coreTaskSubmitClientModuleSource } = ts.transpileModule(core
     target: ts.ScriptTarget.ES2022,
   },
 });
-const coreTaskSubmitClientModule = await import(
-  `data:text/javascript;charset=utf-8,${encodeURIComponent(
-    coreTaskSubmitClientModuleSource
+const coreTaskSubmitClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+  coreTaskSubmitClientModuleSource
       .replace(
         'from "./coreReadTaskClient";',
         `from "${coreReadTaskClientModuleUrl}";`,
@@ -721,8 +724,62 @@ const coreTaskSubmitClientModule = await import(
         'from "./ownerApiClient";',
         `from "${ownerApiClientModuleUrl}";`,
       ),
+)}`;
+const coreTaskSubmitClientModule = await import(coreTaskSubmitClientModuleUrl);
+
+const { outputText: siteSkillFixturesModuleSource } = ts.transpileModule(siteSkillFixturesSource, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+});
+const siteSkillFixturesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(siteSkillFixturesModuleSource)}`;
+const siteSkillFixturesModule = await import(siteSkillFixturesModuleUrl);
+const { outputText: siteSkillPagesModuleSource } = ts.transpileModule(siteSkillPagesSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+    jsx: ts.JsxEmit.ReactJSX,
+  },
+});
+const siteSkillPagesModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(
+    siteSkillPagesModuleSource
+      .replace('from "react/jsx-runtime";', `from "${import.meta.resolve("react/jsx-runtime")}";`)
+      .replace('from "lucide-react";', `from "${import.meta.resolve("lucide-react")}";`)
+      .replace('from "react";', `from "${import.meta.resolve("react")}";`)
+      .replace('from "./coreTaskSubmitClient";', `from "${coreTaskSubmitClientModuleUrl}";`)
+      .replace('from "./siteSkillFixtures";', `from "${siteSkillFixturesModuleUrl}";`),
   )}`
 );
+
+function visitElements(node, visit) {
+  if (Array.isArray(node)) return node.forEach((child) => visitElements(child, visit));
+  if (node == null || typeof node !== "object" || !("props" in node)) return;
+  visit(node);
+  visitElements(node.props.children, visit);
+}
+
+for (const skillId of ["boss-read", "boss-greeting-write-preview"]) {
+  const skill = siteSkillFixturesModule.siteSkillFixtures.find((candidate) => candidate.id === skillId);
+  if (!skill) throw new Error(`BOSS deferred UI smoke failed: ${skillId} fixture is missing.`);
+  let launchCount = 0;
+  const props = {
+    canUseLiveRuntime: true,
+    liveTaskIds: [...skill.relatedTaskIds],
+    skill,
+    onBack() {},
+    onOpenTask() { launchCount += 1; },
+  };
+  const markup = renderToStaticMarkup(createElement(siteSkillPagesModule.SiteSkillDetailPage, props));
+  const tree = siteSkillPagesModule.SiteSkillDetailPage(props);
+  visitElements(tree, (element) => {
+    if (element.type === "button" && typeof element.props.onClick === "function") element.props.onClick();
+  });
+  if (
+    !skill || !markup.includes(skill.name) || !markup.includes("Readiness") || !markup.includes("Lode metadata") ||
+    !markup.includes(coreTaskSubmitClientModule.BOSS_DEFERRED_REASON) || markup.includes("site-skill-primary-action") || launchCount !== 0
+  ) {
+    throw new Error(`BOSS deferred UI smoke failed for ${skillId}: detail or launch behavior drifted.`);
+  }
+}
 
 function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
@@ -1527,6 +1584,9 @@ if (crossOriginReadiness.ok) {
 }
 
 const originalFetch = globalThis.fetch;
+const detailRef = "detail_ref_11111111-1111-4111-8111-111111111111";
+const ownerSearchPostCheckSummary = "Harbor completed the allowlisted read operation and its Lode-bound post-check passed.";
+const ownerSearchCheckedAt = "2026-07-06T10:00:03.000Z";
 const fakeRun = {
   schema_version: "webenvoy.run-query.v0",
   run_id: "run_owner_real_site_xhs_001",
@@ -1562,7 +1622,8 @@ const fakeRun = {
     post_check: {
       schema_version: "webenvoy.post-check-result.v0",
       status: "passed",
-      summary: "Owner contract result refs are queryable.",
+      summary: ownerSearchPostCheckSummary,
+      checked_at: ownerSearchCheckedAt,
     },
   },
 };
@@ -1579,7 +1640,18 @@ globalThis.fetch = async (url, init = {}) => {
   const pathname = String(url);
   submitFetchCalls.push(`${init.method ?? "GET"} ${pathname}`);
   if (pathname.endsWith("/tasks")) submittedTaskPayload = JSON.parse(init.body);
-  const submitRun = { ...fakeRun, run_id: "run_submit_xhs_001" };
+  const submitResultRef = "result:core/xiaohongshu/search-notes/submitted";
+  const submitRun = {
+    ...fakeRun,
+    run_id: "run_submit_xhs_001",
+    runtime_refs: {
+      session_binding: {
+        ...fakeRun.runtime_refs.session_binding,
+        runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+      },
+    },
+    terminal_summary: { ...fakeRun.terminal_summary, result_ref: submitResultRef },
+  };
   const json = pathname.endsWith("/tasks")
     ? { ok: true, run_id: submitRun.run_id }
     : pathname.endsWith(`/runs/${submitRun.run_id}`)
@@ -1594,12 +1666,52 @@ globalThis.fetch = async (url, init = {}) => {
           terminal: true,
           result: {
             envelope_state: "available",
-            payload_state: "not_persisted_in_core",
+            payload_state: "available",
+            result_ref: submitResultRef,
             result_envelope: {
-              result_kind: "xhs_note_search",
-              result_ref: "result:core/xiaohongshu/search-notes/submitted",
+              schema_version: "webenvoy.result-envelope.v0",
+              run_record_ref: submitRun.run_id,
+              ok: true,
+              outcome: "success",
+              terminal: true,
+              capability_ref: "lode:capability/search-notes",
+              result_kind: "search-notes.read_result",
+              result_ref: submitResultRef,
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/submitted"],
+              source_refs: ["source_submit_search", "source_submit_cards", "source_submit_detail_refs"],
+              evidence_refs: [
+                "screenshot_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              ],
+              post_check: {
+                schema_version: "webenvoy.post-check-result.v0",
+                status: "passed",
+                summary: ownerSearchPostCheckSummary,
+                checked_at: ownerSearchCheckedAt,
+                source_refs: ["source_submit_search", "source_submit_cards", "source_submit_detail_refs"],
+                evidence_refs: [
+                  "screenshot_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                  "post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                ],
+                consumer_boundary: "Core records only the validated public summary and opaque operation/source/evidence/post-check refs.",
+              },
+              data: {
+                projection: {
+                  normalized: {
+                    public_summary: {
+                      schema_version: "harbor-read-operation-public-summary/v0",
+                      operation_id: "xhs_search_notes",
+                      result_kind: "xiaohongshu_search_notes_surface",
+                      surface: "search_result",
+                      result_state: "operation_read_response_observed",
+                      response_status: 200,
+                      result_count: 1,
+                      detail_refs: [detailRef],
+                      source_signals: ["pinia_store", "xhs_search_read_network"],
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -1608,10 +1720,21 @@ globalThis.fetch = async (url, init = {}) => {
     ? {
         ok: true,
         evidence: {
+          schema_version: "webenvoy.evidence-refs-query.v0",
+          run_id: submitRun.run_id,
+          status: "succeeded",
           evidence_refs: [
             {
-              ref: "harbor:evidence/xiaohongshu/search-notes/submitted",
+              ref: "screenshot_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
               source: "submit_contract",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:01:03.000Z",
+              runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+            },
+            {
+              ref: "post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              source: "terminal_post_check",
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:01:03.000Z",
@@ -1672,7 +1795,7 @@ for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/e
   }
 }
 
-if (!submittedRun.run.evidenceCards[0]?.summary.includes("harbor:evidence/xiaohongshu/search-notes/submitted")) {
+if (!submittedRun.run.evidenceCards.some((card) => card.summary.includes("post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"))) {
   throw new Error("Core submit smoke failed: submitted run evidence refs were not projected.");
 }
 
@@ -1753,7 +1876,6 @@ if (
   throw new Error(`Core submit failure smoke failed: unreadable owner projection was promoted: ${JSON.stringify(unreadableFailedRun)}`);
 }
 
-const detailRef = "detail_ref_11111111-1111-4111-8111-111111111111";
 let detailPayload;
 let detailPostCount = 0;
 const detailJsonResponse = (json) => ({ ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) });
@@ -1903,38 +2025,95 @@ if (terminalDetail.status !== "failed" || terminalResultQueries !== 0 || origina
   throw new Error("XHS detail terminal smoke failed: failed run queried result refs or lost the positive projection control.");
 }
 
-let ownerSearchDetailRefs = [detailRef];
+const ownerSearchEvidenceRefs = [
+  "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
+  "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+];
+const ownerSearchAdmissionEvidenceRefs = [
+  "evidence_2c29bb68-10e4-458f-b384-97f249e711e9",
+  "evidence_3c29bb68-10e4-458f-b384-97f249e711e9",
+  "evidence_4c29bb68-10e4-458f-b384-97f249e711e9",
+];
+const ownerSearchDedicatedEvidenceRefs = [...ownerSearchEvidenceRefs, ...ownerSearchAdmissionEvidenceRefs];
+const ownerSearchSourceRefs = ["source_6f45e8c0", "source_7f45e8c0", "source_8f45e8c0"];
+let ownerSearchDrift = {};
+const ownerSearchRun = () => ({
+  ...fakeRun,
+  schema_version: ownerSearchDrift.runSchema ?? fakeRun.schema_version,
+  terminal_summary: {
+    ...fakeRun.terminal_summary,
+    terminal: ownerSearchDrift.runTerminal ?? true,
+    status: ownerSearchDrift.runTerminalStatus ?? "succeeded",
+    result_ref: ownerSearchDrift.resultRef ?? "result:core/xiaohongshu/search-notes/contract",
+    ...(ownerSearchDrift.missingRunPostCheck ? { post_check: undefined } : {
+      post_check: {
+        ...fakeRun.terminal_summary.post_check,
+        status: ownerSearchDrift.postCheckStatus ?? "passed",
+        summary: ownerSearchDrift.runPostCheckSummary ?? ownerSearchPostCheckSummary,
+      },
+    }),
+  },
+});
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
-    ? { ok: true, capability_runs: { runs: [fakeRun], latest_run: fakeRun } }
+    ? { ok: true, capability_runs: { runs: [ownerSearchRun()], latest_run: ownerSearchRun() } }
     : pathname.includes("/capability-runs")
     ? { ok: true, capability_runs: { runs: [] } }
+    : pathname.endsWith(`/runs/${fakeRun.run_id}`)
+    ? { ok: true, run: ownerSearchRun() }
     : pathname.endsWith("/result")
     ? {
         ok: true,
         result: {
-          schema_version: "webenvoy.result-query.v0",
+          schema_version: ownerSearchDrift.resultSchema ?? "webenvoy.result-query.v0",
           run_id: fakeRun.run_id,
-          status: "succeeded",
-          terminal: true,
+          status: ownerSearchDrift.resultStatus ?? "succeeded",
+          terminal: ownerSearchDrift.resultTerminal ?? true,
           result: {
-            envelope_state: "available",
-            payload_state: "not_persisted_in_core",
-            result_ref: "result:core/xiaohongshu/search-notes/contract",
+            envelope_state: ownerSearchDrift.envelopeState ?? "available",
+            payload_state: ownerSearchDrift.payloadState ?? "available",
+            result_ref: ownerSearchDrift.resultRef ?? "result:core/xiaohongshu/search-notes/contract",
             result_envelope: {
-              result_kind: "search-notes.read_result",
-              result_ref: "result:core/xiaohongshu/search-notes/contract",
+              schema_version: "webenvoy.result-envelope.v0",
+              run_record_ref: fakeRun.run_id,
+              ok: true,
+              outcome: "success",
+              terminal: true,
+              capability_ref: "lode:capability/search-notes",
+              result_kind: ownerSearchDrift.resultKind ?? "search-notes.read_result",
+              result_ref: ownerSearchDrift.resultRef ?? "result:core/xiaohongshu/search-notes/contract",
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              source_refs: ["source_6f45e8c0", "source_7f45e8c0", "source_8f45e8c0"],
-              evidence_refs: [
-                "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
-                "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
-              ],
-              post_check: {
-                status: "passed",
+              source_refs: ownerSearchDrift.sourceRefs ?? ownerSearchSourceRefs,
+              evidence_refs: ownerSearchEvidenceRefs,
+              ...(ownerSearchDrift.missingEnvelopePostCheck ? {} : {
+                post_check: {
+                  schema_version: "webenvoy.post-check-result.v0",
+                  status: ownerSearchDrift.postCheckStatus ?? "passed",
+                  summary: ownerSearchDrift.envelopePostCheckSummary ?? ownerSearchPostCheckSummary,
+                  checked_at: ownerSearchCheckedAt,
+                  source_refs: ownerSearchDrift.postCheckSourceRefs ?? ownerSearchSourceRefs,
+                  evidence_refs: ownerSearchDrift.postCheckEvidenceRefs ?? ownerSearchEvidenceRefs,
+                  consumer_boundary: "Core records only the validated public summary and opaque operation/source/evidence/post-check refs.",
+                },
+              }),
+              data: {
+                projection: {
+                  normalized: {
+                    public_summary: {
+                      schema_version: ownerSearchDrift.publicSummarySchema ?? "harbor-read-operation-public-summary/v0",
+                      operation_id: "xhs_search_notes",
+                      result_kind: "xiaohongshu_search_notes_surface",
+                      surface: "search_result",
+                      result_state: "operation_read_response_observed",
+                      response_status: 200,
+                      result_count: (ownerSearchDrift.detailRefs ?? [detailRef]).length,
+                      detail_refs: ownerSearchDrift.detailRefs ?? [detailRef],
+                      source_signals: ["pinia_store", "xhs_search_read_network"],
+                    },
+                  },
+                },
               },
-              data: { projection: { normalized: { public_summary: { detail_refs: ownerSearchDetailRefs } } } },
             },
           },
           evidence_refs: [
@@ -1969,7 +2148,19 @@ globalThis.fetch = async (url) => {
     ? {
         ok: true,
         evidence: {
-          evidence_refs: [],
+          schema_version: "webenvoy.evidence-refs-query.v0",
+          run_id: fakeRun.run_id,
+          status: "succeeded",
+          evidence_refs: (ownerSearchDrift.dedicatedEvidenceRefs ?? ownerSearchDedicatedEvidenceRefs).map((ref) => ({
+            ref,
+            source: "terminal",
+            state: ownerSearchDrift.evidenceState ?? "available",
+            raw_access: "not_available_from_core",
+            recorded_at: ownerSearchCheckedAt,
+            ...(ownerSearchDrift.missingEvidenceSession ? {} : {
+              runtime_session_ref: ownerSearchDrift.evidenceSessionRef ?? "session_f76393db-e74f-4bec-88be-63754f7a5d00",
+            }),
+          })),
         },
       }
     : pathname.endsWith("/failure")
@@ -2000,16 +2191,50 @@ const coreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("htt
     runs: [],
   },
 ]);
-ownerSearchDetailRefs = [detailRef, detailRef];
+ownerSearchDrift = { detailRefs: [detailRef, detailRef] };
 const duplicateTargetProjection = await coreReadTaskClientModule.fetchCoreRunProjectionById(
   "http://core.test", fakeRun.run_id, coreReadTaskClientModule.coreReadTaskSpecs[0],
 );
+const searchContractDriftCases = [
+  ["invalid result kind", { resultKind: "xhs_note_search" }],
+  ["empty detail refs", { detailRefs: [] }],
+  ["failed post-check", { postCheckStatus: "failed" }],
+  ["missing source refs", { sourceRefs: [] }],
+  ["unavailable dedicated evidence", { evidenceState: "unavailable" }],
+  ["empty dedicated evidence with valid result evidence", { dedicatedEvidenceRefs: [] }],
+  ["dedicated evidence missing terminal ref", { dedicatedEvidenceRefs: ownerSearchDedicatedEvidenceRefs.slice(1) }],
+  ["dedicated evidence bound to wrong session", { evidenceSessionRef: "session_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+  ["conflicting dedicated evidence", { dedicatedEvidenceRefs: [ownerSearchEvidenceRefs[0], "screenshot_2c29bb68-10e4-458f-b384-97f249e711e9"] }],
+  ["dedicated evidence without run session", { missingEvidenceSession: true }],
+  ["missing result ref", { resultRef: "" }],
+  ["invalid run query schema", { runSchema: "webenvoy.run-query.v1" }],
+  ["non-terminal run summary", { runTerminal: false }],
+  ["mismatched run terminal status", { runTerminalStatus: "running" }],
+  ["invalid result query schema", { resultSchema: "webenvoy.result-query.v1" }],
+  ["non-terminal result query", { resultTerminal: false }],
+  ["non-success result query", { resultStatus: "running" }],
+  ["unavailable result envelope", { envelopeState: "unavailable" }],
+  ["non-available result payload", { payloadState: "not_persisted_in_core" }],
+  ["missing run post-check", { missingRunPostCheck: true }],
+  ["missing envelope post-check", { missingEnvelopePostCheck: true }],
+  ["mismatched post-check summary", { envelopePostCheckSummary: "different owner summary" }],
+  ["unbound post-check source refs", { postCheckSourceRefs: [] }],
+  ["unbound post-check evidence refs", { postCheckEvidenceRefs: [...ownerSearchEvidenceRefs].reverse() }],
+  ["invalid public summary schema", { publicSummarySchema: "harbor-read-operation-public-summary/v1" }],
+];
+for (const [label, drift] of searchContractDriftCases) {
+  ownerSearchDrift = drift;
+  const projection = await coreReadTaskClientModule.fetchCoreRunProjectionById(
+    "http://core.test", fakeRun.run_id, coreReadTaskClientModule.coreReadTaskSpecs[0],
+  );
+  if (projection.ok) throw new Error(`Core read task smoke failed: ${label} was promoted to live success.`);
+}
 globalThis.fetch = originalFetch;
 
 if (coreReadState.status !== "ready" || coreReadState.tasks[0].runs[0]?.source !== "Core live") {
   throw new Error("Core read task smoke failed: live Core projection was not applied.");
 }
-if (coreReadState.tasks[0].runs[0]?.detailTargets?.[0] !== detailRef || duplicateTargetProjection.ok && duplicateTargetProjection.run.detailTargets) {
+if (coreReadState.tasks[0].runs[0]?.detailTargets?.[0] !== detailRef || duplicateTargetProjection.ok) {
   throw new Error("Core read task smoke failed: bounded unique owner detail targets were not enforced.");
 }
 
@@ -2733,8 +2958,8 @@ globalThis.fetch = async (url) => {
                   external_submit: false,
                   identity_ref: "identity-env_xhs_live",
                   page_ref: "page_ref_xhs_creator",
-                  merged_head_ref: "749aff88309b26013cbd24ce1308ca213804a459",
-                  semantic_sha256: strictBackgroundWriteProjection ? "9852721d7b4f803c9a206ab86cacf8a0ae7b33ff1163d354c0fdeaee79173d2f" : undefined,
+                  merged_head_ref: "d18d79cbe280d93b3e855ca906e254bcb9eadf00",
+                  semantic_sha256: strictBackgroundWriteProjection ? "f03577c3290fc8c7b52ed8157b0411d66242f18acdf334200968901ee6121dcd" : undefined,
                   run_ref: runId,
                   classification: "partial_result",
                   precheck_scope: "entrypoint_only",

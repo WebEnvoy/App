@@ -33,8 +33,12 @@ function hasLiveRuntimeEvidence(skill: SiteSkill, canUseLiveRuntime: boolean, li
   return canUseLiveRuntime && skill.relatedTaskIds.some((taskId) => liveTaskIds.includes(taskId));
 }
 
+function isBossDeferredSkill(skill: SiteSkill) {
+  return skill.relatedTaskIds.some(isBossDeferredTask);
+}
+
 function projectSiteSkill(skill: SiteSkill, canUseLiveRuntime: boolean, liveTaskIds: string[]): SiteSkill {
-  if (skill.relatedTaskIds.some(isBossDeferredTask)) {
+  if (isBossDeferredSkill(skill)) {
     return {
       ...skill,
       status: "unavailable",
@@ -283,16 +287,18 @@ export function SiteSkillDetailPage({
             <RefreshCw size={15} />
             {updateActionText(projectedSkill.updateState)}
           </button>
-          <button
-            className="site-skill-primary-action"
-            type="button"
-            disabled={!canLaunchTask}
-            title={canLaunchTask ? undefined : projectedSkill.sourceHealth.detail}
-            onClick={canLaunchTask ? () => onOpenTask(projectedSkill) : undefined}
-          >
-            <Play size={15} />
-            {readOnlyTaskActionText(projectedSkill, canLaunchTask)}
-          </button>
+          {isBossDeferredSkill(projectedSkill) ? null : (
+            <button
+              className="site-skill-primary-action"
+              type="button"
+              disabled={!canLaunchTask}
+              title={canLaunchTask ? undefined : projectedSkill.sourceHealth.detail}
+              onClick={canLaunchTask ? () => onOpenTask(projectedSkill) : undefined}
+            >
+              <Play size={15} />
+              {readOnlyTaskActionText(projectedSkill, canLaunchTask)}
+            </button>
+          )}
         </div>
       </section>
 

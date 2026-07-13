@@ -36,10 +36,13 @@ type CoreRunStatus =
   | "cancelled"
   | "expired";
 
-const xhsWritePrecheckHead = "749aff88309b26013cbd24ce1308ca213804a459";
-const xhsWritePrecheckSemanticSha256 = "9852721d7b4f803c9a206ab86cacf8a0ae7b33ff1163d354c0fdeaee79173d2f";
+const xhsWritePrecheckRegistryContract = Object.freeze({
+  mergedHeadRef: "d18d79cbe280d93b3e855ca906e254bcb9eadf00",
+  semanticSha256: "f03577c3290fc8c7b52ed8157b0411d66242f18acdf334200968901ee6121dcd",
+});
 
 type CoreRunSummary = {
+  schema_version?: string;
   run_id: string;
   status: CoreRunStatus;
   timeline?: { updated_at?: string; terminal_at?: string };
@@ -63,8 +66,10 @@ type CoreRunSummary = {
     };
   };
   terminal_summary?: {
+    terminal?: boolean;
+    status?: CoreRunStatus;
     result_ref?: string;
-    post_check?: { status?: string; summary?: string };
+    post_check?: CorePostCheck;
     failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
   };
 };
@@ -79,7 +84,20 @@ type CoreEvidenceRef = {
   consumer_boundary?: string;
 };
 
+type CorePostCheck = {
+  schema_version?: string;
+  status?: string;
+  summary?: string;
+  checked_at?: string;
+  evidence_refs?: string[];
+  source_refs?: string[];
+  consumer_boundary?: string;
+};
+
 type CoreResultEnvelope = {
+  schema_version?: string;
+  run_id?: string;
+  status?: CoreRunStatus;
   terminal?: boolean;
   result?: {
     envelope_state?: string;
@@ -87,6 +105,12 @@ type CoreResultEnvelope = {
     unavailable_reason?: string;
     result_ref?: string;
     result_envelope?: {
+      schema_version?: string;
+      run_record_ref?: string;
+      ok?: boolean;
+      outcome?: string;
+      terminal?: boolean;
+      capability_ref?: string;
       result_kind?: string;
       result_ref?: string;
       package_ref?: string;
@@ -102,7 +126,7 @@ type CoreResultEnvelope = {
         };
       };
       preview_result?: CorePreviewResult;
-      post_check?: { ref?: string; post_check_ref?: string; status?: string; summary?: string };
+      post_check?: CorePostCheck & { ref?: string; post_check_ref?: string };
       failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
     };
     preview_result?: CorePreviewResult;
@@ -471,8 +495,9 @@ async function fetchRunProjection(
   const runtimeSessionRefFromSession =
     session?.session_refs?.runtime_session_ref ??
     run.runtime_refs?.session_binding?.runtime_session_ref;
-  const objectEvidenceRefs = coreEvidenceRefs(evidence?.evidence_refs).length > 0
-    ? coreEvidenceRefs(evidence?.evidence_refs)
+  const dedicatedEvidenceRefs = coreEvidenceRefs(evidence?.evidence_refs);
+  const objectEvidenceRefs = dedicatedEvidenceRefs.length > 0
+    ? dedicatedEvidenceRefs
     : coreEvidenceRefs(result?.evidence_refs);
   const resultEvidenceRefs = objectEvidenceRefs.length > 0
     ? objectEvidenceRefs
@@ -490,7 +515,19 @@ async function fetchRunProjection(
     session.session_refs?.runtime_session_ref === runtimeSessionRef &&
     evidenceRefs.every((ref) => ref.runtime_session_ref == null || ref.runtime_session_ref === runtimeSessionRef)
   );
-  const detailTargets = searchDetailTargets(run, envelope, publicSummary, sourceRefs, postCheck, sessionBindingValid);
+  const detailTargets = searchDetailTargets(
+    run,
+    result,
+    envelope,
+    publicSummary,
+    sourceRefs,
+    evidence,
+    dedicatedEvidenceRefs,
+    runtimeSessionRef,
+  );
+  if (run.status === "succeeded" && run.task?.capability_ref === "lode:capability/search-notes" && detailTargets.length === 0) {
+    return { ok: false, error: `/runs/${runId} returned contract-drifted search-notes projection` };
+  }
   const normalizedDetail = strictXhsDetailResult(run, envelope, publicSummary, sourceRefs, postCheck, sessionBindingValid);
   if (run.status === "succeeded" && run.task?.capability_ref === "lode:capability/read-note-detail" && normalizedDetail == null) {
     return { ok: false, error: `/runs/${runId} returned contract-drifted read-note-detail projection` };
@@ -619,23 +656,68 @@ const opaqueDetailRefPattern = /^detail_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f
 
 function searchDetailTargets(
   run: CoreRunSummary,
+  result: CoreResultEnvelope,
   envelope: CoreResultEnvelopeBody | undefined,
   publicSummary: JsonRecord | null,
   sourceRefs: string[],
-  postCheck: { status?: string } | undefined,
-  sessionBindingValid: boolean,
+  evidenceQuery: JsonRecord,
+  dedicatedEvidenceRefs: CoreEvidenceRef[],
+  runtimeSessionRef: string | undefined,
 ): string[] {
+  const resultRef = run.terminal_summary?.result_ref;
+  const envelopeEvidenceRefs = stringRefs(envelope?.evidence_refs);
+  const dedicatedEvidenceRefSet = new Set(dedicatedEvidenceRefs.map((ownerRef) => ownerRef.ref));
+  const runPostCheck = run.terminal_summary?.post_check;
+  const envelopePostCheck = envelope?.post_check;
+  const expectedPostCheckSummary = "Harbor completed the allowlisted read operation and its Lode-bound post-check passed.";
   if (
+    run.schema_version !== "webenvoy.run-query.v0" || run.status !== "succeeded" ||
+    run.terminal_summary?.terminal !== true || run.terminal_summary.status !== "succeeded" ||
+    result.schema_version !== "webenvoy.result-query.v0" || result.run_id !== run.run_id ||
+    result.status !== "succeeded" || result.terminal !== true ||
+    result.result?.envelope_state !== "available" || result.result.payload_state !== "available" ||
+    evidenceQuery.schema_version !== "webenvoy.evidence-refs-query.v0" || evidenceQuery.run_id !== run.run_id ||
+    evidenceQuery.status !== "succeeded" ||
     run.status !== "succeeded" || run.task?.capability_ref !== "lode:capability/search-notes" ||
     run.task.package_ref !== "lode://site-capability/xiaohongshu/search-notes@0.1.0" ||
-    envelope?.package_ref !== run.task.package_ref || envelope.result_kind !== "search-notes.read_result" ||
+    envelope?.schema_version !== "webenvoy.result-envelope.v0" || envelope.run_record_ref !== run.run_id ||
+    envelope.ok !== true || envelope.outcome !== "success" || envelope.terminal !== true ||
+    envelope.capability_ref !== run.task.capability_ref || envelope.package_ref !== run.task.package_ref ||
+    envelope.result_kind !== "search-notes.read_result" ||
+    !resultRef || result.result?.result_ref !== resultRef || envelope.result_ref !== resultRef ||
     sourceRefs.length !== 3 || new Set(sourceRefs).size !== 3 ||
-    !exactEnvelopeEvidence(envelope) || postCheck?.status !== "passed" || !sessionBindingValid
+    !exactEnvelopeEvidence(envelope) ||
+    !sameStrings(stringRefs(envelopePostCheck?.source_refs), sourceRefs) ||
+    !sameStrings(stringRefs(envelopePostCheck?.evidence_refs), envelopeEvidenceRefs) ||
+    !runtimeSessionRef || dedicatedEvidenceRefs.length === 0 ||
+    dedicatedEvidenceRefs.some((ownerRef) =>
+      ownerRef.state !== "available" || ownerRef.runtime_session_ref !== runtimeSessionRef
+    ) ||
+    envelopeEvidenceRefs.some((ref) => !dedicatedEvidenceRefSet.has(ref)) ||
+    run.runtime_refs?.session_binding?.runtime_session_ref !== runtimeSessionRef ||
+    runPostCheck?.schema_version !== "webenvoy.post-check-result.v0" ||
+    envelopePostCheck?.schema_version !== runPostCheck.schema_version ||
+    runPostCheck.status !== "passed" || envelopePostCheck.status !== runPostCheck.status ||
+    runPostCheck.summary !== expectedPostCheckSummary || envelopePostCheck.summary !== runPostCheck.summary ||
+    !runPostCheck.checked_at || envelopePostCheck.checked_at !== runPostCheck.checked_at ||
+    !boundedString(envelopePostCheck.consumer_boundary, 1000) ||
+    publicSummary?.schema_version !== "harbor-read-operation-public-summary/v0" ||
+    publicSummary.operation_id !== "xhs_search_notes" || publicSummary.result_kind !== "xiaohongshu_search_notes_surface" ||
+    publicSummary.surface !== "search_result" || publicSummary.result_state !== "operation_read_response_observed" ||
+    typeof publicSummary.response_status !== "number" || publicSummary.response_status < 200 || publicSummary.response_status >= 300 ||
+    arrayValue(publicSummary.source_signals).join(",") !== "pinia_store,xhs_search_read_network"
   ) return [];
   const refs = arrayValue(publicSummary?.detail_refs);
-  if (refs.length === 0 || refs.length > 15 || refs.some((ref) => typeof ref !== "string" || !opaqueDetailRefPattern.test(ref))) return [];
+  if (
+    refs.length === 0 || refs.length > 15 || publicSummary?.result_count !== refs.length ||
+    refs.some((ref) => typeof ref !== "string" || !opaqueDetailRefPattern.test(ref))
+  ) return [];
   const values = refs as string[];
   return new Set(values).size === values.length ? values : [];
+}
+
+function sameStrings(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function strictXhsDetailResult(
@@ -789,6 +871,7 @@ function coreRunSummary(value: unknown): CoreRunSummary | null {
   const status = stringValue(value.status);
   if (!runId || !isCoreRunStatus(status)) return null;
   return {
+    schema_version: stringValue(value.schema_version),
     run_id: runId,
     status,
     timeline: recordValue(value.timeline) as CoreRunSummary["timeline"],
@@ -1106,8 +1189,8 @@ export function isStrictWritePrecheckProjection(
   const truth = run.writePrecheck?.ownerTruth;
   if (!truth || !truth.terminal || truth.status !== "succeeded" || truth.classification !== "partial_result" || truth.precheckScope !== "entrypoint_only" || truth.compositionState !== "composition_not_initialized" || truth.submitted !== false || truth.runRef !== expectedRunId) return false;
   const refs = [truth.identityRef, truth.pageRef, truth.runRef, truth.harborResultRef, truth.submittedResultRef, ...truth.evidenceRefs];
-  return truth.mergedHeadRef === xhsWritePrecheckHead &&
-    truth.semanticSha256 === xhsWritePrecheckSemanticSha256 &&
+  return truth.mergedHeadRef === xhsWritePrecheckRegistryContract.mergedHeadRef &&
+    truth.semanticSha256 === xhsWritePrecheckRegistryContract.semanticSha256 &&
     truth.evidenceRefs.length > 0 && truth.evidenceRefs.length <= 16 &&
     refs.every((ref) => safeOwnerRef(ref)) &&
     truth.fieldStates.length === 3 &&
