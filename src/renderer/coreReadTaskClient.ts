@@ -9,6 +9,7 @@ export type CoreReadCapability = {
   capabilityRef: string;
   capabilityVersion: string;
   packageRef: string;
+  lockRef?: string;
 };
 
 export type CoreReadTaskSpec = {
@@ -35,7 +36,13 @@ type CoreRunStatus =
   | "cancelled"
   | "expired";
 
+const xhsWritePrecheckRegistryContract = Object.freeze({
+  mergedHeadRef: "d18d79cbe280d93b3e855ca906e254bcb9eadf00",
+  semanticSha256: "f03577c3290fc8c7b52ed8157b0411d66242f18acdf334200968901ee6121dcd",
+});
+
 type CoreRunSummary = {
+  schema_version?: string;
   run_id: string;
   status: CoreRunStatus;
   timeline?: { updated_at?: string; terminal_at?: string };
@@ -59,8 +66,10 @@ type CoreRunSummary = {
     };
   };
   terminal_summary?: {
+    terminal?: boolean;
+    status?: CoreRunStatus;
     result_ref?: string;
-    post_check?: { status?: string; summary?: string };
+    post_check?: CorePostCheck;
     failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
   };
 };
@@ -75,20 +84,49 @@ type CoreEvidenceRef = {
   consumer_boundary?: string;
 };
 
+type CorePostCheck = {
+  schema_version?: string;
+  status?: string;
+  summary?: string;
+  checked_at?: string;
+  evidence_refs?: string[];
+  source_refs?: string[];
+  consumer_boundary?: string;
+};
+
 type CoreResultEnvelope = {
+  schema_version?: string;
+  run_id?: string;
+  status?: CoreRunStatus;
+  terminal?: boolean;
   result?: {
     envelope_state?: string;
     payload_state?: string;
     unavailable_reason?: string;
     result_ref?: string;
     result_envelope?: {
+      schema_version?: string;
+      run_record_ref?: string;
+      ok?: boolean;
+      outcome?: string;
+      terminal?: boolean;
+      capability_ref?: string;
       result_kind?: string;
       result_ref?: string;
       package_ref?: string;
       source_refs?: string[];
       evidence_refs?: string[];
+      data?: {
+        projection?: {
+          normalized?: {
+            public_summary?: unknown;
+          };
+          source_refs?: unknown[];
+          evidence_refs?: unknown[];
+        };
+      };
       preview_result?: CorePreviewResult;
-      post_check?: { ref?: string; post_check_ref?: string; status?: string; summary?: string };
+      post_check?: CorePostCheck & { ref?: string; post_check_ref?: string };
       failure?: { code?: string; category?: string; phase?: string; recovery_hint?: string };
     };
     preview_result?: CorePreviewResult;
@@ -103,12 +141,31 @@ type CorePreviewState = "available" | "preview_unavailable" | "page_changed" | "
 
 type CorePreviewResult = {
   state?: string;
+  classification?: string;
+  precheck_scope?: string;
+  composition_state?: string;
+  entrypoint_observations?: unknown;
+  prohibited_actions_observed?: unknown;
+  semantic_sha256?: string;
   submitted?: boolean;
   expected_change?: {
     change_kind?: string;
     target_ref?: string;
     summary?: string;
     external_submit?: boolean;
+    identity_ref?: string;
+    page_ref?: string;
+    merged_head_ref?: string;
+    semantic_sha256?: string;
+    run_ref?: string;
+    classification?: string;
+    precheck_scope?: string;
+    composition_state?: string;
+    entrypoint_observations?: unknown;
+    prohibited_actions_observed?: unknown;
+    field_states?: unknown;
+    harbor_result_ref?: string;
+    submitted_result_ref?: string;
   };
   action_refs?: {
     action_request_id?: string;
@@ -205,9 +262,10 @@ export const coreReadTaskSpecs: CoreReadTaskSpec[] = [
     packageVersion: "0.1.0",
     capabilities: [
       {
-        capabilityRef: "lode:capability/xiaohongshu-draft-precheck",
+        capabilityRef: "lode:capability/publish-note-precheck",
         capabilityVersion: "0.1.0",
-        packageRef: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+        packageRef: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+        lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1",
       },
     ],
     resourceRequirementRefs: ["xiaohongshu.publish-note-precheck.resources"],
@@ -320,6 +378,7 @@ async function fetchCoreReadTask(
     task: {
       ...fallbackTask,
       source: coreLiveSource,
+      blocker: undefined,
       packageSource: {
         ...fallbackTask.packageSource,
         name: spec.packageName,
@@ -408,11 +467,21 @@ async function fetchRunProjection(
   const evidence = evidencePayload.payload;
   const failure = failurePayload.payload as CoreFailureEnvelope;
   const session = sessionPayload.payload as CoreSessionRefsEnvelope;
-  const fixtureReason = fixtureOrDemoPayloadReason({ run, result, evidence, failure, session });
+  const resultEnvelope = result?.result?.result_envelope;
+  const fixtureReason =
+    fixtureOrDemoPayloadReason({ run, evidence, failure, session }) ??
+    fixtureOrDemoPayloadReason({
+      ...result,
+      result: result.result == null ? undefined : {
+        ...result.result,
+        result_envelope: resultEnvelope == null ? undefined : { ...resultEnvelope, data: undefined },
+      },
+    }) ??
+    fixtureOrDemoPayloadReason(resultEnvelope?.data?.projection);
   if (fixtureReason) {
     return { ok: false, error: `/runs/${runId} returned fixture/demo/smoke payload: ${fixtureReason}` };
   }
-  const envelope = result?.result?.result_envelope;
+  const envelope = resultEnvelope;
   const refReason = coreProjectionRefReason(run, result, evidence, session, envelope);
   if (refReason) {
     return { ok: false, error: `/runs/${runId} returned invalid typed ref: ${refReason}` };
@@ -420,11 +489,15 @@ async function fetchRunProjection(
   const isWritePrecheck = spec.mode === "write-precheck";
   const previewResult = corePreviewResult(envelope?.preview_result ?? result?.result?.preview_result);
   const postCheck = run.terminal_summary?.post_check ?? envelope?.post_check;
+  const readProjection = recordValue(envelope?.data?.projection);
+  const publicSummary = recordValue(recordValue(readProjection?.normalized)?.public_summary);
+  const sourceRefs = stringRefs(envelope?.source_refs);
   const runtimeSessionRefFromSession =
     session?.session_refs?.runtime_session_ref ??
     run.runtime_refs?.session_binding?.runtime_session_ref;
-  const objectEvidenceRefs = coreEvidenceRefs(evidence?.evidence_refs).length > 0
-    ? coreEvidenceRefs(evidence?.evidence_refs)
+  const dedicatedEvidenceRefs = coreEvidenceRefs(evidence?.evidence_refs);
+  const objectEvidenceRefs = dedicatedEvidenceRefs.length > 0
+    ? dedicatedEvidenceRefs
     : coreEvidenceRefs(result?.evidence_refs);
   const resultEvidenceRefs = objectEvidenceRefs.length > 0
     ? objectEvidenceRefs
@@ -436,6 +509,29 @@ async function fetchRunProjection(
   const runtimeSessionRef =
     runtimeSessionRefFromSession ??
     evidenceRefs.find((ref) => ref.runtime_session_ref)?.runtime_session_ref;
+  const sessionBindingValid = Boolean(
+    runtimeSessionRef &&
+    run.runtime_refs?.session_binding?.runtime_session_ref === runtimeSessionRef &&
+    session.session_refs?.runtime_session_ref === runtimeSessionRef &&
+    evidenceRefs.every((ref) => ref.runtime_session_ref == null || ref.runtime_session_ref === runtimeSessionRef)
+  );
+  const detailTargets = searchDetailTargets(
+    run,
+    result,
+    envelope,
+    publicSummary,
+    sourceRefs,
+    evidence,
+    dedicatedEvidenceRefs,
+    runtimeSessionRef,
+  );
+  if (run.status === "succeeded" && run.task?.capability_ref === "lode:capability/search-notes" && detailTargets.length === 0) {
+    return { ok: false, error: `/runs/${runId} returned contract-drifted search-notes projection` };
+  }
+  const normalizedDetail = strictXhsDetailResult(run, envelope, publicSummary, sourceRefs, postCheck, sessionBindingValid);
+  if (run.status === "succeeded" && run.task?.capability_ref === "lode:capability/read-note-detail" && normalizedDetail == null) {
+    return { ok: false, error: `/runs/${runId} returned contract-drifted read-note-detail projection` };
+  }
   const failureRecord = failure?.failure ?? result?.failure ?? envelope?.failure ?? run.terminal_summary?.failure;
   const hasFailureRecovery = Boolean(failureRecord || (failure?.reason_class && failure.reason_class !== "none"));
   const resultKind = envelope?.result_kind ?? (isWritePrecheck ? "real_page_write_precheck_projection" : result?.result?.unavailable_reason ?? "not_available");
@@ -443,7 +539,10 @@ async function fetchRunProjection(
   const writeState = isWritePrecheck
     ? writePrecheckState(run, result, previewResult, failureRecord, failure?.reason_class)
     : null;
-  const lifecycle = isWritePrecheck && writeState != null
+  const entrypointPartial = isEntrypointPartial(previewResult);
+  const lifecycle = isWritePrecheck && writeState != null && entrypointPartial && run.status === "succeeded"
+    ? "completed"
+    : isWritePrecheck && writeState != null
     ? lifecycleFromWritePrecheck(run.status, writeState)
     : lifecycleFromStatus(run.status);
   const outcome = isWritePrecheck && writeState != null
@@ -451,17 +550,27 @@ async function fetchRunProjection(
     : outcomeFromStatus(run.status);
   const resultRows = isWritePrecheck && writeState != null
     ? writePrecheckResultRows(run, resultKind, payloadState, previewResult, writeState, runtimeSessionRef)
-    : [
+    : normalizedDetail == null ? [
         { label: "Run status", value: run.status, source: coreLiveSource },
         { label: "Result kind", value: resultKind, source: coreLiveSource },
         { label: "Payload state", value: payloadState, source: coreLiveSource },
         { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
         ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
+      ] : [
+        { label: "笔记标题", value: normalizedDetail.title, source: coreLiveSource },
+        { label: "作者", value: normalizedDetail.author, source: coreLiveSource },
+        { label: "正文摘要", value: normalizedDetail.bodySummary, source: coreLiveSource },
+        { label: "互动指标", value: normalizedDetail.metrics, source: coreLiveSource },
+        { label: "Post-check", value: postCheck?.status ? `${postCheck.status}: ${postCheck.summary ?? ""}` : "not reported", source: coreLiveSource },
+        ...(runtimeSessionRef ? [{ label: "执行现场", value: runtimeSessionRef, source: coreLiveSource }] : []),
       ];
   const writePrecheck = isWritePrecheck && writeState != null
-    ? coreWritePrecheck(run, previewResult, writeState, evidenceRefs, runtimeSessionRef)
+    ? coreWritePrecheck(run, result, previewResult, writeState, evidenceRefs, runtimeSessionRef)
     : undefined;
-  const approval = isWritePrecheck && writeState != null
+  if (spec.taskId === "task-xhs-publish-write-preview" && run.status === "succeeded" && !isStrictWritePrecheckProjection({ writePrecheck }, run.run_id)) {
+    return { ok: false, error: `/runs/${runId} returned contract-drifted write-precheck projection` };
+  }
+  const approval = isWritePrecheck && writeState != null && !entrypointPartial
     ? coreApprovalPreview(run, previewResult, writeState)
     : undefined;
 
@@ -482,14 +591,25 @@ async function fetchRunProjection(
           : actionIntentFromCoreRun(run, failure),
         owner: "Core",
         source: coreLiveSource,
+        ownerUpdatedAt: run.timeline?.updated_at ?? run.timeline?.terminal_at,
+        ...(detailTargets.length === 0 ? {} : { detailTargets }),
         resultRows,
-        fieldSources: evidenceRefs.map((entry, index) => ({
-          field: `证据引用 ${index + 1}`,
-          value: entry.ref,
-          locator: entry.runtime_session_ref ?? runtimeSessionRef ?? "Core evidence refs query",
-          evidenceRef: entry.ref,
-          source: coreLiveSource,
-        })),
+        fieldSources: [
+          ...sourceRefs.map((ref, index) => ({
+            field: `来源引用 ${index + 1}`,
+            value: ref,
+            locator: "Core result source refs",
+            evidenceRef: ref,
+            source: coreLiveSource,
+          })),
+          ...evidenceRefs.map((entry, index) => ({
+            field: `证据引用 ${index + 1}`,
+            value: entry.ref,
+            locator: entry.runtime_session_ref ?? runtimeSessionRef ?? "Core evidence refs query",
+            evidenceRef: entry.ref,
+            source: coreLiveSource,
+          })),
+        ],
         evidenceCards: evidenceRefs.map((entry, index) => ({
           id: `ev-${run.run_id}-${index}`,
           title: `Core evidence ref ${index + 1}`,
@@ -530,6 +650,133 @@ async function fetchRunProjection(
       },
     },
   };
+}
+
+const opaqueDetailRefPattern = /^detail_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function searchDetailTargets(
+  run: CoreRunSummary,
+  result: CoreResultEnvelope,
+  envelope: CoreResultEnvelopeBody | undefined,
+  publicSummary: JsonRecord | null,
+  sourceRefs: string[],
+  evidenceQuery: JsonRecord,
+  dedicatedEvidenceRefs: CoreEvidenceRef[],
+  runtimeSessionRef: string | undefined,
+): string[] {
+  const resultRef = run.terminal_summary?.result_ref;
+  const envelopeEvidenceRefs = stringRefs(envelope?.evidence_refs);
+  const dedicatedEvidenceRefSet = new Set(dedicatedEvidenceRefs.map((ownerRef) => ownerRef.ref));
+  const runPostCheck = run.terminal_summary?.post_check;
+  const envelopePostCheck = envelope?.post_check;
+  const expectedPostCheckSummary = "Harbor completed the allowlisted read operation and its Lode-bound post-check passed.";
+  if (
+    run.schema_version !== "webenvoy.run-query.v0" || run.status !== "succeeded" ||
+    run.terminal_summary?.terminal !== true || run.terminal_summary.status !== "succeeded" ||
+    result.schema_version !== "webenvoy.result-query.v0" || result.run_id !== run.run_id ||
+    result.status !== "succeeded" || result.terminal !== true ||
+    result.result?.envelope_state !== "available" || result.result.payload_state !== "available" ||
+    evidenceQuery.schema_version !== "webenvoy.evidence-refs-query.v0" || evidenceQuery.run_id !== run.run_id ||
+    evidenceQuery.status !== "succeeded" ||
+    run.status !== "succeeded" || run.task?.capability_ref !== "lode:capability/search-notes" ||
+    run.task.package_ref !== "lode://site-capability/xiaohongshu/search-notes@0.1.0" ||
+    envelope?.schema_version !== "webenvoy.result-envelope.v0" || envelope.run_record_ref !== run.run_id ||
+    envelope.ok !== true || envelope.outcome !== "success" || envelope.terminal !== true ||
+    envelope.capability_ref !== run.task.capability_ref || envelope.package_ref !== run.task.package_ref ||
+    envelope.result_kind !== "search-notes.read_result" ||
+    !resultRef || result.result?.result_ref !== resultRef || envelope.result_ref !== resultRef ||
+    sourceRefs.length !== 3 || new Set(sourceRefs).size !== 3 ||
+    !exactEnvelopeEvidence(envelope) ||
+    !sameStrings(stringRefs(envelopePostCheck?.source_refs), sourceRefs) ||
+    !sameStrings(stringRefs(envelopePostCheck?.evidence_refs), envelopeEvidenceRefs) ||
+    !runtimeSessionRef || dedicatedEvidenceRefs.length === 0 ||
+    dedicatedEvidenceRefs.some((ownerRef) =>
+      ownerRef.state !== "available" || ownerRef.runtime_session_ref !== runtimeSessionRef
+    ) ||
+    envelopeEvidenceRefs.some((ref) => !dedicatedEvidenceRefSet.has(ref)) ||
+    run.runtime_refs?.session_binding?.runtime_session_ref !== runtimeSessionRef ||
+    runPostCheck?.schema_version !== "webenvoy.post-check-result.v0" ||
+    envelopePostCheck?.schema_version !== runPostCheck.schema_version ||
+    runPostCheck.status !== "passed" || envelopePostCheck.status !== runPostCheck.status ||
+    runPostCheck.summary !== expectedPostCheckSummary || envelopePostCheck.summary !== runPostCheck.summary ||
+    !runPostCheck.checked_at || envelopePostCheck.checked_at !== runPostCheck.checked_at ||
+    !boundedString(envelopePostCheck.consumer_boundary, 1000) ||
+    publicSummary?.schema_version !== "harbor-read-operation-public-summary/v0" ||
+    publicSummary.operation_id !== "xhs_search_notes" || publicSummary.result_kind !== "xiaohongshu_search_notes_surface" ||
+    publicSummary.surface !== "search_result" || publicSummary.result_state !== "operation_read_response_observed" ||
+    typeof publicSummary.response_status !== "number" || publicSummary.response_status < 200 || publicSummary.response_status >= 300 ||
+    arrayValue(publicSummary.source_signals).join(",") !== "pinia_store,xhs_search_read_network"
+  ) return [];
+  const refs = arrayValue(publicSummary?.detail_refs);
+  if (
+    refs.length === 0 || refs.length > 15 || publicSummary?.result_count !== refs.length ||
+    refs.some((ref) => typeof ref !== "string" || !opaqueDetailRefPattern.test(ref))
+  ) return [];
+  const values = refs as string[];
+  return new Set(values).size === values.length ? values : [];
+}
+
+function sameStrings(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function strictXhsDetailResult(
+  run: CoreRunSummary,
+  envelope: CoreResultEnvelopeBody | undefined,
+  publicSummary: JsonRecord | null,
+  sourceRefs: string[],
+  postCheck: { status?: string } | undefined,
+  sessionBindingValid: boolean,
+) {
+  const packageRef = "lode://site-capability/xiaohongshu/read-note-detail@0.1.0";
+  if (
+    run.status !== "succeeded" || run.task?.capability_ref !== "lode:capability/read-note-detail" ||
+    run.task.package_ref !== packageRef || envelope?.package_ref !== packageRef || envelope.result_kind !== "read-note-detail.read_result" ||
+    sourceRefs.length !== 3 || new Set(sourceRefs).size !== 3 || !exactEnvelopeEvidence(envelope) ||
+    postCheck?.status !== "passed" || !sessionBindingValid
+  ) return null;
+  const normalized = recordValue(publicSummary?.normalized);
+  const author = recordValue(normalized?.author);
+  const metrics = recordValue(normalized?.interaction_metrics);
+  const citation = recordValue(normalized?.source_citation);
+  const noteId = stringValue(normalized?.note_id);
+  const canonicalUrl = stringValue(normalized?.canonical_url);
+  const title = stringValue(normalized?.title);
+  const summary = stringValue(normalized?.summary);
+  const bodySummary = stringValue(normalized?.body_summary);
+  const authorName = stringValue(author?.display_name);
+  const authorId = stringValue(author?.author_id);
+  const fieldSources = arrayValue(citation?.field_sources);
+  if (
+    normalized?.kind !== "xiaohongshu_note_detail" ||
+    !noteId || !/^[a-f0-9]{24}$/i.test(noteId) || canonicalUrl !== `https://www.xiaohongshu.com/explore/${noteId}` ||
+    !boundedString(title, 200) || !boundedString(summary, 2000) || !boundedString(bodySummary, 4000) ||
+    !boundedString(authorName, 100) || !boundedString(authorId, 100) || author?.profile_url !== `https://www.xiaohongshu.com/user/profile/${authorId}` ||
+    !metrics || !["likes", "comments", "collects", "shares"].every((key) => boundedString(metrics[key], 40)) ||
+    citation?.kind !== "xhs_note_detail_ref" || citation.note_id !== noteId || citation.url !== canonicalUrl ||
+    fieldSources.join(",") !== "pinia_store_summary,network_summary,dom_snapshot_summary" ||
+    (normalized.source_status !== "located" && normalized.source_status !== "partially_located")
+  ) return null;
+  const metricText = ["likes", "collects", "comments", "shares"]
+    .flatMap((key) => stringValue(metrics[key]) ? [`${key}: ${stringValue(metrics[key])}`] : [])
+    .join(" / ");
+  return { title, bodySummary, author: authorName, metrics: metricText || "not reported" };
+}
+
+function exactEnvelopeEvidence(envelope: CoreResultEnvelopeBody | undefined) {
+  const refs = stringRefs(envelope?.evidence_refs);
+  return refs.length === 2 && new Set(refs).size === 2 &&
+    refs.filter((ref) => ref.startsWith("post_check_")).length === 1 &&
+    refs.filter((ref) => !ref.startsWith("post_check_")).length === 1;
+}
+
+function boundedString(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= max && value.trim() === value;
+}
+
+function stringRefs(value: unknown): string[] {
+  const refs = arrayValue(value);
+  return refs.every((ref) => typeof ref === "string" && ref.length > 0) ? refs as string[] : [];
 }
 
 export async function fetchCoreRunProjectionById(
@@ -624,6 +871,7 @@ function coreRunSummary(value: unknown): CoreRunSummary | null {
   const status = stringValue(value.status);
   if (!runId || !isCoreRunStatus(status)) return null;
   return {
+    schema_version: stringValue(value.schema_version),
     run_id: runId,
     status,
     timeline: recordValue(value.timeline) as CoreRunSummary["timeline"],
@@ -804,6 +1052,7 @@ function writePrecheckResultRows(
 
 function coreWritePrecheck(
   run: CoreRunSummary,
+  result: CoreResultEnvelope,
   preview: CorePreviewResult | undefined,
   state: CorePreviewState,
   evidenceRefs: CoreEvidenceRef[],
@@ -813,7 +1062,24 @@ function coreWritePrecheck(
   const targetRef = expectedChange?.target_ref ?? "owner writable target ref";
   const expectedSummary = expectedChange?.summary ?? "Core write-precheck projection is available from owner refs.";
   const externalSubmit = expectedChange?.external_submit === false ? "false" : "not exposed";
-  const submitted = submittedLabel(preview);
+  const fieldStates = strictWritePrecheckFieldStates(expectedChange?.field_states);
+  const classification = expectedChange?.classification ?? preview?.classification;
+  const precheckScope = expectedChange?.precheck_scope ?? preview?.precheck_scope;
+  const compositionState = expectedChange?.composition_state ?? preview?.composition_state;
+  const submitted = preview?.submitted === false && classification === "partial_result" && precheckScope === "entrypoint_only"
+    ? "false / 未发布"
+    : submittedLabel(preview);
+  const entrypointObservations = strictEntrypointObservations(expectedChange?.entrypoint_observations ?? preview?.entrypoint_observations);
+  const prohibitedActionsObserved = strictProhibitedActions(expectedChange?.prohibited_actions_observed ?? preview?.prohibited_actions_observed);
+  const semanticSha256 = expectedChange?.semantic_sha256 ?? preview?.semantic_sha256 ?? "";
+  const ownerRefs = [
+    ["identity_ref", expectedChange?.identity_ref],
+    ["page_ref", expectedChange?.page_ref],
+    ["merged_head_ref", expectedChange?.merged_head_ref],
+    ["run_ref", expectedChange?.run_ref],
+    ["harbor_result_ref", expectedChange?.harbor_result_ref],
+    ["submitted_result_ref", expectedChange?.submitted_result_ref],
+  ].filter((item): item is [string, string] => typeof item[1] === "string");
   return {
     state,
     modeLabel: `真实页面写前验证 / ${state}`,
@@ -840,6 +1106,16 @@ function coreWritePrecheck(
         after: submitted,
         source: coreLiveSource,
       },
+      { label: "classification", before: "Core owner truth", after: classification ?? "not exposed", source: coreLiveSource },
+      { label: "precheck_scope", before: "Core owner truth", after: precheckScope ?? "not exposed", source: coreLiveSource },
+      { label: "composition_state", before: "Core owner truth", after: compositionState ?? "not exposed", source: coreLiveSource },
+      ...ownerRefs.map(([label, value]) => ({ label, before: "owner ref", after: value, source: coreLiveSource })),
+      ...(fieldStates === undefined ? [] : [{
+        label: "field_states",
+        before: "Core owner truth",
+        after: fieldStates.map((field) => `${field.field}: ${field.availability}/${field.observation}`).join("; "),
+        source: coreLiveSource,
+      }]),
       {
         label: "evidence refs",
         before: "owner refs",
@@ -848,8 +1124,79 @@ function coreWritePrecheck(
       },
     ],
     noSubmitGuard: "active",
-    stateNote: writePrecheckStateNote(state, preview),
+    stateNote: entrypointObservations && prohibitedActionsObserved && classification === "partial_result" && precheckScope === "entrypoint_only" && compositionState === "composition_not_initialized"
+      ? "创作入口已确认，未执行上传、生成、保存或发布。标题、正文和发布控件尚未出现，因此未验证。"
+      : writePrecheckStateNote(state, preview),
+    ...(run.status !== "succeeded" || fieldStates === undefined || entrypointObservations === undefined || prohibitedActionsObserved === undefined || classification !== "partial_result" || precheckScope !== "entrypoint_only" || compositionState !== "composition_not_initialized" ? {} : { ownerTruth: {
+      terminal: result.terminal === true,
+      status: run.status,
+      classification,
+      precheckScope,
+      compositionState,
+      submitted: preview?.submitted ?? true,
+      identityRef: expectedChange?.identity_ref ?? "",
+      pageRef: expectedChange?.page_ref ?? "",
+      mergedHeadRef: expectedChange?.merged_head_ref ?? "",
+      semanticSha256,
+      runRef: expectedChange?.run_ref ?? "",
+      harborResultRef: expectedChange?.harbor_result_ref ?? "",
+      submittedResultRef: expectedChange?.submitted_result_ref ?? "",
+      evidenceRefs: preview?.evidence_refs ?? [],
+      entrypointObservations,
+      prohibitedActionsObserved,
+      fieldStates,
+    } }),
   };
+}
+
+function strictWritePrecheckFieldStates(value: unknown): NonNullable<NonNullable<RunProjection["writePrecheck"]>["ownerTruth"]>["fieldStates"] | undefined {
+  if (!Array.isArray(value) || value.length !== 3) return undefined;
+  const expected = ["title_input", "content_editor", "publish_control"] as const;
+  const fields = value.map(recordValue);
+  if (fields.some((field, index) => field?.field !== expected[index] || field.availability !== "unavailable" || field.observation !== "not_observed")) return undefined;
+  return expected.map((field) => ({ field, availability: "unavailable", observation: "not_observed" }));
+}
+
+function strictEntrypointObservations(value: unknown): NonNullable<NonNullable<RunProjection["writePrecheck"]>["ownerTruth"]>["entrypointObservations"] | undefined {
+  const facts = recordValue(value);
+  const keys = ["route_loaded", "user_confirmed_identity", "challenge_absent", "publish_vue_container_visible", "upload_image_tab_active", "upload_image_entry_visible", "text_image_entry_visible"];
+  if (!facts || Object.keys(facts).length !== keys.length || keys.some((key) => facts[key] !== true)) return undefined;
+  return { routeLoaded: true, userConfirmedIdentity: true, challengeAbsent: true, publishVueContainerVisible: true, uploadImageTabActive: true, uploadImageEntryVisible: true, textImageEntryVisible: true };
+}
+
+function strictProhibitedActions(value: unknown): NonNullable<NonNullable<RunProjection["writePrecheck"]>["ownerTruth"]>["prohibitedActionsObserved"] | undefined {
+  const actions = recordValue(value);
+  const keys = ["upload", "generate", "save", "publish"];
+  if (!actions || Object.keys(actions).length !== keys.length || keys.some((key) => actions[key] !== false)) return undefined;
+  return { upload: false, generate: false, save: false, publish: false };
+}
+
+function isEntrypointPartial(preview: CorePreviewResult | undefined) {
+  const change = preview?.expected_change;
+  return (change?.classification ?? preview?.classification) === "partial_result" &&
+    (change?.precheck_scope ?? preview?.precheck_scope) === "entrypoint_only" &&
+    (change?.composition_state ?? preview?.composition_state) === "composition_not_initialized";
+}
+
+function safeOwnerRef(value: string) {
+  return value.length <= 512 && /^[A-Za-z][A-Za-z0-9:._/-]+$/.test(value) && !unsafeCoreRef.test(value);
+}
+
+export function isStrictWritePrecheckProjection(
+  run: Pick<RunProjection, "writePrecheck">,
+  expectedRunId: string,
+) {
+  const truth = run.writePrecheck?.ownerTruth;
+  if (!truth || !truth.terminal || truth.status !== "succeeded" || truth.classification !== "partial_result" || truth.precheckScope !== "entrypoint_only" || truth.compositionState !== "composition_not_initialized" || truth.submitted !== false || truth.runRef !== expectedRunId) return false;
+  const refs = [truth.identityRef, truth.pageRef, truth.runRef, truth.harborResultRef, truth.submittedResultRef, ...truth.evidenceRefs];
+  return truth.mergedHeadRef === xhsWritePrecheckRegistryContract.mergedHeadRef &&
+    truth.semanticSha256 === xhsWritePrecheckRegistryContract.semanticSha256 &&
+    truth.evidenceRefs.length > 0 && truth.evidenceRefs.length <= 16 &&
+    refs.every((ref) => safeOwnerRef(ref)) &&
+    truth.fieldStates.length === 3 &&
+    truth.fieldStates.every((field) => field.availability === "unavailable" && field.observation === "not_observed") &&
+    Object.values(truth.entrypointObservations).every((observed) => observed === true) &&
+    Object.values(truth.prohibitedActionsObserved).every((observed) => observed === false);
 }
 
 function coreApprovalPreview(

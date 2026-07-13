@@ -4,6 +4,8 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
 const requiredFiles = [
@@ -29,6 +31,10 @@ const identityEnvironmentFixturesSource = await readFile("src/renderer/identityE
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
+const taskThreadComposerSource = await readFile("src/renderer/TaskThreadComposer.tsx", "utf8");
+const siteSkillPagesSource = await readFile("src/renderer/SiteSkillPages.tsx", "utf8");
+const siteSkillFixturesSource = await readFile("src/renderer/siteSkillFixtures.ts", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -36,6 +42,15 @@ const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvir
 const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
 const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
+
+if (
+  !taskThreadPageSource.includes('mainTaskBusy={coreSubmitState.status === "submitting" || coreSubmitState.status === "polling"}') ||
+  !taskThreadPageSource.includes("const disabled = mainTaskBusy || detailSubmitting") ||
+  !taskThreadPageSource.includes('mainTaskBusy ? "搜索任务进行中"') ||
+  !taskThreadPageSource.includes('state?.status === "polling" ? `继续查询详情')
+) {
+  throw new Error("Task thread smoke failed: stale detail targets are not disabled only while the main search is busy.");
+}
 const manualAuthenticationCompletionModule = await import(
   pathToFileURL(path.resolve("dist-electron/manualAuthenticationCompletion.js")).href,
 );
@@ -446,7 +461,13 @@ if (!readiness.failClosed || readiness.canUseLiveRuntime) {
 
 const lodeBundle = lodeAssetBundleModule.resolveLodeAssetBundle({}, undefined);
 
-if (lodeBundle.state !== "ready" || lodeBundle.packageCount < 6 || lodeBundle.missingPackageRefs.length > 0) {
+if (
+  lodeBundle.state !== "ready" ||
+  lodeBundle.packageCount < 3 ||
+  lodeBundle.missingPackageRefs.length > 0 ||
+  lodeBundle.requiredPackageRefs.length !== 3 ||
+  lodeBundle.requiredPackageRefs.some((ref) => !ref.includes("/xiaohongshu/"))
+) {
   throw new Error(`Lode asset bundle smoke failed: ${JSON.stringify(lodeBundle)}`);
 }
 
@@ -690,9 +711,8 @@ const { outputText: coreTaskSubmitClientModuleSource } = ts.transpileModule(core
     target: ts.ScriptTarget.ES2022,
   },
 });
-const coreTaskSubmitClientModule = await import(
-  `data:text/javascript;charset=utf-8,${encodeURIComponent(
-    coreTaskSubmitClientModuleSource
+const coreTaskSubmitClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+  coreTaskSubmitClientModuleSource
       .replace(
         'from "./coreReadTaskClient";',
         `from "${coreReadTaskClientModuleUrl}";`,
@@ -705,8 +725,78 @@ const coreTaskSubmitClientModule = await import(
         'from "./ownerApiClient";',
         `from "${ownerApiClientModuleUrl}";`,
       ),
+)}`;
+const coreTaskSubmitClientModule = await import(coreTaskSubmitClientModuleUrl);
+
+const rejectedSubmitState = coreTaskSubmitClientModule.coreTaskSubmitFailureState(
+  new Error("token=must-not-reach-the-ui"),
+);
+if (
+  rejectedSubmitState.status !== "failed" ||
+  rejectedSubmitState.summary.includes("token=must-not-reach-the-ui") ||
+  !appSource.includes("coreSubmitInFlightByKey.current.has(submitKey)") ||
+  !appSource.includes("coreSubmitInFlightByKey.current.get(submitKey) !== submitSequence") ||
+  !appSource.includes("coreSubmitInFlightByKey.current.delete(submitKey)") ||
+  !appSource.includes("result = coreTaskSubmitFailureState(error)") ||
+  !appSource.includes("if (!coreSubmitInFlightByKey.current.has(submitKey))") ||
+  (taskThreadComposerSource.match(/disabled=\{isBusy\}/g) ?? []).length < 4
+) {
+  throw new Error("Core submit state smoke failed: owner rejection or same-key race can leave stale submitting state.");
+}
+
+const { outputText: siteSkillFixturesModuleSource } = ts.transpileModule(siteSkillFixturesSource, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+});
+const siteSkillFixturesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(siteSkillFixturesModuleSource)}`;
+const siteSkillFixturesModule = await import(siteSkillFixturesModuleUrl);
+const { outputText: siteSkillPagesModuleSource } = ts.transpileModule(siteSkillPagesSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+    jsx: ts.JsxEmit.ReactJSX,
+  },
+});
+const siteSkillPagesModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(
+    siteSkillPagesModuleSource
+      .replace('from "react/jsx-runtime";', `from "${import.meta.resolve("react/jsx-runtime")}";`)
+      .replace('from "lucide-react";', `from "${import.meta.resolve("lucide-react")}";`)
+      .replace('from "react";', `from "${import.meta.resolve("react")}";`)
+      .replace('from "./coreTaskSubmitClient";', `from "${coreTaskSubmitClientModuleUrl}";`)
+      .replace('from "./siteSkillFixtures";', `from "${siteSkillFixturesModuleUrl}";`),
   )}`
 );
+
+function visitElements(node, visit) {
+  if (Array.isArray(node)) return node.forEach((child) => visitElements(child, visit));
+  if (node == null || typeof node !== "object" || !("props" in node)) return;
+  visit(node);
+  visitElements(node.props.children, visit);
+}
+
+for (const skillId of ["boss-read", "boss-greeting-write-preview"]) {
+  const skill = siteSkillFixturesModule.siteSkillFixtures.find((candidate) => candidate.id === skillId);
+  if (!skill) throw new Error(`BOSS deferred UI smoke failed: ${skillId} fixture is missing.`);
+  let launchCount = 0;
+  const props = {
+    canUseLiveRuntime: true,
+    liveTaskIds: [...skill.relatedTaskIds],
+    skill,
+    onBack() {},
+    onOpenTask() { launchCount += 1; },
+  };
+  const markup = renderToStaticMarkup(createElement(siteSkillPagesModule.SiteSkillDetailPage, props));
+  const tree = siteSkillPagesModule.SiteSkillDetailPage(props);
+  visitElements(tree, (element) => {
+    if (element.type === "button" && typeof element.props.onClick === "function") element.props.onClick();
+  });
+  if (
+    !skill || !markup.includes(skill.name) || !markup.includes("Readiness") || !markup.includes("Lode metadata") ||
+    !markup.includes(coreTaskSubmitClientModule.BOSS_DEFERRED_REASON) || markup.includes("site-skill-primary-action") || launchCount !== 0
+  ) {
+    throw new Error(`BOSS deferred UI smoke failed for ${skillId}: detail or launch behavior drifted.`);
+  }
+}
 
 function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
@@ -1127,6 +1217,84 @@ if (JSON.stringify(submitReadiness.payload).includes(readonlySubmitTask.business
   throw new Error("Core submit smoke failed: free-form businessInput leaked into the payload.");
 }
 
+const writePrecheckTask = {
+  ...readonlySubmitTask,
+  id: "task-xhs-publish-write-preview",
+  title: "小红书发布草稿写前验证",
+  siteSkill: "小红书发布草稿写前预览",
+  businessInput: "禁止泄漏的真实草稿内容",
+  packageSource: {
+    sourceRef: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+    lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1",
+  },
+};
+const writePrecheckReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+  writePrecheckTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+if (
+  !writePrecheckReadiness.ok ||
+  writePrecheckReadiness.payload.package_ref !== "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0" ||
+  writePrecheckReadiness.payload.task_intent.policy.execution_intent !== "validate_only" ||
+  writePrecheckReadiness.payload.task_intent.scope.target_ref !== writePrecheckReadiness.payload.validate_only?.url ||
+  writePrecheckReadiness.payload.task_intent.capability.lock_ref !== "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1" ||
+  writePrecheckReadiness.payload.validate_only?.no_submit_guard !== "active" ||
+  Object.keys(writePrecheckReadiness.payload.validate_only ?? {}).some((key) => !["url", "target_ref", "no_submit_guard", "requested_fields", "include_source_refs", "proposed_input_summary"].includes(key)) ||
+  JSON.stringify(writePrecheckReadiness.payload).includes(writePrecheckTask.businessInput) ||
+  /publish|save|upload|submit|schedule/i.test(Object.keys(writePrecheckReadiness.payload).join(" "))
+) {
+  throw new Error(`Core write-precheck submit smoke failed: ${JSON.stringify(writePrecheckReadiness)}`);
+}
+if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, { ...liveRuntimeForSubmit, canUseLiveRuntime: false }, [readyXhsIdentity]).ok) {
+  throw new Error("Core write-precheck submit smoke failed: unavailable runtime did not fail closed.");
+}
+for (const [label, task] of [
+  ["missing lock", { ...writePrecheckTask, packageSource: { ...writePrecheckTask.packageSource, lockRef: undefined } }],
+  ["drifted lock", { ...writePrecheckTask, packageSource: { ...writePrecheckTask.packageSource, lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.0" } }],
+  ["drifted package", { ...writePrecheckTask, packageSource: { ...writePrecheckTask.packageSource, sourceRef: "lode://site-capability/xiaohongshu/other@0.1.0" } }],
+]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(task, liveRuntimeForSubmit, [readyXhsIdentity]).ok) {
+    throw new Error(`Core write-precheck submit smoke failed: ${label} was accepted.`);
+  }
+}
+for (const [label, identity] of [
+  ["missing admission facts", { ...readyXhsIdentity, admissionFacts: undefined }],
+  ["unconfirmed provenance", { ...readyXhsIdentity, admissionFacts: { ...readyXhsIdentity.admissionFacts, authenticationProvenance: null } }],
+  ["missing storage", { ...readyXhsIdentity, storage: { ...readyXhsIdentity.storage, profileStorage: "缺失" } }],
+  ["missing execution ref", { ...readyXhsIdentity, executionIdentityRef: "" }],
+]) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error(`Core write-precheck identity smoke failed: ${label} was accepted.`);
+  }
+}
+const writePrecheckChromeIdentity = {
+  ...readyXhsIdentity,
+  provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", role: "受限后备", state: "warning" },
+  readiness: { ...readyXhsIdentity.readiness, state: "warning" },
+  admissionFacts: {
+    ...readyXhsIdentity.admissionFacts,
+    providerId: "chrome_official",
+    providerRole: "restricted_fallback",
+    warningReasonCodes: ["provider_conflict", "fingerprint_conflict"],
+  },
+};
+if (!coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, liveRuntimeForSubmit, [writePrecheckChromeIdentity]).ok) {
+  throw new Error("Core write-precheck identity smoke failed: proven official Chrome fallback was blocked.");
+}
+for (const [label, warnings] of [
+  ["missing warning", ["provider_conflict"]],
+  ["extra warning", ["provider_conflict", "fingerprint_conflict", "proxy_missing"]],
+]) {
+  const identity = {
+    ...writePrecheckChromeIdentity,
+    admissionFacts: { ...writePrecheckChromeIdentity.admissionFacts, warningReasonCodes: warnings },
+  };
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(writePrecheckTask, liveRuntimeForSubmit, [identity]).ok) {
+    throw new Error(`Core write-precheck official Chrome smoke failed: ${label} was accepted.`);
+  }
+}
+
 const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   readonlySubmitTask,
   liveRuntimeForSubmit,
@@ -1211,32 +1379,90 @@ const bossReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
   liveRuntimeForSubmit,
   [restrictedChromeBossIdentity],
 );
-if (
-  !bossReadiness.ok ||
-  bossReadiness.identity.admissionFacts?.warningReasonCodes.includes("proxy_missing") !== true ||
-  bossReadiness.payload.public_query?.query !== "前端工程师" ||
-  bossReadiness.payload.public_query?.city_code !== "101020100" ||
-  bossReadiness.payload.public_query?.page !== 1 ||
-  bossReadiness.payload.public_query?.limit !== 15 ||
-  Object.keys(bossReadiness.payload.public_query ?? {}).length !== 4 ||
-  bossReadiness.payload.task_intent.scope.target_type !== "boss_job_search" ||
-  bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
-  bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
-  JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
-  JSON.stringify(bossReadiness.payload).includes("read-job-detail")
-) {
-  throw new Error(`Core BOSS submit smoke failed: canonical one-shot search payload is malformed: ${JSON.stringify(bossReadiness)}`);
+const bossDeferredReason = "目标站点当前访问受限，功能延期";
+if (bossReadiness.ok || bossReadiness.reason !== bossDeferredReason) {
+  throw new Error(`Core BOSS submit smoke failed: search was not deferred with the product reason: ${JSON.stringify(bossReadiness)}`);
 }
-if (!coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(restrictedChromeBossIdentity, "boss", coreReadTaskClientModule.coreReadTaskSpecs[1])) {
-  throw new Error("Core BOSS submit smoke failed: identity task entry disagrees with the accepted restricted Chrome search admission.");
-}
-if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(restrictedChromeBossIdentity, "task-boss-real-read") !== null) {
-  throw new Error("Core BOSS submit smoke failed: identity task entry blocked the accepted restricted Chrome search admission.");
-}
-for (const taskId of ["task-boss-greeting-write-preview", "task-unknown"]) {
-  if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(readyBossIdentity, taskId) === null) {
-    throw new Error(`Core BOSS submit smoke failed: identity task entry admitted non-read task ${taskId}.`);
+for (const taskId of ["task-boss-real-read", "task-boss-greeting-write-preview"]) {
+  if (coreTaskSubmitClientModule.readOnlyIdentityAdmissionBlockReason(readyBossIdentity, taskId) !== bossDeferredReason) {
+    throw new Error(`Core BOSS submit smoke failed: identity entry did not expose the deferred reason for ${taskId}.`);
   }
+}
+let bossSubmitRequests = 0;
+const fetchBeforeDeferredSubmit = globalThis.fetch;
+globalThis.fetch = async () => {
+  bossSubmitRequests += 1;
+  throw new Error("BOSS deferred submit must not reach an owner endpoint");
+};
+const deferredSubmit = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://127.0.0.1:9",
+  bossSearchTask,
+  liveRuntimeForSubmit,
+  [restrictedChromeBossIdentity],
+);
+if (deferredSubmit.status !== "blocked" || deferredSubmit.summary !== bossDeferredReason || bossSubmitRequests !== 0) {
+  throw new Error(`Core BOSS submit smoke failed: deferred command reached POST /tasks: ${JSON.stringify(deferredSubmit)}`);
+}
+const deferredWritePrecheckSubmit = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://127.0.0.1:9",
+  { ...bossSearchTask, id: "task-boss-greeting-write-preview", title: "BOSS 打招呼写前验证" },
+  liveRuntimeForSubmit,
+  [readyBossIdentity],
+);
+if (deferredWritePrecheckSubmit.status !== "blocked" || deferredWritePrecheckSubmit.summary !== bossDeferredReason || bossSubmitRequests !== 0) {
+  throw new Error(`Core BOSS submit smoke failed: deferred write-precheck reached POST /tasks: ${JSON.stringify(deferredWritePrecheckSubmit)}`);
+}
+globalThis.fetch = fetchBeforeDeferredSubmit;
+
+const historicalFailure = {
+  id: "run-boss-history-failure",
+  label: "BOSS historical failure",
+  lifecycle: "completed",
+  outcome: "failure-safe",
+  source: "Core live",
+  ownerUpdatedAt: "2026-07-12T00:00:00.000Z",
+  resultRows: [{ label: "Failure reason", value: "access_limited", source: "Core live" }],
+  evidenceCards: [],
+  capabilityAttribution: { failureClass: "runtime" },
+  failureRecovery: { reason: "runtime_admission_disabled", source: "Core live" },
+};
+const projectedBossTask = coreTaskSubmitClientModule.projectDeferredBossTask({
+  ...bossSearchTask,
+  packageSource: {
+    name: "@lode/boss-read-only",
+    version: "0.1.0",
+    capabilityRef: "lode:capability/job-search",
+    sourceRef: "lode://site-capability/boss/job-search@0.1.0",
+    boundary: "fixture",
+  },
+  runs: [
+    { id: "fixture-success", lifecycle: "completed", outcome: "success", source: "Core fixture" },
+    { id: "live-success", lifecycle: "completed", outcome: "success", source: "Core live" },
+    historicalFailure,
+  ],
+});
+if (
+  projectedBossTask.blocker !== bossDeferredReason ||
+  projectedBossTask.runs[0]?.summary !== bossDeferredReason ||
+  projectedBossTask.runs.some((run) => run.id === "fixture-success" || run.id === "live-success") ||
+  projectedBossTask.runs[1]?.lifecycle !== "blocked" ||
+  !projectedBossTask.runs[1]?.label.startsWith("历史失败 · ") ||
+  projectedBossTask.runs[1]?.resultRows?.[0]?.value !== "2026-07-12T00:00:00.000Z" ||
+  projectedBossTask.runs[1]?.resultRows?.[0]?.source !== "Core live" ||
+  projectedBossTask.runs[1]?.evidenceCards?.length !== 0 ||
+  projectedBossTask.runs[1]?.failureRecovery?.source !== "Core live" ||
+  projectedBossTask.runs[1]?.capabilityAttribution?.failureClass !== "runtime"
+) {
+  throw new Error(`BOSS deferred projection smoke failed: current success or history diagnostics were misrepresented. ${JSON.stringify(projectedBossTask)}`);
+}
+if (projectedBossTask.runs[0]?.capabilityAttribution?.failureClass !== "runtime_admission_disabled") {
+  throw new Error("BOSS deferred projection smoke failed: product deferral was misclassified as a site change.");
+}
+if (coreTaskSubmitClientModule.projectDeferredBossTask(readonlySubmitTask) !== readonlySubmitTask) {
+  throw new Error("BOSS deferred projection smoke failed: Xiaohongshu task was changed.");
+}
+if (!rendererAssets.includes(bossDeferredReason)) {
+  throw new Error("BOSS deferred UI smoke failed: packaged renderer is missing the exact access-limited state.");
 }
 if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(readyBossIdentity, "boss", coreReadTaskClientModule.coreReadTaskSpecs[3])) {
   throw new Error("Core BOSS submit smoke failed: exported read-only identity admission accepted a write-precheck spec.");
@@ -1272,11 +1498,11 @@ if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveR
 if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(xhsMissingProxyIdentity, "xiaohongshu", coreReadTaskClientModule.coreReadTaskSpecs[0])) {
   throw new Error("Core submit smoke failed: identity task entry admitted Xiaohongshu restricted Chrome with proxy_missing.");
 }
-for (const [length, accepted] of [[80, true], [81, false]]) {
+for (const length of [80, 81]) {
   const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
   const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]);
-  if (readiness.ok !== accepted) {
-    throw new Error(`Core BOSS submit smoke failed: ${length}-character query acceptance was ${readiness.ok}.`);
+  if (readiness.ok || readiness.reason !== bossDeferredReason) {
+    throw new Error(`Core BOSS submit smoke failed: ${length}-character query bypassed deferred state.`);
   }
 }
 
@@ -1312,7 +1538,7 @@ for (const id of ["task-boss-greeting-write-preview", "task-boss-job-search-bulk
 }
 
 const promotedTask = coreTaskSubmitClientModule.promoteSubmittedCoreTask(
-  { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", runs: [{ id: "fixture-run", source: "Core fixture" }] },
+  { ...readonlySubmitTask, source: "Core fixture", identitySource: "Harbor fixture", blocker: "fixture runtime unavailable", runs: [{ id: "fixture-run", source: "Core fixture" }] },
   { id: "live-run", source: "Core live" },
 );
 if (
@@ -1320,6 +1546,7 @@ if (
   promotedTask.identitySource !== "Harbor live" ||
   promotedTask.runs.length !== 1 ||
   promotedTask.runs[0]?.id !== "live-run" ||
+  promotedTask.blocker !== undefined ||
   promotedTask.packageSource.lockRef !== readonlySubmitTask.packageSource.lockRef
 ) {
   throw new Error(`Core submit smoke failed: live promotion retained fixture history or rewrote Lode provenance: ${JSON.stringify(promotedTask)}`);
@@ -1374,6 +1601,9 @@ if (crossOriginReadiness.ok) {
 }
 
 const originalFetch = globalThis.fetch;
+const detailRef = "detail_ref_11111111-1111-4111-8111-111111111111";
+const ownerSearchPostCheckSummary = "Harbor completed the allowlisted read operation and its Lode-bound post-check passed.";
+const ownerSearchCheckedAt = "2026-07-06T10:00:03.000Z";
 const fakeRun = {
   schema_version: "webenvoy.run-query.v0",
   run_id: "run_owner_real_site_xhs_001",
@@ -1409,7 +1639,8 @@ const fakeRun = {
     post_check: {
       schema_version: "webenvoy.post-check-result.v0",
       status: "passed",
-      summary: "Owner contract result refs are queryable.",
+      summary: ownerSearchPostCheckSummary,
+      checked_at: ownerSearchCheckedAt,
     },
   },
 };
@@ -1426,7 +1657,18 @@ globalThis.fetch = async (url, init = {}) => {
   const pathname = String(url);
   submitFetchCalls.push(`${init.method ?? "GET"} ${pathname}`);
   if (pathname.endsWith("/tasks")) submittedTaskPayload = JSON.parse(init.body);
-  const submitRun = { ...fakeRun, run_id: "run_submit_xhs_001" };
+  const submitResultRef = "result:core/xiaohongshu/search-notes/submitted";
+  const submitRun = {
+    ...fakeRun,
+    run_id: "run_submit_xhs_001",
+    runtime_refs: {
+      session_binding: {
+        ...fakeRun.runtime_refs.session_binding,
+        runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+      },
+    },
+    terminal_summary: { ...fakeRun.terminal_summary, result_ref: submitResultRef },
+  };
   const json = pathname.endsWith("/tasks")
     ? { ok: true, run_id: submitRun.run_id }
     : pathname.endsWith(`/runs/${submitRun.run_id}`)
@@ -1441,12 +1683,52 @@ globalThis.fetch = async (url, init = {}) => {
           terminal: true,
           result: {
             envelope_state: "available",
-            payload_state: "not_persisted_in_core",
+            payload_state: "available",
+            result_ref: submitResultRef,
             result_envelope: {
-              result_kind: "xhs_note_search",
-              result_ref: "result:core/xiaohongshu/search-notes/submitted",
+              schema_version: "webenvoy.result-envelope.v0",
+              run_record_ref: submitRun.run_id,
+              ok: true,
+              outcome: "success",
+              terminal: true,
+              capability_ref: "lode:capability/search-notes",
+              result_kind: "search-notes.read_result",
+              result_ref: submitResultRef,
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              evidence_refs: ["harbor:evidence/xiaohongshu/search-notes/submitted"],
+              source_refs: ["source_submit_search", "source_submit_cards", "source_submit_detail_refs"],
+              evidence_refs: [
+                "screenshot_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              ],
+              post_check: {
+                schema_version: "webenvoy.post-check-result.v0",
+                status: "passed",
+                summary: ownerSearchPostCheckSummary,
+                checked_at: ownerSearchCheckedAt,
+                source_refs: ["source_submit_search", "source_submit_cards", "source_submit_detail_refs"],
+                evidence_refs: [
+                  "screenshot_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                  "post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                ],
+                consumer_boundary: "Core records only the validated public summary and opaque operation/source/evidence/post-check refs.",
+              },
+              data: {
+                projection: {
+                  normalized: {
+                    public_summary: {
+                      schema_version: "harbor-read-operation-public-summary/v0",
+                      operation_id: "xhs_search_notes",
+                      result_kind: "xiaohongshu_search_notes_surface",
+                      surface: "search_result",
+                      result_state: "operation_read_response_observed",
+                      response_status: 200,
+                      result_count: 1,
+                      detail_refs: [detailRef],
+                      source_signals: ["pinia_store", "xhs_search_read_network"],
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -1455,10 +1737,21 @@ globalThis.fetch = async (url, init = {}) => {
     ? {
         ok: true,
         evidence: {
+          schema_version: "webenvoy.evidence-refs-query.v0",
+          run_id: submitRun.run_id,
+          status: "succeeded",
           evidence_refs: [
             {
-              ref: "harbor:evidence/xiaohongshu/search-notes/submitted",
+              ref: "screenshot_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
               source: "submit_contract",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:01:03.000Z",
+              runtime_session_ref: harborRuntimeSession.runtime_session_ref,
+            },
+            {
+              ref: "post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              source: "terminal_post_check",
               state: "available",
               raw_access: "not_available_from_core",
               recorded_at: "2026-07-06T10:01:03.000Z",
@@ -1509,7 +1802,7 @@ if (
 ) {
   throw new Error(`Core submit smoke failed: one-shot POST or exact public query contract was violated: ${JSON.stringify(submittedTaskPayload)}`);
 }
-if (ownerRequestTimeouts[0] !== 65_000 || ownerRequestTimeouts.slice(1).some((timeout) => timeout !== 2500)) {
+if (ownerRequestTimeouts[0] !== 65_000 || ownerRequestTimeouts[1] !== 3500 || ownerRequestTimeouts.slice(2).some((timeout) => timeout !== 2500)) {
   throw new Error(`Core submit smoke failed: /tasks and owner read timeouts diverged from IPC boundaries: ${ownerRequestTimeouts.join(",")}`);
 }
 
@@ -1519,12 +1812,168 @@ for (const expectedPath of ["/tasks", "/runs/run_submit_xhs_001", "/result", "/e
   }
 }
 
-if (!submittedRun.run.evidenceCards[0]?.summary.includes("harbor:evidence/xiaohongshu/search-notes/submitted")) {
+if (!submittedRun.run.evidenceCards.some((card) => card.summary.includes("post_check_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"))) {
   throw new Error("Core submit smoke failed: submitted run evidence refs were not projected.");
 }
 
 if (!submittedRun.run.resultRows.some((row) => row.value === harborRuntimeSession.runtime_session_ref)) {
   throw new Error("Core submit smoke failed: Harbor session ref from create/readback/session chain was not projected.");
+}
+
+const failedRun = {
+  ...fakeRun,
+  run_id: "run_submit_xhs_login_required_001",
+  status: "requires_user_action",
+  terminal_summary: {
+    terminal: true,
+    status: "requires_user_action",
+    failure: { category: "resource_admission", code: "not_logged_in", phase: "runtime_binding", attribution: "runtime" },
+  },
+};
+const failedSubmitCalls = [];
+let strictBackgroundWriteProjection = true;
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  failedSubmitCalls.push(pathname);
+  const json = pathname.endsWith("/tasks")
+    ? { ok: false, run_id: failedRun.run_id, error: { code: "not_logged_in" } }
+    : pathname.endsWith(`/runs/${failedRun.run_id}`)
+    ? { ok: true, run: failedRun }
+    : pathname.endsWith("/result")
+    ? { ok: true, result: { schema_version: "webenvoy.result-query.v0", run_id: failedRun.run_id, status: "requires_user_action", terminal: true } }
+    : pathname.endsWith("/evidence-refs")
+    ? { ok: true, evidence: { evidence_refs: [] } }
+    : pathname.endsWith("/failure")
+    ? { ok: true, failure_reason: { reason_class: "not_logged_in", app_action: "manual_handoff", retryable: true } }
+    : pathname.endsWith("/session-refs")
+    ? { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref, control_owner: "none", lifecycle_state: "idle", session_use: "core_task_run" } } }
+    : { ok: false, error: { code: "unexpected_failed_submit_path" } };
+  return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) };
+};
+const failedSubmittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+globalThis.fetch = originalFetch;
+if (failedSubmittedRun.status !== "failed" || failedSubmittedRun.run?.failureRecovery?.reason !== "not_logged_in") {
+  throw new Error(`Core submit failure smoke failed: persisted owner failure was not projected: ${JSON.stringify(failedSubmittedRun)}`);
+}
+if (
+  failedSubmitCalls.filter((path) => path.endsWith("/tasks")).length !== 1 ||
+  ["/runs/", "/result", "/evidence-refs", "/failure", "/session-refs"].some(
+    (suffix) => failedSubmitCalls.filter((path) =>
+      suffix === "/runs/" ? path.endsWith(`/runs/${failedRun.run_id}`) : path.endsWith(suffix),
+    ).length !== 1,
+  )
+) {
+  throw new Error(`Core submit failure smoke failed: owner readback calls diverged: ${failedSubmitCalls.join(",")}`);
+}
+
+globalThis.fetch = async (url) => {
+  const pathname = String(url);
+  const json = pathname.endsWith("/tasks")
+    ? { ok: false, run_id: "run_submit_xhs_unreadable_001", error: { code: "runtime_unavailable" } }
+    : { ok: false, error: { code: "run_not_queryable" } };
+  return { ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) };
+};
+const unreadableFailedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
+  "http://core.test",
+  readonlySubmitTask,
+  liveRuntimeForSubmit,
+  [readyXhsIdentity],
+);
+globalThis.fetch = originalFetch;
+if (
+  unreadableFailedRun.status !== "failed" ||
+  unreadableFailedRun.run !== undefined ||
+  unreadableFailedRun.summary !== "Core /tasks did not accept the read-only task."
+) {
+  throw new Error(`Core submit failure smoke failed: unreadable owner projection was promoted: ${JSON.stringify(unreadableFailedRun)}`);
+}
+
+let detailPayload;
+let detailPostCount = 0;
+const detailJsonResponse = (json) => ({ ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json) });
+globalThis.fetch = async (url, init = {}) => {
+  const pathname = String(url);
+  if (pathname.endsWith("/tasks")) {
+    detailPostCount += 1;
+    detailPayload = JSON.parse(init.body);
+    return detailJsonResponse({ ok: true, run_id: "run_submit_xhs_detail_001" });
+  }
+  const detailRun = {
+    ...fakeRun,
+    run_id: "run_submit_xhs_detail_001",
+    task: {
+      capability_ref: "lode:capability/read-note-detail",
+      capability_version: "0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+      capability_lock_ref: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+    },
+  };
+  if (pathname.endsWith("/runs/run_submit_xhs_detail_001")) return detailJsonResponse({ ok: true, run: detailRun });
+  if (pathname.endsWith("/result")) return detailJsonResponse({ ok: true, result: { result: { envelope_state: "available", payload_state: "not_persisted_in_core", result_envelope: {
+    result_kind: "read-note-detail.read_result",
+    result_ref: "result:core/xhs/detail/001",
+    package_ref: detailRun.task.package_ref,
+    source_refs: ["source_11111111-1111-4111-8111-111111111111", "source_22222222-2222-4222-8222-222222222222", "source_33333333-3333-4333-8333-333333333333"],
+    evidence_refs: ["evidence_11111111-1111-4111-8111-111111111111", "post_check_11111111-1111-4111-8111-111111111111"],
+    post_check: { status: "passed" },
+    data: { projection: { normalized: { public_summary: { normalized: {
+      kind: "xiaohongshu_note_detail", note_id: "0123456789abcdef01234567", canonical_url: "https://www.xiaohongshu.com/explore/0123456789abcdef01234567",
+      title: "公开标题", summary: "公开摘要", body_summary: "公开正文摘要",
+      author: { display_name: "公开作者", author_id: "author-001", profile_url: "https://www.xiaohongshu.com/user/profile/author-001" },
+      interaction_metrics: { likes: "12", collects: "3", comments: "2", shares: "1" },
+      source_citation: { kind: "xhs_note_detail_ref", note_id: "0123456789abcdef01234567", url: "https://www.xiaohongshu.com/explore/0123456789abcdef01234567", field_sources: ["pinia_store_summary", "network_summary", "dom_snapshot_summary"] },
+      source_status: "located",
+    } } } } },
+  } } } });
+  if (pathname.endsWith("/evidence-refs")) return detailJsonResponse({ ok: true, evidence: { evidence_refs: [
+    { ref: "evidence_11111111-1111-4111-8111-111111111111", state: "available" },
+    { ref: "post_check_11111111-1111-4111-8111-111111111111", state: "available" },
+  ] } });
+  if (pathname.endsWith("/failure")) return detailJsonResponse({ ok: true, failure_reason: { reason_class: "none" } });
+  if (pathname.endsWith("/session-refs")) return detailJsonResponse({ ok: true, session_refs: { session_refs: { runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00" } } });
+  return detailJsonResponse({ ok: false, error: { code: "unexpected_detail_path" } });
+};
+const detailRun = await coreTaskSubmitClientModule.submitCoreXhsDetailTask(
+  "http://core.test", readonlySubmitTask, detailRef, liveRuntimeForSubmit, [readyXhsIdentity], { pollAttempts: 1, pollIntervalMs: 0 },
+);
+const originalFieldSources = detailRun.status === "ready" ? detailRun.run.fieldSources : [];
+globalThis.fetch = originalFetch;
+if (
+  detailRun.status !== "ready" || detailPostCount !== 1 ||
+  detailPayload?.task_intent?.scope?.target_ref !== detailRef ||
+  detailPayload?.task_intent?.input?.refs?.[0] !== detailRef ||
+  detailPayload?.task_intent?.capability?.ref !== "lode:capability/read-note-detail" ||
+  detailPayload?.task_intent?.resource_requirement_refs?.[0] !== "xiaohongshu.read-note-detail.resources" ||
+  "public_query" in detailPayload || "url" in detailPayload.harbor ||
+  /https?:|xsec|0123456789abcdef01234567|AI 工具/.test(JSON.stringify(detailPayload))
+) {
+  throw new Error(`XHS detail submit smoke failed: ${JSON.stringify({ detailRun, detailPostCount, detailPayload })}`);
+}
+if (
+  !appSource.includes("detailInFlightRefs.current.has(detailRef)") ||
+  !appSource.includes("current[submitKey]?.task ?? submitTask") ||
+  !appSource.includes("finally {") ||
+  !appSource.includes("detailInFlightRefs.current.delete(detailRef)") ||
+  !coreTaskSubmitClientSource.includes("crypto.randomUUID()")
+) {
+  throw new Error("XHS detail concurrency smoke failed: same-ref guard or functional run merge is missing.");
+}
+if (
+  !detailRun.run.resultRows.some((row) => row.value === "公开标题") ||
+  detailRun.run.fieldSources.filter((row) => row.field.startsWith("来源引用")).length !== 3 ||
+  !detailRun.run.fieldSources.some((row) => row.value.startsWith("post_check_"))
+) {
+  throw new Error(`XHS detail projection smoke failed: ${JSON.stringify(detailRun.run)}`);
+}
+for (const invalidRef of ["", "0123456789abcdef01234567", "https://www.xiaohongshu.com/explore/0123456789abcdef01234567", "xsec_token=forbidden"]) {
+  const blocked = await coreTaskSubmitClientModule.submitCoreXhsDetailTask("http://core.test", readonlySubmitTask, invalidRef, liveRuntimeForSubmit, [readyXhsIdentity]);
+  if (blocked.status !== "blocked") throw new Error(`XHS detail invalid target was admitted: ${invalidRef}`);
 }
 
 globalThis.fetch = async (url, init = {}) => {
@@ -1554,97 +2003,133 @@ if (pendingRun.status !== "polling" || pendingRun.runId !== "run_submit_pending_
   throw new Error(`Core submit smoke failed: accepted-but-not-ready run was not kept in polling state: ${JSON.stringify(pendingRun)}`);
 }
 
-let submittedBossPayload;
-const acceptsCore273BossPayload = (payload) =>
-  payload?.task_intent?.capability?.ref === "lode:capability/job-search" &&
-  payload?.task_intent?.capability?.source_ref === "lode://site-capability/boss/job-search@0.1.0" &&
-  payload?.task_intent?.scope?.target_type === "boss_job_search" &&
-  payload?.task_intent?.scope?.target_ref === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" &&
-  payload?.public_query?.query === "前端工程师" &&
-  payload?.public_query?.city_code === "101020100" &&
-  payload?.public_query?.page === 1 &&
-  payload?.public_query?.limit === 15 &&
-  Object.keys(payload.public_query).length === 4 &&
-  payload?.harbor?.url === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100";
+let resumePosts = 0;
+globalThis.fetch = async (url, init = {}) => {
+  if (init.method === "POST") resumePosts += 1;
+  const pathname = String(url);
+  return detailJsonResponse(pathname.endsWith("/runs/run_submit_pending_001")
+    ? { ok: true, run: { ...fakeRun, run_id: "run_submit_pending_001", status: "running" } }
+    : { ok: false });
+};
+const resumedPending = await coreTaskSubmitClientModule.resumeCoreXhsDetailPolling(
+  "http://core.test", "run_submit_pending_001", { pollAttempts: 1, pollIntervalMs: 0 },
+);
+globalThis.fetch = originalFetch;
+if (resumedPending.status !== "polling" || resumePosts !== 0) {
+  throw new Error("XHS detail resume smoke failed: existing run polling issued a new POST.");
+}
+
+let terminalResultQueries = 0;
+const uniqueDetailRunIds = [];
 globalThis.fetch = async (url, init = {}) => {
   const pathname = String(url);
   if (pathname.endsWith("/tasks")) {
-    submittedBossPayload = JSON.parse(init.body);
-    const accepted = acceptsCore273BossPayload(submittedBossPayload);
-    const body = accepted
-      ? { ok: true, run_id: "run_submit_boss_001" }
-      : { ok: false, error: { code: "public_query_invalid" } };
-    return { ok: accepted, status: accepted ? 202 : 400, json: async () => body, text: async () => JSON.stringify(body) };
+    uniqueDetailRunIds.push(JSON.parse(init.body).run_id);
+    return detailJsonResponse({ ok: true, run_id: "run_submit_failed_001" });
   }
-  const body = { ok: false, error: { code: "run_not_queryable_yet" } };
-  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
+  if (pathname.endsWith("/runs/run_submit_failed_001")) return detailJsonResponse({ ok: true, run: { ...fakeRun, run_id: "run_submit_failed_001", status: "failed" } });
+  terminalResultQueries += 1;
+  return detailJsonResponse({ ok: false });
 };
-const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
-  "http://core.test",
-  bossSearchTask,
-  liveRuntimeForSubmit,
-  [readyBossIdentity],
-  { pollAttempts: 1, pollIntervalMs: 0 },
+const terminalDetail = await coreTaskSubmitClientModule.submitCoreXhsDetailTask(
+  "http://core.test", readonlySubmitTask, detailRef, liveRuntimeForSubmit, [readyXhsIdentity], { pollAttempts: 1, pollIntervalMs: 0 },
 );
-const acceptedBossPayload = submittedBossPayload;
-const wrongTargetTypeResponse = await globalThis.fetch("http://core.test/tasks", {
-  method: "POST",
-  body: JSON.stringify({
-    ...acceptedBossPayload,
-    task_intent: {
-      ...acceptedBossPayload.task_intent,
-      scope: { ...acceptedBossPayload.task_intent.scope, target_type: "site" },
-    },
-  }),
-});
+await coreTaskSubmitClientModule.submitCoreXhsDetailTask(
+  "http://core.test", readonlySubmitTask, detailRef, liveRuntimeForSubmit, [readyXhsIdentity], { pollAttempts: 1, pollIntervalMs: 0 },
+);
 globalThis.fetch = originalFetch;
-if (
-  acceptedBossRun.status !== "polling" ||
-  acceptedBossRun.runId !== "run_submit_boss_001" ||
-  acceptedBossPayload?.public_query?.query !== "前端工程师" ||
-  acceptedBossPayload?.public_query?.city_code !== "101020100" ||
-  acceptedBossPayload?.public_query?.page !== 1 ||
-  acceptedBossPayload?.public_query?.limit !== 15 ||
-  Object.keys(acceptedBossPayload?.public_query ?? {}).length !== 4 ||
-  acceptedBossPayload?.task_intent?.scope?.target_type !== "boss_job_search" ||
-  acceptedBossPayload?.harbor?.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100"
-) {
-  throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core #273 payload: ${JSON.stringify({ acceptedBossRun, acceptedBossPayload })}`);
-}
-if (wrongTargetTypeResponse.status !== 400) {
-  throw new Error("Core BOSS submit smoke failed: wrong target_type was not rejected by the Core #273 contract handler.");
+if (terminalDetail.status !== "failed" || terminalResultQueries !== 0 || originalFieldSources.length === 0 || new Set(uniqueDetailRunIds).size !== 2) {
+  throw new Error("XHS detail terminal smoke failed: failed run queried result refs or lost the positive projection control.");
 }
 
+const ownerSearchEvidenceRefs = [
+  "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
+  "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
+];
+const ownerSearchAdmissionEvidenceRefs = [
+  "evidence_2c29bb68-10e4-458f-b384-97f249e711e9",
+  "evidence_3c29bb68-10e4-458f-b384-97f249e711e9",
+  "evidence_4c29bb68-10e4-458f-b384-97f249e711e9",
+];
+const ownerSearchDedicatedEvidenceRefs = [...ownerSearchEvidenceRefs, ...ownerSearchAdmissionEvidenceRefs];
+const ownerSearchSourceRefs = ["source_6f45e8c0", "source_7f45e8c0", "source_8f45e8c0"];
+let ownerSearchDrift = {};
+const ownerSearchRun = () => ({
+  ...fakeRun,
+  schema_version: ownerSearchDrift.runSchema ?? fakeRun.schema_version,
+  terminal_summary: {
+    ...fakeRun.terminal_summary,
+    terminal: ownerSearchDrift.runTerminal ?? true,
+    status: ownerSearchDrift.runTerminalStatus ?? "succeeded",
+    result_ref: ownerSearchDrift.resultRef ?? "result:core/xiaohongshu/search-notes/contract",
+    ...(ownerSearchDrift.missingRunPostCheck ? { post_check: undefined } : {
+      post_check: {
+        ...fakeRun.terminal_summary.post_check,
+        status: ownerSearchDrift.postCheckStatus ?? "passed",
+        summary: ownerSearchDrift.runPostCheckSummary ?? ownerSearchPostCheckSummary,
+      },
+    }),
+  },
+});
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   const json = pathname.includes("/capability-runs") && pathname.includes("search-notes")
-    ? { ok: true, capability_runs: { runs: [fakeRun], latest_run: fakeRun } }
+    ? { ok: true, capability_runs: { runs: [ownerSearchRun()], latest_run: ownerSearchRun() } }
     : pathname.includes("/capability-runs")
     ? { ok: true, capability_runs: { runs: [] } }
+    : pathname.endsWith(`/runs/${fakeRun.run_id}`)
+    ? { ok: true, run: ownerSearchRun() }
     : pathname.endsWith("/result")
     ? {
         ok: true,
         result: {
-          schema_version: "webenvoy.result-query.v0",
+          schema_version: ownerSearchDrift.resultSchema ?? "webenvoy.result-query.v0",
           run_id: fakeRun.run_id,
-          status: "succeeded",
-          terminal: true,
+          status: ownerSearchDrift.resultStatus ?? "succeeded",
+          terminal: ownerSearchDrift.resultTerminal ?? true,
           result: {
-            envelope_state: "available",
-            payload_state: "not_persisted_in_core",
-            result_ref: "result:core/xiaohongshu/search-notes/contract",
+            envelope_state: ownerSearchDrift.envelopeState ?? "available",
+            payload_state: ownerSearchDrift.payloadState ?? "available",
+            result_ref: ownerSearchDrift.resultRef ?? "result:core/xiaohongshu/search-notes/contract",
             result_envelope: {
-              result_kind: "xhs_note_search",
-              result_ref: "result:core/xiaohongshu/search-notes/contract",
+              schema_version: "webenvoy.result-envelope.v0",
+              run_record_ref: fakeRun.run_id,
+              ok: true,
+              outcome: "success",
+              terminal: true,
+              capability_ref: "lode:capability/search-notes",
+              result_kind: ownerSearchDrift.resultKind ?? "search-notes.read_result",
+              result_ref: ownerSearchDrift.resultRef ?? "result:core/xiaohongshu/search-notes/contract",
               package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
-              source_refs: ["source_6f45e8c0"],
-              evidence_refs: [
-                "screenshot_f65fac74-c1e8-4285-8015-ac8e22eb7d76",
-                "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
-              ],
-              post_check: {
-                ref: "post_check_1c29bb68-10e4-458f-b384-97f249e711e9",
-                status: "passed",
+              source_refs: ownerSearchDrift.sourceRefs ?? ownerSearchSourceRefs,
+              evidence_refs: ownerSearchEvidenceRefs,
+              ...(ownerSearchDrift.missingEnvelopePostCheck ? {} : {
+                post_check: {
+                  schema_version: "webenvoy.post-check-result.v0",
+                  status: ownerSearchDrift.postCheckStatus ?? "passed",
+                  summary: ownerSearchDrift.envelopePostCheckSummary ?? ownerSearchPostCheckSummary,
+                  checked_at: ownerSearchCheckedAt,
+                  source_refs: ownerSearchDrift.postCheckSourceRefs ?? ownerSearchSourceRefs,
+                  evidence_refs: ownerSearchDrift.postCheckEvidenceRefs ?? ownerSearchEvidenceRefs,
+                  consumer_boundary: "Core records only the validated public summary and opaque operation/source/evidence/post-check refs.",
+                },
+              }),
+              data: {
+                projection: {
+                  normalized: {
+                    public_summary: {
+                      schema_version: ownerSearchDrift.publicSummarySchema ?? "harbor-read-operation-public-summary/v0",
+                      operation_id: "xhs_search_notes",
+                      result_kind: "xiaohongshu_search_notes_surface",
+                      surface: "search_result",
+                      result_state: "operation_read_response_observed",
+                      response_status: 200,
+                      result_count: (ownerSearchDrift.detailRefs ?? [detailRef]).length,
+                      detail_refs: ownerSearchDrift.detailRefs ?? [detailRef],
+                      source_signals: ["pinia_store", "xhs_search_read_network"],
+                    },
+                  },
+                },
               },
             },
           },
@@ -1665,6 +2150,14 @@ globalThis.fetch = async (url) => {
               recorded_at: "2026-07-06T10:00:03.000Z",
               runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
             },
+            {
+              ref: "screenshot_2c29bb68-10e4-458f-b384-97f249e711e9",
+              source: "owner_diagnostic",
+              state: "available",
+              raw_access: "not_available_from_core",
+              recorded_at: "2026-07-06T10:00:03.000Z",
+              runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00",
+            },
           ],
         },
       }
@@ -1672,7 +2165,19 @@ globalThis.fetch = async (url) => {
     ? {
         ok: true,
         evidence: {
-          evidence_refs: [],
+          schema_version: "webenvoy.evidence-refs-query.v0",
+          run_id: fakeRun.run_id,
+          status: "succeeded",
+          evidence_refs: (ownerSearchDrift.dedicatedEvidenceRefs ?? ownerSearchDedicatedEvidenceRefs).map((ref) => ({
+            ref,
+            source: "terminal",
+            state: ownerSearchDrift.evidenceState ?? "available",
+            raw_access: "not_available_from_core",
+            recorded_at: ownerSearchCheckedAt,
+            ...(ownerSearchDrift.missingEvidenceSession ? {} : {
+              runtime_session_ref: ownerSearchDrift.evidenceSessionRef ?? "session_f76393db-e74f-4bec-88be-63754f7a5d00",
+            }),
+          })),
         },
       }
     : pathname.endsWith("/failure")
@@ -1703,10 +2208,51 @@ const coreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("htt
     runs: [],
   },
 ]);
+ownerSearchDrift = { detailRefs: [detailRef, detailRef] };
+const duplicateTargetProjection = await coreReadTaskClientModule.fetchCoreRunProjectionById(
+  "http://core.test", fakeRun.run_id, coreReadTaskClientModule.coreReadTaskSpecs[0],
+);
+const searchContractDriftCases = [
+  ["invalid result kind", { resultKind: "xhs_note_search" }],
+  ["empty detail refs", { detailRefs: [] }],
+  ["failed post-check", { postCheckStatus: "failed" }],
+  ["missing source refs", { sourceRefs: [] }],
+  ["unavailable dedicated evidence", { evidenceState: "unavailable" }],
+  ["empty dedicated evidence with valid result evidence", { dedicatedEvidenceRefs: [] }],
+  ["dedicated evidence missing terminal ref", { dedicatedEvidenceRefs: ownerSearchDedicatedEvidenceRefs.slice(1) }],
+  ["dedicated evidence bound to wrong session", { evidenceSessionRef: "session_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+  ["conflicting dedicated evidence", { dedicatedEvidenceRefs: [ownerSearchEvidenceRefs[0], "screenshot_2c29bb68-10e4-458f-b384-97f249e711e9"] }],
+  ["dedicated evidence without run session", { missingEvidenceSession: true }],
+  ["missing result ref", { resultRef: "" }],
+  ["invalid run query schema", { runSchema: "webenvoy.run-query.v1" }],
+  ["non-terminal run summary", { runTerminal: false }],
+  ["mismatched run terminal status", { runTerminalStatus: "running" }],
+  ["invalid result query schema", { resultSchema: "webenvoy.result-query.v1" }],
+  ["non-terminal result query", { resultTerminal: false }],
+  ["non-success result query", { resultStatus: "running" }],
+  ["unavailable result envelope", { envelopeState: "unavailable" }],
+  ["non-available result payload", { payloadState: "not_persisted_in_core" }],
+  ["missing run post-check", { missingRunPostCheck: true }],
+  ["missing envelope post-check", { missingEnvelopePostCheck: true }],
+  ["mismatched post-check summary", { envelopePostCheckSummary: "different owner summary" }],
+  ["unbound post-check source refs", { postCheckSourceRefs: [] }],
+  ["unbound post-check evidence refs", { postCheckEvidenceRefs: [...ownerSearchEvidenceRefs].reverse() }],
+  ["invalid public summary schema", { publicSummarySchema: "harbor-read-operation-public-summary/v1" }],
+];
+for (const [label, drift] of searchContractDriftCases) {
+  ownerSearchDrift = drift;
+  const projection = await coreReadTaskClientModule.fetchCoreRunProjectionById(
+    "http://core.test", fakeRun.run_id, coreReadTaskClientModule.coreReadTaskSpecs[0],
+  );
+  if (projection.ok) throw new Error(`Core read task smoke failed: ${label} was promoted to live success.`);
+}
 globalThis.fetch = originalFetch;
 
 if (coreReadState.status !== "ready" || coreReadState.tasks[0].runs[0]?.source !== "Core live") {
   throw new Error("Core read task smoke failed: live Core projection was not applied.");
+}
+if (coreReadState.tasks[0].runs[0]?.detailTargets?.[0] !== detailRef || duplicateTargetProjection.ok) {
+  throw new Error("Core read task smoke failed: bounded unique owner detail targets were not enforced.");
 }
 
 if (!coreReadState.tasks[0].runs[0].evidenceCards[0]?.summary.includes("not_available_from_core")) {
@@ -2058,10 +2604,10 @@ const writePreviewRuns = [
     status: "succeeded",
     timeline: { updated_at: "2026-07-06T11:00:04.000Z", terminal_at: "2026-07-06T11:00:04.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
     runtime_refs: {
@@ -2074,10 +2620,10 @@ const writePreviewRuns = [
     status: "cancelled",
     timeline: { updated_at: "2026-07-06T11:03:02.000Z", terminal_at: "2026-07-06T11:03:02.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
   },
@@ -2087,10 +2633,10 @@ const writePreviewRuns = [
     status: "expired",
     timeline: { updated_at: "2026-07-06T11:14:01.000Z", terminal_at: "2026-07-06T11:14:01.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
   },
@@ -2100,10 +2646,10 @@ const writePreviewRuns = [
     status: "failed",
     timeline: { updated_at: "2026-07-06T11:15:01.000Z", terminal_at: "2026-07-06T11:15:01.000Z" },
     task: {
-      capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+      capability_ref: "lode:capability/publish-note-precheck",
       capability_version: "0.1.0",
-      capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
-      package_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+      capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      package_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
     },
     admission: { action_risk: "write" },
   },
@@ -2204,7 +2750,7 @@ const bossWritePreviewRuns = [
 globalThis.fetch = async (url) => {
   const pathname = String(url);
   const runId = decodeURIComponent(pathname.match(/\/runs\/([^/]+)/)?.[1] ?? "");
-  const json = pathname.includes("/capability-runs") && pathname.includes("xiaohongshu-draft-precheck")
+  const json = pathname.includes("/capability-runs") && pathname.includes("publish-note-precheck")
     ? { ok: true, capability_runs: { runs: writePreviewRuns } }
     : pathname.includes("/capability-runs") && pathname.includes("boss-greeting-precheck")
     ? { ok: true, capability_runs: { runs: bossWritePreviewRuns } }
@@ -2424,15 +2970,40 @@ globalThis.fetch = async (url) => {
                 state: "available",
                 submitted: false,
                 expected_change: {
-                  summary: "预览小红书草稿编辑器可写字段和预期草稿变化，不保存、不发布。",
-                  target_ref: "harbor:writable-target/xiaohongshu/draft-editor",
+                  summary: "创作入口已确认，未执行上传、生成、保存或发布。标题、正文和发布控件尚未出现，因此未验证。",
+                  target_ref: "writable-target:xiaohongshu/creator-publish-note",
                   external_submit: false,
+                  identity_ref: "identity-env_xhs_live",
+                  page_ref: "page_ref_xhs_creator",
+                  merged_head_ref: "d18d79cbe280d93b3e855ca906e254bcb9eadf00",
+                  semantic_sha256: strictBackgroundWriteProjection ? "f03577c3290fc8c7b52ed8157b0411d66242f18acdf334200968901ee6121dcd" : undefined,
+                  run_ref: runId,
+                  classification: "partial_result",
+                  precheck_scope: "entrypoint_only",
+                  composition_state: "composition_not_initialized",
+                  entrypoint_observations: {
+                    route_loaded: true,
+                    user_confirmed_identity: true,
+                    challenge_absent: true,
+                    publish_vue_container_visible: true,
+                    upload_image_tab_active: true,
+                    upload_image_entry_visible: true,
+                    text_image_entry_visible: true,
+                  },
+                  prohibited_actions_observed: { upload: false, generate: false, save: false, publish: false },
+                  field_states: ["title_input", "content_editor", "publish_control"].map((field) => ({
+                    field,
+                    availability: "unavailable",
+                    observation: "not_observed",
+                  })),
+                  harbor_result_ref: "harbor_result_xhs_precheck",
+                  submitted_result_ref: "submitted_result_xhs_false",
                 },
                 action_refs: { action_request_id: "action-request:intent_real_site_xiaohongshu_draft_preview" },
                 capability: {
-                  capability_ref: "lode:capability/xiaohongshu-draft-precheck",
+                  capability_ref: "lode:capability/publish-note-precheck",
                   capability_version: "0.1.0",
-                  capability_source_ref: "lode://site-capability/xiaohongshu/draft-precheck@0.1.0",
+                  capability_source_ref: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
                 },
                 evidence_refs: [
                   "harbor:evidence/xiaohongshu/draft-editor/precheck",
@@ -2501,7 +3072,13 @@ const writePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState(
     runs: [],
   },
 ]);
+strictBackgroundWriteProjection = false;
+const driftedWritePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", writePreviewState.tasks);
 globalThis.fetch = originalFetch;
+
+if (driftedWritePreviewState.liveTaskIds.includes("task-xhs-publish-write-preview")) {
+  throw new Error("Core write-precheck smoke failed: background refresh promoted a projection without the strict Lode pin.");
+}
 
 const writePreviewTask = writePreviewState.tasks.find((task) => task.id === "task-xhs-publish-write-preview");
 const bossWritePreviewTask = writePreviewState.tasks.find((task) => task.id === "task-boss-greeting-write-preview");
@@ -2514,6 +3091,9 @@ const writePreviewStates = writePreviewTask.runs.map((run) => run.writePrecheck?
 
 if (writePreviewState.status !== "ready" || writePreviewTask.source !== "Core live" || bossWritePreviewTask.source !== "Core live") {
   throw new Error("Core write-precheck smoke failed: live Core projection was not applied.");
+}
+if (writePreviewTask.blocker !== undefined) {
+  throw new Error("Core write-precheck smoke failed: fallback blocker survived a live owner projection.");
 }
 
 for (const expectedState of ["available", "user_cancelled", "expired", "page_changed"]) {
@@ -2529,9 +3109,43 @@ if (!writePreviewTask.runs.some((run) => run.resultRows.some((row) => row.label 
 if (!writePreviewTask.runs.some((run) => run.fieldSources?.some((field) => field.evidenceRef === "harbor:evidence/xiaohongshu/draft-editor/preview-result-only"))) {
   throw new Error("Core write-precheck smoke failed: preview_result evidence_refs were dropped.");
 }
+if (!writePreviewTask.runs.some((run) => run.writePrecheck?.diffRows.some((row) => row.label === "submitted_result_ref" && row.after === "submitted_result_xhs_false"))) {
+  throw new Error("Core write-precheck smoke failed: expected_change owner refs were not projected.");
+}
+const strictWriteTruth = writePreviewTask.runs.find((run) => run.writePrecheck?.ownerTruth?.status === "succeeded")?.writePrecheck?.ownerTruth;
+if (!strictWriteTruth) throw new Error("Core write-precheck smoke failed: strict owner truth is missing.");
+const strictWriteRun = { writePrecheck: { ownerTruth: strictWriteTruth } };
+if (!coreTaskSubmitClientModule.isStrictWritePrecheckProjection(strictWriteRun, strictWriteTruth.runRef)) {
+  throw new Error(`Core write-precheck smoke failed: complete strict owner truth was rejected: ${JSON.stringify(strictWriteTruth)}`);
+}
+for (const [label, change] of [
+  ["terminal", { terminal: false }],
+  ["status", { status: "running" }],
+  ["submitted", { submitted: true }],
+  ["classification", { classification: "success_result" }],
+  ["precheck_scope", { precheckScope: "field_level" }],
+  ["composition_state", { compositionState: "initialized" }],
+  ["identity_ref", { identityRef: "" }],
+  ["page_ref", { pageRef: "" }],
+  ["merged_head_ref", { mergedHeadRef: "not-a-head" }],
+  ["semantic_sha256", { semanticSha256: "0".repeat(64) }],
+  ["run_ref", { runRef: "other_run" }],
+  ["harbor_result_ref", { harborResultRef: "" }],
+  ["submitted_result_ref", { submittedResultRef: "" }],
+  ["evidence_refs", { evidenceRefs: [] }],
+  ["field_states", { fieldStates: strictWriteTruth.fieldStates.slice(0, 2) }],
+  ["entrypoint_observations", { entrypointObservations: { ...strictWriteTruth.entrypointObservations, uploadImageEntryVisible: false } }],
+  ["prohibited_actions", { prohibitedActionsObserved: { ...strictWriteTruth.prohibitedActionsObserved, upload: true } }],
+]) {
+  const run = { writePrecheck: { ownerTruth: { ...strictWriteTruth, ...change } } };
+  if (coreTaskSubmitClientModule.isStrictWritePrecheckProjection(run, strictWriteTruth.runRef)) {
+    throw new Error(`Core write-precheck strict projection smoke failed: ${label} conflict was accepted.`);
+  }
+}
 
-if (!writePreviewTask.runs.some((run) => run.approval?.statuses.some((status) => status.status === "pending"))) {
-  throw new Error("Core write-precheck smoke failed: pending approval state is missing.");
+const entrypointPartialRun = writePreviewTask.runs.find((run) => run.writePrecheck?.ownerTruth?.classification === "partial_result");
+if (!entrypointPartialRun || entrypointPartialRun.lifecycle !== "completed" || entrypointPartialRun.outcome !== "partial" || entrypointPartialRun.approval || entrypointPartialRun.writePrecheck?.submittedLabel !== "false / 未发布" || entrypointPartialRun.writePrecheck?.stateNote !== "创作入口已确认，未执行上传、生成、保存或发布。标题、正文和发布控件尚未出现，因此未验证。") {
+  throw new Error(`Core write-precheck smoke failed: entrypoint-only partial result was presented as field-level success or approval: ${JSON.stringify(entrypointPartialRun)}`);
 }
 
 if (bossWritePreviewTask.runs.some((run) => run.lifecycle !== "blocked" || run.approval?.statuses.some((status) => status.status === "pending"))) {
@@ -2924,5 +3538,5 @@ async function startJsonServer(bodyForPath) {
   };
 }
 
-console.log("WebEnvoy desktop shell smoke passed.");
+console.log("WebEnvoy source-contract/build smoke passed; packaged runtime assets are not cross-repository integration evidence.");
 process.exit(0);

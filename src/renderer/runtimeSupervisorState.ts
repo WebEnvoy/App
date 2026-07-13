@@ -82,10 +82,31 @@ export function projectRuntimeGatedTasks(
   liveTaskIds: string[],
 ) {
   if (runtime.canUseLiveRuntime) {
-    return tasks.map((task) => (liveTaskIds.includes(task.id) ? task : runtimeBlockedTask(task, runtime)));
+    return tasks.map((task) => (liveTaskIds.includes(task.id) ? task : runtimeAwaitingResultTask(task, runtime)));
   }
 
   return tasks.map((task) => runtimeBlockedTask(task, runtime));
+}
+
+function runtimeAwaitingResultTask(task: TaskProjection, runtime: RuntimeSupervisorState): TaskProjection {
+  return {
+    ...task,
+    source: runtimeSupervisorSource,
+    blocker: undefined,
+    runs: [{
+      id: `runtime-ready-${task.id}`,
+      label: "等待任务提交",
+      lifecycle: "queued",
+      outcome: "unavailable",
+      summary: "本地 runtime 已就绪；尚无 Core owner run 或结果。",
+      actionIntent: "通过任务输入区提交后，等待 Core owner projection。",
+      owner: "Core",
+      source: runtimeSupervisorSource,
+      resultRows: [{ label: "Owner result", value: "尚未提交任务", source: runtimeSupervisorSource }],
+      evidenceCards: [],
+      process: [runtime.summary, "No fixture/demo projection was promoted to a live result."],
+    }],
+  };
 }
 
 export function projectRuntimeGatedIdentities(

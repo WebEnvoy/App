@@ -1,11 +1,11 @@
-import { Activity, AlertTriangle, Ban, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
+import { Activity, AlertTriangle, Ban, BookOpen, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
 import { useState } from "react";
 
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
-import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
+import { BOSS_DEFERRED_REASON, isBossDeferredTask, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 
@@ -17,6 +17,8 @@ export function TaskThreadPage({
   selectedRun,
   selectedTask,
   onActiveRunChange,
+  onReadDetail,
+  detailSubmitStates,
 }: {
   coreReadState: CoreReadTaskLoadState;
   coreSubmitState: CoreTaskSubmitState;
@@ -25,6 +27,8 @@ export function TaskThreadPage({
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   onActiveRunChange: (runId: string) => void;
+  onReadDetail: (detailRef: string) => void;
+  detailSubmitStates: Record<string, CoreTaskSubmitState>;
 }) {
   return (
     <div className="thread-body">
@@ -43,7 +47,7 @@ export function TaskThreadPage({
 
         <CoreReadSourceStrip selectedTask={selectedTask} state={coreReadState} />
         <RuntimeSupervisorStrip state={runtimeSupervisorState} />
-        <CoreSubmitStrip state={coreSubmitState} />
+        <CoreSubmitStrip state={coreSubmitState} writePrecheck={selectedTask.id === "task-xhs-publish-write-preview"} />
         <TaskIntentTurn selectedTask={selectedTask} />
 
         {selectedTask.blocker ? (
@@ -62,6 +66,9 @@ export function TaskThreadPage({
               isSelected={run.id === selectedRun.id}
               key={run.id}
               run={run}
+              onReadDetail={onReadDetail}
+              detailSubmitStates={detailSubmitStates}
+              mainTaskBusy={coreSubmitState.status === "submitting" || coreSubmitState.status === "polling"}
             />
           ))}
         </div>
@@ -70,7 +77,10 @@ export function TaskThreadPage({
   );
 }
 
-function CoreSubmitStrip({ state }: { state: CoreTaskSubmitState }) {
+function CoreSubmitStrip({ state, writePrecheck }: { state: CoreTaskSubmitState; writePrecheck: boolean }) {
+  const summary = writePrecheck && state.status === "idle"
+    ? "真实 validate-only 写前验证尚未提交；仅在 Core admission、Harbor live identity 和精确 Lode spec 可用时启用。"
+    : state.summary;
   const status =
     state.status === "ready"
       ? "ready"
@@ -93,9 +103,9 @@ function CoreSubmitStrip({ state }: { state: CoreTaskSubmitState }) {
     <section className={`core-read-source-strip core-read-source-${status}`} aria-label="Core task submit status">
       <div>
         <strong>{title}</strong>
-        <span>POST /tasks read-only</span>
+        <span>{writePrecheck ? "POST /tasks validate-only" : "POST /tasks read-only"}</span>
       </div>
-      <p>{state.summary}</p>
+      <p>{summary}</p>
       <span className="badge">{runId}</span>
     </section>
   );
@@ -162,11 +172,14 @@ function CoreReadSourceStrip({
   state: CoreReadTaskLoadState;
 }) {
   const isLiveTask = state.liveTaskIds.includes(selectedTask.id);
-  const isWritePrecheckTask = selectedTask.runs.some((run) => run.writePrecheck);
+  const isDeferred = isBossDeferredTask(selectedTask.id);
+  const isWritePrecheckTask = selectedTask.id === "task-xhs-publish-write-preview";
   const taskKind = isWritePrecheckTask ? "写前验证" : "只读任务结果";
-  const status = state.status === "ready" && !isLiveTask ? "fallback" : state.status;
+  const status = isDeferred ? "deferred" : state.status === "ready" && !isLiveTask ? "fallback" : state.status;
   const label =
-    status === "ready"
+    status === "deferred"
+      ? "访问受限"
+      : status === "ready"
       ? "实时结果"
       : status === "fallback"
       ? "本地展示"
@@ -174,7 +187,9 @@ function CoreReadSourceStrip({
       ? "正在检查"
       : "本地展示";
   const summary =
-    status === "ready"
+    status === "deferred"
+      ? BOSS_DEFERRED_REASON
+      : status === "ready"
       ? isWritePrecheckTask
         ? "已读取 owner 返回的写前验证引用；页面只展示预期变化、证据引用、风险状态和 owner submitted 状态。"
         : "已读取 owner 返回的只读运行结果引用；页面只展示结果、证据引用和恢复状态。"
@@ -191,7 +206,7 @@ function CoreReadSourceStrip({
         <span>{taskKind}</span>
       </div>
       <p>{summary}</p>
-      <span className="badge">{status === "ready" ? "owner refs" : "fallback"}</span>
+      <span className="badge">{status === "deferred" ? "deferred" : status === "ready" ? "owner refs" : "fallback"}</span>
     </section>
   );
 }
@@ -232,7 +247,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
   );
 }
 
-function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean }) {
+function RunTurn({ run, isSelected, onReadDetail, detailSubmitStates, mainTaskBusy }: { run: RunProjection; isSelected: boolean; onReadDetail: (detailRef: string) => void; detailSubmitStates: Record<string, CoreTaskSubmitState>; mainTaskBusy: boolean }) {
   return (
     <article
       className={isSelected ? "run-turn selected" : "run-turn"}
@@ -258,6 +273,24 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
           <span className="badge">{outcomeLabel(run.outcome)}</span>
         </div>
         <p>{run.summary}</p>
+        {run.detailTargets?.length ? (
+          <section className="failure-recovery-panel" aria-label="小红书详情读取命令">
+            <div className="card-title compact-title">
+              <BookOpen size={18} />
+              <h3>读取搜索结果详情</h3>
+              <span className="source-chip">Core live</span>
+            </div>
+            {run.detailTargets.map((detailRef, index) => {
+              const state = detailSubmitStates[detailRef];
+              const detailSubmitting = state?.status === "submitting";
+              const disabled = mainTaskBusy || detailSubmitting;
+              return <button className="cancel-intent-button" disabled={disabled} key={detailRef} type="button" onClick={() => onReadDetail(detailRef)}>
+                <BookOpen size={15} />
+                {mainTaskBusy ? "搜索任务进行中" : detailSubmitting ? `详情 ${index + 1} 提交中` : state?.status === "polling" ? `继续查询详情 ${index + 1}` : `读取详情 ${index + 1}`}
+              </button>;
+            })}
+          </section>
+        ) : null}
         {run.writePrecheck ? <WritePrecheckPreview run={run} /> : null}
         {run.approval ? <ApprovalPreview run={run} /> : null}
         <h3 className="subsection-title">提取结果</h3>

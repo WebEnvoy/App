@@ -27,8 +27,14 @@ import {
 } from "./coreReadTaskClient";
 import {
   coreTaskSubmitReadiness,
+  coreTaskSubmitFailureState,
   initialCoreTaskSubmitState,
+  isBossDeferredTask,
+  projectDeferredBossTask,
   promoteSubmittedCoreTask,
+  promoteSubmittedDetailRun,
+  resumeCoreXhsDetailPolling,
+  submitCoreXhsDetailTask,
   submitCoreReadOnlyTask,
   type CoreTaskSubmitState,
 } from "./coreTaskSubmitClient";
@@ -154,6 +160,36 @@ function readOnlyTaskId(taskId: string) {
   return milestone14TaskIds.has(taskId) && !taskId.includes("write-preview");
 }
 
+function disableFixtureWritePrecheck(task: TaskProjection): TaskProjection {
+  if (task.id !== "task-xhs-publish-write-preview" || task.source === "Core live") return task;
+  return {
+    ...task,
+    businessInput: "固定安全摘要；不会发送草稿内容",
+    blocker: "等待 Core、Harbor 和 Lode live runtime；fixture 写前验证已禁用。",
+    packageSource: {
+      ...task.packageSource,
+      capabilityRef: "lode:capability/publish-note-precheck",
+      sourceRef: "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
+      lockRef: "lode://lock/site-capability/xiaohongshu/publish-note-precheck@0.1.1",
+      source: "App local-only",
+      boundary: "仅用于提交固定 validate_only intent；产品结果必须来自 Core/Harbor/Lode owner refs。",
+    },
+    runs: [{
+      id: "xhs-write-precheck-live-required",
+      label: "等待真实写前验证",
+      lifecycle: "blocked",
+      outcome: "unavailable",
+      summary: "当前没有可展示的真实写前验证；fixture 不作为产品结果。",
+      actionIntent: "连接可用的 Core、Harbor 和 Lode runtime 后运行 validate_only precheck。",
+      owner: "Core",
+      source: "App local-only",
+      resultRows: [{ label: "Owner result", value: "尚无 owner result", source: "App local-only" }],
+      evidenceCards: [],
+      process: ["Fixture write-precheck projection disabled."],
+    }],
+  };
+}
+
 export function App() {
   const [shellContext, setShellContext] = useState<ShellContext | null>(null);
   const [connectionConfig, setConnectionConfig] = useState<LocalConnectionConfig>(
@@ -166,6 +202,10 @@ export function App() {
     coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
   );
   const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
+  const coreSubmitInFlightByKey = useRef(new Map<string, number>());
+  const coreSubmitSequence = useRef(0);
+  const [detailSubmitStatesByRef, setDetailSubmitStatesByRef] = useState<Record<string, CoreTaskSubmitState>>({});
+  const detailInFlightRefs = useRef(new Set<string>());
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
   const [taskBusinessInputOverrides, setTaskBusinessInputOverrides] = useState<Record<string, string>>({});
   const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
@@ -216,7 +256,7 @@ export function App() {
   const effectiveCoreReadTasks = useMemo(
     () =>
       effectiveCoreReadState.tasks.map((task) =>
-        applyLocalTaskContext(task, taskBusinessInputOverrides, harborIdentityState),
+        applyLocalTaskContext(disableFixtureWritePrecheck(task), taskBusinessInputOverrides, harborIdentityState),
       ),
     [effectiveCoreReadState.tasks, harborIdentityState, taskBusinessInputOverrides],
   );
@@ -226,7 +266,7 @@ export function App() {
         effectiveCoreReadTasks,
         runtimeSupervisorState,
         effectiveCoreReadState.liveTaskIds,
-      ),
+      ).map(projectDeferredBossTask),
     [effectiveCoreReadState.liveTaskIds, effectiveCoreReadTasks, runtimeSupervisorState],
   );
   const selectedTask =
@@ -440,6 +480,7 @@ export function App() {
     const taskId = skill.relatedTaskIds[0];
     if (
       taskId != null &&
+      !isBossDeferredTask(taskId) &&
       runtimeSupervisorState.canUseLiveRuntime &&
       (readOnlyTaskId(taskId) || effectiveCoreReadState.liveTaskIds.includes(taskId))
     ) {
@@ -454,10 +495,12 @@ export function App() {
       ...current,
       [taskId]: value,
     }));
-    setCoreSubmitStatesByKey((current) => ({
-      ...current,
-      [submitKey]: initialCoreTaskSubmitState,
-    }));
+    if (!coreSubmitInFlightByKey.current.has(submitKey)) {
+      setCoreSubmitStatesByKey((current) => ({
+        ...current,
+        [submitKey]: initialCoreTaskSubmitState,
+      }));
+    }
   }
 
   async function submitSelectedCoreTask() {
@@ -476,33 +519,89 @@ export function App() {
       }));
       return;
     }
+    if (coreSubmitInFlightByKey.current.has(submitKey)) return;
+    const submitSequence = coreSubmitSequence.current + 1;
+    coreSubmitSequence.current = submitSequence;
+    coreSubmitInFlightByKey.current.set(submitKey, submitSequence);
 
     setCoreSubmitStatesByKey((current) => ({
       ...current,
       [submitKey]: {
         status: "submitting",
-        summary: "正在向 Core POST /tasks 提交只读 task intent。",
+        summary: submitTask.id === "task-xhs-publish-write-preview"
+          ? "正在向 Core POST /tasks 提交 validate_only 写前验证；不会发送草稿内容。"
+          : "正在向 Core POST /tasks 提交只读 task intent。",
       },
     }));
-    const result = await submitCoreReadOnlyTask(
-      submitEndpoint,
-      submitTask,
-      runtimeSupervisorState,
-      harborIdentityState.identities,
-    );
-    setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
-    if (result.status === "ready") {
-      setSubmittedTaskOverrides((current) => ({
-        ...current,
-        [submitKey]: {
-          endpoint: submitEndpoint,
-          taskId: submitTask.id,
-          task: promoteSubmittedCoreTask(submitTask, result.run),
-        },
-      }));
-      if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
-        setSelectedRunId(result.run.id);
+    try {
+      let result: CoreTaskSubmitState;
+      try {
+        result = await submitCoreReadOnlyTask(
+          submitEndpoint,
+          submitTask,
+          runtimeSupervisorState,
+          harborIdentityState.identities,
+        );
+      } catch (error) {
+        result = coreTaskSubmitFailureState(error);
       }
+      if (coreSubmitInFlightByKey.current.get(submitKey) !== submitSequence) return;
+      setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
+      if ("run" in result && result.run) {
+        const run = result.run;
+        setSubmittedTaskOverrides((current) => ({
+          ...current,
+          [submitKey]: {
+            endpoint: submitEndpoint,
+            taskId: submitTask.id,
+            task: promoteSubmittedCoreTask(submitTask, run),
+          },
+        }));
+        if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
+          setSelectedRunId(run.id);
+        }
+      }
+    } finally {
+      if (coreSubmitInFlightByKey.current.get(submitKey) === submitSequence) {
+        coreSubmitInFlightByKey.current.delete(submitKey);
+      }
+    }
+  }
+
+  async function submitSelectedXhsDetail(detailRef: string) {
+    if (detailInFlightRefs.current.has(detailRef)) return;
+    detailInFlightRefs.current.add(detailRef);
+    const submitTask = selectedSubmitTask;
+    const submitEndpoint = connectionConfig.coreEndpoint;
+    const submitKey = coreSubmitStateKey(submitTask.id, submitEndpoint);
+    const previous = detailSubmitStatesByRef[detailRef];
+    setDetailSubmitStatesByRef((current) => ({
+      ...current,
+      [detailRef]: previous?.status === "polling"
+        ? { status: "polling", runId: previous.runId, summary: `正在继续查询 ${previous.runId}。` }
+        : { status: "submitting", summary: "正在向 Core 提交 opaque detail target。" },
+    }));
+    let result: CoreTaskSubmitState;
+    try {
+      result = previous?.status === "polling"
+        ? await resumeCoreXhsDetailPolling(submitEndpoint, previous.runId)
+        : await submitCoreXhsDetailTask(submitEndpoint, submitTask, detailRef, runtimeSupervisorState, harborIdentityState.identities);
+    } catch (error) {
+      result = { ...coreTaskSubmitFailureState(error), ...(previous?.status === "polling" ? { runId: previous.runId } : {}) };
+    } finally {
+      detailInFlightRefs.current.delete(detailRef);
+    }
+    setDetailSubmitStatesByRef((current) => ({ ...current, [detailRef]: result }));
+    if (result.status !== "ready") return;
+    setSubmittedTaskOverrides((current) => ({
+      ...current, [submitKey]: {
+        endpoint: submitEndpoint,
+        taskId: submitTask.id,
+        task: promoteSubmittedDetailRun(current[submitKey]?.task ?? submitTask, result.run),
+      },
+    }));
+    if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
+      setSelectedRunId(result.run.id);
     }
   }
 
@@ -774,6 +873,8 @@ export function App() {
               selectedRun={selectedRun}
               selectedTask={selectedTask}
               onActiveRunChange={setSelectedRunId}
+              onReadDetail={submitSelectedXhsDetail}
+              detailSubmitStates={detailSubmitStatesByRef}
             />
           </ThreadWorkspace>
         )

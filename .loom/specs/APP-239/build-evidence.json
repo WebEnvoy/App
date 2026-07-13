@@ -1,269 +1,55 @@
 {
   "schema_version": "loom-build-evidence/v1",
   "item_id": "APP-239",
+  "task_goal": "Consume Core-owned Xiaohongshu search detail refs, submit one exact detail task, and display real public result/evidence refs.",
+  "branch": "work/app-239-xhs-detail-handoff",
+  "head_at_validation": "9412b7f9cc921066d404744c079475faf327beb9",
+  "covered_issues": [239, 241],
+  "ownership_constraints": ["App renderer/client only", "No Core/Harbor/Lode edits", "No BOSS production", "No sensitive material or external write"],
   "delegations": [
     {
-      "id": "meitner-app-implementation",
+      "id": "curie-app-239-detail-handoff",
+      "task_goal": "Implement the bounded App search-to-detail owner-ref handoff.",
+      "context_locators": [".loom/work-items/APP-239.md", ".loom/specs/APP-239/spec.md", "https://github.com/WebEnvoy/WebEnvoy/pull/283"],
+      "read_scope": ["App design documents", "existing Core read/submit clients", "Task Thread UI", "scripts/smoke.mjs"],
+      "write_ownership": ["src/renderer/coreReadTaskClient.ts", "src/renderer/coreTaskSubmitClient.ts", "src/renderer/App.tsx", "src/renderer/TaskThreadPage.tsx", "src/renderer/taskThreadFixtures.ts", "scripts/smoke.mjs"],
+      "non_goals": ["Loom carriers", "GitHub mutations", "other repositories", "production pages", "external writes"],
+      "validation_expectation": "typecheck, smoke, packaged smoke, diff check, and independent review",
+      "output_format": "Changed paths, owner contract, validation, and residual risks.",
+      "integration_target": "APP-239 product head and item-specific carriers",
       "status": "integrated",
-      "task_goal": "Implement App-only APP-239 real read-only task result display anchored on #239 and covering #238-#242.",
-      "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results",
-        ".loom/work-items/APP-239.md",
-        ".loom/specs/APP-239/spec.md",
-        ".loom/specs/APP-239/plan.md"
-      ],
-      "read_scope": [
-        "AGENTS.md",
-        "VISION.md",
-        "DESIGN.md",
-        "docs/adr/0008-desktop-ui-design-checkpoint.md",
-        "src/renderer/**",
-        "scripts/smoke.mjs"
-      ],
-      "write_ownership": [
-        "src/renderer/coreReadTaskClient.ts",
-        "src/renderer/App.tsx",
-        "src/renderer/TaskThreadPage.tsx",
-        "src/renderer/TaskThreadRightPanel.tsx",
-        "src/renderer/ThreadNavigationRail.tsx",
-        "src/renderer/taskThreadFixtures.ts",
-        "src/renderer/siteSkillFixtures.ts",
-        "src/renderer/harborIdentityProjection.ts",
-        "src/renderer/IdentityEnvironmentDetails.tsx",
-        "src/renderer/styles.css",
-        "scripts/smoke.mjs#initial-core-read-smoke"
-      ],
-      "non_goals": [
-        "Core/Harbor/Lode changes",
-        "real external site access",
-        "real account/profile/Cookie use",
-        "submit/publish/send/write actions",
-        "PR/issue/merge/closeout writes"
-      ],
-      "validation_expectation": "npm run typecheck; npm run smoke; git diff --check",
-      "output_format": "Implementation summary with changed paths, validation, risks, and boundary confirmation.",
-      "integration_target": "APP-239 implementation commit and item-specific Loom carriers."
+      "result": "Implemented and repaired through two independent review rounds; final review ALLOW."
     },
     {
-      "id": "bernoulli-code-review",
+      "id": "rawls-app-239-semantic-review",
+      "task_goal": "Review Core contract fidelity, fail-closed behavior, concurrency, privacy, and BOSS deferred regression.",
+      "context_locators": ["APP-239 product diff", "Core #270 merged contract", "scripts/smoke.mjs"],
+      "read_scope": ["APP-239 changed product files", "Core/Harbor authoritative contracts", "focused smoke"],
+      "write_ownership": ["read_only:no_tracked_writes:rawls-app-239-review"],
+      "non_goals": ["file edits", "GitHub mutations", "production actions"],
+      "validation_expectation": "Severity-ordered findings and final ALLOW/BLOCK verdict.",
+      "output_format": "Findings with locator, impact, and minimal fix.",
+      "integration_target": "Main controller fixes and final review artifact",
       "status": "integrated",
-      "task_goal": "Review APP-239 Core read task client and result projection for correctness, security, and privacy blockers.",
-      "context_locators": [
-        "src/renderer/coreReadTaskClient.ts",
-        "scripts/smoke.mjs",
-        ".loom/specs/APP-239/**"
-      ],
-      "read_scope": [
-        "git diff",
-        "src/renderer/coreReadTaskClient.ts",
-        "scripts/smoke.mjs",
-        "APP-239 Loom carriers"
-      ],
-      "write_ownership": [
-        "read_only:no_tracked_writes:bernoulli-code-review"
-      ],
-      "non_goals": [
-        "file edits",
-        "GitHub writes",
-        "real account/profile/external actions"
-      ],
-      "validation_expectation": "Identify P0/P1/P2 findings and targeted reproduction evidence.",
-      "output_format": "Findings with file/line, impact, and minimal fix.",
-      "integration_target": "Main controller fixes per-run detail failure handling, app_action none suppression, and smoke coverage."
-    },
-    {
-      "id": "bacon-ux-review",
-      "status": "integrated",
-      "task_goal": "Review APP-239 desktop Task Thread behavior against App design checkpoint.",
-      "context_locators": [
-        "VISION.md",
-        "DESIGN.md",
-        "docs/adr/0008-desktop-ui-design-checkpoint.md",
-        "src/renderer/App.tsx",
-        "src/renderer/TaskThreadPage.tsx",
-        "src/renderer/TaskThreadRightPanel.tsx"
-      ],
-      "read_scope": [
-        "design docs",
-        "git diff",
-        "Task Thread UI files"
-      ],
-      "write_ownership": [
-        "read_only:no_tracked_writes:bacon-ux-review"
-      ],
-      "non_goals": [
-        "visual redesign",
-        "file edits",
-        "real account/profile/external actions"
-      ],
-      "validation_expectation": "Identify PR Ready UX blockers.",
-      "output_format": "P0/P1/P2 UX findings with file/line and minimal fix.",
-      "integration_target": "Main controller fixes selected-run rail binding, APP-239 read-only task filtering, endpoint/jargon exposure, viewer/runtime ref labeling, and disabled controls."
-    },
-    {
-      "id": "jason-loom-readiness-review",
-      "status": "integrated",
-      "task_goal": "Audit APP-239 Loom carrier, GitHub issue coverage, and PR readiness gaps.",
-      "context_locators": [
-        ".loom/work-items/APP-239.md",
-        ".loom/specs/APP-239/**",
-        ".loom/progress/APP-239.md",
-        "WebEnvoy/App issues #238-#247"
-      ],
-      "read_scope": [
-        "APP-239 Loom files",
-        "GitHub issue/PR read-only state",
-        "Loom validation outputs"
-      ],
-      "write_ownership": [
-        "read_only:no_tracked_writes:jason-loom-readiness-review"
-      ],
-      "non_goals": [
-        "carrier edits",
-        "PR creation",
-        "issue writes",
-        "merge/closeout"
-      ],
-      "validation_expectation": "Classify carrier/GitHub/pre-review blockers and PR body requirements.",
-      "output_format": "Blockers/non-blockers with commands, output summaries, and PR body coverage points.",
-      "integration_target": "Main controller updates task carrier rows, evidence map, work-item artifacts, progress checkpoint, current pointer, bootstrap fact-chain, and validation summary."
-    },
-    {
-      "id": "kant-current-head-semantic-review",
-      "status": "integrated",
-      "task_goal": "Review current-head APP-239 implementation for correctness, privacy, external-write, and read-only boundary blockers.",
-      "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results",
-        "src/renderer/coreReadTaskClient.ts",
-        "src/renderer/SiteSkillPages.tsx",
-        "scripts/smoke.mjs",
-        ".loom/specs/APP-239/**"
-      ],
-      "read_scope": [
-        "git diff main...HEAD",
-        "APP-239 changed App renderer files",
-        "APP-239 Loom carriers"
-      ],
-      "write_ownership": [
-        "read_only:no_tracked_writes:kant-current-head-semantic-review"
-      ],
-      "non_goals": [
-        "file edits",
-        "GitHub writes",
-        "real account/profile/external actions"
-      ],
-      "validation_expectation": "Identify P0/P1/P2 semantic findings and residual risk.",
-      "output_format": "Findings with file/line, impact, and minimal fix.",
-      "integration_target": "Main controller records no P0/P1 blockers and routes two P2 findings to bounded worker repair."
-    },
-    {
-      "id": "euler-p2-review-fixes",
-      "status": "integrated",
-      "task_goal": "Fix APP-239 P2 review findings in disjoint App files.",
-      "context_locators": [
-        "/Volumes/2T/dev/WebEnvoy/App.worktrees/app-239-real-read-results",
-        "src/renderer/SiteSkillPages.tsx",
-        "scripts/smoke.mjs#boss-failure-and-cta-smoke"
-      ],
-      "read_scope": [
-        "Site skill detail CTA behavior",
-        "Core read task smoke coverage"
-      ],
-      "write_ownership": [
-        "src/renderer/SiteSkillPages.tsx",
-        "scripts/smoke.mjs"
-      ],
-      "non_goals": [
-        ".loom/** edits",
-        "package file edits",
-        "other src file edits",
-        "GitHub writes",
-        "real account/profile/external actions"
-      ],
-      "validation_expectation": "npm run typecheck; npm run smoke; git diff --check",
-      "output_format": "Changed paths, validation result, residual risk.",
-      "integration_target": "Main controller integrates BOSS/failure smoke coverage and read-only-only Library CTA behavior into final APP-239 commit."
+      "result": "All contract, polling, concurrency, and evidence findings fixed; final ALLOW."
     }
   ],
-  "integration_evidence": [
-    {
-      "id": "code-review-p1-integrated",
-      "source": "bernoulli-code-review",
-      "status": "integrated",
-      "summary": "Per-run detail failure no longer falls back silently to older successful runs; app_action none no longer renders as action intent or failure recovery.",
-      "locators": [
-        "src/renderer/coreReadTaskClient.ts",
-        "scripts/smoke.mjs"
-      ],
-      "validation": [
-        "npm run typecheck",
-        "npm run smoke"
-      ]
-    },
-    {
-      "id": "ux-p1-integrated",
-      "source": "bacon-ux-review",
-      "status": "integrated",
-      "summary": "Task Thread now defaults to APP-239 read-only tasks, keeps selected Run controlled, distinguishes viewer/runtime refs, and disables out-of-scope controls.",
-      "locators": [
-        "src/renderer/App.tsx",
-        "src/renderer/TaskThreadPage.tsx",
-        "src/renderer/TaskThreadRightPanel.tsx",
-        "src/renderer/ThreadNavigationRail.tsx"
-      ],
-      "validation": [
-        "npm run typecheck",
-        "npm run smoke"
-      ]
-    },
-    {
-      "id": "loom-readiness-integrated",
-      "source": "jason-loom-readiness-review",
-      "status": "integrated",
-      "summary": "APP-239 carrier rows cover #238-#242, current pointer and bootstrap fact-chain are bound to APP-239, and tool-surface blockers are recorded without being treated as App product failures.",
-      "locators": [
-        ".loom/work-items/APP-239.md",
-        ".loom/progress/APP-239.md",
-        ".loom/status/current.md",
-        ".loom/bootstrap/init-result.json",
-        ".loom/specs/APP-239/evidence-map.md",
-        ".loom/specs/APP-239/task-carrier.md"
-      ],
-      "validation": [
-        "loom fact-chain --target . --json",
-        "loom suite carrier validate --target . --item APP-239 --json",
-        "loom suite evidence validate --target . --item APP-239 --json"
-      ]
-    },
-    {
-      "id": "current-head-semantic-review-integrated",
-      "source": "kant-current-head-semantic-review",
-      "status": "integrated",
-      "summary": "Current-head review found no P0/P1 blockers. Two P2 issues were accepted: BOSS/failure smoke coverage and read-only-only Library CTA behavior.",
-      "locators": [
-        "scripts/smoke.mjs",
-        "src/renderer/SiteSkillPages.tsx"
-      ],
-      "validation": [
-        "git diff --check main...HEAD",
-        "npm run typecheck",
-        "npm run smoke"
-      ]
-    },
-    {
-      "id": "p2-fixes-integrated",
-      "source": "euler-p2-review-fixes",
-      "status": "integrated",
-      "summary": "Smoke now covers BOSS live Core projection and non-none failure recovery; Library detail CTA now only launches APP-239 read-only task ids and disables write-pre related tasks.",
-      "locators": [
-        "scripts/smoke.mjs",
-        "src/renderer/SiteSkillPages.tsx"
-      ],
-      "validation": [
-        "npm run typecheck",
-        "npm run smoke",
-        "git diff --check"
-      ]
-    }
-  ]
+  "validation_results": [
+    {"command": "npm run typecheck", "result": "pass"},
+    {"command": "npm run smoke", "result": "pass"},
+    {"command": "npm run smoke:packaged", "result": "pass"},
+    {"command": "WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 npm run smoke:packaged:readonly", "result": "pass"},
+    {"command": "git diff --check", "result": "pass"}
+  ],
+  "visual_artifacts": [
+    {"locator": "artifacts/gh-168-packaged-preview.png", "classification": "packaged_shell_smoke_only"},
+    {"locator": "artifacts/app-265-packaged-readonly-smoke.png", "classification": "packaged_fixture_fail_closed_smoke_only"}
+  ],
+  "runtime_evidence_boundary": {
+    "evidence_type": "local_contract_and_packaged_runtime_smoke",
+    "not_live_site_e2e": true,
+    "issue_closeout_requires_merged_packaged_app_e2e": true,
+    "boss_production_not_accessed": true,
+    "external_write_not_performed": true
+  }
 }

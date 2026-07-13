@@ -1,10 +1,9 @@
-# Evidence Map
+# APP-239 Evidence Map
 
-| Evidence id | Type | Source locator | Consumes | Binding | Freshness | Consumer boundary | Remediation direction |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| EV-001 | issue_tree_evidence | https://github.com/WebEnvoy/App/issues/238 https://github.com/WebEnvoy/App/issues/239 https://github.com/WebEnvoy/App/issues/240 https://github.com/WebEnvoy/App/issues/241 https://github.com/WebEnvoy/App/issues/242 | App milestone #14 FR and Work Items read back on 2026-07-07 UTC | APP-239 scope | present | planning/readiness evidence only | Re-read before PR metadata if issue bodies or dependencies change. |
-| EV-002 | upstream_fact_evidence | https://github.com/WebEnvoy/WebEnvoy/issues/225 and closed children #226/#227/#228/#229 | Core read-only run/result/evidence/failure query facts | APP-239 dependency | present | read-only refs/status facts only; Core #230/PR #240 write-precheck not consumed | Stop and re-plan if APP-239 starts depending on Core #230/PR #240. |
-| EV-003 | behavior_evidence | src/renderer/coreReadTaskClient.ts; src/renderer/App.tsx; src/renderer/TaskThreadPage.tsx; src/renderer/TaskThreadRightPanel.tsx | Core owner API query mapping and App display state | APP-239 behavior | present | App display only; no owner truth writes | Rerun typecheck/smoke after code changes. |
-| EV-004 | test_evidence | scripts/smoke.mjs | Core live projection smoke and raw evidence boundary | APP-239 validation | present | local smoke only; no real Core endpoint or browser required | Expand if owner API contract changes. |
-| EV-005 | validation_evidence | .loom/progress/APP-239.md | npm run typecheck; npm run smoke; git diff --check | APP-239 latest validation | present | local branch readiness only | Refresh after any diff or head change. |
-| EV-006 | fresh_verification_input | .loom/progress/APP-239.md | EV-001 EV-002 EV-003 EV-004 EV-005 | APP-239 current verification input | present | review and merge-ready evidence only; no live site, profile, Cookie, submit, publish, send, or owner truth write | Refresh after any code, fixture, carrier, validation, head SHA, or PR metadata change. |
+| Evidence ID | Type | Source Locator | Binding | Freshness | Consumer Boundary | Remediation |
+| --- | --- | --- | --- | --- | --- | --- |
+| EV-001 | issue_tree | https://github.com/WebEnvoy/App/issues/239; https://github.com/WebEnvoy/App/issues/241 | APP-239/#241 scope | present | planning only | Re-read after issue change. |
+| EV-002 | upstream_contract | https://github.com/WebEnvoy/WebEnvoy/pull/283 | Core opaque detail target and detail task contract | merged `795059d6` | Core behavior only | Stop if owner contract changes. |
+| EV-003 | behavior | `src/renderer/coreReadTaskClient.ts`; `src/renderer/coreTaskSubmitClient.ts`; `src/renderer/App.tsx`; `src/renderer/TaskThreadPage.tsx` | APP-239 implementation | product head `9412b7f` | App behavior only | Refresh after implementation changes. |
+| EV-004 | test | `scripts/smoke.mjs`; packaged smoke scripts | positive/fail-closed target, submit, resume, result and packaged runtime paths | 2026-07-12T14:29Z | local/packaged test only | Refresh after validation/head changes. |
+| EV-005 | live_runtime | merged packaged App Computer Use run refs | #239/#241 closeout | missing | XHS read-only only | Required before issue closeout. |

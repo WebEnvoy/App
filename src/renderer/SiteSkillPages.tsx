@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { BOSS_DEFERRED_REASON, isBossDeferredTask } from "./coreTaskSubmitClient";
 import { type SiteSkill, type SiteSkillStatus, siteSkillFixtures } from "./siteSkillFixtures";
 
 const directoryTabs = ["全部", "电商", "内容平台", "招聘", "内容发布", "账号身份", "诊断"] as const;
@@ -32,7 +33,20 @@ function hasLiveRuntimeEvidence(skill: SiteSkill, canUseLiveRuntime: boolean, li
   return canUseLiveRuntime && skill.relatedTaskIds.some((taskId) => liveTaskIds.includes(taskId));
 }
 
+function isBossDeferredSkill(skill: SiteSkill) {
+  return skill.relatedTaskIds.some(isBossDeferredTask);
+}
+
 function projectSiteSkill(skill: SiteSkill, canUseLiveRuntime: boolean, liveTaskIds: string[]): SiteSkill {
+  if (isBossDeferredSkill(skill)) {
+    return {
+      ...skill,
+      status: "unavailable",
+      readiness: skill.readiness.map((item) => ({ ...item, status: "unavailable", detail: BOSS_DEFERRED_REASON })),
+      boundaries: [BOSS_DEFERRED_REASON, ...skill.boundaries],
+      sourceHealth: { label: "access limited", status: "unavailable", detail: BOSS_DEFERRED_REASON },
+    };
+  }
   const hasLiveEvidence = hasLiveRuntimeEvidence(skill, canUseLiveRuntime, liveTaskIds);
 
   if (hasLiveEvidence) {
@@ -273,16 +287,18 @@ export function SiteSkillDetailPage({
             <RefreshCw size={15} />
             {updateActionText(projectedSkill.updateState)}
           </button>
-          <button
-            className="site-skill-primary-action"
-            type="button"
-            disabled={!canLaunchTask}
-            title={canLaunchTask ? undefined : projectedSkill.sourceHealth.detail}
-            onClick={canLaunchTask ? () => onOpenTask(projectedSkill) : undefined}
-          >
-            <Play size={15} />
-            {readOnlyTaskActionText(projectedSkill, canLaunchTask)}
-          </button>
+          {isBossDeferredSkill(projectedSkill) ? null : (
+            <button
+              className="site-skill-primary-action"
+              type="button"
+              disabled={!canLaunchTask}
+              title={canLaunchTask ? undefined : projectedSkill.sourceHealth.detail}
+              onClick={canLaunchTask ? () => onOpenTask(projectedSkill) : undefined}
+            >
+              <Play size={15} />
+              {readOnlyTaskActionText(projectedSkill, canLaunchTask)}
+            </button>
+          )}
         </div>
       </section>
 

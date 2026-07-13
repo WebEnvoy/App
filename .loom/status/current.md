@@ -2,34 +2,34 @@
 
 ## Derived Fact Chain View
 
-- Item ID: APP-240
-- Goal: Enable one real read-only BOSS `job-search` submit and display Core-owned run/result/evidence/session refs.
-- Scope: Structured `query` plus explicit `city_code`, canonical BOSS search URL, page 1, limit at most 15, strict live identity/runtime admission including authenticated official Chrome restricted fallback with preserved provider/proxy/fingerprint warnings, consistent per-entry identity-page admission, owner-ref result display, focused smoke coverage, and APP-240 item-specific carriers.
-- Execution Path: work/app-240-identity-entry-admission
+- Item ID: APP-239
+- Goal: Let users continue from a successful Xiaohongshu search result into one Core-owned note-detail task and inspect real public refs.
+- Scope: Ownership remains in App for Core owner-result parsing, bounded opaque target selection, exact detail submit, polling, result/source/evidence/post-check/session projection, fixture isolation, and APP-239 carriers. BOSS and write-precheck remain excluded.
+- Execution Path: work/app-239-xhs-detail-handoff
 - Workspace Entry: .
-- Recovery Entry: .loom/progress/APP-240.md
-- Review Entry: .loom/reviews/APP-240.json
-- Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged:readonly; git diff --check
-- Closing Condition: PR Ready only. Keep #240 open until Core #270 delivers real `detail_ref`-based job detail.
-- Current Checkpoint: pre-review
-- Current Stop: Product head `4751f3ef448a00380ed0f3009c4227f560e3135f` passed focused/full validation and independent current-head review after the identity detail entry was aligned with the existing restricted-Chrome BOSS search admission.
-- Next Step: Push the reviewed correction, open the APP-240 PR, consume hosted gate, and merge; keep #240 open while Harbor resolves the live `page.boss_spa.ready` blocker and until merged-package BOSS result/evidence/post-check evidence exists.
-- Blockers: None
-- Latest Validation Summary: 2026-07-12T06:37Z: At product head `4751f3ef448a00380ed0f3009c4227f560e3135f`, `npm run typecheck`, `npm run smoke`, and `git diff --check` passed. Independent current-head review returned ALLOW after confirming per-entry shared admission: authenticated Harbor-live BOSS restricted Chrome job search is enabled, while write-precheck, unknown task, needs-auth, non-live, XHS proxy_missing, proxy-only, and unknown-warning paths remain fail closed. Computer Use pre-validation exposed the corrected BOSS entry and submitted run `app-boss-mrhf6p7h`; Core returned the precise downstream blocker `resource_fact_missing:page.boss_spa.ready`, and Harbor released session `session_d11738b7-5d23-4a4b-88bf-48e070207cb4`. No external write occurred.
-- Recovery Boundary: Revert this branch. Do not modify Core, Harbor, Lode, merge a PR, close an issue, or perform a real account/site action.
-- Current Lane: APP-240 identity-entry admission consistency correction.
+- Recovery Entry: .loom/progress/APP-239.md
+- Review Entry: .loom/reviews/APP-239.json
+- Validation Entry: npm run typecheck; npm run smoke; npm run smoke:packaged:readonly; git diff --check; packaged App Computer Use E2E
+- Closing Condition: Implementation PR merged and merged-head packaged App Computer Use E2E proves search -> opaque detail ref -> detail run/result/source/evidence/post-check/session refs. Keep BOSS and write-precheck issues open.
+- Current Checkpoint: review
+- Current Stop: Product head `9412b7f9cc921066d404744c079475faf327beb9` passed local and packaged validation plus independent semantic review with no blocking findings.
+- Next Step: Commit current-head carriers, create the stacked APP-239 PR, and consume hosted checks. Keep #239/#241 open for merged packaged live E2E.
+- Blockers: APP-290 / PR #291 must merge before this stacked PR can target main. Core #270 is merged as `795059d6ac08df10e26f89789a675614c738c1ca`.
+- Latest Validation Summary: 2026-07-12T14:29Z at product head `9412b7f9cc921066d404744c079475faf327beb9`: `npm run typecheck`, `npm run smoke`, `npm run smoke:packaged`, `WEBENVOY_REQUIRE_PACKAGED_RUNTIME=1 npm run smoke:packaged:readonly`, and `git diff --check` passed using Core #270 and Harbor #252 packaged sources. Independent review returned ALLOW after exact Core envelope, strict detail normalization, resume zero-POST, concurrency, UUID, fixture isolation, and BOSS deferred checks.
+- Recovery Boundary: Revert only APP-239 detail-handoff code and item-specific carriers; no Core/Harbor/Lode edits, BOSS production, sensitive material, external writes, or issue closeout.
+- Current Lane: APP-239 Xiaohongshu opaque-ref detail handoff.
 
 ## Runtime Evidence
 
-- Run Entry: pre-merge `app-boss-mrhf6p7h` blocked downstream on `resource_fact_missing:page.boss_spa.ready`; merged-package successful replay remains pending
-- Logs Entry: scripts/smoke.mjs
-- Diagnostics Entry: src/renderer/coreTaskSubmitClient.ts
-- Verification Entry: .loom/progress/APP-240.md
-- Lane Entry: .loom/specs/APP-240/plan.md
+- Run Entry: no live detail run during implementation; merged packaged App E2E required for closeout
+- Logs Entry: scripts/smoke.mjs; packaged runtime smoke at product head `9412b7f9cc921066d404744c079475faf327beb9`
+- Diagnostics Entry: src/renderer/coreReadTaskClient.ts; src/renderer/coreTaskSubmitClient.ts
+- Verification Entry: .loom/specs/APP-239/build-evidence.json
+- Lane Entry: .loom/specs/APP-239/plan.md
 
 ## Sources
 
-- Static Truth: .loom/work-items/APP-240.md
-- Dynamic Truth: .loom/progress/APP-240.md
+- Static Truth: .loom/work-items/APP-239.md
+- Dynamic Truth: .loom/progress/APP-239.md
 - Locator Truth: .loom/bootstrap/init-result.json
 - Fact Chain CLI: loom fact-chain --target . --json

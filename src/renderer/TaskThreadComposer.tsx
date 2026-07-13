@@ -58,6 +58,7 @@ export function TaskThreadComposer({
     harborIdentityState.identities,
   );
   const isBossSearch = selectedTask.id === "task-boss-real-read";
+  const isXhsWritePrecheck = selectedTask.id === "task-xhs-publish-write-preview";
   const bossInput = isBossSearch ? parseBossJobSearchInput(businessInput) : null;
   const bossValues = bossInput?.ok
     ? bossInput.value
@@ -68,10 +69,15 @@ export function TaskThreadComposer({
   const isBusy = coreSubmitState.status === "submitting" || coreSubmitState.status === "polling";
   const canSubmit = submitReadiness.ok && !isBusy;
   const isRestrictedFallback = submitReadiness.ok && submitReadiness.identity.readiness.state === "warning";
+  const stateSummary = isXhsWritePrecheck && coreSubmitState.status === "idle"
+    ? "真实 validate-only 写前验证尚未提交；按钮只在 Core admission、Harbor live identity 和精确 Lode spec 都可用时启用。"
+    : coreSubmitState.summary;
   const submitSummary = submitReadiness.ok
     ? isRestrictedFallback
-      ? `Warning：官方 Chrome 受限后备，仅允许单次 ${selectedTask.id.includes("boss") ? "BOSS 职位搜索" : "小红书"}只读任务。${coreSubmitState.summary}`
-      : coreSubmitState.summary
+      ? isXhsWritePrecheck
+        ? `Warning：官方 Chrome 受限后备，仅允许单次小红书 validate-only 写前验证。${stateSummary}`
+        : `Warning：官方 Chrome 受限后备，仅允许单次 ${selectedTask.id.includes("boss") ? "BOSS 职位搜索" : "小红书"}只读任务。${stateSummary}`
+      : stateSummary
     : submitReadiness.reason;
 
   useEffect(() => {
@@ -149,13 +155,14 @@ export function TaskThreadComposer({
               data-webenvoy-composer=""
               type="text"
               value={bossValues.query}
+              disabled={isBusy}
               maxLength={80}
               onChange={(event) => updateBossInput({ query: event.currentTarget.value })}
             />
           </label>
           <label style={{ display: "grid", flex: "0 0 96px", gap: 2 }}>
             <span>城市</span>
-            <select value={bossValues.city_code} onChange={(event) => updateBossInput({ city_code: event.currentTarget.value })}>
+            <select disabled={isBusy} value={bossValues.city_code} onChange={(event) => updateBossInput({ city_code: event.currentTarget.value })}>
               <option value="101020100">上海</option>
             </select>
           </label>
@@ -167,15 +174,19 @@ export function TaskThreadComposer({
               max={15}
               step={1}
               value={bossValues.limit}
+              disabled={isBusy}
               onChange={(event) => updateBossInput({ limit: Math.min(15, Math.max(1, Number(event.currentTarget.value) || 1)) })}
             />
           </label>
         </div>
+      ) : isXhsWritePrecheck ? (
+        <p className="boundary-copy">固定安全摘要：校验发布页和内容编辑目标，生成草稿预览，不保存、不上传、不发布。草稿内容不会发送。</p>
       ) : (
         <textarea
           ref={inputRef}
           data-webenvoy-composer=""
           value={businessInput}
+          disabled={isBusy}
           rows={2}
           onChange={(event) => onBusinessInputChange(event.currentTarget.value)}
           placeholder="当前任务的结构化业务输入"
@@ -195,7 +206,7 @@ export function TaskThreadComposer({
             type="button"
           >
             <ShieldCheck size={14} />
-            <span className="composer-button-label">{selectedRun.writePrecheck ? "No-submit 边界" : "只读边界"}</span>
+            <span className="composer-button-label">{isXhsWritePrecheck ? "No-submit 边界" : "只读边界"}</span>
           </button>
         </div>
         <div className="composer-expanding-controls">
@@ -232,7 +243,7 @@ export function TaskThreadComposer({
           <button
             className="composer-send"
             type="submit"
-            aria-label="提交只读 Core task"
+            aria-label={isXhsWritePrecheck ? "提交 validate-only Core task" : "提交只读 Core task"}
             disabled={!canSubmit}
             title={submitSummary}
           >
