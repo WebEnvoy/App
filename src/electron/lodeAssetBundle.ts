@@ -28,9 +28,6 @@ const requiredPackageRefs = [
   "lode://site-capability/xiaohongshu/search-notes@0.1.0",
   "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
   "lode://site-capability/xiaohongshu/publish-note-precheck@0.1.0",
-  "lode://site-capability/boss/job-search@0.1.0",
-  "lode://site-capability/boss/read-job-detail@0.1.0",
-  "lode://site-capability/boss/greet-precheck@0.1.0",
 ];
 
 const requiredPackageFiles = [
@@ -126,7 +123,7 @@ function inspectLodeAssetRoot(
       requiredPackageRefs,
       missingPackageRefs: [],
       checkedAt,
-      summary: "Lode local package registry and required Xiaohongshu/BOSS capability assets are available for Core consumption.",
+      summary: "Lode local package registry and required Xiaohongshu capability assets are available for Core consumption.",
       consumerBoundary,
     };
   } catch (error) {

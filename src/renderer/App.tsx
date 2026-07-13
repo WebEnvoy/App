@@ -31,6 +31,9 @@ import {
   isBossDeferredTask,
   projectDeferredBossTask,
   promoteSubmittedCoreTask,
+  promoteSubmittedDetailRun,
+  resumeCoreXhsDetailPolling,
+  submitCoreXhsDetailTask,
   submitCoreReadOnlyTask,
   type CoreTaskSubmitState,
 } from "./coreTaskSubmitClient";
@@ -168,6 +171,8 @@ export function App() {
     coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
   );
   const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
+  const [detailSubmitStatesByRef, setDetailSubmitStatesByRef] = useState<Record<string, CoreTaskSubmitState>>({});
+  const detailInFlightRefs = useRef(new Set<string>());
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
   const [taskBusinessInputOverrides, setTaskBusinessInputOverrides] = useState<Record<string, string>>({});
   const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
@@ -494,18 +499,56 @@ export function App() {
       harborIdentityState.identities,
     );
     setCoreSubmitStatesByKey((current) => ({ ...current, [submitKey]: result }));
-    if (result.status === "ready") {
+    if ("run" in result && result.run) {
+      const run = result.run;
       setSubmittedTaskOverrides((current) => ({
         ...current,
         [submitKey]: {
           endpoint: submitEndpoint,
           taskId: submitTask.id,
-          task: promoteSubmittedCoreTask(submitTask, result.run),
+          task: promoteSubmittedCoreTask(submitTask, run),
         },
       }));
       if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
-        setSelectedRunId(result.run.id);
+        setSelectedRunId(run.id);
       }
+    }
+  }
+
+  async function submitSelectedXhsDetail(detailRef: string) {
+    if (detailInFlightRefs.current.has(detailRef)) return;
+    detailInFlightRefs.current.add(detailRef);
+    const submitTask = selectedSubmitTask;
+    const submitEndpoint = connectionConfig.coreEndpoint;
+    const submitKey = coreSubmitStateKey(submitTask.id, submitEndpoint);
+    const previous = detailSubmitStatesByRef[detailRef];
+    setDetailSubmitStatesByRef((current) => ({
+      ...current,
+      [detailRef]: previous?.status === "polling"
+        ? { status: "polling", runId: previous.runId, summary: `正在继续查询 ${previous.runId}。` }
+        : { status: "submitting", summary: "正在向 Core 提交 opaque detail target。" },
+    }));
+    let result: CoreTaskSubmitState;
+    try {
+      result = previous?.status === "polling"
+        ? await resumeCoreXhsDetailPolling(submitEndpoint, previous.runId)
+        : await submitCoreXhsDetailTask(submitEndpoint, submitTask, detailRef, runtimeSupervisorState, harborIdentityState.identities);
+    } catch (error) {
+      result = { status: "failed", ...(previous?.status === "polling" ? { runId: previous.runId } : {}), summary: `详情任务请求失败：${error instanceof Error ? error.message : "unknown error"}` };
+    } finally {
+      detailInFlightRefs.current.delete(detailRef);
+    }
+    setDetailSubmitStatesByRef((current) => ({ ...current, [detailRef]: result }));
+    if (result.status !== "ready") return;
+    setSubmittedTaskOverrides((current) => ({
+      ...current, [submitKey]: {
+        endpoint: submitEndpoint,
+        taskId: submitTask.id,
+        task: promoteSubmittedDetailRun(current[submitKey]?.task ?? submitTask, result.run),
+      },
+    }));
+    if (selectedTaskIdRef.current === submitTask.id && coreEndpointRef.current === submitEndpoint) {
+      setSelectedRunId(result.run.id);
     }
   }
 
@@ -777,6 +820,8 @@ export function App() {
               selectedRun={selectedRun}
               selectedTask={selectedTask}
               onActiveRunChange={setSelectedRunId}
+              onReadDetail={submitSelectedXhsDetail}
+              detailSubmitStates={detailSubmitStatesByRef}
             />
           </ThreadWorkspace>
         )

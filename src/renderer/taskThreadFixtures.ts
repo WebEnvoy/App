@@ -30,6 +30,7 @@ export type RunProjection = {
   owner: "Core";
   source: OwnerSource;
   ownerUpdatedAt?: string;
+  detailTargets?: string[];
   resultRows: Array<{ label: string; value: string; source: OwnerSource }>;
   fieldSources?: Array<{
     field: string;

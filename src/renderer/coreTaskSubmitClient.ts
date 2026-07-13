@@ -10,7 +10,7 @@ export type CoreTaskSubmitState =
   | { status: "submitting"; summary: string }
   | { status: "polling"; summary: string; runId: string }
   | { status: "ready"; summary: string; runId: string; run: RunProjection }
-  | { status: "failed"; summary: string; runId?: string };
+  | { status: "failed"; summary: string; runId?: string; run?: RunProjection };
 
 type SubmitReadiness =
   | { ok: true; spec: CoreReadTaskSpec; identity: IdentityEnvironmentProjection; payload: CoreTaskPayload }
@@ -54,6 +54,13 @@ type CoreTaskPayload = {
     url: string;
     reuse_existing: true;
   };
+};
+
+type CoreDetailTaskPayload = Omit<CoreTaskPayload, "public_query" | "harbor" | "task_intent"> & {
+  task_intent: Omit<CoreTaskPayload["task_intent"], "scope"> & {
+    scope: { target_type: "xiaohongshu_note_detail"; target_ref: string };
+  };
+  harbor: { identity_environment_ref: string; reuse_existing: true };
 };
 
 type CoreTaskSubmitOptions = {
@@ -340,7 +347,13 @@ export async function submitCoreReadOnlyTask(
   const runId = runIdFromSubmitResponse(submitResponse) ?? readiness.payload.run_id;
 
   if (!isOkResponse(submitResponse)) {
-    return { status: "failed", runId, summary: responseError(submitResponse, "Core /tasks did not accept the read-only task.") };
+    const projection = await fetchCoreRunProjectionById(endpoint, runId, readiness.spec);
+    return {
+      status: "failed",
+      runId,
+      ...(projection.ok ? { run: projection.run } : {}),
+      summary: responseError(submitResponse, "Core /tasks did not accept the read-only task."),
+    };
   }
 
   const projected = await pollSubmittedRun(endpoint, runId, readiness.spec, options);
@@ -351,11 +364,97 @@ export async function submitCoreReadOnlyTask(
         run: projected.run,
         summary: `Core accepted /tasks and returned live run ${runId}; result/evidence/failure/session refs were polled from owner endpoints.`,
       }
-    : {
+    : projected.terminal ? {
+        status: "failed",
+        runId,
+        summary: projected.error,
+      } : {
         status: "polling",
         runId,
         summary: `Core accepted /tasks as ${runId}; owner refs are not queryable yet. ${projected.error}`,
       };
+}
+
+export async function submitCoreXhsDetailTask(
+  endpoint: string,
+  task: TaskProjection,
+  detailRef: string,
+  runtime: RuntimeSupervisorState,
+  identities: IdentityEnvironmentProjection[],
+  options: CoreTaskSubmitOptions = {},
+): Promise<CoreTaskSubmitState> {
+  if (!/^detail_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(detailRef)) {
+    return { status: "blocked", summary: "Core detail target 无效；只接受搜索 owner result 返回的 opaque detail ref。" };
+  }
+  const searchReadiness = coreTaskSubmitReadiness(task, runtime, identities);
+  if (!searchReadiness.ok || task.id !== "task-xhs-real-read") {
+    return { status: "blocked", summary: searchReadiness.ok ? "当前任务不是小红书搜索详情 handoff。" : searchReadiness.reason };
+  }
+  const detailCapability = searchReadiness.spec.capabilities.find((item) => item.capabilityRef === "lode:capability/read-note-detail");
+  if (!detailCapability) return { status: "blocked", summary: "缺少 Lode read-note-detail capability pin。" };
+  const runId = `app-xiaohongshu-detail-${crypto.randomUUID()}`;
+  const payload: CoreDetailTaskPayload = {
+    run_id: runId,
+    package_ref: detailCapability.packageRef,
+    task_intent: {
+      schema_version: "webenvoy.task-intent.v0",
+      intent_id: `intent_${runId}`,
+      entrypoint: "app",
+      user_intent: { summary: "读取搜索结果中的小红书笔记详情" },
+      capability: {
+        ref: detailCapability.capabilityRef,
+        version: detailCapability.capabilityVersion,
+        source_ref: detailCapability.packageRef,
+        lock_ref: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.0",
+      },
+      input: { summary: "读取搜索结果中的小红书笔记详情", refs: [detailRef] },
+      scope: { target_type: "xiaohongshu_note_detail", target_ref: detailRef },
+      policy: { risk: "read", execution_intent: "read", timeout_ms: 60_000 },
+      resource_requirement_refs: ["xiaohongshu.read-note-detail.resources"],
+      evidence_policy_ref: searchReadiness.spec.evidencePolicyRef,
+    },
+    harbor: { identity_environment_ref: searchReadiness.identity.identityEnvironmentRef, reuse_existing: true },
+  };
+  if (containsSensitiveField(payload) || /https?:|xsec|public_query/i.test(JSON.stringify(payload))) {
+    return { status: "blocked", summary: "详情 payload 包含禁止的公开 URL/query 或敏感字段；已 fail closed。" };
+  }
+  const response = await requestJson(endpoint, "/tasks", { method: "POST", body: JSON.stringify(payload) });
+  const submittedRunId = runIdFromSubmitResponse(response) ?? runId;
+  if (!isOkResponse(response)) return { status: "failed", runId: submittedRunId, summary: responseError(response, "Core /tasks 未接受详情任务。") };
+  const projected = await pollSubmittedRun(endpoint, submittedRunId, {
+    ...searchReadiness.spec,
+    capabilities: [detailCapability],
+    resourceRequirementRefs: ["xiaohongshu.read-note-detail.resources"],
+  }, options);
+  return projected.ok
+    ? { status: "ready", runId: submittedRunId, run: projected.run, summary: `Core 已完成详情 run ${submittedRunId}；结果与 refs 来自 owner API。` }
+    : projected.terminal
+      ? { status: "failed", runId: submittedRunId, summary: projected.error }
+      : { status: "polling", runId: submittedRunId, summary: `Core 已受理详情 run ${submittedRunId}；owner refs 尚不可查询。 ${projected.error}` };
+}
+
+export async function resumeCoreXhsDetailPolling(
+  endpoint: string,
+  runId: string,
+  options: CoreTaskSubmitOptions = {},
+): Promise<CoreTaskSubmitState> {
+  const spec = coreReadTaskSpecs.find((item) => item.taskId === "task-xhs-real-read" && item.mode === "read");
+  const detailCapability = spec?.capabilities.find((item) => item.capabilityRef === "lode:capability/read-note-detail");
+  if (!spec || !detailCapability) return { status: "failed", runId, summary: "缺少 read-note-detail polling spec。" };
+  const projected = await pollSubmittedRun(endpoint, runId, {
+    ...spec,
+    capabilities: [detailCapability],
+    resourceRequirementRefs: ["xiaohongshu.read-note-detail.resources"],
+  }, options);
+  return projected.ok
+    ? { status: "ready", runId, run: projected.run, summary: `Core 已完成详情 run ${runId}；结果与 refs 来自 owner API。` }
+    : projected.terminal
+      ? { status: "failed", runId, summary: projected.error }
+      : { status: "polling", runId, summary: `详情 run ${runId} 仍在执行；可继续查询，不会再次提交。 ${projected.error}` };
+}
+
+export function promoteSubmittedDetailRun(task: TaskProjection, run: RunProjection): TaskProjection {
+  return { ...task, source: "Core live", identitySource: "Harbor live", runs: [run, ...task.runs.filter((item) => item.id !== run.id)] };
 }
 
 export function promoteSubmittedCoreTask(task: TaskProjection, run: RunProjection): TaskProjection {
@@ -406,14 +505,29 @@ async function pollSubmittedRun(
   const attempts = Math.max(1, options.pollAttempts ?? 30);
   const intervalMs = Math.max(0, options.pollIntervalMs ?? 1000);
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const statusResponse = await requestJson(endpoint, `/runs/${encodeURIComponent(runId)}`, { method: "GET" });
+    const status = runStatus(statusResponse);
+    if (status && ["failed", "blocked", "cancelled", "expired", "unknown_outcome", "requires_user_action", "manual_recovery_required"].includes(status)) {
+      return { ok: false as const, terminal: true as const, error: `Core run ${runId} terminated as ${status}` };
+    }
+    if (status !== "succeeded") {
+      lastError = `Core run ${runId} is ${status ?? "not queryable"}`;
+      if (attempt + 1 < attempts && intervalMs > 0) await new Promise((resolve) => globalThis.setTimeout(resolve, intervalMs));
+      continue;
+    }
     const projection = await fetchCoreRunProjectionById(endpoint, runId, spec);
-    if (projection.ok) return projection;
-    lastError = projection.error;
+    if (projection.ok && projection.run.lifecycle === "completed" && projection.run.outcome === "success") return projection;
+    lastError = projection.ok ? `Core run ${runId} did not produce strict success` : projection.error;
     if (attempt + 1 < attempts && intervalMs > 0) {
       await new Promise((resolve) => globalThis.setTimeout(resolve, intervalMs));
     }
   }
-  return { ok: false as const, error: `Core run ${runId} was accepted but not yet queryable: ${lastError}` };
+  return { ok: false as const, terminal: false as const, error: `Core run ${runId} was accepted but not ready: ${lastError}` };
+}
+
+function runStatus(value: unknown) {
+  if (!isRecord(value) || value.ok !== true) return undefined;
+  return stringValue(recordValue(value.run)?.status);
 }
 
 async function requestJson(base: string, path: string, init: RequestInit): Promise<unknown> {
