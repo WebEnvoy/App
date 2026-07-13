@@ -83,6 +83,37 @@ export type RunProjection = {
     diffRows: Array<{ label: string; before: string; after: string; source: OwnerSource }>;
     noSubmitGuard: "active";
     stateNote: string;
+    ownerTruth?: {
+      terminal: boolean;
+      status: string;
+      classification: "partial_result";
+      precheckScope: "entrypoint_only";
+      compositionState: "composition_not_initialized";
+      submitted: boolean;
+      identityRef: string;
+      pageRef: string;
+      mergedHeadRef: string;
+      semanticSha256: string;
+      runRef: string;
+      harborResultRef: string;
+      submittedResultRef: string;
+      evidenceRefs: string[];
+      entrypointObservations: {
+        routeLoaded: true;
+        userConfirmedIdentity: true;
+        challengeAbsent: true;
+        publishVueContainerVisible: true;
+        uploadImageTabActive: true;
+        uploadImageEntryVisible: true;
+        textImageEntryVisible: true;
+      };
+      prohibitedActionsObserved: { upload: false; generate: false; save: false; publish: false };
+      fieldStates: Array<{
+        field: "title_input" | "content_editor" | "publish_control";
+        availability: "unavailable";
+        observation: "not_observed";
+      }>;
+    };
   };
   approval?: {
     actionRequestId: string;

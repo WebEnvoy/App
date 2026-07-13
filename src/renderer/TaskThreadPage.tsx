@@ -47,7 +47,7 @@ export function TaskThreadPage({
 
         <CoreReadSourceStrip selectedTask={selectedTask} state={coreReadState} />
         <RuntimeSupervisorStrip state={runtimeSupervisorState} />
-        <CoreSubmitStrip state={coreSubmitState} />
+        <CoreSubmitStrip state={coreSubmitState} writePrecheck={selectedTask.id === "task-xhs-publish-write-preview"} />
         <TaskIntentTurn selectedTask={selectedTask} />
 
         {selectedTask.blocker ? (
@@ -77,7 +77,10 @@ export function TaskThreadPage({
   );
 }
 
-function CoreSubmitStrip({ state }: { state: CoreTaskSubmitState }) {
+function CoreSubmitStrip({ state, writePrecheck }: { state: CoreTaskSubmitState; writePrecheck: boolean }) {
+  const summary = writePrecheck && state.status === "idle"
+    ? "真实 validate-only 写前验证尚未提交；仅在 Core admission、Harbor live identity 和精确 Lode spec 可用时启用。"
+    : state.summary;
   const status =
     state.status === "ready"
       ? "ready"
@@ -100,9 +103,9 @@ function CoreSubmitStrip({ state }: { state: CoreTaskSubmitState }) {
     <section className={`core-read-source-strip core-read-source-${status}`} aria-label="Core task submit status">
       <div>
         <strong>{title}</strong>
-        <span>POST /tasks read-only</span>
+        <span>{writePrecheck ? "POST /tasks validate-only" : "POST /tasks read-only"}</span>
       </div>
-      <p>{state.summary}</p>
+      <p>{summary}</p>
       <span className="badge">{runId}</span>
     </section>
   );
@@ -170,7 +173,7 @@ function CoreReadSourceStrip({
 }) {
   const isLiveTask = state.liveTaskIds.includes(selectedTask.id);
   const isDeferred = isBossDeferredTask(selectedTask.id);
-  const isWritePrecheckTask = selectedTask.runs.some((run) => run.writePrecheck);
+  const isWritePrecheckTask = selectedTask.id === "task-xhs-publish-write-preview";
   const taskKind = isWritePrecheckTask ? "写前验证" : "只读任务结果";
   const status = isDeferred ? "deferred" : state.status === "ready" && !isLiveTask ? "fallback" : state.status;
   const label =
