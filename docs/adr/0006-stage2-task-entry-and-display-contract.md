@@ -4,6 +4,10 @@
 
 Accepted for Stage 2 docs-only contract, 2026-06-30.
 
+Superseded for current display hierarchy and authorization UX by
+[ADR 0009](0009-human-workbench-information-architecture.md), 2026-07-14.
+Owner truth, sensitive-data, cache, query, and unavailable-state boundaries remain valid.
+
 ## Context
 
 App Stage 2 needs one user-facing contract for task submission, run viewing,

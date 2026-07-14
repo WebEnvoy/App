@@ -19,8 +19,8 @@ App 可以承载 WebEnvoy Console、Harbor Profile / Runtime Session / Viewer UI
 - 只有用户显式从站点技能发起自动任务时，App 才向 Core 提交 task intent。
 - `Task = 站点技能 + 账号身份 + 业务输入` 是 App 用来组织体验的 Task Thread key；Core 仍拥有 task intent 和 run record truth。
 - App 必须能呈现 Agent/API/CLI/MCP/SDK/skills 等非 App 调用方产生的运行事实。
-- Task Thread first 是默认桌面体验，不取消 Library 的站点技能/能力资产管理面，也不取消 Browser 的账号身份/运行现场管理面。
-- UI 实现前必须读取 `VISION.md`、`DESIGN.md`、`docs/adr/0008-desktop-ui-design-checkpoint.md` 和 `docs/design/desktop-task-thread-direction.png`。
+- Work、Browser、Library 是当前三个业务域；Task Thread 只是 Work 的候选组织方式，必须经过 App #298 的 IA 与低保真场景验收后才能成为实现约束。
+- UI 实现前必须读取 `VISION.md`、`DESIGN.md` 和 `docs/adr/0009-human-workbench-information-architecture.md`。ADR 0008 和旧方向图只作历史输入。
 
 ## 目录方向
 
