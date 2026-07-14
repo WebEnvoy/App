@@ -4,6 +4,10 @@
 
 Accepted for FR #92 checkpoint，2026-07-02。
 
+Superseded for current information architecture by
+[ADR 0009](0009-human-workbench-information-architecture.md), 2026-07-14.
+本 ADR 只保留为历史 checkpoint 和候选 shell/component 输入。
+
 本 ADR 覆盖 #92 以及 Work Item #96、#97、#98、#99。它是 #93、#94、#95 进入实现前必须消费的 docs-only 设计事实载体，不实现 Electron shell、React UI、API client、schema、fixture、viewer、evidence store 或组件系统。
 
 ## 背景
