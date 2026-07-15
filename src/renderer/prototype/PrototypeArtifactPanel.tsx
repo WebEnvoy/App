@@ -1,9 +1,9 @@
-import { Braces, ExternalLink, FileText, Image as ImageIcon, LoaderCircle } from "lucide-react";
+import { Braces, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import samplePagePreview from "../../../artifacts/app-208-real-read-task.png";
-import { PanelTabs } from "../shellPrimitives";
-import { productRows, resultRows, type ArtifactSet, type PrototypeResultSelection, type PrototypeTask } from "./prototypeData";
+import { productRows, resultRows, type ArtifactSet, type PrototypeResultSelection, type PrototypeRun, type PrototypeTask } from "./prototypeData";
 
 const downloadFiles = [
   { name: "新品发布会-主片.mp4", size: "126 MB", state: "已保存" },
@@ -12,25 +12,99 @@ const downloadFiles = [
   { name: "幕后花絮.mp4", size: null, state: "来源已失效" },
 ];
 
-export function PrototypeArtifactPanel({ selectedResult, task }: { selectedResult: PrototypeResultSelection | null; task: PrototypeTask }) {
-  const state = task.artifactState ?? (task.artifactSet == null ? "none" : "ready");
-  const artifact = state === "ready" && task.artifactSet != null ? createArtifact(task, task.artifactSet) : null;
-  const unavailable = state === "pending" ? <ArtifactPending /> : <ArtifactEmpty />;
+type FileTabId = "json" | "markdown" | "image";
+type ResultTabId = `result:${string}`;
+type ArtifactTabId = FileTabId | ResultTabId;
+type RunTabState = { openTabIds: ArtifactTabId[]; activeTabId: ArtifactTabId | null };
+
+const artifactTabLabels: Record<FileTabId, string> = {
+  json: "result.json",
+  markdown: "summary.md",
+  image: "page.png",
+};
+
+export function PrototypeArtifactPanel({ requestKey, run, selectedResult, task }: { requestKey: number; run: PrototypeRun; selectedResult: PrototypeResultSelection | null; task: PrototypeTask }) {
+  const artifactSet = run.artifactSet ?? task.artifactSet;
+  const state = run.artifactState ?? task.artifactState ?? (artifactSet == null ? "none" : "ready");
+  const artifact = state === "ready" && artifactSet != null ? createArtifact(run, artifactSet) : null;
+  const [resultTabs, setResultTabs] = useState<Record<ResultTabId, PrototypeResultSelection>>({});
+  const defaultTab: FileTabId | null = state === "ready" ? artifactSet === "article" ? "markdown" : "json" : null;
+  const [tabStateByRun, setTabStateByRun] = useState<Record<string, RunTabState>>({});
+  const tabState = tabStateByRun[run.id] ?? initialRunTabState(defaultTab);
+  const availableTabIds = useMemo<ArtifactTabId[]>(() => {
+    const result: ArtifactTabId[] = Object.entries(resultTabs).filter(([, selection]) => selection.runId === run.id).map(([tabId]) => tabId as ResultTabId);
+    if (artifact != null) result.push("json", "markdown");
+    if (artifact != null && artifactSet === "xhs-notes") result.push("image");
+    return result;
+  }, [artifact, artifactSet, resultTabs, run.id]);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (selectedResult == null) return;
+    const tabId = resultTabId(selectedResult);
+    setResultTabs((current) => ({ ...current, [tabId]: selectedResult }));
+    setTabStateByRun((current) => {
+      const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
+      return { ...current, [run.id]: { openTabIds: currentRun.openTabIds.includes(tabId) ? currentRun.openTabIds : [...currentRun.openTabIds, tabId], activeTabId: tabId } };
+    });
+  }, [defaultTab, requestKey, run.id, selectedResult]);
+
+  function closeTab(tabId: ArtifactTabId) {
+    setTabStateByRun((current) => {
+      const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
+      const index = currentRun.openTabIds.indexOf(tabId);
+      const nextTabs = currentRun.openTabIds.filter((id) => id !== tabId);
+      return { ...current, [run.id]: { openTabIds: nextTabs, activeTabId: currentRun.activeTabId === tabId ? nextTabs[Math.min(index, nextTabs.length - 1)] ?? null : currentRun.activeTabId } };
+    });
+  }
+
+  function openTab(tabId: ArtifactTabId) {
+    setTabStateByRun((current) => {
+      const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
+      return { ...current, [run.id]: { openTabIds: currentRun.openTabIds.includes(tabId) ? currentRun.openTabIds : [...currentRun.openTabIds, tabId], activeTabId: tabId } };
+    });
+    setAddMenuOpen(false);
+  }
+
+  const closedTabIds = availableTabIds.filter((id) => !tabState.openTabIds.includes(id));
 
   return (
     <aside className="prototype-artifact-panel codex-scrollbar" aria-label="任务文件预览">
-      <PanelTabs
-        ariaLabel="任务文件预览"
-        defaultValue={selectedResult == null ? task.artifactSet === "article" ? "markdown" : "json" : "result-item"}
-        tabs={[
-          ...(selectedResult == null ? [] : [{ id: "result-item", label: selectedResult.kind === "product" ? "商品详情" : "笔记详情", content: <ResultItemPreview result={selectedResult} /> }]),
-          { id: "json", label: "result.json", content: artifact == null ? unavailable : <FilePreview icon={<Braces size={16} />} name="result.json" meta={artifact.jsonMeta}><pre>{JSON.stringify(artifact.payload, null, 2)}</pre></FilePreview> },
-          { id: "markdown", label: "summary.md", content: artifact == null ? unavailable : <FilePreview icon={<FileText size={16} />} name="summary.md" meta="Markdown"><ArtifactMarkdown task={task} set={task.artifactSet} /></FilePreview> },
-          { id: "image", label: "page.png", content: artifact == null ? unavailable : task.artifactSet === "xhs-notes" ? <FilePreview icon={<ImageIcon size={16} />} name="page.png" meta="PNG · 1280 × 800"><img className="artifact-image-preview" src={samplePagePreview} alt="小红书采集任务页面截图样例" /></FilePreview> : <ArtifactEmpty /> },
-        ]}
-      />
+      <div className="panel-tabs prototype-controlled-tabs">
+        <div className="panel-tab-strip">
+          <div className="panel-tab-scroll"><div className="panel-tab-list" role="tablist" aria-label="任务文件预览">{tabState.openTabIds.map((tabId) => <div className={`prototype-closable-tab ${tabState.activeTabId === tabId ? "active" : ""}`} key={tabId}><button className="panel-tab-trigger" type="button" role="tab" aria-selected={tabState.activeTabId === tabId} onClick={() => setTabStateByRun((current) => ({ ...current, [run.id]: { ...tabState, activeTabId: tabId } }))}><span className="panel-tab-label">{tabLabel(tabId, resultTabs)}</span></button><button className="prototype-tab-close" type="button" aria-label={`关闭 ${tabLabel(tabId, resultTabs)}`} title="关闭" onClick={() => closeTab(tabId)}><X size={12} /></button></div>)}</div></div>
+          <div className="prototype-tab-add-wrap"><button className="prototype-tab-add" type="button" aria-label="打开文件" title="打开文件" disabled={closedTabIds.length === 0} onClick={() => setAddMenuOpen((open) => !open)}><Plus size={14} /></button>{addMenuOpen ? <div className="prototype-tab-add-menu">{closedTabIds.map((tabId) => <button type="button" key={tabId} onClick={() => openTab(tabId)}>{tabLabel(tabId, resultTabs)}</button>)}</div> : null}</div>
+        </div>
+        <div className="panel-tab-content">{tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
+      </div>
     </aside>
   );
+}
+
+function initialRunTabState(defaultTab: FileTabId | null): RunTabState {
+  return { openTabIds: defaultTab == null ? [] : [defaultTab], activeTabId: defaultTab };
+}
+
+function resultTabId(result: PrototypeResultSelection): ResultTabId {
+  return `result:${result.runId}:${result.kind}:${result.row[0]}`;
+}
+
+function isResultTabId(tabId: ArtifactTabId): tabId is ResultTabId {
+  return tabId.startsWith("result:");
+}
+
+function tabLabel(tabId: ArtifactTabId, resultTabs: Record<ResultTabId, PrototypeResultSelection>) {
+  if (!isResultTabId(tabId)) return artifactTabLabels[tabId];
+  const result = resultTabs[tabId];
+  return result == null ? "结果详情" : `${result.kind === "product" ? "商品" : "笔记"} · ${result.row[0]}`;
+}
+
+function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtifact> | null, artifactSet: ArtifactSet | undefined, resultTabs: Record<ResultTabId, PrototypeResultSelection>, run: PrototypeRun, state: "ready" | "pending" | "none", task: PrototypeTask) {
+  if (isResultTabId(tabId)) return resultTabs[tabId] == null ? <ArtifactEmpty /> : <ResultItemPreview result={resultTabs[tabId]} />;
+  if (artifact == null) return state === "pending" ? <ArtifactPending /> : <ArtifactEmpty />;
+  if (tabId === "json") return <FilePreview icon={<Braces size={16} />} name="result.json" meta={artifact.jsonMeta}><pre>{JSON.stringify(artifact.payload, null, 2)}</pre></FilePreview>;
+  if (tabId === "markdown") return <FilePreview icon={<FileText size={16} />} name="summary.md" meta="Markdown"><ArtifactMarkdown run={run} task={task} set={artifactSet} /></FilePreview>;
+  return <FilePreview icon={<ImageIcon size={16} />} name="page.png" meta="PNG · 1280 × 800"><img className="artifact-image-preview" src={samplePagePreview} alt="小红书采集任务页面截图样例" /></FilePreview>;
 }
 
 function ResultItemPreview({ result }: { result: PrototypeResultSelection }) {
@@ -53,31 +127,31 @@ function ResultItemPreview({ result }: { result: PrototypeResultSelection }) {
   );
 }
 
-function createArtifact(task: PrototypeTask, set: ArtifactSet) {
+function createArtifact(run: PrototypeRun, set: ArtifactSet) {
   if (set === "xhs-notes") {
     const items = resultRows.map(([title, author, interactions, readAt]) => ({ title, author, interactions, readAt }));
-    const total = task.artifactTotal ?? items.length;
-    return { jsonMeta: `JSON · ${items.length}/${total} 条预览`, payload: { task: task.title, status: task.stateLabel, total, preview: items } };
+    const total = run.artifactTotal ?? items.length;
+    return { jsonMeta: `JSON · ${items.length}/${total} 条预览`, payload: { input: run.input, status: run.stateLabel, total, preview: items } };
   }
   if (set === "shop-products") {
     const items = productRows.map(([title, price, stock, readAt]) => ({ title, price, stock, readAt }));
-    const current = task.artifactCurrent ?? items.length;
-    return { jsonMeta: `JSON · ${items.length}/${current} 条预览`, payload: { task: task.title, status: task.stateLabel, current, expected: task.artifactTotal, preview: items } };
+    const current = run.artifactCurrent ?? items.length;
+    return { jsonMeta: `JSON · ${items.length}/${current} 条预览`, payload: { input: run.input, status: run.stateLabel, current, expected: run.artifactTotal, preview: items } };
   }
   if (set === "article") {
-    return { jsonMeta: "JSON · 文章摘要", payload: { task: task.title, title: "我们如何把重复的网站工作变成可复用任务", author: "WebEnvoy 产品团队", publishedAt: "2026-07-14" } };
+    return { jsonMeta: "JSON · 文章摘要", payload: { input: run.input, title: "我们如何把重复的网站工作变成可复用任务", author: "WebEnvoy 产品团队", publishedAt: "2026-07-14" } };
   }
   if (set === "download-files") {
-    return { jsonMeta: `JSON · ${downloadFiles.length} 个文件`, payload: { task: task.title, files: downloadFiles } };
+    return { jsonMeta: `JSON · ${downloadFiles.length} 个文件`, payload: { input: run.input, files: downloadFiles } };
   }
-  return { jsonMeta: "JSON · 未提交", payload: { task: task.title, submitted: false, title: "三个让我每天省下两小时的 AI 工具", topics: ["AI工具", "效率提升", "内容创作", "工作流"] } };
+  return { jsonMeta: "JSON · 未提交", payload: { input: run.input, submitted: false, title: "三个让我每天省下两小时的 AI 工具", topics: ["AI工具", "效率提升", "内容创作", "工作流"] } };
 }
 
-function ArtifactMarkdown({ set, task }: { set: ArtifactSet | undefined; task: PrototypeTask }) {
+function ArtifactMarkdown({ run, set, task }: { run: PrototypeRun; set: ArtifactSet | undefined; task: PrototypeTask }) {
   return (
     <article className="markdown-preview">
-      <h1>{task.title}</h1>
-      <p>{task.summary}</p>
+      <h1>{run.input}</h1>
+      <p>{run.summary}</p>
       <h2>{set === "write-preview" ? "提交状态" : set === "download-files" ? "文件结果" : "任务结果"}</h2>
       {set === "write-preview" ? <p><strong>未提交</strong>。页面内容已填写并校验，没有点击发布。</p> : null}
       {set === "download-files" ? <ul>{downloadFiles.map((file) => <li key={file.name}>{file.name}：{file.state}</li>)}</ul> : null}
@@ -92,7 +166,11 @@ function ArtifactPending() {
 }
 
 function ArtifactEmpty() {
-  return <div className="artifact-empty"><ImageIcon size={20} /><strong>没有可预览文件</strong><span>当前任务或当前 Run 尚未返回此类文件。</span></div>;
+  return <div className="artifact-empty"><ImageIcon size={20} /><strong>没有可预览文件</strong><span>当前运行尚未返回文件。</span></div>;
+}
+
+function ArtifactTabsClosed() {
+  return <div className="artifact-empty"><FileText size={20} /><strong>没有打开的文件</strong><span>点击上方“+”打开当前运行的文件。</span></div>;
 }
 
 function FilePreview({ children, icon, meta, name }: { children: ReactNode; icon: ReactNode; meta: string; name: string }) {

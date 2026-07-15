@@ -1,24 +1,27 @@
 import {
+  BriefcaseBusiness,
   Check,
   CircleAlert,
-  CircleStop,
   Download,
   Import,
+  Images,
   KeyRound,
   LoaderCircle,
   Monitor,
+  MessageCircle,
+  Music2,
   Pencil,
   Play,
   RefreshCw,
-  RotateCcw,
   ShieldCheck,
+  ShoppingBag,
   UserRoundPlus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { Identity, PrototypeTask } from "./prototypeData";
+import type { Identity, ProxyProfile } from "./prototypeData";
 
-type BrowserMode = "detail" | "create" | "repair" | "live" | "edit" | "dependencies";
+type BrowserMode = "detail" | "create" | "repair" | "edit" | "dependencies";
 
 type BrowserSurfaceProps = {
   cloakProviderInstalled: boolean;
@@ -26,14 +29,13 @@ type BrowserSurfaceProps = {
   identity: Identity;
   initialIdentitySite: string;
   mode: BrowserMode;
-  taskList: PrototypeTask[];
+  proxies: ProxyProfile[];
   onCreate: (identity: Identity) => void;
   onDeleteIdentity: (identityId: string) => void;
+  onManageProxies: () => void;
   onModeChange: (mode: BrowserMode) => void;
   onOpenInstance: (identityId: string) => void;
   onProviderRepaired: () => void;
-  onReturnToTask: (identityId: string) => void;
-  onTakeoverCompleted: (identityId: string) => void;
   onUpdateIdentity: (identity: Identity) => void;
   onUseSkill: () => void;
 };
@@ -44,27 +46,22 @@ export function BrowserSurface({
   identity,
   initialIdentitySite,
   mode,
-  taskList,
+  proxies,
   onCreate,
   onDeleteIdentity,
+  onManageProxies,
   onModeChange,
   onOpenInstance,
   onProviderRepaired,
-  onReturnToTask,
-  onTakeoverCompleted,
   onUpdateIdentity,
   onUseSkill,
 }: BrowserSurfaceProps) {
-  if (mode === "create") return <CreateIdentity cloakProviderInstalled={cloakProviderInstalled} initialSite={initialIdentitySite} onCreate={onCreate} />;
+  if (mode === "create") return <CreateIdentity cloakProviderInstalled={cloakProviderInstalled} initialSite={initialIdentitySite} proxies={proxies} onCreate={onCreate} onManageProxies={onManageProxies} />;
   if (mode === "repair") {
     return <ProviderRecovery onDone={() => { onProviderRepaired(); onModeChange("dependencies"); }} />;
   }
-  if (mode === "live") {
-    const hasPausedTask = taskList.some((task) => task.identityId === identity.id && task.kind === "takeover" && task.state === "waiting");
-    return <LiveBrowser hasPausedTask={hasPausedTask} identity={identity} onReturnToTask={onReturnToTask} onTakeoverCompleted={onTakeoverCompleted} />;
-  }
   if (mode === "edit") {
-    return <EditIdentity cloakProviderInstalled={cloakProviderInstalled} identity={identity} onDelete={onDeleteIdentity} onSave={onUpdateIdentity} />;
+    return <EditIdentity cloakProviderInstalled={cloakProviderInstalled} identity={identity} proxies={proxies} onDelete={onDeleteIdentity} onManageProxies={onManageProxies} onSave={onUpdateIdentity} />;
   }
   if (mode === "dependencies") {
     return <EnvironmentDependencies cloakProviderInstalled={cloakProviderInstalled} identities={identities} onModeChange={onModeChange} />;
@@ -93,11 +90,12 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
       <IdentitySectionTabs active="identities" onModeChange={onModeChange} />
       <header className="prototype-page-heading identity-heading">
         <div className="identity-title-group">
-          <span className="identity-avatar">{identity.site.slice(0, 1)}</span>
-          <div>
-            <div className="prototype-eyebrow">{identity.site}</div>
-            <h1>{identity.name}</h1>
-            <p>站点账号：{identity.account}</p>
+            <span className="identity-site-mark"><SiteGlyph site={identity.site} /></span>
+            <span className="identity-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
+            <div>
+              <div className="prototype-eyebrow">{identity.site}</div>
+              <h1>{identity.account}</h1>
+              <p>{identity.name} · {identity.platformId ?? "平台 ID 待同步"}</p>
           </div>
         </div>
         <div className="identity-heading-actions">
@@ -122,18 +120,19 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
           </div>
         </div>
         <div className="section-actions">
-          <button className="prototype-button primary" type="button" disabled={unavailable} onClick={() => { onOpenInstance(identity.id); onModeChange("live"); }}><Monitor size={14} />{running ? "查看实例" : sessionFailed ? "重试启动" : identity.loginState === "login-required" || identity.loginState === "unknown" ? "打开并登录" : "启动实例"}</button>
+          <button className="prototype-button primary" type="button" disabled={unavailable} onClick={() => onOpenInstance(identity.id)}><Monitor size={14} />{running ? "聚焦浏览器" : sessionFailed ? "重试启动" : identity.loginState === "login-required" || identity.loginState === "unknown" ? "打开浏览器并登录" : "启动浏览器"}</button>
           <button className="prototype-button" type="button" disabled={!canCreateTask} onClick={onUseSkill}><Play size={14} />创建任务</button>
         </div>
       </section>
 
       <div className="identity-management-grid">
         <section className="prototype-section identity-facts-section">
-          <div className="prototype-section-title"><div><h2>账号信息</h2><p>这个身份在目标站点上的业务归属</p></div></div>
+          <div className="prototype-section-title"><div><h2>站点账号</h2><p>登录校验后从目标站点同步，只读展示</p></div></div>
+          <div className="site-account-profile"><span className="identity-avatar account-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span><div><strong>{identity.account}</strong><span>{identity.platformId ?? "平台 ID 待登录后同步"}</span></div><span className={`prototype-state-chip ${identity.loginState === "logged-in" ? "available" : "login"}`}>{identity.loginState === "logged-in" ? <Check size={13} /> : <CircleAlert size={13} />}{loginLabel}</span></div>
           <dl className="prototype-detail-list">
             <div><dt>目标站点</dt><dd>{identity.site}</dd></div>
-            <div><dt>站点账号</dt><dd>{identity.account}</dd></div>
-            <div><dt>身份名称</dt><dd>{identity.name}</dd></div>
+            <div><dt>平台 ID</dt><dd>{identity.platformId ?? "待同步"}</dd></div>
+            <div><dt>本地名称</dt><dd>{identity.name}</dd></div>
             <div><dt>标签</dt><dd>{(identity.tags ?? [identity.site, identity.account]).join(" · ")}</dd></div>
           </dl>
         </section>
@@ -141,7 +140,7 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
           <div className="prototype-section-title"><div><h2>环境配置</h2><p>Provider、代理、地区与浏览器参数</p></div></div>
           <dl className="prototype-detail-list">
             <div><dt>Provider</dt><dd>{identity.provider}</dd></div>
-            <div><dt>地区与语言</dt><dd>{identity.region ?? "中国大陆"} · {identity.language ?? "简体中文"} · {identity.timezone ?? "自动时区"}</dd></div>
+            <div><dt>地区与语言</dt><dd>{identity.region ?? "跟随 IP"} · {identity.language ?? "跟随 IP"} · {identity.timezone ?? "跟随 IP"}</dd></div>
             <div><dt>代理</dt><dd>{identity.proxy ?? "团队推荐线路"} · 可用</dd></div>
             <div><dt>启动页面</dt><dd>{identity.startPage ?? "站点首页"}</dd></div>
           </dl>
@@ -152,13 +151,12 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
   );
 }
 
-function EditIdentity({ cloakProviderInstalled, identity, onDelete, onSave }: { cloakProviderInstalled: boolean; identity: Identity; onDelete: (identityId: string) => void; onSave: (identity: Identity) => void }) {
+function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onManageProxies, onSave }: { cloakProviderInstalled: boolean; identity: Identity; proxies: ProxyProfile[]; onDelete: (identityId: string) => void; onManageProxies: () => void; onSave: (identity: Identity) => void }) {
   const [name, setName] = useState(identity.name);
-  const [account, setAccount] = useState(identity.account);
   const [provider, setProvider] = useState(identity.provider);
   const [region, setRegion] = useState(identity.region ?? "中国大陆");
   const [language, setLanguage] = useState(identity.language ?? "简体中文");
-  const [timezone, setTimezone] = useState(identity.timezone ?? "自动时区");
+  const [timezone, setTimezone] = useState(identity.timezone ?? "跟随 IP");
   const [proxy, setProxy] = useState(identity.proxy ?? "团队推荐线路");
   const [startPage, setStartPage] = useState(identity.startPage ?? defaultStartPage(identity.site));
   const [tags, setTags] = useState((identity.tags ?? []).join("，"));
@@ -173,7 +171,6 @@ function EditIdentity({ cloakProviderInstalled, identity, onDelete, onSave }: { 
     onSave({
       ...identity,
       name,
-      account,
       provider,
       region,
       language,
@@ -196,10 +193,10 @@ function EditIdentity({ cloakProviderInstalled, identity, onDelete, onSave }: { 
 
   return (
     <div className="prototype-page edit-identity-page">
-      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>编辑 {identity.name}</h1><p>在一个页面统一管理站点账号信息和持久浏览器环境。</p></div></header>
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>编辑 {identity.account}</h1><p>在一个页面统一管理站点账号信息和持久浏览器环境。</p></div></header>
       <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); saveChanges(); }}>
-        <fieldset><legend>站点账号</legend><div className="inline-form-grid"><label>身份名称<input required value={name} onChange={(event) => setName(event.target.value)} /></label><label>目标站点<input disabled value={identity.site} /></label></div><div className="inline-form-grid"><label>站点账号<input required value={account} onChange={(event) => setAccount(event.target.value)} /></label><label>标签<input value={tags} placeholder="内容运营，品牌号" onChange={(event) => setTags(event.target.value)} /></label></div></fieldset>
-        <fieldset><legend>浏览器环境</legend><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option value="CloakBrowser" disabled={!cloakProviderInstalled}>CloakBrowser{cloakProviderInstalled ? "" : "（未安装）"}</option><option value="官方 Chrome">官方 Chrome</option></select></label><div className="inline-form-grid three"><label>地区<select value={region} onChange={(event) => setRegion(event.target.value)}><option>中国大陆</option><option>美国</option><option>日本</option></select></label><label>语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>简体中文</option><option>English</option></select></label><label>时区<select value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>自动时区</option><option>Asia/Shanghai</option></select></label></div><div className="inline-form-grid"><label>代理<select value={proxy} onChange={(event) => setProxy(event.target.value)}><option>团队推荐线路</option><option>不使用代理</option></select></label><label>启动页面<input value={startPage} onChange={(event) => setStartPage(event.target.value)} /></label></div></fieldset>
+        <fieldset><legend>站点账号</legend><div className="site-account-profile editable-account-profile"><span className="identity-avatar account-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span><div><strong>{identity.account}</strong><span>{identity.site} · {identity.platformId ?? "平台 ID 待同步"}</span></div><span className={`prototype-state-chip ${identity.loginState === "logged-in" ? "available" : "login"}`}>{identity.loginState === "logged-in" ? "已登录" : "待登录"}</span></div><p className="muted-copy">昵称、头像、平台 ID 和登录状态由登录校验同步，不能在本地修改。</p><div className="inline-form-grid"><label>本地身份名称<input required value={name} onChange={(event) => setName(event.target.value)} /></label><label>标签<input value={tags} placeholder="内容运营，品牌号" onChange={(event) => setTags(event.target.value)} /></label></div></fieldset>
+        <fieldset><legend>浏览器环境</legend><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option value="CloakBrowser" disabled={!cloakProviderInstalled}>CloakBrowser{cloakProviderInstalled ? "" : "（未安装）"}</option><option value="官方 Chrome">官方 Chrome</option></select></label><div className="inline-form-grid three"><label>地区<select value={region} onChange={(event) => setRegion(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>中国大陆</option><option>美国</option><option>日本</option></select></label><label>语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>简体中文</option><option>English</option></select></label><label>时区<select value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>Asia/Shanghai</option><option>America/Los_Angeles</option></select></label></div><div className="inline-form-grid"><label>代理<select value={proxy} onChange={(event) => setProxy(event.target.value)}>{proxyOptions(proxies)}<option>不使用代理</option></select><button className="inline-link field-link" type="button" onClick={onManageProxies}>新增或管理代理</button></label><label>启动页面<input type="url" value={startPage} onChange={(event) => setStartPage(event.target.value)} /></label></div></fieldset>
         <fieldset><legend>本机环境</legend><div className="environment-path-row"><span><strong>数据目录</strong><small>~/Library/Application Support/WebEnvoy/profiles/{identity.id}</small></span><button className="prototype-button" type="button" onClick={() => setPathOpened(true)}>{pathOpened ? "已在访达中显示" : "在访达中显示"}</button></div><p className="muted-copy">删除身份、清理本机环境等操作集中在这里管理。</p></fieldset>
         <div className="form-footer"><button className="prototype-button danger" type="button" onClick={() => onDelete(identity.id)}>删除账号身份</button><button className="prototype-button primary" type="submit">保存更改</button></div>
       </form>
@@ -224,22 +221,21 @@ function EnvironmentDependencies({ cloakProviderInstalled, identities, onModeCha
   );
 }
 
-function CreateIdentity({ cloakProviderInstalled, initialSite, onCreate }: { cloakProviderInstalled: boolean; initialSite: string; onCreate: (identity: Identity) => void }) {
+function CreateIdentity({ cloakProviderInstalled, initialSite, proxies, onCreate, onManageProxies }: { cloakProviderInstalled: boolean; initialSite: string; proxies: ProxyProfile[]; onCreate: (identity: Identity) => void; onManageProxies: () => void }) {
   const [name, setName] = useState("");
-  const [account, setAccount] = useState("");
   const [site, setSite] = useState(initialSite);
   const [provider, setProvider] = useState(cloakProviderInstalled ? "CloakBrowser" : "官方 Chrome");
   const [region, setRegion] = useState("中国大陆");
   const [language, setLanguage] = useState("简体中文");
-  const [timezone, setTimezone] = useState("自动时区");
+  const [timezone, setTimezone] = useState("跟随 IP");
   const [proxy, setProxy] = useState("团队推荐线路");
   return (
     <div className="prototype-page create-identity-page">
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>创建账号身份</h1><p>为一个站点账号创建独立、持久的浏览器环境。</p></div><button className="prototype-button" type="button"><Import size={14} />从已有环境导入</button></header>
-      <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); onCreate({ id: `identity-${Date.now()}`, name, site, account: account || "待登录", provider, region, language, timezone, proxy, tags: [site], fingerprint: provider === "CloakBrowser" ? "独立种子 · WebGL/Canvas 隔离" : "Chrome 默认指纹", userAgent: "跟随 Provider 稳定版本", screen: "跟随本机显示器", loginState: "login-required", sessionState: "idle", controller: "空闲", lastHealthyAt: "刚刚创建", state: "login", stateLabel: "需要登录", detail: "环境已创建 · 等待首次登录" }); }}>
-        <fieldset><legend>站点账号</legend><div className="inline-form-grid"><label>身份名称<input required value={name} placeholder="例如：小红书品牌号" onChange={(event) => setName(event.target.value)} /></label><label>目标站点<select value={site} onChange={(event) => setSite(event.target.value)}><option>小红书</option><option>微信公众号</option><option>抖音</option><option>淘宝</option></select></label></div><label>站点账号（可选）<input value={account} placeholder="例如：品牌内容" onChange={(event) => setAccount(event.target.value)} /></label></fieldset>
+      <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); onCreate({ id: `identity-${Date.now()}`, name, site, account: "待登录同步", accountAvatar: "?", provider, region, language, timezone, proxy, startPage: defaultStartPage(site), tags: [site], fingerprint: provider === "CloakBrowser" ? "独立种子 · WebGL/Canvas 隔离" : "Chrome 默认指纹", userAgent: "跟随 Provider 稳定版本", screen: "跟随本机显示器", loginState: "login-required", sessionState: "idle", controller: "空闲", lastHealthyAt: "刚刚创建", state: "login", stateLabel: "需要登录", detail: "环境已创建 · 等待首次登录" }); }}>
+        <fieldset><legend>账号身份</legend><div className="inline-form-grid"><label>本地身份名称<input required value={name} placeholder="例如：小红书品牌号" onChange={(event) => setName(event.target.value)} /></label><label>目标站点<select value={site} onChange={(event) => setSite(event.target.value)}><option>小红书</option><option>微信公众号</option><option>抖音</option><option>淘宝</option></select></label></div><p className="muted-copy">创建环境并完成首次登录后，App 会同步账号头像、昵称、平台 ID 和登录状态。</p></fieldset>
         <fieldset><legend>浏览器 Provider</legend><div className="provider-choice-list"><label className={provider === "CloakBrowser" ? "selected" : ""}><input type="radio" name="provider" disabled={!cloakProviderInstalled} checked={provider === "CloakBrowser"} onChange={() => setProvider("CloakBrowser")} /><ShieldCheck size={18} /><span><strong>CloakBrowser</strong><small>{cloakProviderInstalled ? "推荐 · 由 WebEnvoy 管理安装、更新与修复" : "尚未安装 · 请先到环境依赖中安装"}</small></span></label><label className={provider === "官方 Chrome" ? "selected" : ""}><input type="radio" name="provider" checked={provider === "官方 Chrome"} onChange={() => setProvider("官方 Chrome")} /><Monitor size={18} /><span><strong>官方 Chrome</strong><small>使用本机安装 · 部分环境能力受限</small></span></label></div></fieldset>
-        <fieldset><legend>环境预设</legend><div className="inline-form-grid three"><label>地区<select value={region} onChange={(event) => setRegion(event.target.value)}><option>中国大陆</option><option>美国</option><option>日本</option></select></label><label>语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>简体中文</option><option>English</option></select></label><label>时区<select value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>自动时区</option><option>Asia/Shanghai</option></select></label></div><label>代理<select value={proxy} onChange={(event) => setProxy(event.target.value)}><option>团队推荐线路</option><option>不使用代理</option></select></label></fieldset>
+        <fieldset><legend>环境预设</legend><div className="inline-form-grid three"><label>地区<select value={region} onChange={(event) => setRegion(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>中国大陆</option><option>美国</option><option>日本</option></select></label><label>语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>简体中文</option><option>English</option></select></label><label>时区<select value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>Asia/Shanghai</option><option>America/Los_Angeles</option></select></label></div><label>代理<select value={proxy} onChange={(event) => setProxy(event.target.value)}>{proxyOptions(proxies)}<option>不使用代理</option></select><button className="inline-link field-link" type="button" onClick={onManageProxies}>新增或管理代理</button></label></fieldset>
         <div className="form-footer"><span>保存后将打开新环境，由你完成首次登录。</span><button className="prototype-button primary" type="submit" disabled={name.trim() === ""}><UserRoundPlus size={14} />创建并登录</button></div>
       </form>
     </div>
@@ -266,35 +262,22 @@ function RecoveryStep({ active, detail, done, label }: { active: boolean; detail
   return <div className={`recovery-step ${active ? "active" : ""} ${done ? "done" : ""}`}><span>{done ? <Check size={14} /> : active ? <LoaderCircle size={14} /> : null}</span><div><strong>{label}</strong><small>{detail}</small></div></div>;
 }
 
-function LiveBrowser({ hasPausedTask, identity, onReturnToTask, onTakeoverCompleted }: { hasPausedTask: boolean; identity: Identity; onReturnToTask: (identityId: string) => void; onTakeoverCompleted: (identityId: string) => void }) {
-  const [controlState, setControlState] = useState<"viewing" | "controlling" | "validating" | "complete">("viewing");
-  const sitePreview = liveSitePreview(identity.site);
-  useEffect(() => {
-    if (controlState !== "validating") return;
-    const timer = window.setTimeout(() => { setControlState("complete"); onTakeoverCompleted(identity.id); }, 1100);
-    return () => window.clearTimeout(timer);
-  }, [controlState, identity.id, onTakeoverCompleted]);
-  return (
-    <div className="live-browser-page">
-      <div className="live-browser-toolbar"><div><span className="browser-control-dot" /><span className="browser-control-dot" /><span className="browser-control-dot" /></div><div className="browser-address"><KeyRound size={13} />{sitePreview.address}</div><button type="button" aria-label="刷新"><RefreshCw size={14} /></button></div>
-      <div className="live-browser-content"><div className="sample-site-sidebar"><strong>{identity.site}</strong>{sitePreview.sections.map((section) => <span className={section === sitePreview.selected ? "selected" : undefined} key={section}>{section}</span>)}</div><div className="sample-login-surface"><div className="sample-login-complete"><Check size={28} /><h2>{hasPausedTask ? "登录已完成" : `${identity.site} 已打开`}</h2><p>当前页面属于“{identity.name}”，等待 WebEnvoy 校验。</p></div></div></div>
-      <div className="takeover-bar"><div><strong>{identity.name}</strong><span>{controlState === "viewing" ? hasPausedTask ? "任务已暂停，当前为只读查看" : "实例已打开，当前为只读查看" : controlState === "controlling" ? "你正在控制浏览器" : controlState === "validating" ? "正在校验登录与页面状态" : hasPausedTask ? "校验成功，可以继续任务" : "校验成功，实例状态已更新"}</span></div><div className="section-actions">{controlState === "viewing" ? <button className="prototype-button primary" type="button" onClick={() => setControlState("controlling")}><Monitor size={14} />接管</button> : null}{controlState === "controlling" ? <><button className="prototype-button" type="button"><CircleStop size={14} />无法完成</button><button className="prototype-button primary" type="button" onClick={() => setControlState("validating")}><Check size={14} />已完成，继续</button></> : null}{controlState === "validating" ? <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button> : null}{controlState === "complete" ? <button className="prototype-button primary" type="button" onClick={() => onReturnToTask(identity.id)}><RotateCcw size={14} />{hasPausedTask ? "返回任务" : "返回身份"}</button> : null}</div></div>
-    </div>
-  );
-}
-
-function liveSitePreview(site: string) {
-  if (site === "小红书") return { address: "xiaohongshu.com/explore", sections: ["首页", "发现", "消息", "我"], selected: "发现" };
-  if (site === "微信公众号") return { address: "mp.weixin.qq.com", sections: ["首页", "内容与互动", "数据", "设置"], selected: "首页" };
-  if (site === "抖音") return { address: "douyin.com", sections: ["首页", "推荐", "消息", "我"], selected: "首页" };
-  if (site === "淘宝") return { address: "taobao.com", sections: ["首页", "商品", "消息", "账号"], selected: "首页" };
-  return { address: "站点首页", sections: ["首页", "业务页面", "账号"], selected: "首页" };
-}
-
 function defaultStartPage(site: string) {
   if (site === "小红书") return "https://www.xiaohongshu.com/explore";
   if (site === "微信公众号") return "https://mp.weixin.qq.com/";
   if (site === "抖音") return "https://www.douyin.com/";
   if (site === "淘宝") return "https://www.taobao.com/";
   return "https://example.com/";
+}
+
+function proxyOptions(proxies: ProxyProfile[]) {
+  return proxies.map((proxy) => <option value={proxy.name} key={proxy.id}>{proxy.name}{proxy.state === "可用" ? "" : `（${proxy.state}）`}</option>);
+}
+
+function SiteGlyph({ site }: { site: string }) {
+  if (site === "小红书") return <Images size={15} />;
+  if (site === "微信公众号") return <MessageCircle size={15} />;
+  if (site === "抖音") return <Music2 size={15} />;
+  if (site === "淘宝") return <ShoppingBag size={15} />;
+  return <BriefcaseBusiness size={15} />;
 }
