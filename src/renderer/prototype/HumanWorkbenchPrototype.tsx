@@ -28,6 +28,7 @@ import {
   type AppView,
   type AuthorizationPolicy,
   type Identity,
+  type PrototypeResultSelection,
   type PrototypeTask,
 } from "./prototypeData";
 import { WorkSurface } from "./WorkSurface";
@@ -56,6 +57,8 @@ export function HumanWorkbenchPrototype() {
   const [cloakProviderInstalled, setCloakProviderInstalled] = useState(false);
   const [globalPolicy, setGlobalPolicy] = useState<Exclude<AuthorizationPolicy, "inherit">>("ask");
   const [skillPolicies, setSkillPolicies] = useState<Record<string, AuthorizationPolicy>>({});
+  const [selectedResult, setSelectedResult] = useState<PrototypeResultSelection | null>(null);
+  const [resultPreviewRequestKey, setResultPreviewRequestKey] = useState(0);
   const selectedTask = taskList.find((task) => task.id === selectedTaskId) ?? taskList[0];
   const selectedIdentity =
     identityList.find((identity) => identity.id === selectedIdentityId) ?? identityList[0];
@@ -91,6 +94,7 @@ export function HumanWorkbenchPrototype() {
 
   function openTask(taskId: string) {
     setSelectedTaskId(taskId);
+    setSelectedResult(null);
     setWorkMode("detail");
     setView("work");
   }
@@ -105,8 +109,30 @@ export function HumanWorkbenchPrototype() {
   function submitTask(task: PrototypeTask) {
     setTaskList((current) => [task, ...current]);
     setSelectedTaskId(task.id);
+    setSelectedResult(null);
     setWorkMode("detail");
     setView("work");
+  }
+
+  function openResult(result: PrototypeResultSelection) {
+    setSelectedResult(result);
+    setResultPreviewRequestKey((current) => current + 1);
+  }
+
+  function openIdentityInstance(identityId: string) {
+    setIdentityList((current) => current.map((identity) => {
+      if (identity.id !== identityId || identity.sessionState === "running") return identity;
+      return {
+        ...identity,
+        state: "running",
+        stateLabel: "运行中",
+        sessionState: "running",
+        controller: "用户控制",
+        currentPage: identity.currentPage ?? defaultIdentityPage(identity.site),
+        lastHealthyAt: "刚刚",
+        detail: "实例运行中 · 用户控制",
+      };
+    }));
   }
 
   function openIdentity(identityId: string) {
@@ -146,6 +172,7 @@ export function HumanWorkbenchPrototype() {
 
   return (
     <AppShell
+      rightPanelOpenRequestKey={resultPreviewRequestKey}
       left={
         <LeftPanel>
           <PrototypeSidebar
@@ -216,6 +243,7 @@ export function HumanWorkbenchPrototype() {
               identities={identityList}
               mode={workMode}
               preferredIdentityId={preferredIdentityId}
+              taskList={taskList}
               selectedSkill={selectedSkill}
               skillPolicy={skillPolicies[selectedSkill.id] ?? "inherit"}
               task={selectedTask}
@@ -227,7 +255,9 @@ export function HumanWorkbenchPrototype() {
                 setView("browser");
               }}
               onCreateTask={submitTask}
+              onOpenResult={openResult}
               onOpenBrowser={() => {
+                openIdentityInstance("research");
                 setSelectedIdentityId("research");
                 setBrowserMode("live");
                 setView("browser");
@@ -236,6 +266,7 @@ export function HumanWorkbenchPrototype() {
                 setLibraryMode("catalog");
                 setView("library");
               }}
+              onSelectTask={openTask}
               onSelectSkill={setSelectedSkillId}
             />
           ) : null}
@@ -249,6 +280,7 @@ export function HumanWorkbenchPrototype() {
               taskList={taskList}
               onCreate={saveIdentity}
               onModeChange={setBrowserMode}
+              onOpenInstance={openIdentityInstance}
               onProviderRepaired={() => {
                 setCloakProviderInstalled(true);
                 setIdentityList((current) => current.map((identity) => identity.provider === "CloakBrowser" && identity.state === "repair" ? {
@@ -261,9 +293,10 @@ export function HumanWorkbenchPrototype() {
                   lastHealthyAt: "尚未启动",
                 } : identity));
               }}
-              onTakeoverCompleted={() => {
-                setTakeoverCompleted(true);
-                setTaskList((current) => current.map((task) => task.id === "xhs-login" ? {
+              onTakeoverCompleted={(identityId) => {
+                const pausedTask = taskList.find((task) => task.identityId === identityId && task.kind === "takeover" && task.state === "waiting");
+                if (pausedTask != null) setTakeoverCompleted(true);
+                setTaskList((current) => current.map((task) => task.id === pausedTask?.id ? {
                   ...task,
                   state: "running",
                   stateLabel: "正在继续",
@@ -272,19 +305,23 @@ export function HumanWorkbenchPrototype() {
                   runs: [{ id: "run-current", label: "本次运行", stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" }],
                   artifactState: "pending",
                 } : task));
-                setIdentityList((current) => current.map((identity) => identity.id === "research" ? {
+                setIdentityList((current) => current.map((identity) => identity.id === identityId ? {
                   ...identity,
                   state: "running",
                   stateLabel: "运行中",
                   loginState: "logged-in",
                   sessionState: "running",
-                  controller: "任务占用",
-                  currentPage: "小红书收藏夹",
+                  controller: pausedTask == null ? "用户控制" : "任务占用",
+                  currentPage: pausedTask == null ? identity.currentPage ?? `${identity.site} 当前页面` : `${identity.site} 收藏夹`,
                   lastHealthyAt: "刚刚",
-                  detail: "登录已确认 · 任务正在继续",
+                  detail: pausedTask == null ? "实例运行中 · 用户控制" : "登录已确认 · 任务正在继续",
                 } : identity));
               }}
-              onReturnToTask={() => openTask("xhs-login")}
+              onReturnToTask={(identityId) => {
+                const pausedTask = taskList.find((task) => task.identityId === identityId && task.kind === "takeover");
+                if (pausedTask == null) setBrowserMode("detail");
+                else openTask(pausedTask.id);
+              }}
               onDeleteIdentity={(identityId) => {
                 const remaining = identityList.filter((identity) => identity.id !== identityId);
                 if (remaining.length === 0) return;
@@ -318,9 +355,17 @@ export function HumanWorkbenchPrototype() {
           {view === "settings" ? <SettingsSurface globalPolicy={globalPolicy} section={settingsSection} onGlobalPolicyChange={setGlobalPolicy} /> : null}
         </ThreadWorkspace>
       }
-      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} task={selectedTask} /></RightPanel> : null}
+      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={`${selectedTask.id}:${resultPreviewRequestKey}`} selectedResult={selectedResult} task={selectedTask} /></RightPanel> : null}
     />
   );
+}
+
+function defaultIdentityPage(site: string) {
+  if (site === "小红书") return "小红书发现页";
+  if (site === "微信公众号") return "微信公众号首页";
+  if (site === "抖音") return "抖音首页";
+  if (site === "淘宝") return "淘宝首页";
+  return `${site} 首页`;
 }
 
 function PrototypeSidebar({

@@ -1,9 +1,9 @@
-import { Braces, FileText, Image as ImageIcon, LoaderCircle } from "lucide-react";
+import { Braces, ExternalLink, FileText, Image as ImageIcon, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
 import samplePagePreview from "../../../artifacts/app-208-real-read-task.png";
 import { PanelTabs } from "../shellPrimitives";
-import { productRows, resultRows, type ArtifactSet, type PrototypeTask } from "./prototypeData";
+import { productRows, resultRows, type ArtifactSet, type PrototypeResultSelection, type PrototypeTask } from "./prototypeData";
 
 const downloadFiles = [
   { name: "新品发布会-主片.mp4", size: "126 MB", state: "已保存" },
@@ -12,7 +12,7 @@ const downloadFiles = [
   { name: "幕后花絮.mp4", size: null, state: "来源已失效" },
 ];
 
-export function PrototypeArtifactPanel({ task }: { task: PrototypeTask }) {
+export function PrototypeArtifactPanel({ selectedResult, task }: { selectedResult: PrototypeResultSelection | null; task: PrototypeTask }) {
   const state = task.artifactState ?? (task.artifactSet == null ? "none" : "ready");
   const artifact = state === "ready" && task.artifactSet != null ? createArtifact(task, task.artifactSet) : null;
   const unavailable = state === "pending" ? <ArtifactPending /> : <ArtifactEmpty />;
@@ -21,14 +21,35 @@ export function PrototypeArtifactPanel({ task }: { task: PrototypeTask }) {
     <aside className="prototype-artifact-panel codex-scrollbar" aria-label="任务文件预览">
       <PanelTabs
         ariaLabel="任务文件预览"
-        defaultValue={task.artifactSet === "article" ? "markdown" : "json"}
+        defaultValue={selectedResult == null ? task.artifactSet === "article" ? "markdown" : "json" : "result-item"}
         tabs={[
+          ...(selectedResult == null ? [] : [{ id: "result-item", label: selectedResult.kind === "product" ? "商品详情" : "笔记详情", content: <ResultItemPreview result={selectedResult} /> }]),
           { id: "json", label: "result.json", content: artifact == null ? unavailable : <FilePreview icon={<Braces size={16} />} name="result.json" meta={artifact.jsonMeta}><pre>{JSON.stringify(artifact.payload, null, 2)}</pre></FilePreview> },
           { id: "markdown", label: "summary.md", content: artifact == null ? unavailable : <FilePreview icon={<FileText size={16} />} name="summary.md" meta="Markdown"><ArtifactMarkdown task={task} set={task.artifactSet} /></FilePreview> },
           { id: "image", label: "page.png", content: artifact == null ? unavailable : task.artifactSet === "xhs-notes" ? <FilePreview icon={<ImageIcon size={16} />} name="page.png" meta="PNG · 1280 × 800"><img className="artifact-image-preview" src={samplePagePreview} alt="小红书采集任务页面截图样例" /></FilePreview> : <ArtifactEmpty /> },
         ]}
       />
     </aside>
+  );
+}
+
+function ResultItemPreview({ result }: { result: PrototypeResultSelection }) {
+  const { row } = result;
+  const product = result.kind === "product";
+  return (
+    <article className="artifact-result-preview">
+      <div className="artifact-result-heading">
+        <div><span>{product ? "采集结果 · 商品" : "采集结果 · 笔记"}</span><h2>{row[0]}</h2><p>{product ? `${row[1]} · ${row[2]} · ${row[3]}读取` : `${row[1]} · ${row[3]}`}</p></div>
+        <button type="button" aria-label={product ? "打开商品详情" : "打开来源页面"} title={product ? "打开商品详情" : "打开来源页面"}><ExternalLink size={15} /></button>
+      </div>
+      <div className="artifact-result-body">
+        <p>{product ? "轻量便携的桌面补光设备，适合直播、视频会议和近距离产品拍摄。" : "把资料交给 AI 之前，先明确最终要消费的业务结果。适合自动化的不是打开网页本身，而是可重复的搜索、阅读、整理和交付过程。"}</p>
+        {!product ? <p>这篇笔记整理了五种常见方法，并对适用场景、输入要求和结果形式进行了对比。</p> : null}
+      </div>
+      <dl className="artifact-result-facts">
+        {product ? <><div><dt>价格</dt><dd>{row[1]}</dd></div><div><dt>库存</dt><dd>{row[2]}</dd></div><div><dt>店铺</dt><dd>示例数码配件店</dd></div><div><dt>发货地</dt><dd>浙江杭州</dd></div></> : <><div><dt>互动</dt><dd>{row[2]}</dd></div><div><dt>评论</dt><dd>126</dd></div><div><dt>收藏</dt><dd>943</dd></div><div><dt>话题</dt><dd>#AI工具 #效率提升</dd></div></>}
+      </dl>
+    </article>
   );
 }
 

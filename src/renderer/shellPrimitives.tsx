@@ -41,9 +41,10 @@ type AppShellProps = {
   header: (panelControls: ShellPanelControls) => ReactNode;
   workspace: ReactNode;
   right: ReactNode | null;
+  rightPanelOpenRequestKey?: number;
 };
 
-export function AppShell({ left, header, workspace, right }: AppShellProps) {
+export function AppShell({ left, header, workspace, right, rightPanelOpenRequestKey }: AppShellProps) {
   const [isLeftOpen, setLeftOpen] = useState(true);
   const [isRightOpen, setRightOpen] = useState(true);
   const [isLeftPreviewOpen, setLeftPreviewOpen] = useState(false);
@@ -122,6 +123,12 @@ export function AppShell({ left, header, workspace, right }: AppShellProps) {
       setRightFullscreen(false);
     }
   }, [hasRightPanel, isRightOpen]);
+
+  useEffect(() => {
+    if (rightPanelOpenRequestKey != null && hasRightPanel) {
+      setRightOpen(true);
+    }
+  }, [hasRightPanel, rightPanelOpenRequestKey]);
 
   useEffect(() => {
     return () => {

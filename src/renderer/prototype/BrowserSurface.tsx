@@ -30,9 +30,10 @@ type BrowserSurfaceProps = {
   onCreate: (identity: Identity) => void;
   onDeleteIdentity: (identityId: string) => void;
   onModeChange: (mode: BrowserMode) => void;
+  onOpenInstance: (identityId: string) => void;
   onProviderRepaired: () => void;
-  onReturnToTask: () => void;
-  onTakeoverCompleted: () => void;
+  onReturnToTask: (identityId: string) => void;
+  onTakeoverCompleted: (identityId: string) => void;
   onUpdateIdentity: (identity: Identity) => void;
   onUseSkill: () => void;
 };
@@ -47,6 +48,7 @@ export function BrowserSurface({
   onCreate,
   onDeleteIdentity,
   onModeChange,
+  onOpenInstance,
   onProviderRepaired,
   onReturnToTask,
   onTakeoverCompleted,
@@ -58,7 +60,8 @@ export function BrowserSurface({
     return <ProviderRecovery onDone={() => { onProviderRepaired(); onModeChange("dependencies"); }} />;
   }
   if (mode === "live") {
-    return <LiveBrowser identity={identity} onReturnToTask={onReturnToTask} onTakeoverCompleted={onTakeoverCompleted} />;
+    const hasPausedTask = taskList.some((task) => task.identityId === identity.id && task.kind === "takeover" && task.state === "waiting");
+    return <LiveBrowser hasPausedTask={hasPausedTask} identity={identity} onReturnToTask={onReturnToTask} onTakeoverCompleted={onTakeoverCompleted} />;
   }
   if (mode === "edit") {
     return <EditIdentity cloakProviderInstalled={cloakProviderInstalled} identity={identity} onDelete={onDeleteIdentity} onSave={onUpdateIdentity} />;
@@ -66,7 +69,7 @@ export function BrowserSurface({
   if (mode === "dependencies") {
     return <EnvironmentDependencies cloakProviderInstalled={cloakProviderInstalled} identities={identities} onModeChange={onModeChange} />;
   }
-  return <IdentityDetail identity={identity} taskList={taskList} onModeChange={onModeChange} onUseSkill={onUseSkill} />;
+  return <IdentityDetail identity={identity} onModeChange={onModeChange} onOpenInstance={onOpenInstance} onUseSkill={onUseSkill} />;
 }
 
 function IdentitySectionTabs({ active, onModeChange }: { active: "identities" | "dependencies"; onModeChange: (mode: BrowserMode) => void }) {
@@ -78,12 +81,11 @@ function IdentitySectionTabs({ active, onModeChange }: { active: "identities" | 
   );
 }
 
-function IdentityDetail({ identity, taskList, onModeChange, onUseSkill }: { identity: Identity; taskList: PrototypeTask[]; onModeChange: (mode: BrowserMode) => void; onUseSkill: () => void }) {
+function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: { identity: Identity; onModeChange: (mode: BrowserMode) => void; onOpenInstance: (identityId: string) => void; onUseSkill: () => void }) {
   const unavailable = identity.state === "repair";
   const running = identity.sessionState === "running";
   const sessionFailed = identity.sessionState === "failed";
   const canCreateTask = !unavailable && !sessionFailed && identity.loginState === "logged-in";
-  const identityTasks = taskList.filter((task) => task.identityId === identity.id);
   const loginLabel = identity.loginState === "logged-in" ? "已登录" : identity.loginState === "login-required" ? "需要登录" : "登录状态未知";
   const loginNote = identity.loginState === "logged-in" ? "14:31 确认" : identity.loginState === "login-required" ? "登录已失效" : unavailable ? "待 Provider 恢复后确认" : "等待登录确认";
   return (
@@ -109,7 +111,6 @@ function IdentityDetail({ identity, taskList, onModeChange, onUseSkill }: { iden
         <span className={unavailable ? "needs-action" : "ready"}><ShieldCheck size={13} /><strong>{unavailable ? "Provider 未安装" : "环境可用"}</strong><small>{identity.provider}</small></span>
         <span className={sessionFailed ? "needs-action" : running ? "running" : "neutral"}><Monitor size={13} /><strong>{sessionFailed ? "实例启动失败" : running ? "实例运行中" : "实例空闲"}</strong><small>{identity.currentPage ?? "未打开"}</small></span>
         <span className={identity.controller === "任务占用" ? "running" : "neutral"}><KeyRound size={13} /><strong>控制者</strong><small>{identity.controller ?? "空闲"}</small></span>
-        <span className="neutral"><Play size={13} /><strong>{identityTasks.length} 个最近任务</strong><small>{identityTasks[0]?.updatedAt ?? "暂无任务"}</small></span>
       </section>
 
       <section className="identity-instance-section">
@@ -121,14 +122,14 @@ function IdentityDetail({ identity, taskList, onModeChange, onUseSkill }: { iden
           </div>
         </div>
         <div className="section-actions">
-          <button className="prototype-button primary" type="button" disabled={unavailable} onClick={() => onModeChange("live")}><Monitor size={14} />{running ? "查看实例" : sessionFailed ? "重试启动" : identity.loginState === "login-required" || identity.loginState === "unknown" ? "打开并登录" : "启动实例"}</button>
+          <button className="prototype-button primary" type="button" disabled={unavailable} onClick={() => { onOpenInstance(identity.id); onModeChange("live"); }}><Monitor size={14} />{running ? "查看实例" : sessionFailed ? "重试启动" : identity.loginState === "login-required" || identity.loginState === "unknown" ? "打开并登录" : "启动实例"}</button>
           <button className="prototype-button" type="button" disabled={!canCreateTask} onClick={onUseSkill}><Play size={14} />创建任务</button>
         </div>
       </section>
 
       <div className="identity-management-grid">
         <section className="prototype-section identity-facts-section">
-          <div className="prototype-section-title"><div><h2>账号信息</h2><p>这个身份在目标站点上的业务归属</p></div><button className="inline-link" type="button" onClick={() => onModeChange("edit")}>编辑</button></div>
+          <div className="prototype-section-title"><div><h2>账号信息</h2><p>这个身份在目标站点上的业务归属</p></div></div>
           <dl className="prototype-detail-list">
             <div><dt>目标站点</dt><dd>{identity.site}</dd></div>
             <div><dt>站点账号</dt><dd>{identity.account}</dd></div>
@@ -137,7 +138,7 @@ function IdentityDetail({ identity, taskList, onModeChange, onUseSkill }: { iden
           </dl>
         </section>
         <section className="prototype-section identity-facts-section">
-          <div className="prototype-section-title"><div><h2>环境配置</h2><p>统一管理 Provider、代理、地区与浏览器参数</p></div><button className="inline-link" type="button" onClick={() => onModeChange("edit")}>管理环境</button></div>
+          <div className="prototype-section-title"><div><h2>环境配置</h2><p>Provider、代理、地区与浏览器参数</p></div></div>
           <dl className="prototype-detail-list">
             <div><dt>Provider</dt><dd>{identity.provider}</dd></div>
             <div><dt>地区与语言</dt><dd>{identity.region ?? "中国大陆"} · {identity.language ?? "简体中文"} · {identity.timezone ?? "自动时区"}</dd></div>
@@ -147,11 +148,6 @@ function IdentityDetail({ identity, taskList, onModeChange, onUseSkill }: { iden
           <details className="identity-profile-details"><summary>浏览器配置详情</summary><dl className="prototype-detail-list"><div><dt>Profile</dt><dd>{identity.id}</dd></div><div><dt>指纹摘要</dt><dd>{identity.fingerprint ?? "Provider 默认指纹"}</dd></div><div><dt>User agent</dt><dd>{identity.userAgent ?? "跟随 Provider 稳定版本"}</dd></div><div><dt>屏幕</dt><dd>{identity.screen ?? "跟随本机显示器"}</dd></div><div><dt>当前页面</dt><dd>{identity.currentPage ?? "未打开"}</dd></div><div><dt>最近正常</dt><dd>{identity.lastHealthyAt ?? "尚未验证"}</dd></div><div><dt>存储</dt><dd>本机持久环境 · 已隔离</dd></div></dl></details>
         </section>
       </div>
-
-      <section className="prototype-section related-task-section">
-        <div className="prototype-section-title"><div><h2>最近任务</h2><p>使用这个账号身份执行的任务</p></div></div>
-        {identityTasks.length > 0 ? identityTasks.slice(0, 3).map((task) => <div className="identity-task-row" key={task.id}><span className={`prototype-status-dot ${task.state}`} /><div><strong>{task.title}</strong><small>{task.skill} · {task.updatedAt}</small></div><span>{task.stateLabel}</span></div>) : <p className="muted-copy">这个账号身份还没有执行过任务。</p>}
-      </section>
     </div>
   );
 }
@@ -164,7 +160,7 @@ function EditIdentity({ cloakProviderInstalled, identity, onDelete, onSave }: { 
   const [language, setLanguage] = useState(identity.language ?? "简体中文");
   const [timezone, setTimezone] = useState(identity.timezone ?? "自动时区");
   const [proxy, setProxy] = useState(identity.proxy ?? "团队推荐线路");
-  const [startPage, setStartPage] = useState(identity.startPage ?? "https://www.xiaohongshu.com/explore");
+  const [startPage, setStartPage] = useState(identity.startPage ?? defaultStartPage(identity.site));
   const [tags, setTags] = useState((identity.tags ?? []).join("，"));
   const [pathOpened, setPathOpened] = useState(false);
 
@@ -270,18 +266,35 @@ function RecoveryStep({ active, detail, done, label }: { active: boolean; detail
   return <div className={`recovery-step ${active ? "active" : ""} ${done ? "done" : ""}`}><span>{done ? <Check size={14} /> : active ? <LoaderCircle size={14} /> : null}</span><div><strong>{label}</strong><small>{detail}</small></div></div>;
 }
 
-function LiveBrowser({ identity, onReturnToTask, onTakeoverCompleted }: { identity: Identity; onReturnToTask: () => void; onTakeoverCompleted: () => void }) {
+function LiveBrowser({ hasPausedTask, identity, onReturnToTask, onTakeoverCompleted }: { hasPausedTask: boolean; identity: Identity; onReturnToTask: (identityId: string) => void; onTakeoverCompleted: (identityId: string) => void }) {
   const [controlState, setControlState] = useState<"viewing" | "controlling" | "validating" | "complete">("viewing");
+  const sitePreview = liveSitePreview(identity.site);
   useEffect(() => {
     if (controlState !== "validating") return;
-    const timer = window.setTimeout(() => { setControlState("complete"); onTakeoverCompleted(); }, 1100);
+    const timer = window.setTimeout(() => { setControlState("complete"); onTakeoverCompleted(identity.id); }, 1100);
     return () => window.clearTimeout(timer);
-  }, [controlState, onTakeoverCompleted]);
+  }, [controlState, identity.id, onTakeoverCompleted]);
   return (
     <div className="live-browser-page">
-      <div className="live-browser-toolbar"><div><span className="browser-control-dot" /><span className="browser-control-dot" /><span className="browser-control-dot" /></div><div className="browser-address"><KeyRound size={13} />xiaohongshu.com/explore</div><button type="button" aria-label="刷新"><RefreshCw size={14} /></button></div>
-      <div className="live-browser-content"><div className="sample-site-sidebar"><strong>小红书</strong><span>首页</span><span className="selected">发现</span><span>消息</span><span>我</span></div><div className="sample-login-surface"><div className="sample-login-complete"><Check size={28} /><h2>登录已完成</h2><p>当前页面显示账号主页，等待 WebEnvoy 校验。</p></div></div></div>
-      <div className="takeover-bar"><div><strong>{identity.name}</strong><span>{controlState === "viewing" ? "任务已暂停，当前为只读查看" : controlState === "controlling" ? "你正在控制浏览器" : controlState === "validating" ? "正在校验登录与页面状态" : "校验成功，可以继续任务"}</span></div><div className="section-actions">{controlState === "viewing" ? <button className="prototype-button primary" type="button" onClick={() => setControlState("controlling")}><Monitor size={14} />接管</button> : null}{controlState === "controlling" ? <><button className="prototype-button" type="button"><CircleStop size={14} />无法完成</button><button className="prototype-button primary" type="button" onClick={() => setControlState("validating")}><Check size={14} />已完成，继续</button></> : null}{controlState === "validating" ? <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button> : null}{controlState === "complete" ? <button className="prototype-button primary" type="button" onClick={onReturnToTask}><RotateCcw size={14} />返回任务</button> : null}</div></div>
+      <div className="live-browser-toolbar"><div><span className="browser-control-dot" /><span className="browser-control-dot" /><span className="browser-control-dot" /></div><div className="browser-address"><KeyRound size={13} />{sitePreview.address}</div><button type="button" aria-label="刷新"><RefreshCw size={14} /></button></div>
+      <div className="live-browser-content"><div className="sample-site-sidebar"><strong>{identity.site}</strong>{sitePreview.sections.map((section) => <span className={section === sitePreview.selected ? "selected" : undefined} key={section}>{section}</span>)}</div><div className="sample-login-surface"><div className="sample-login-complete"><Check size={28} /><h2>{hasPausedTask ? "登录已完成" : `${identity.site} 已打开`}</h2><p>当前页面属于“{identity.name}”，等待 WebEnvoy 校验。</p></div></div></div>
+      <div className="takeover-bar"><div><strong>{identity.name}</strong><span>{controlState === "viewing" ? hasPausedTask ? "任务已暂停，当前为只读查看" : "实例已打开，当前为只读查看" : controlState === "controlling" ? "你正在控制浏览器" : controlState === "validating" ? "正在校验登录与页面状态" : hasPausedTask ? "校验成功，可以继续任务" : "校验成功，实例状态已更新"}</span></div><div className="section-actions">{controlState === "viewing" ? <button className="prototype-button primary" type="button" onClick={() => setControlState("controlling")}><Monitor size={14} />接管</button> : null}{controlState === "controlling" ? <><button className="prototype-button" type="button"><CircleStop size={14} />无法完成</button><button className="prototype-button primary" type="button" onClick={() => setControlState("validating")}><Check size={14} />已完成，继续</button></> : null}{controlState === "validating" ? <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button> : null}{controlState === "complete" ? <button className="prototype-button primary" type="button" onClick={() => onReturnToTask(identity.id)}><RotateCcw size={14} />{hasPausedTask ? "返回任务" : "返回身份"}</button> : null}</div></div>
     </div>
   );
+}
+
+function liveSitePreview(site: string) {
+  if (site === "小红书") return { address: "xiaohongshu.com/explore", sections: ["首页", "发现", "消息", "我"], selected: "发现" };
+  if (site === "微信公众号") return { address: "mp.weixin.qq.com", sections: ["首页", "内容与互动", "数据", "设置"], selected: "首页" };
+  if (site === "抖音") return { address: "douyin.com", sections: ["首页", "推荐", "消息", "我"], selected: "首页" };
+  if (site === "淘宝") return { address: "taobao.com", sections: ["首页", "商品", "消息", "账号"], selected: "首页" };
+  return { address: "站点首页", sections: ["首页", "业务页面", "账号"], selected: "首页" };
+}
+
+function defaultStartPage(site: string) {
+  if (site === "小红书") return "https://www.xiaohongshu.com/explore";
+  if (site === "微信公众号") return "https://mp.weixin.qq.com/";
+  if (site === "抖音") return "https://www.douyin.com/";
+  if (site === "淘宝") return "https://www.taobao.com/";
+  return "https://example.com/";
 }

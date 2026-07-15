@@ -22,7 +22,7 @@ import {
   skills,
   type AuthorizationPolicy,
   type Identity,
-  type PrototypeRun,
+  type PrototypeResultSelection,
   type PrototypeTask,
   type Skill,
 } from "./prototypeData";
@@ -35,11 +35,14 @@ export function WorkSurface({
   selectedSkill,
   skillPolicy,
   task,
+  taskList,
   takeoverCompleted,
   onCreateIdentity,
   onCreateTask,
+  onOpenResult,
   onOpenBrowser,
   onOpenLibrary,
+  onSelectTask,
   onSelectSkill,
 }: {
   globalPolicy: Exclude<AuthorizationPolicy, "inherit">;
@@ -49,11 +52,14 @@ export function WorkSurface({
   selectedSkill: Skill;
   skillPolicy: AuthorizationPolicy;
   task: PrototypeTask;
+  taskList: PrototypeTask[];
   takeoverCompleted: boolean;
   onCreateIdentity: () => void;
   onCreateTask: (task: PrototypeTask) => void;
+  onOpenResult: (result: PrototypeResultSelection) => void;
   onOpenBrowser: () => void;
   onOpenLibrary: () => void;
+  onSelectTask: (taskId: string) => void;
   onSelectSkill: (skillId: string) => void;
 }) {
   if (mode === "create") {
@@ -72,10 +78,33 @@ export function WorkSurface({
     );
   }
 
-  return <TaskDetail task={task} takeoverCompleted={takeoverCompleted} onOpenBrowser={onOpenBrowser} />;
+  return (
+    <TaskDetail
+      task={task}
+      taskList={taskList}
+      takeoverCompleted={takeoverCompleted}
+      onOpenBrowser={onOpenBrowser}
+      onOpenResult={onOpenResult}
+      onSelectTask={onSelectTask}
+    />
+  );
 }
 
-function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: PrototypeTask; takeoverCompleted: boolean; onOpenBrowser: () => void }) {
+function TaskDetail({
+  task,
+  taskList,
+  takeoverCompleted,
+  onOpenBrowser,
+  onOpenResult,
+  onSelectTask,
+}: {
+  task: PrototypeTask;
+  taskList: PrototypeTask[];
+  takeoverCompleted: boolean;
+  onOpenBrowser: () => void;
+  onOpenResult: (result: PrototypeResultSelection) => void;
+  onSelectTask: (taskId: string) => void;
+}) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const waiting = task.kind === "takeover" && !takeoverCompleted;
   const resumed = task.kind === "takeover" && takeoverCompleted;
@@ -83,12 +112,11 @@ function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: Prototyp
   const storedRuns = task.runs ?? [{ id: "run-current", label: "本次运行", stateLabel: task.stateLabel, summary: task.summary }];
   const runs = resumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
   const currentRun = runs.at(-1) ?? runs[0];
-  const navigationItems = taskNavigationItems(task, runs);
 
   return (
     <div className="prototype-page task-detail-page">
       <div className="prototype-task-thread-layout">
-        <PrototypeRunRail items={navigationItems} />
+        <PrototypeTaskRail selectedTaskId={task.id} tasks={taskList} onSelectTask={onSelectTask} />
         <div className="prototype-task-thread-content">
           <header className="prototype-page-heading task-heading" data-content-search-unit-key={`${task.id}-context`}>
             <div><div className="prototype-eyebrow">{task.site} · {task.skill}</div><h1>{task.title}</h1><p>{resumed ? "登录状态校验成功，任务已恢复执行，正在读取收藏夹内容。" : task.summary}</p></div>
@@ -101,7 +129,7 @@ function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: Prototyp
             <div className="task-run-label"><span>{currentRun.label}</span><strong>{waiting ? "等待人工处理" : currentRun.stateLabel}</strong></div>
             {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>任务已暂停。打开对应账号的浏览器，登录后由系统校验并继续原任务。</p></div><button className="prototype-button primary" type="button" onClick={onOpenBrowser}>打开浏览器</button></section> : null}
             {newlyCreated ? <NewTaskRunning task={task} /> : null}
-            {!newlyCreated && task.kind === "collection" ? <CollectionResult task={task} /> : null}
+            {!newlyCreated && task.kind === "collection" ? <CollectionResult task={task} onOpenResult={onOpenResult} /> : null}
             {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
             {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
             {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
@@ -117,19 +145,28 @@ function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: Prototyp
   );
 }
 
-type TaskNavigationItem = { id: string; label: string };
-
-function taskNavigationItems(task: PrototypeTask, runs: PrototypeRun[]): TaskNavigationItem[] {
-  return [
-    { id: `${task.id}-context`, label: "任务信息" },
-    ...runs.map((run) => ({ id: `${task.id}-${run.id}`, label: `${run.label} · ${run.stateLabel}` })),
-    { id: `${task.id}-sources`, label: "任务来源" },
-    { id: `${task.id}-diagnostics`, label: "运行详情" },
-  ];
-}
-
-function PrototypeRunRail({ items }: { items: TaskNavigationItem[] }) {
-  return <nav className="thread-navigation-rail prototype-run-rail" aria-label="任务运行导航"><div className="thread-navigation-rail-list"><div className="thread-navigation-rail-rows">{items.map((item) => <button className="thread-navigation-row" type="button" aria-label={`跳转到${item.label}`} title={item.label} key={item.id} onClick={() => document.querySelector(`[data-content-search-unit-key="${item.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" })}><span className="thread-navigation-marker-frame"><span className="thread-navigation-marker" /></span></button>)}</div></div></nav>;
+function PrototypeTaskRail({ selectedTaskId, tasks, onSelectTask }: { selectedTaskId: string; tasks: PrototypeTask[]; onSelectTask: (taskId: string) => void }) {
+  return (
+    <nav className="thread-navigation-rail prototype-task-rail" aria-label="任务快速导航">
+      <div className="thread-navigation-rail-list">
+        <div className="thread-navigation-rail-rows">
+          {tasks.map((task) => (
+            <button
+              className="thread-navigation-row"
+              type="button"
+              aria-current={selectedTaskId === task.id ? "true" : undefined}
+              aria-label={`切换到任务：${task.title}`}
+              title={`${task.site} · ${task.title} · ${task.identity}`}
+              key={task.id}
+              onClick={() => onSelectTask(task.id)}
+            >
+              <span className="thread-navigation-marker-frame"><span className="thread-navigation-marker" /></span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
 }
 
 function NewTaskRunning({ task }: { task: PrototypeTask }) {
@@ -141,58 +178,28 @@ function NewTaskRunning({ task }: { task: PrototypeTask }) {
   );
 }
 
-function CollectionResult({ task }: { task: PrototypeTask }) {
+function CollectionResult({ task, onOpenResult }: { task: PrototypeTask; onOpenResult: (result: PrototypeResultSelection) => void }) {
   const running = task.state === "running";
-  const [selectedRow, setSelectedRow] = useState<string[] | null>(null);
   const isProductCollection = task.site === "淘宝";
   const rows = isProductCollection ? productRows : resultRows;
-
-  if (selectedRow != null) {
-    return <ResultItemDetail row={selectedRow} product={isProductCollection} onBack={() => setSelectedRow(null)} />;
-  }
 
   return (
     <section className="prototype-section result-section">
       <div className="prototype-section-title">
-        <div><h2>{isProductCollection ? "已读取的商品" : "采集结果"}</h2><p>{running ? "任务继续运行时，已完成的数据仍可查看。" : "12 条笔记 · 0 条失败 · 当前显示 5 条"}</p></div>
+        <div>
+          <h2>本次任务的采集结果</h2>
+          <p>{running ? `单个任务 · 本次 Run 已返回 ${task.artifactCurrent ?? rows.length}/${task.artifactTotal ?? "?"} 条商品 · 当前预览 ${rows.length} 条` : `单个任务 · 本次 Run 返回 ${task.artifactTotal ?? rows.length} 条笔记 · 当前预览 ${rows.length} 条`}</p>
+        </div>
         <div className="section-actions"><button className="prototype-button" type="button"><ListFilter size={14} />筛选</button><button className="prototype-button" type="button">导出</button></div>
       </div>
       {running ? <div className="prototype-progress"><span style={{ width: "45%" }} /></div> : null}
       <div className="prototype-table-wrap">
         <table className="prototype-table">
           <thead><tr>{(isProductCollection ? ["商品", "价格", "库存", "读取时间"] : ["笔记标题", "作者", "互动", "读取时间"]).map((heading) => <th key={heading}>{heading}</th>)}<th aria-label="操作" /></tr></thead>
-          <tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`打开 ${row[0]}`} onClick={() => setSelectedRow(row)}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
+          <tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`在右侧预览 ${row[0]}`} title="在右侧预览" onClick={() => onOpenResult({ kind: isProductCollection ? "product" : "note", row })}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
         </table>
       </div>
     </section>
-  );
-}
-
-function ResultItemDetail({ row, product, onBack }: { row: string[]; product: boolean; onBack: () => void }) {
-  if (product) {
-    return (
-      <article className="prototype-section result-item-detail">
-        <button className="inline-link" type="button" onClick={onBack}>返回商品列表</button>
-        <div className="result-item-heading">
-          <div><div className="prototype-eyebrow">采集结果 · 商品</div><h2>{row[0]}</h2><p>{row[1]} · {row[2]} · {row[3]}读取</p></div>
-          <button className="prototype-button" type="button"><ExternalLink size={14} />打开商品详情</button>
-        </div>
-        <div className="result-item-body"><p>轻量便携的桌面补光设备，适合直播、视频会议和近距离产品拍摄。</p></div>
-        <dl className="result-item-facts"><div><dt>价格</dt><dd>{row[1]}</dd></div><div><dt>库存</dt><dd>{row[2]}</dd></div><div><dt>店铺</dt><dd>示例数码配件店</dd></div><div><dt>发货地</dt><dd>浙江杭州</dd></div></dl>
-      </article>
-    );
-  }
-
-  return (
-    <article className="prototype-section result-item-detail">
-      <button className="inline-link" type="button" onClick={onBack}>返回采集结果</button>
-      <div className="result-item-heading">
-        <div><div className="prototype-eyebrow">采集结果 · 笔记</div><h2>{row[0]}</h2><p>{row[1]} · {row[3]}</p></div>
-        <button className="prototype-button" type="button"><ExternalLink size={14} />打开来源页面</button>
-      </div>
-      <div className="result-item-body"><p>把资料交给 AI 之前，先明确最终要消费的业务结果。适合自动化的不是“打开网页”本身，而是可重复的搜索、阅读、整理和交付过程。</p><p>这篇笔记整理了五种常见方法，并对适用场景、输入要求和结果形式进行了对比。</p></div>
-      <dl className="result-item-facts"><div><dt>点赞</dt><dd>{row[2]}</dd></div><div><dt>评论</dt><dd>126</dd></div><div><dt>收藏</dt><dd>943</dd></div><div><dt>话题</dt><dd>#AI工具 #效率提升</dd></div></dl>
-    </article>
   );
 }
 
