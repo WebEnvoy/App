@@ -5,9 +5,13 @@
 Accepted by App #306 as the direction for App #298 product correction, 2026-07-14.
 
 本 ADR 只接受产品方向和设计约束，不代表 IA inventory、原型或场景验收已经完成，
-也不关闭 App #298 或其 #299-#305 子项。
+也不关闭 App #298 或其 #299-#305、#308 子项。
 
-本 ADR 固化产品方向和下一轮低保真设计约束，不实现生产 UI。它保留 ADR
+2026-07-15 process correction：App #298 在 IA 定稿前增加 Loom Story 用户确认
+Gate，并以高保真原型用户验收替代低保真场景验收。Loom review、自动 review、PR
+merge 或 agent 判断不能代替这两次用户确认。
+
+本 ADR 固化产品方向和下一轮设计约束，不实现生产 UI。它保留 ADR
 0005/0006/0008 的 owner truth、敏感数据和本地缓存边界，但 supersede 以下旧决策：
 
 - evidence card、refs、runtime facts 或右侧 context tabs 默认可见；
@@ -95,16 +99,22 @@ App 消费 Core 的统一授权策略：
 App 不保存授权 truth，不建立站点专用审批状态机。个人本机体验使用“授权”或“确认”，
 只有未来真实多人流程才使用“审批”。
 
-## 低保真设计门槛
+## Story 与高保真设计门槛
 
 生产 UI Work Item 前必须完成：
 
+- Loom User Story、Story Readiness 与 Story Business Confirmation；confirmation
+  初始为 `pending`，只有用户明确确认后才可进入 IA 定稿；
 - 当前页面 inventory，并标记保留、重命名、移动、折叠、仅诊断或删除；
 - 三域导航和页面清单；
 - 账号、技能、任务三种入口旅程；
 - provider 安装修复、人工接管和授权旅程；
 - 业务结果、空结果、失败和需要人工处理状态；
-- 低保真原型场景验收。
+- 高保真原型场景验收；原型可采用交互单页应用、图片状态序列或其他足以评审
+  关键旅程的载体，但必须由用户明确批准。
+
+用户要求修订 Story 或原型时，状态保持 `revision-requested`，不得进入生产 UI
+Work Item。Loom review 与自动检查只可验证载体，不构成产品审核。
 
 固定三栏、右侧 tabs、navigation rail 或 Task Thread 树只能作为候选组件，不再是
 未经场景验证的全局结构约束。

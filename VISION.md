@@ -24,7 +24,7 @@ WebEnvoy App 应坚持：
 - App 可以保存 UI 设置、最近视图和带来源/时间/stale 标记的非敏感展示缓存；
 - 结果必须能追溯到结果依据，失败必须能说明失败阶段和下一步动作；
 - 没有合适站点技能时，用户、Agent、API、CLI 或 MCP 可以通过账号身份启动受控浏览器实例，但这不是自动任务执行；
-- Work、Browser、Library 是三个可管理、可观测的业务域；Task Thread 仅是待低保真验证的 Work 候选组织方式；
+- Work、Browser、Library 是三个可管理、可观测的业务域；Task Thread 仅是待用户确认 Story 与高保真原型验证的 Work 候选组织方式；
 - 真实写入、批量 crawler、marketplace 和通用 browser agent loop 不属于首个桌面闭环。
 
 ## 核心对象
