@@ -3,7 +3,7 @@
 ## Status and Scope
 
 This document is the canonical information architecture candidate for App #298
-and consumes the user-confirmed GWT Story in `.loom/stories/APP-308.md`. It
+and consumes the user-confirmed GWT Story in `docs/stories/APP-308.md`. It
 covers App #300-#304 and is the product input to the high-fidelity prototype in
 App #305.
 
