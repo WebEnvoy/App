@@ -17,10 +17,12 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import {
   authorizationPolicyLabels,
+  productRows,
   resultRows,
   skills,
   type AuthorizationPolicy,
   type Identity,
+  type PrototypeRun,
   type PrototypeTask,
   type Skill,
 } from "./prototypeData";
@@ -76,66 +78,58 @@ export function WorkSurface({
 function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: PrototypeTask; takeoverCompleted: boolean; onOpenBrowser: () => void }) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const waiting = task.kind === "takeover" && !takeoverCompleted;
+  const resumed = task.kind === "takeover" && takeoverCompleted;
   const newlyCreated = task.id.startsWith("task-") && task.state === "running";
+  const storedRuns = task.runs ?? [{ id: "run-current", label: "本次运行", stateLabel: task.stateLabel, summary: task.summary }];
+  const runs = resumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
+  const currentRun = runs.at(-1) ?? runs[0];
+  const navigationItems = taskNavigationItems(task, runs);
 
   return (
     <div className="prototype-page task-detail-page">
-      <header className="prototype-page-heading task-heading">
-        <div>
-          <div className="prototype-eyebrow">{task.site} · {task.skill}</div>
-          <h1>{task.title}</h1>
-          <p>{task.summary}</p>
-        </div>
-        <span className={`prototype-state-chip ${waiting ? "waiting" : takeoverCompleted && task.kind === "takeover" ? "running" : task.state}`}>
-          {takeoverCompleted && task.kind === "takeover" ? <LoaderCircle size={13} /> : task.state === "success" ? <Check size={13} /> : null}
-          {takeoverCompleted && task.kind === "takeover" ? "已恢复 · 正在继续" : task.stateLabel}
-        </span>
-      </header>
+      <div className="prototype-task-thread-layout">
+        <PrototypeRunRail items={navigationItems} />
+        <div className="prototype-task-thread-content">
+          <header className="prototype-page-heading task-heading" data-content-search-unit-key={`${task.id}-context`}>
+            <div><div className="prototype-eyebrow">{task.site} · {task.skill}</div><h1>{task.title}</h1><p>{resumed ? "登录状态校验成功，任务已恢复执行，正在读取收藏夹内容。" : task.summary}</p></div>
+            <span className={`prototype-state-chip ${waiting ? "waiting" : takeoverCompleted && task.kind === "takeover" ? "running" : task.state}`}>{takeoverCompleted && task.kind === "takeover" ? <LoaderCircle size={13} /> : task.state === "success" ? <Check size={13} /> : null}{takeoverCompleted && task.kind === "takeover" ? "已恢复 · 正在继续" : task.stateLabel}</span>
+          </header>
 
-      {waiting ? (
-        <section className="prototype-callout action-needed">
-          <CircleAlert size={18} />
-          <div><strong>需要你完成登录</strong><p>任务已暂停。打开对应账号的浏览器，登录后由系统校验并继续原任务。</p></div>
-          <button className="prototype-button primary" type="button" onClick={onOpenBrowser}>打开浏览器</button>
-        </section>
-      ) : null}
+          {runs.slice(0, -1).map((run) => <section className="task-run-summary" data-content-search-unit-key={`${task.id}-${run.id}`} key={run.id}><div><span>{run.label}</span><strong>{run.stateLabel}</strong></div><span className="prototype-state-chip available"><Check size={13} />已完成</span><p>{run.summary}</p></section>)}
 
-      {newlyCreated ? <NewTaskRunning task={task} /> : null}
-      {!newlyCreated && task.kind === "collection" ? <CollectionResult task={task} /> : null}
-      {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
-      {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
-      {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
-      {task.kind === "takeover" && takeoverCompleted ? (
-        <section className="prototype-section running-result">
-          <div className="prototype-section-title"><div><h2>任务已继续</h2><p>登录状态校验成功，正在读取收藏夹内容。</p></div><span>3 / 18</span></div>
-          <div className="prototype-progress"><span style={{ width: "22%" }} /></div>
-        </section>
-      ) : null}
-
-      <section className={`task-source-strip ${task.authorization != null ? "with-authorization" : ""}`}>
-        <div><span>账号身份</span><strong>{task.identity}</strong></div>
-        <div><span>站点技能</span><strong>{task.skill}</strong></div>
-        <div><span>创建来源</span><strong>{task.source}</strong></div>
-        <div><span>更新时间</span><strong>{task.updatedAt}</strong></div>
-        {task.authorization != null ? <div><span>任务授权</span><strong>{task.authorization}</strong></div> : null}
-      </section>
-
-      <section className="prototype-disclosure">
-        <button type="button" onClick={() => setDiagnosticsOpen((open) => !open)}>
-          <ChevronDown size={15} className={diagnosticsOpen ? "rotated" : ""} />
-          运行详情与诊断
-          <span>仅在排查问题时查看</span>
-        </button>
-        {diagnosticsOpen ? (
-          <div className="diagnostic-detail">
-            <p><strong>最近阶段</strong> 页面读取与结果标准化</p>
-            <p><strong>来源摘要</strong> 目标页面在 {task.updatedAt} 完成确认</p>
-            <p><strong>内部记录</strong> 已保留，可从诊断导出；默认不占用业务结果区域。</p>
+          <div className="task-current-run" data-content-search-unit-key={`${task.id}-${currentRun.id}`}>
+            <div className="task-run-label"><span>{currentRun.label}</span><strong>{waiting ? "等待人工处理" : currentRun.stateLabel}</strong></div>
+            {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>任务已暂停。打开对应账号的浏览器，登录后由系统校验并继续原任务。</p></div><button className="prototype-button primary" type="button" onClick={onOpenBrowser}>打开浏览器</button></section> : null}
+            {newlyCreated ? <NewTaskRunning task={task} /> : null}
+            {!newlyCreated && task.kind === "collection" ? <CollectionResult task={task} /> : null}
+            {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
+            {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
+            {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
+            {task.kind === "takeover" && takeoverCompleted ? <section className="prototype-section running-result"><div className="prototype-section-title"><div><h2>任务已继续</h2><p>登录状态校验成功，正在读取收藏夹内容。</p></div><span>3 / 18</span></div><div className="prototype-progress"><span style={{ width: "22%" }} /></div></section> : null}
           </div>
-        ) : null}
-      </section>
+
+          <section className={`task-source-strip ${task.authorization != null ? "with-authorization" : ""}`} data-content-search-unit-key={`${task.id}-sources`}><div><span>账号身份</span><strong>{task.identity}</strong></div><div><span>站点技能</span><strong>{task.skill}</strong></div><div><span>创建来源</span><strong>{task.source}</strong></div><div><span>更新时间</span><strong>{task.updatedAt}</strong></div>{task.authorization != null ? <div><span>任务授权</span><strong>{task.authorization}</strong></div> : null}</section>
+
+          <section className="prototype-disclosure" data-content-search-unit-key={`${task.id}-diagnostics`}><button type="button" onClick={() => setDiagnosticsOpen((open) => !open)}><ChevronDown size={15} className={diagnosticsOpen ? "rotated" : ""} />运行详情与诊断<span>仅在排查问题时查看</span></button>{diagnosticsOpen ? <div className="diagnostic-detail"><p><strong>最近阶段</strong> 页面读取与结果标准化</p><p><strong>来源摘要</strong> 目标页面在 {task.updatedAt} 完成确认</p><p><strong>内部记录</strong> 已保留，可从诊断导出；默认不占用业务结果区域。</p></div> : null}</section>
+        </div>
+      </div>
     </div>
   );
+}
+
+type TaskNavigationItem = { id: string; label: string };
+
+function taskNavigationItems(task: PrototypeTask, runs: PrototypeRun[]): TaskNavigationItem[] {
+  return [
+    { id: `${task.id}-context`, label: "任务信息" },
+    ...runs.map((run) => ({ id: `${task.id}-${run.id}`, label: `${run.label} · ${run.stateLabel}` })),
+    { id: `${task.id}-sources`, label: "任务来源" },
+    { id: `${task.id}-diagnostics`, label: "运行详情" },
+  ];
+}
+
+function PrototypeRunRail({ items }: { items: TaskNavigationItem[] }) {
+  return <nav className="thread-navigation-rail prototype-run-rail" aria-label="任务运行导航"><div className="thread-navigation-rail-list"><div className="thread-navigation-rail-rows">{items.map((item) => <button className="thread-navigation-row" type="button" aria-label={`跳转到${item.label}`} title={item.label} key={item.id} onClick={() => document.querySelector(`[data-content-search-unit-key="${item.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" })}><span className="thread-navigation-marker-frame"><span className="thread-navigation-marker" /></span></button>)}</div></div></nav>;
 }
 
 function NewTaskRunning({ task }: { task: PrototypeTask }) {
@@ -150,29 +144,45 @@ function NewTaskRunning({ task }: { task: PrototypeTask }) {
 function CollectionResult({ task }: { task: PrototypeTask }) {
   const running = task.state === "running";
   const [selectedRow, setSelectedRow] = useState<string[] | null>(null);
+  const isProductCollection = task.site === "淘宝";
+  const rows = isProductCollection ? productRows : resultRows;
 
   if (selectedRow != null) {
-    return <ResultItemDetail row={selectedRow} onBack={() => setSelectedRow(null)} />;
+    return <ResultItemDetail row={selectedRow} product={isProductCollection} onBack={() => setSelectedRow(null)} />;
   }
 
   return (
     <section className="prototype-section result-section">
       <div className="prototype-section-title">
-        <div><h2>{running ? "已读取的商品" : "采集结果"}</h2><p>{running ? "任务继续运行时，已完成的数据仍可查看。" : "12 条笔记 · 0 条失败 · 当前显示 5 条"}</p></div>
+        <div><h2>{isProductCollection ? "已读取的商品" : "采集结果"}</h2><p>{running ? "任务继续运行时，已完成的数据仍可查看。" : "12 条笔记 · 0 条失败 · 当前显示 5 条"}</p></div>
         <div className="section-actions"><button className="prototype-button" type="button"><ListFilter size={14} />筛选</button><button className="prototype-button" type="button">导出</button></div>
       </div>
       {running ? <div className="prototype-progress"><span style={{ width: "45%" }} /></div> : null}
       <div className="prototype-table-wrap">
         <table className="prototype-table">
-          <thead><tr><th>笔记标题</th><th>作者</th><th>互动</th><th>读取时间</th><th aria-label="操作" /></tr></thead>
-          <tbody>{resultRows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`打开 ${row[0]}`} onClick={() => setSelectedRow(row)}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
+          <thead><tr>{(isProductCollection ? ["商品", "价格", "库存", "读取时间"] : ["笔记标题", "作者", "互动", "读取时间"]).map((heading) => <th key={heading}>{heading}</th>)}<th aria-label="操作" /></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`打开 ${row[0]}`} onClick={() => setSelectedRow(row)}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
         </table>
       </div>
     </section>
   );
 }
 
-function ResultItemDetail({ row, onBack }: { row: string[]; onBack: () => void }) {
+function ResultItemDetail({ row, product, onBack }: { row: string[]; product: boolean; onBack: () => void }) {
+  if (product) {
+    return (
+      <article className="prototype-section result-item-detail">
+        <button className="inline-link" type="button" onClick={onBack}>返回商品列表</button>
+        <div className="result-item-heading">
+          <div><div className="prototype-eyebrow">采集结果 · 商品</div><h2>{row[0]}</h2><p>{row[1]} · {row[2]} · {row[3]}读取</p></div>
+          <button className="prototype-button" type="button"><ExternalLink size={14} />打开商品详情</button>
+        </div>
+        <div className="result-item-body"><p>轻量便携的桌面补光设备，适合直播、视频会议和近距离产品拍摄。</p></div>
+        <dl className="result-item-facts"><div><dt>价格</dt><dd>{row[1]}</dd></div><div><dt>库存</dt><dd>{row[2]}</dd></div><div><dt>店铺</dt><dd>示例数码配件店</dd></div><div><dt>发货地</dt><dd>浙江杭州</dd></div></dl>
+      </article>
+    );
+  }
+
   return (
     <article className="prototype-section result-item-detail">
       <button className="inline-link" type="button" onClick={onBack}>返回采集结果</button>
@@ -229,7 +239,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
   const [identityId, setIdentityId] = useState(preferredIdentityId);
   const [taskPolicy, setTaskPolicy] = useState<AuthorizationPolicy>("inherit");
   useEffect(() => setBusinessInput(""), [selectedSkill.id]);
-  const compatibleIdentities = identities.filter((identity) => identity.site === selectedSkill.site && (identity.state === "available" || identity.state === "running"));
+  const compatibleIdentities = identities.filter((identity) => identity.site === selectedSkill.site && (identity.state === "available" || identity.state === "running") && identity.loginState === "logged-in" && identity.sessionState !== "failed");
   const inheritedPolicy = skillPolicy === "inherit" ? globalPolicy : skillPolicy;
   const resolvedPolicy = taskPolicy === "inherit" ? inheritedPolicy : taskPolicy;
   useEffect(() => {
@@ -256,6 +266,9 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
       summary: `已使用“${businessInput}”创建任务，结果会在此页面持续更新。`,
       kind,
       authorization: authorizationPolicyLabels[resolvedPolicy],
+      runs: [{ id: "run-01", label: "本次运行", stateLabel: "正在运行", summary: `正在使用“${identity.name}”执行“${selectedSkill.name}”。` }],
+      artifactSet: kind === "article" ? "article" : kind === "download" ? "download-files" : kind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes",
+      artifactState: "pending",
     });
   }
 
@@ -267,7 +280,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
           <fieldset><legend>1. 选择站点技能</legend><label>站点技能<select value={selectedSkill.id} onChange={(event) => onSelectSkill(event.target.value)}>{skills.filter((skill) => skill.availability === "available").map((skill) => <option key={skill.id} value={skill.id}>{skill.site} · {skill.name}</option>)}</select></label><button className="inline-link" type="button" onClick={onOpenLibrary}>在 Library 中浏览全部技能</button></fieldset>
           <fieldset><legend>2. 选择账号身份</legend>{compatibleIdentities.length > 0 ? <label>账号身份<select value={identityId} onChange={(event) => setIdentityId(event.target.value)}>{compatibleIdentities.map((identity) => <option key={identity.id} value={identity.id}>{identity.name} · {identity.stateLabel}</option>)}</select></label> : <div className="empty-inline"><CircleAlert size={16} /><span>没有兼容的账号身份</span><button type="button" onClick={onCreateIdentity}>创建账号身份</button></div>}</fieldset>
           <fieldset><legend>3. 填写业务输入</legend><label>{selectedSkill.inputLabel}<input required value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} /></label>{selectedSkill.id === "xhs-search" ? <div className="inline-form-grid"><label>结果数量<select defaultValue="20"><option>20</option><option>50</option><option>100</option></select></label><label>排序<select defaultValue="综合"><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}</fieldset>
-          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><label>本任务授权<select value={taskPolicy} onChange={(event) => setTaskPolicy(event.target.value as AuthorizationPolicy)}><option value="inherit">继承技能设置（{authorizationPolicyLabels[inheritedPolicy]}）</option><option value="read">自动允许本任务的只读动作</option><option value="ask">按需询问</option><option value="strict">每个外部动作前询问</option></select></label><p className="muted-copy">只影响这个任务；需要单次确认的动作会在执行时询问。</p><button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0}><Play size={14} />创建并运行</button></fieldset>
+          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><label>本任务授权<select value={taskPolicy} onChange={(event) => setTaskPolicy(event.target.value as AuthorizationPolicy)}><option value="inherit">继承技能设置（{authorizationPolicyLabels[inheritedPolicy]}）</option><option value="full">完全访问</option><option value="ask">写入批准</option><option value="read">只读</option><option value="strict">每一步都要批准</option></select></label><p className="muted-copy">只影响这个任务；需要单次确认的动作会在执行时询问。</p><button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0}><Play size={14} />创建并运行</button></fieldset>
         </form>
         <aside className="create-task-summary"><div className="skill-mark"><Download size={18} /></div><h2>{selectedSkill.name}</h2><p>{selectedSkill.description}</p><dl><div><dt>站点</dt><dd>{selectedSkill.site}</dd></div><div><dt>业务输入</dt><dd>{selectedSkill.inputLabel}</dd></div><div><dt>结果</dt><dd>{selectedSkill.output}</dd></div></dl></aside>
       </div>

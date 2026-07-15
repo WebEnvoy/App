@@ -21,22 +21,28 @@ Open `http://127.0.0.1:5174/prototype.html`.
 
 1. Work: open collection, readable content, download and not-submitted write
    results; expand diagnostics only when needed.
-2. Work creation: choose a Site Skill, use its declared fields, choose a
+2. Work navigation: browse tasks by site, Site Skill, and Account Identity;
+   use the left-edge rail to move between runs and task sections.
+3. Result consumption: inspect the structured result in the center, then switch
+   the task/Run-owned right file preview between JSON, rendered Markdown, and
+   page image; pending or absent files remain explicit empty states.
+4. Work creation: choose a Site Skill, use its declared fields, choose a
    compatible Account Identity and create the sample task.
-3. Result consumption: open a collected note from the structured result table.
-4. Account Identity: inspect the site account and instance summary, edit the
-   identity, and manage its environment from one surface.
-5. Environment Dependencies: switch from Account Identities to the independent
+5. Account Identity: inspect independent login, environment, instance and
+   controller facts, edit the identity, and manage its environment from one
+   surface.
+6. Environment Dependencies: switch from Account Identities to the independent
    dependency tab, install CloakBrowser, wait for launch validation, and confirm
-   the Provider and affected identities become available.
-6. Human takeover: open `读取收藏夹中的竞品笔记`, open the browser, take over,
+   the Provider becomes available while identities without confirmed login stay
+   unavailable for task creation.
+7. Human takeover: open `读取收藏夹中的竞品笔记`, open the browser, take over,
    choose `已完成，继续`, wait for validation and return to the resumed task.
-7. Library: filter by site and business tag, open a skill, and use `去使用`.
-8. Missing identity: use the Taobao skill, create a Taobao identity, and confirm
+8. Library: filter by site and business tag, open a skill, and use `去使用`.
+9. Missing identity: use the Taobao skill, create a Taobao identity, and confirm
    the prototype returns to the original task form with that identity selected.
-9. Authorization: change the global default in Settings, the skill default in
+10. Authorization: change the global default in Settings, the skill default in
    Library, and the task override in Work creation.
-10. Settings: click the avatar/name entry, then inspect Global Authorization,
+11. Settings: click the avatar/name entry, then inspect Global Authorization,
     Connections, and Diagnostics as separate pages.
 
 ## Deliberate Product Corrections
@@ -45,11 +51,17 @@ Open `http://127.0.0.1:5174/prototype.html`.
   the current page hierarchy or status-heavy composition.
 - Business results are the default Work body. Source facts are compact and
   runtime diagnostics are collapsed.
+- Work uses the existing Codex-like three-panel shell for task detail: grouped
+  tasks on the left, multiple runs and business results in the center, and a
+  generic multi-tab artifact preview on the right.
 - Work, Account Identity and Library are the only primary product domains.
   Settings is a utility destination opened from the user identity area.
 - Account Identity keeps site-account facts, instance actions and environment
   management together. Provider installation and repair live in a sibling
   Environment Dependencies tab.
+- Harbor/CloakBrowser profile and session research informs the independent
+  login, environment, instance, controller and health facts. Raw paths,
+  endpoints and full fingerprint fields remain folded into technical detail.
 - Task creation is generated from Site Skill inputs rather than an open prompt.
 - Authorization is configured at its owner surface: global in Settings, skill
   in Library, task in Work, and one-time at execution.

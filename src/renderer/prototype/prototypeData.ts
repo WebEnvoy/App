@@ -1,7 +1,15 @@
 export type AppView = "work" | "browser" | "library" | "settings";
-export type AuthorizationPolicy = "inherit" | "ask" | "read" | "strict";
+export type AuthorizationPolicy = "inherit" | "full" | "ask" | "read" | "strict";
 export type TaskKind = "collection" | "article" | "download" | "write" | "takeover";
 export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
+export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
+
+export type PrototypeRun = {
+  id: string;
+  label: string;
+  stateLabel: string;
+  summary: string;
+};
 
 export type PrototypeTask = {
   id: string;
@@ -17,6 +25,11 @@ export type PrototypeTask = {
   summary: string;
   kind: TaskKind;
   authorization?: string;
+  runs?: PrototypeRun[];
+  artifactSet?: ArtifactSet;
+  artifactState?: "ready" | "pending" | "none";
+  artifactTotal?: number;
+  artifactCurrent?: number;
 };
 
 export type Identity = {
@@ -33,13 +46,23 @@ export type Identity = {
   timezone?: string;
   proxy?: string;
   startPage?: string;
+  tags?: string[];
+  fingerprint?: string;
+  userAgent?: string;
+  screen?: string;
+  loginState?: "logged-in" | "login-required" | "unknown";
+  sessionState?: "idle" | "running" | "failed";
+  controller?: string;
+  currentPage?: string;
+  lastHealthyAt?: string;
 };
 
 export const authorizationPolicyLabels: Record<AuthorizationPolicy, string> = {
   inherit: "继承上一级设置",
-  ask: "按需询问",
-  read: "自动允许只读",
-  strict: "每次询问",
+  full: "完全访问",
+  ask: "写入批准",
+  read: "只读",
+  strict: "每一步都要批准",
 };
 
 export type Skill = {
@@ -68,6 +91,13 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 14:32",
     summary: "已按关键词“AI 工具”采集 12 条笔记，内容与作者信息可直接查看。",
     kind: "collection",
+    artifactSet: "xhs-notes",
+    artifactState: "ready",
+    artifactTotal: 12,
+    runs: [
+      { id: "run-01", label: "首次采集", stateLabel: "已完成 · 8 条", summary: "首次运行读取 8 条笔记，随后按相同输入再次执行。" },
+      { id: "run-02", label: "再次采集", stateLabel: "已完成 · 12 条", summary: "本次运行读取 12 条笔记并更新结构化结果。" },
+    ],
   },
   {
     id: "wechat-article",
@@ -82,6 +112,8 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 13:18",
     summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
     kind: "article",
+    artifactSet: "article",
+    artifactState: "ready",
   },
   {
     id: "douyin-download",
@@ -96,6 +128,8 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 12:46",
     summary: "3 个文件已保存，1 个文件因来源失效未完成，可单独重试。",
     kind: "download",
+    artifactSet: "download-files",
+    artifactState: "ready",
   },
   {
     id: "xhs-draft",
@@ -110,6 +144,8 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 11:20",
     summary: "标题、正文和 4 个话题已填入页面并校验，尚未点击发布。",
     kind: "write",
+    artifactSet: "write-preview",
+    artifactState: "ready",
   },
   {
     id: "xhs-login",
@@ -124,6 +160,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "10 分钟前",
     summary: "账号登录状态已过期。任务已暂停，登录完成并校验成功后会继续。",
     kind: "takeover",
+    artifactState: "none",
   },
   {
     id: "shop-running",
@@ -138,6 +175,14 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "刚刚",
     summary: "正在读取商品标题、价格和库存状态，已产生可用的部分结果。",
     kind: "collection",
+    artifactSet: "shop-products",
+    artifactState: "ready",
+    artifactTotal: 80,
+    artifactCurrent: 36,
+    runs: [
+      { id: "run-01", label: "昨日同步", stateLabel: "已完成 · 64 条", summary: "昨日同步已完成，结果仍可查看。" },
+      { id: "run-02", label: "本次同步", stateLabel: "正在读取 · 36/80", summary: "本次运行正在读取新增商品。" },
+    ],
   },
 ];
 
@@ -151,6 +196,15 @@ export const identities: Identity[] = [
     state: "running",
     stateLabel: "运行中",
     detail: "实例由任务使用 · 小红书发现页",
+    tags: ["内容运营", "品牌号"],
+    fingerprint: "Chrome 默认指纹 · WebGL 自动",
+    userAgent: "Chrome 126 · macOS",
+    screen: "1512 × 982 · 2x",
+    loginState: "logged-in",
+    sessionState: "running",
+    controller: "任务占用",
+    currentPage: "小红书发现页",
+    lastHealthyAt: "刚刚",
   },
   {
     id: "research",
@@ -161,6 +215,10 @@ export const identities: Identity[] = [
     state: "login",
     stateLabel: "需要登录",
     detail: "登录状态已过期 · 18 分钟前确认",
+    loginState: "login-required",
+    sessionState: "idle",
+    controller: "空闲",
+    lastHealthyAt: "18 分钟前",
   },
   {
     id: "wechat-brand",
@@ -171,6 +229,10 @@ export const identities: Identity[] = [
     state: "available",
     stateLabel: "可用",
     detail: "空闲 · 今天 13:18 使用",
+    loginState: "logged-in",
+    sessionState: "idle",
+    controller: "空闲",
+    lastHealthyAt: "今天 13:18",
   },
   {
     id: "douyin-lab",
@@ -181,6 +243,14 @@ export const identities: Identity[] = [
     state: "repair",
     stateLabel: "需要修复",
     detail: "CloakBrowser 未安装",
+    tags: ["素材研究", "抖音"],
+    fingerprint: "独立种子 · WebGL/Canvas 隔离",
+    userAgent: "Chrome 126 · macOS",
+    screen: "1440 × 900 · 2x",
+    loginState: "unknown",
+    sessionState: "failed",
+    controller: "空闲",
+    lastHealthyAt: "尚未验证",
   },
 ];
 
@@ -259,4 +329,10 @@ export const resultRows = [
   ["AI 工具怎么选：先看这三个场景", "小北效率论", "1,284", "今天 14:21"],
   ["从资料收集到内容发布的自动化", "运营手记", "986", "今天 14:16"],
   ["普通人也能搭好的 AI 信息流", "小林同学", "735", "今天 14:12"],
+];
+
+export const productRows = [
+  ["便携补光灯", "¥129", "有货", "今天 14:31"],
+  ["无线领夹麦克风", "¥239", "有货", "今天 14:29"],
+  ["桌面直播支架", "¥89", "补货中", "今天 14:27"],
 ];

@@ -1,21 +1,26 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Boxes,
+  BriefcaseBusiness,
   CircleUserRound,
   Cloud,
+  Images,
   Library,
+  MessageCircle,
+  Music2,
   Plus,
   Settings,
   ShieldCheck,
+  ShoppingBag,
   SquarePen,
   Stethoscope,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
-import { AppShell, LeftPanel, ThreadWorkspace } from "../shellPrimitives";
+import { AppShell, LeftPanel, RightPanel, ThreadWorkspace } from "../shellPrimitives";
 import { BrowserSurface } from "./BrowserSurface";
 import { LibrarySurface, SettingsSurface } from "./LibrarySettingsSurfaces";
+import { PrototypeArtifactPanel } from "./PrototypeArtifactPanel";
 import {
   identities as initialIdentities,
   skills,
@@ -192,6 +197,7 @@ export function HumanWorkbenchPrototype() {
             <h2>{pageTitle}</h2>
           </div>
           <div className="topbar-right-slot prototype-topbar-actions">
+            {view === "work" && workMode === "detail" ? panelControls.right : null}
             <span className="prototype-badge">交互原型 · 样例数据</span>
             {view === "work" ? (
               <button className="prototype-button compact primary" type="button" onClick={() => createTask()}><Plus size={14} />创建任务</button>
@@ -247,12 +253,37 @@ export function HumanWorkbenchPrototype() {
                 setCloakProviderInstalled(true);
                 setIdentityList((current) => current.map((identity) => identity.provider === "CloakBrowser" && identity.state === "repair" ? {
                   ...identity,
-                  state: "available",
-                  stateLabel: "可用",
-                  detail: "空闲 · Provider 刚刚完成验证",
+                  state: identity.loginState === "logged-in" ? "available" : "login",
+                  stateLabel: identity.loginState === "logged-in" ? "可用" : "需要登录",
+                  detail: identity.loginState === "logged-in" ? "空闲 · Provider 刚刚完成验证" : "Provider 已验证 · 等待登录确认",
+                  sessionState: "idle",
+                  controller: "空闲",
+                  lastHealthyAt: "尚未启动",
                 } : identity));
               }}
-              onTakeoverCompleted={() => setTakeoverCompleted(true)}
+              onTakeoverCompleted={() => {
+                setTakeoverCompleted(true);
+                setTaskList((current) => current.map((task) => task.id === "xhs-login" ? {
+                  ...task,
+                  state: "running",
+                  stateLabel: "正在继续",
+                  updatedAt: "刚刚",
+                  summary: "登录状态校验成功，任务已恢复执行，正在读取收藏夹内容。",
+                  runs: [{ id: "run-current", label: "本次运行", stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" }],
+                  artifactState: "pending",
+                } : task));
+                setIdentityList((current) => current.map((identity) => identity.id === "research" ? {
+                  ...identity,
+                  state: "running",
+                  stateLabel: "运行中",
+                  loginState: "logged-in",
+                  sessionState: "running",
+                  controller: "任务占用",
+                  currentPage: "小红书收藏夹",
+                  lastHealthyAt: "刚刚",
+                  detail: "登录已确认 · 任务正在继续",
+                } : identity));
+              }}
               onReturnToTask={() => openTask("xhs-login")}
               onDeleteIdentity={(identityId) => {
                 const remaining = identityList.filter((identity) => identity.id !== identityId);
@@ -287,7 +318,7 @@ export function HumanWorkbenchPrototype() {
           {view === "settings" ? <SettingsSurface globalPolicy={globalPolicy} section={settingsSection} onGlobalPolicyChange={setGlobalPolicy} /> : null}
         </ThreadWorkspace>
       }
-      right={null}
+      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} task={selectedTask} /></RightPanel> : null}
     />
   );
 }
@@ -336,12 +367,7 @@ function PrototypeSidebar({
             <button type="button" aria-label="新建" title="新建" onClick={onCreate}><Plus size={15} /></button>
           ) : null}
         </div>
-        {view === "work" ? taskList.map((task) => (
-          <button className={`prototype-sidebar-row ${selectedTaskId === task.id ? "selected" : ""}`} type="button" key={task.id} onClick={() => onOpenTask(task.id)}>
-            <span className={`prototype-status-dot ${task.state}`} />
-            <span><strong>{task.title}</strong><small>{task.site} · {task.source}</small></span>
-          </button>
-        )) : null}
+        {view === "work" ? <TaskTree selectedTaskId={selectedTaskId} taskList={taskList} onOpenTask={onOpenTask} /> : null}
         {view === "browser" ? identities.map((identity) => (
           <button className={`prototype-sidebar-row ${selectedIdentityId === identity.id ? "selected" : ""}`} type="button" key={identity.id} onClick={() => onOpenIdentity(identity.id)}>
             <span className="prototype-account-mark">{identity.site.slice(0, 1)}</span>
@@ -350,7 +376,7 @@ function PrototypeSidebar({
         )) : null}
         {view === "library" ? ["小红书", "微信公众号", "抖音", "淘宝", "BOSS 直聘"].map((site) => (
           <button className={`prototype-sidebar-row site-row ${librarySiteFilter === site ? "selected" : ""}`} type="button" key={site} onClick={() => onOpenSite(site)}>
-            <Boxes size={14} /><span><strong>{site}</strong><small>{skills.filter((skill) => skill.site === site).length} 个技能</small></span>
+            <SiteGlyph site={site} /><span><strong>{site}</strong><small>{skills.filter((skill) => skill.site === site).length} 个技能</small></span>
           </button>
         )) : null}
         {view === "settings" ? [
@@ -372,6 +398,38 @@ function PrototypeSidebar({
       </footer>
     </aside>
   );
+}
+
+function TaskTree({ selectedTaskId, taskList, onOpenTask }: { selectedTaskId: string; taskList: PrototypeTask[]; onOpenTask: (taskId: string) => void }) {
+  const sites = Array.from(new Set(taskList.map((task) => task.site)));
+  return sites.map((site) => {
+    const siteTasks = taskList.filter((task) => task.site === site);
+    const siteSkills = Array.from(new Set(siteTasks.map((task) => task.skill)));
+    return (
+      <div className="prototype-task-tree-site" key={site}>
+        <div className="prototype-task-tree-label"><SiteGlyph site={site} /><strong>{site}</strong></div>
+        {siteSkills.map((skill) => (
+          <div className="prototype-task-tree-skill" key={skill}>
+            <span>{skill}</span>
+            {siteTasks.filter((task) => task.skill === skill).map((task) => (
+              <button className={`prototype-sidebar-row task-tree-leaf ${selectedTaskId === task.id ? "selected" : ""}`} type="button" key={task.id} onClick={() => onOpenTask(task.id)}>
+                <span className={`prototype-status-dot ${task.state}`} />
+                <span><strong>{task.identity}</strong><small>{task.title} · {task.source}</small></span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  });
+}
+
+function SiteGlyph({ site }: { site: string }) {
+  if (site === "小红书") return <Images size={14} />;
+  if (site === "微信公众号") return <MessageCircle size={14} />;
+  if (site === "抖音") return <Music2 size={14} />;
+  if (site === "淘宝") return <ShoppingBag size={14} />;
+  return <BriefcaseBusiness size={14} />;
 }
 
 function SidebarNav({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
