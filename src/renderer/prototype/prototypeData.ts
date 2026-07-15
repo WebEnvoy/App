@@ -1,4 +1,5 @@
 export type AppView = "work" | "browser" | "library" | "settings";
+export type AuthorizationPolicy = "inherit" | "ask" | "read" | "strict";
 export type TaskKind = "collection" | "article" | "download" | "write" | "takeover";
 export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
 
@@ -8,12 +9,14 @@ export type PrototypeTask = {
   skill: string;
   site: string;
   identity: string;
+  identityId: string;
   source: "App" | "CLI" | "MCP" | "API" | "SDK" | "Agent";
   state: TaskState;
   stateLabel: string;
   updatedAt: string;
   summary: string;
   kind: TaskKind;
+  authorization?: string;
 };
 
 export type Identity = {
@@ -25,6 +28,18 @@ export type Identity = {
   state: "available" | "running" | "login" | "repair";
   stateLabel: string;
   detail: string;
+  region?: string;
+  language?: string;
+  timezone?: string;
+  proxy?: string;
+  startPage?: string;
+};
+
+export const authorizationPolicyLabels: Record<AuthorizationPolicy, string> = {
+  inherit: "继承上一级设置",
+  ask: "按需询问",
+  read: "自动允许只读",
+  strict: "每次询问",
 };
 
 export type Skill = {
@@ -46,6 +61,7 @@ export const tasks: PrototypeTask[] = [
     skill: "搜索并读取笔记",
     site: "小红书",
     identity: "小红书运营号 A",
+    identityId: "xhs-a",
     source: "App",
     state: "success",
     stateLabel: "已完成 · 12 条",
@@ -59,6 +75,7 @@ export const tasks: PrototypeTask[] = [
     skill: "公众号文章阅读",
     site: "微信公众号",
     identity: "品牌内容号",
+    identityId: "wechat-brand",
     source: "MCP",
     state: "success",
     stateLabel: "已完成",
@@ -72,6 +89,7 @@ export const tasks: PrototypeTask[] = [
     skill: "公开视频下载",
     site: "抖音",
     identity: "内容研究号",
+    identityId: "douyin-lab",
     source: "CLI",
     state: "partial",
     stateLabel: "部分完成 · 3/4",
@@ -85,6 +103,7 @@ export const tasks: PrototypeTask[] = [
     skill: "发布笔记",
     site: "小红书",
     identity: "小红书运营号 A",
+    identityId: "xhs-a",
     source: "Agent",
     state: "not-submitted",
     stateLabel: "未提交",
@@ -98,6 +117,7 @@ export const tasks: PrototypeTask[] = [
     skill: "收藏夹浏览",
     site: "小红书",
     identity: "竞品研究号",
+    identityId: "research",
     source: "API",
     state: "waiting",
     stateLabel: "需要你完成登录",
@@ -111,6 +131,7 @@ export const tasks: PrototypeTask[] = [
     skill: "商品列表采集",
     site: "淘宝",
     identity: "店铺观察号",
+    identityId: "shop-observer",
     source: "SDK",
     state: "running",
     stateLabel: "正在读取 · 36/80",
@@ -126,7 +147,7 @@ export const identities: Identity[] = [
     name: "小红书运营号 A",
     site: "小红书",
     account: "品牌内容",
-    provider: "CloakBrowser",
+    provider: "官方 Chrome",
     state: "running",
     stateLabel: "运行中",
     detail: "实例由任务使用 · 小红书发现页",
@@ -146,7 +167,7 @@ export const identities: Identity[] = [
     name: "品牌内容号",
     site: "微信公众号",
     account: "内容团队",
-    provider: "CloakBrowser",
+    provider: "官方 Chrome",
     state: "available",
     stateLabel: "可用",
     detail: "空闲 · 今天 13:18 使用",

@@ -13,21 +13,25 @@ import {
   ShieldCheck,
   Square,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import {
+  authorizationPolicyLabels,
   resultRows,
   skills,
-  tasks,
+  type AuthorizationPolicy,
   type Identity,
   type PrototypeTask,
   type Skill,
 } from "./prototypeData";
 
 export function WorkSurface({
+  globalPolicy,
   identities,
   mode,
+  preferredIdentityId,
   selectedSkill,
+  skillPolicy,
   task,
   takeoverCompleted,
   onCreateIdentity,
@@ -36,13 +40,16 @@ export function WorkSurface({
   onOpenLibrary,
   onSelectSkill,
 }: {
+  globalPolicy: Exclude<AuthorizationPolicy, "inherit">;
   identities: Identity[];
   mode: "detail" | "create";
+  preferredIdentityId: string;
   selectedSkill: Skill;
+  skillPolicy: AuthorizationPolicy;
   task: PrototypeTask;
   takeoverCompleted: boolean;
   onCreateIdentity: () => void;
-  onCreateTask: (taskId: string) => void;
+  onCreateTask: (task: PrototypeTask) => void;
   onOpenBrowser: () => void;
   onOpenLibrary: () => void;
   onSelectSkill: (skillId: string) => void;
@@ -50,8 +57,11 @@ export function WorkSurface({
   if (mode === "create") {
     return (
       <CreateTaskSurface
+        globalPolicy={globalPolicy}
         identities={identities}
+        preferredIdentityId={preferredIdentityId}
         selectedSkill={selectedSkill}
+        skillPolicy={skillPolicy}
         onCreateIdentity={onCreateIdentity}
         onCreateTask={onCreateTask}
         onOpenLibrary={onOpenLibrary}
@@ -66,6 +76,7 @@ export function WorkSurface({
 function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: PrototypeTask; takeoverCompleted: boolean; onOpenBrowser: () => void }) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const waiting = task.kind === "takeover" && !takeoverCompleted;
+  const newlyCreated = task.id.startsWith("task-") && task.state === "running";
 
   return (
     <div className="prototype-page task-detail-page">
@@ -89,10 +100,11 @@ function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: Prototyp
         </section>
       ) : null}
 
-      {task.kind === "collection" ? <CollectionResult task={task} /> : null}
-      {task.kind === "article" ? <ArticleResult /> : null}
-      {task.kind === "download" ? <DownloadResult /> : null}
-      {task.kind === "write" ? <WriteResult /> : null}
+      {newlyCreated ? <NewTaskRunning task={task} /> : null}
+      {!newlyCreated && task.kind === "collection" ? <CollectionResult task={task} /> : null}
+      {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
+      {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
+      {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
       {task.kind === "takeover" && takeoverCompleted ? (
         <section className="prototype-section running-result">
           <div className="prototype-section-title"><div><h2>任务已继续</h2><p>登录状态校验成功，正在读取收藏夹内容。</p></div><span>3 / 18</span></div>
@@ -100,11 +112,12 @@ function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: Prototyp
         </section>
       ) : null}
 
-      <section className="task-source-strip">
+      <section className={`task-source-strip ${task.authorization != null ? "with-authorization" : ""}`}>
         <div><span>账号身份</span><strong>{task.identity}</strong></div>
         <div><span>站点技能</span><strong>{task.skill}</strong></div>
         <div><span>创建来源</span><strong>{task.source}</strong></div>
         <div><span>更新时间</span><strong>{task.updatedAt}</strong></div>
+        {task.authorization != null ? <div><span>任务授权</span><strong>{task.authorization}</strong></div> : null}
       </section>
 
       <section className="prototype-disclosure">
@@ -122,6 +135,15 @@ function TaskDetail({ task, takeoverCompleted, onOpenBrowser }: { task: Prototyp
         ) : null}
       </section>
     </div>
+  );
+}
+
+function NewTaskRunning({ task }: { task: PrototypeTask }) {
+  return (
+    <section className="prototype-section running-result">
+      <div className="prototype-section-title"><div><h2>任务已开始</h2><p>正在使用“{task.identity}”执行“{task.skill}”。首批结果就绪后会显示在这里。</p></div><span>准备中</span></div>
+      <div className="prototype-progress"><span style={{ width: "16%" }} /></div>
+    </section>
   );
 }
 
@@ -202,21 +224,50 @@ function WriteResult() {
   );
 }
 
-function CreateTaskSurface({ identities, selectedSkill, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { identities: Identity[]; selectedSkill: Skill; onCreateIdentity: () => void; onCreateTask: (taskId: string) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
+function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: Exclude<AuthorizationPolicy, "inherit">; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy: AuthorizationPolicy; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
   const [businessInput, setBusinessInput] = useState("");
-  const [identityId, setIdentityId] = useState(identities[0]?.id ?? "");
+  const [identityId, setIdentityId] = useState(preferredIdentityId);
+  const [taskPolicy, setTaskPolicy] = useState<AuthorizationPolicy>("inherit");
   useEffect(() => setBusinessInput(""), [selectedSkill.id]);
-  const compatibleIdentities = identities.filter((identity) => identity.site === selectedSkill.site);
+  const compatibleIdentities = identities.filter((identity) => identity.site === selectedSkill.site && (identity.state === "available" || identity.state === "running"));
+  const inheritedPolicy = skillPolicy === "inherit" ? globalPolicy : skillPolicy;
+  const resolvedPolicy = taskPolicy === "inherit" ? inheritedPolicy : taskPolicy;
+  useEffect(() => {
+    const preferredIsCompatible = compatibleIdentities.some((identity) => identity.id === preferredIdentityId);
+    setIdentityId(preferredIsCompatible ? preferredIdentityId : compatibleIdentities[0]?.id ?? "");
+  }, [preferredIdentityId, selectedSkill.id]);
+
+  function submitTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const identity = compatibleIdentities.find((item) => item.id === identityId);
+    if (identity == null) return;
+    const kind = selectedSkill.id === "wechat-read" ? "article" : selectedSkill.tags.includes("内容发布") ? "write" : selectedSkill.tags.includes("内容下载") ? "download" : "collection";
+    onCreateTask({
+      id: `task-${Date.now()}`,
+      title: `${selectedSkill.name} · ${businessInput}`,
+      skill: selectedSkill.name,
+      site: selectedSkill.site,
+      identity: identity.name,
+      identityId: identity.id,
+      source: "App",
+      state: "running",
+      stateLabel: "正在运行",
+      updatedAt: "刚刚",
+      summary: `已使用“${businessInput}”创建任务，结果会在此页面持续更新。`,
+      kind,
+      authorization: authorizationPolicyLabels[resolvedPolicy],
+    });
+  }
 
   return (
     <div className="prototype-page create-task-page">
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">Work</div><h1>创建任务</h1><p>任务输入由站点技能定义，不使用开放式指令。</p></div></header>
       <div className="create-task-layout">
-        <form className="prototype-form" onSubmit={(event) => { event.preventDefault(); onCreateTask(tasks[0].id); }}>
+        <form className="prototype-form" onSubmit={submitTask}>
           <fieldset><legend>1. 选择站点技能</legend><label>站点技能<select value={selectedSkill.id} onChange={(event) => onSelectSkill(event.target.value)}>{skills.filter((skill) => skill.availability === "available").map((skill) => <option key={skill.id} value={skill.id}>{skill.site} · {skill.name}</option>)}</select></label><button className="inline-link" type="button" onClick={onOpenLibrary}>在 Library 中浏览全部技能</button></fieldset>
           <fieldset><legend>2. 选择账号身份</legend>{compatibleIdentities.length > 0 ? <label>账号身份<select value={identityId} onChange={(event) => setIdentityId(event.target.value)}>{compatibleIdentities.map((identity) => <option key={identity.id} value={identity.id}>{identity.name} · {identity.stateLabel}</option>)}</select></label> : <div className="empty-inline"><CircleAlert size={16} /><span>没有兼容的账号身份</span><button type="button" onClick={onCreateIdentity}>创建账号身份</button></div>}</fieldset>
           <fieldset><legend>3. 填写业务输入</legend><label>{selectedSkill.inputLabel}<input required value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} /></label>{selectedSkill.id === "xhs-search" ? <div className="inline-form-grid"><label>结果数量<select defaultValue="20"><option>20</option><option>50</option><option>100</option></select></label><label>排序<select defaultValue="综合"><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}</fieldset>
-          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><div className="task-review-row"><span>当前授权</span><strong>读取公开内容 · 当前任务允许</strong></div><button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0}><Play size={14} />创建并运行</button></fieldset>
+          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><label>本任务授权<select value={taskPolicy} onChange={(event) => setTaskPolicy(event.target.value as AuthorizationPolicy)}><option value="inherit">继承技能设置（{authorizationPolicyLabels[inheritedPolicy]}）</option><option value="read">自动允许本任务的只读动作</option><option value="ask">按需询问</option><option value="strict">每个外部动作前询问</option></select></label><p className="muted-copy">只影响这个任务；需要单次确认的动作会在执行时询问。</p><button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0}><Play size={14} />创建并运行</button></fieldset>
         </form>
         <aside className="create-task-summary"><div className="skill-mark"><Download size={18} /></div><h2>{selectedSkill.name}</h2><p>{selectedSkill.description}</p><dl><div><dt>站点</dt><dd>{selectedSkill.site}</dd></div><div><dt>业务输入</dt><dd>{selectedSkill.inputLabel}</dd></div><div><dt>结果</dt><dd>{selectedSkill.output}</dd></div></dl></aside>
       </div>

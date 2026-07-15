@@ -2,17 +2,19 @@ import {
   ArrowRight,
   ChevronDown,
   CircleAlert,
-  ExternalLink,
+  CircleCheck,
+  Cloud,
+  Download,
   Filter,
-  KeyRound,
   Library,
+  RefreshCw,
   Search,
   ShieldCheck,
-  SlidersHorizontal,
+  Stethoscope,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { skills, type Skill } from "./prototypeData";
+import { skills, type AuthorizationPolicy, type Skill } from "./prototypeData";
 
 const tags = ["全部", "数据采集", "内容发布", "内容下载", "内容浏览"];
 
@@ -20,15 +22,19 @@ export function LibrarySurface({
   mode,
   siteFilter,
   selectedSkill,
+  skillPolicies,
   onModeChange,
   onSelectSkill,
+  onSkillPolicyChange,
   onUse,
 }: {
   mode: "catalog" | "detail";
   siteFilter: string;
   selectedSkill: Skill;
+  skillPolicies: Record<string, AuthorizationPolicy>;
   onModeChange: (mode: "catalog" | "detail") => void;
   onSelectSkill: (skillId: string) => void;
+  onSkillPolicyChange: (skillId: string, policy: AuthorizationPolicy) => void;
   onUse: (skillId: string) => void;
 }) {
   const [tag, setTag] = useState("全部");
@@ -41,7 +47,7 @@ export function LibrarySurface({
   }), [query, siteFilter, tag]);
 
   if (mode === "detail") {
-    return <SkillDetail skill={selectedSkill} onBack={() => onModeChange("catalog")} onUse={onUse} />;
+    return <SkillDetail policy={skillPolicies[selectedSkill.id] ?? "inherit"} skill={selectedSkill} onBack={() => onModeChange("catalog")} onPolicyChange={(policy) => onSkillPolicyChange(selectedSkill.id, policy)} onUse={onUse} />;
   }
 
   const sites = Array.from(new Set(filteredSkills.map((skill) => skill.site)));
@@ -64,37 +70,65 @@ function SkillRow({ skill, onOpen, onUse }: { skill: Skill; onOpen: () => void; 
   );
 }
 
-function SkillDetail({ skill, onBack, onUse }: { skill: Skill; onBack: () => void; onUse: (skillId: string) => void }) {
+function SkillDetail({ policy, skill, onBack, onPolicyChange, onUse }: { policy: AuthorizationPolicy; skill: Skill; onBack: () => void; onPolicyChange: (policy: AuthorizationPolicy) => void; onUse: (skillId: string) => void }) {
   return (
     <div className="prototype-page skill-detail-page">
       <button className="inline-link back-link" type="button" onClick={onBack}>返回站点技能</button>
       <header className="prototype-page-heading skill-detail-heading"><div className="skill-detail-title"><span className="skill-icon large"><Library size={22} /></span><div><div className="prototype-eyebrow">{skill.site}</div><h1>{skill.name}</h1><div className="skill-tags">{skill.tags.map((tag) => <em key={tag}>{tag}</em>)}</div></div></div>{skill.availability === "available" ? <button className="prototype-button primary" type="button" onClick={() => onUse(skill.id)}>去使用 <ArrowRight size={14} /></button> : <button className="prototype-button" type="button" disabled>当前不可用</button>}</header>
       {skill.availability === "unavailable" ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>目标站点当前访问受限</strong><p>人工访问同样无法稳定进入结果与详情页。本技能保留为延期项，不会创建生产任务。</p></div></section> : null}
       <div className="skill-detail-grid"><section className="prototype-section"><h2>这个技能能做什么</h2><p className="lead-copy">{skill.description}</p><dl className="prototype-detail-list"><div><dt>需要提供</dt><dd>{skill.inputLabel}</dd></div><div><dt>返回结果</dt><dd>{skill.output}</dd></div><div><dt>兼容账号</dt><dd>{skill.site} · 登录状态可用</dd></div></dl></section><section className="prototype-section"><h2>创建任务时的输入</h2><div className="sample-contract-field"><label>{skill.inputLabel}</label><div>{skill.inputPlaceholder}</div></div><p className="muted-copy">App 会按技能合同渲染字段、选项和校验，不接受任意开放指令。</p></section></div>
+      <section className="prototype-section skill-authorization-section"><div className="prototype-section-title"><div><h2>技能授权</h2><p>只影响“{skill.name}”，任务创建时仍可覆盖。</p></div></div><label>这个技能默认使用<select value={policy} onChange={(event) => onPolicyChange(event.target.value as AuthorizationPolicy)}><option value="inherit">继承全局设置</option><option value="read">自动允许声明的只读动作</option><option value="ask">执行外部动作前询问</option><option value="strict">每个外部动作都询问</option></select></label><span>技能声明范围：{skill.tags.includes("内容发布") ? "读取、准备、提交" : "读取"}</span></section>
       <section className="prototype-disclosure"><button type="button"><ChevronDown size={15} />版本、维护与诊断<span>当前版本 1.4.2 · 由 Lode 提供</span></button></section>
     </div>
   );
 }
 
-export function SettingsSurface() {
-  const [defaultPolicy, setDefaultPolicy] = useState("ask");
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
-  const [skillPoliciesOpen, setSkillPoliciesOpen] = useState(false);
+type SettingsSection = "authorization" | "connections" | "diagnostics";
+
+export function SettingsSurface({ globalPolicy, section, onGlobalPolicyChange }: { globalPolicy: Exclude<AuthorizationPolicy, "inherit">; section: SettingsSection; onGlobalPolicyChange: (policy: Exclude<AuthorizationPolicy, "inherit">) => void }) {
+  if (section === "connections") return <ConnectionSettings />;
+  if (section === "diagnostics") return <DiagnosticsSettings />;
+  return <GlobalAuthorizationSettings policy={globalPolicy} onPolicyChange={onGlobalPolicyChange} />;
+}
+
+function GlobalAuthorizationSettings({ policy, onPolicyChange }: { policy: Exclude<AuthorizationPolicy, "inherit">; onPolicyChange: (policy: Exclude<AuthorizationPolicy, "inherit">) => void }) {
   return (
     <div className="prototype-page settings-page">
-      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>授权策略</h1><p>统一控制 App、CLI、MCP、API、SDK 和 Agent 发起的任务。</p></div></header>
-      <div className="settings-layout">
-        <section className="settings-main">
-          <div className="settings-section"><div className="settings-section-heading"><ShieldCheck size={18} /><div><h2>全局默认</h2><p>没有更具体配置时使用。更具体的任务或单次选择优先。</p></div></div><div className="segmented-policy" role="group" aria-label="全局默认授权"><button className={defaultPolicy === "ask" ? "selected" : ""} type="button" onClick={() => setDefaultPolicy("ask")}><strong>按需询问</strong><span>推荐</span></button><button className={defaultPolicy === "read" ? "selected" : ""} type="button" onClick={() => setDefaultPolicy("read")}><strong>自动允许只读</strong><span>读取和下载</span></button><button className={defaultPolicy === "strict" ? "selected" : ""} type="button" onClick={() => setDefaultPolicy("strict")}><strong>每次询问</strong><span>所有外部动作</span></button></div></div>
-          <div className="settings-section"><div className="settings-section-heading"><SlidersHorizontal size={18} /><div><h2>授权范围</h2><p>从全局到单次逐级覆盖，实际动作仍不能超出技能声明。</p></div></div><div className="scope-table"><ScopeRow level="全局" description="所有入口的默认策略" value={defaultPolicy === "read" ? "自动允许只读" : defaultPolicy === "strict" ? "每次询问" : "按需询问"} /><ScopeRow level="站点技能" description="例如：小红书发布笔记" value="3 项自定义" /><ScopeRow level="当前任务" description="只在一个任务生命周期内有效" value="随任务设置" /><ScopeRow level="单次" description="只允许当前动作一次" value="运行时选择" /></div></div>
-          <div className="settings-section"><div className="settings-section-heading"><KeyRound size={18} /><div><h2>外部动作分类</h2><p>用一致的动作含义替代每个页面各自的“审批”。</p></div></div><div className="action-category-grid"><div><strong>读取</strong><span>浏览、采集、读取内容</span></div><div><strong>准备</strong><span>填写、预览、校验但不提交</span></div><div><strong>提交</strong><span>发布、发送、保存到外部站点</span></div><div><strong>环境</strong><span>安装 Provider、删除本机环境</span></div></div></div>
-        </section>
-        <aside className="settings-aside"><section><h2>当前效果</h2><p>只读任务会在技能允许的范围内直接运行；发布等外部写入动作会在需要时请求一次、任务级或技能级授权。</p><button className="prototype-button" type="button" onClick={() => setSkillPoliciesOpen((open) => !open)}>{skillPoliciesOpen ? "收起技能级配置" : "查看技能级配置"}</button>{skillPoliciesOpen ? <div className="settings-diagnostics"><span>搜索并读取笔记 · 自动允许只读</span><span>发布笔记 · 提交前询问</span><span>公开视频下载 · 按需询问</span></div> : null}</section><section><h2>连接与诊断</h2><p>Core、Harbor 和 Lode 当前可用。技术连接信息默认折叠。</p><button className="inline-link" type="button" onClick={() => setDiagnosticsOpen((open) => !open)}>{diagnosticsOpen ? "收起诊断" : "展开诊断"}</button>{diagnosticsOpen ? <div className="settings-diagnostics"><span>Core · 可用</span><span>Harbor · 可用</span><span>Lode · 可用</span><button type="button"><ExternalLink size={13} />导出诊断</button></div> : null}</section></aside>
-      </div>
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>全局授权</h1><p>设置所有入口创建任务时使用的默认策略。</p></div></header>
+      <section className="settings-main settings-single-column">
+        <div className="settings-section"><div className="settings-section-heading"><ShieldCheck size={18} /><div><h2>默认策略</h2><p>站点技能或任务没有单独配置时使用此策略。</p></div></div><div className="segmented-policy" role="group" aria-label="全局默认授权"><button className={policy === "ask" ? "selected" : ""} type="button" onClick={() => onPolicyChange("ask")}><strong>按需询问</strong><span>写入等外部动作前询问</span></button><button className={policy === "read" ? "selected" : ""} type="button" onClick={() => onPolicyChange("read")}><strong>自动允许只读</strong><span>技能声明内的读取和下载</span></button><button className={policy === "strict" ? "selected" : ""} type="button" onClick={() => onPolicyChange("strict")}><strong>每次询问</strong><span>每个外部动作都确认</span></button></div></div>
+        <div className="settings-section"><div className="settings-section-heading"><ShieldCheck size={18} /><div><h2>适用入口</h2><p>同一默认策略用于 App、CLI、MCP、API、SDK 和 Agent。</p></div></div><div className="settings-entry-list">{["App", "CLI", "MCP", "API", "SDK", "Agent"].map((entry) => <span key={entry}><CircleCheck size={14} />{entry}</span>)}</div></div>
+      </section>
     </div>
   );
 }
 
-function ScopeRow({ description, level, value }: { description: string; level: string; value: string }) {
-  return <div className="scope-row"><span><strong>{level}</strong><small>{description}</small></span><span>{value}</span></div>;
+function ConnectionSettings() {
+  return (
+    <div className="prototype-page settings-page">
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>连接</h1><p>管理 App 使用的本机服务连接。</p></div></header>
+      <section className="settings-main settings-single-column">
+        <ServiceConnection name="Core" detail="任务与结果" endpoint="http://127.0.0.1:8787" />
+        <ServiceConnection name="Harbor" detail="账号身份与浏览器实例" endpoint="http://127.0.0.1:8788" />
+        <ServiceConnection name="Lode" detail="站点技能" endpoint="http://127.0.0.1:8789" />
+      </section>
+    </div>
+  );
+}
+
+function ServiceConnection({ detail, endpoint, name }: { detail: string; endpoint: string; name: string }) {
+  const [checked, setChecked] = useState(false);
+  return <div className="service-connection-row"><span className="service-icon"><Cloud size={17} /></span><div><h2>{name}</h2><p>{detail}</p><small>{checked ? "刚刚验证连接" : endpoint}</small></div><span className="prototype-state-chip available"><CircleCheck size={13} />已连接</span><button className="prototype-button" type="button" onClick={() => setChecked(true)}><RefreshCw size={14} />{checked ? "连接正常" : "测试连接"}</button></div>;
+}
+
+function DiagnosticsSettings() {
+  const [checked, setChecked] = useState(false);
+  const [exported, setExported] = useState(false);
+  return (
+    <div className="prototype-page settings-page">
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>诊断</h1><p>在任务或环境出现问题时检查本机组件并导出诊断信息。</p></div></header>
+      <section className="diagnostics-summary"><span className="diagnostics-icon"><Stethoscope size={20} /></span><div><h2>所有组件运行正常</h2><p>{checked ? "刚刚重新检查完成" : "最近检查：刚刚"} · Core、Harbor、Lode 与浏览器 Provider 均可访问</p></div><button className="prototype-button" type="button" onClick={() => setChecked(true)}><RefreshCw size={14} />{checked ? "检查完成" : "重新检查"}</button></section>
+      <section className="prototype-section diagnostic-actions"><div><h2>诊断包</h2><p>{exported ? "诊断包已保存到下载目录。" : "导出运行日志和组件状态，不包含密码、Cookie 或浏览器数据。"}</p></div><button className="prototype-button" type="button" onClick={() => setExported(true)}><Download size={14} />{exported ? "已导出" : "导出诊断包"}</button></section>
+    </div>
+  );
 }

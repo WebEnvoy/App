@@ -50,6 +50,33 @@ input:focus-visible {
   padding: 2px 0 12px;
 }
 
+.prototype-user-footer {
+  min-height: 58px;
+  padding: 8px 2px 10px;
+}
+
+.sidebar-user-footer .prototype-user-entry {
+  display: flex;
+  width: 100%;
+  height: auto;
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 6px;
+}
+
+.prototype-user-entry .user-avatar {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
+  font-size: 10px;
+}
+
+.prototype-user-entry .user-copy {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
 .prototype-sidebar-row {
   display: grid;
   width: 100%;

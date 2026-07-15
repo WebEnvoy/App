@@ -1,13 +1,15 @@
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Boxes,
   CircleUserRound,
+  Cloud,
   Library,
   Plus,
   Settings,
+  ShieldCheck,
   SquarePen,
+  Stethoscope,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -19,28 +21,37 @@ import {
   skills,
   tasks,
   type AppView,
+  type AuthorizationPolicy,
   type Identity,
+  type PrototypeTask,
 } from "./prototypeData";
 import { WorkSurface } from "./WorkSurface";
 
 type WorkMode = "detail" | "create";
-type BrowserMode = "detail" | "create" | "repair" | "live";
+type BrowserMode = "detail" | "create" | "repair" | "live" | "edit" | "dependencies";
 type LibraryMode = "catalog" | "detail";
+type SettingsSection = "authorization" | "connections" | "diagnostics";
 
 export function HumanWorkbenchPrototype() {
   const [view, setView] = useState<AppView>("work");
   const [workMode, setWorkMode] = useState<WorkMode>("detail");
   const [browserMode, setBrowserMode] = useState<BrowserMode>("detail");
   const [libraryMode, setLibraryMode] = useState<LibraryMode>("catalog");
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("authorization");
   const [selectedTaskId, setSelectedTaskId] = useState(tasks[0].id);
+  const [taskList, setTaskList] = useState<PrototypeTask[]>(tasks);
   const [selectedIdentityId, setSelectedIdentityId] = useState(initialIdentities[0].id);
   const [selectedSkillId, setSelectedSkillId] = useState(skills[0].id);
   const [librarySiteFilter, setLibrarySiteFilter] = useState("全部");
   const [identityList, setIdentityList] = useState<Identity[]>(initialIdentities);
   const [identityCreationSite, setIdentityCreationSite] = useState("小红书");
   const [returnToTaskCreation, setReturnToTaskCreation] = useState(false);
+  const [preferredIdentityId, setPreferredIdentityId] = useState("");
   const [takeoverCompleted, setTakeoverCompleted] = useState(false);
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
+  const [cloakProviderInstalled, setCloakProviderInstalled] = useState(false);
+  const [globalPolicy, setGlobalPolicy] = useState<Exclude<AuthorizationPolicy, "inherit">>("ask");
+  const [skillPolicies, setSkillPolicies] = useState<Record<string, AuthorizationPolicy>>({});
+  const selectedTask = taskList.find((task) => task.id === selectedTaskId) ?? taskList[0];
   const selectedIdentity =
     identityList.find((identity) => identity.id === selectedIdentityId) ?? identityList[0];
   const selectedSkill = skills.find((skill) => skill.id === selectedSkillId) ?? skills[0];
@@ -53,13 +64,15 @@ export function HumanWorkbenchPrototype() {
       if (browserMode === "create") return "创建账号身份";
       if (browserMode === "repair") return "修复浏览器 Provider";
       if (browserMode === "live") return `${selectedIdentity.name} · 浏览器`;
+      if (browserMode === "edit") return `编辑 ${selectedIdentity.name}`;
+      if (browserMode === "dependencies") return "环境依赖";
       return selectedIdentity.name;
     }
     if (view === "library") {
       return libraryMode === "detail" ? selectedSkill.name : "Library";
     }
-    return "设置";
-  }, [browserMode, libraryMode, selectedIdentity.name, selectedSkill.name, selectedTask.title, view, workMode]);
+    return settingsSection === "authorization" ? "全局授权" : settingsSection === "connections" ? "连接" : "诊断";
+  }, [browserMode, libraryMode, selectedIdentity.name, selectedSkill.name, selectedTask.title, settingsSection, view, workMode]);
 
   function openView(nextView: AppView) {
     setView(nextView);
@@ -77,9 +90,17 @@ export function HumanWorkbenchPrototype() {
     setView("work");
   }
 
-  function createTask(skillId?: string) {
+  function createTask(skillId?: string, identityId?: string) {
     if (skillId != null) setSelectedSkillId(skillId);
+    setPreferredIdentityId(identityId ?? "");
     setWorkMode("create");
+    setView("work");
+  }
+
+  function submitTask(task: PrototypeTask) {
+    setTaskList((current) => [task, ...current]);
+    setSelectedTaskId(task.id);
+    setWorkMode("detail");
     setView("work");
   }
 
@@ -101,6 +122,7 @@ export function HumanWorkbenchPrototype() {
     setBrowserMode("detail");
     if (returnToTaskCreation) {
       setReturnToTaskCreation(false);
+      setPreferredIdentityId(identity.id);
       setWorkMode("create");
       setView("work");
     }
@@ -124,8 +146,10 @@ export function HumanWorkbenchPrototype() {
           <PrototypeSidebar
             identities={identityList}
             librarySiteFilter={librarySiteFilter}
+            settingsSection={settingsSection}
             selectedIdentityId={selectedIdentity.id}
             selectedTaskId={selectedTask.id}
+            taskList={taskList}
             view={view}
             onCreate={() => {
               if (view === "browser") {
@@ -142,6 +166,10 @@ export function HumanWorkbenchPrototype() {
               setView("library");
             }}
             onOpenTask={openTask}
+            onOpenSettingsSection={(section) => {
+              setSettingsSection(section);
+              setView("settings");
+            }}
             onOpenView={openView}
           />
         </LeftPanel>
@@ -178,9 +206,12 @@ export function HumanWorkbenchPrototype() {
         <ThreadWorkspace>
           {view === "work" ? (
             <WorkSurface
+              globalPolicy={globalPolicy}
               identities={identityList}
               mode={workMode}
+              preferredIdentityId={preferredIdentityId}
               selectedSkill={selectedSkill}
+              skillPolicy={skillPolicies[selectedSkill.id] ?? "inherit"}
               task={selectedTask}
               takeoverCompleted={takeoverCompleted}
               onCreateIdentity={() => {
@@ -189,7 +220,7 @@ export function HumanWorkbenchPrototype() {
                 setBrowserMode("create");
                 setView("browser");
               }}
-              onCreateTask={openTask}
+              onCreateTask={submitTask}
               onOpenBrowser={() => {
                 setSelectedIdentityId("research");
                 setBrowserMode("live");
@@ -204,13 +235,17 @@ export function HumanWorkbenchPrototype() {
           ) : null}
           {view === "browser" ? (
             <BrowserSurface
+              cloakProviderInstalled={cloakProviderInstalled}
               identity={selectedIdentity}
+              identities={identityList}
               initialIdentitySite={identityCreationSite}
               mode={browserMode}
+              taskList={taskList}
               onCreate={saveIdentity}
               onModeChange={setBrowserMode}
               onProviderRepaired={() => {
-                setIdentityList((current) => current.map((identity) => identity.id === selectedIdentity.id ? {
+                setCloakProviderInstalled(true);
+                setIdentityList((current) => current.map((identity) => identity.provider === "CloakBrowser" && identity.state === "repair" ? {
                   ...identity,
                   state: "available",
                   stateLabel: "可用",
@@ -219,7 +254,22 @@ export function HumanWorkbenchPrototype() {
               }}
               onTakeoverCompleted={() => setTakeoverCompleted(true)}
               onReturnToTask={() => openTask("xhs-login")}
-              onUseSkill={() => createTask("xhs-search")}
+              onDeleteIdentity={(identityId) => {
+                const remaining = identityList.filter((identity) => identity.id !== identityId);
+                if (remaining.length === 0) return;
+                setIdentityList(remaining);
+                setSelectedIdentityId(remaining[0]?.id ?? "");
+                setBrowserMode("detail");
+              }}
+              onUpdateIdentity={(updated) => {
+                setIdentityList((current) => current.map((identity) => identity.id === updated.id ? updated : identity));
+                setTaskList((current) => current.map((task) => task.identityId === updated.id ? { ...task, identity: updated.name } : task));
+                setBrowserMode("detail");
+              }}
+              onUseSkill={() => {
+                const compatibleSkill = skills.find((skill) => skill.site === selectedIdentity.site && skill.availability === "available");
+                if (compatibleSkill != null) createTask(compatibleSkill.id, selectedIdentity.id);
+              }}
             />
           ) : null}
           {view === "library" ? (
@@ -227,12 +277,14 @@ export function HumanWorkbenchPrototype() {
               mode={libraryMode}
               siteFilter={librarySiteFilter}
               selectedSkill={selectedSkill}
+              skillPolicies={skillPolicies}
               onModeChange={setLibraryMode}
               onSelectSkill={setSelectedSkillId}
+              onSkillPolicyChange={(skillId, policy) => setSkillPolicies((current) => ({ ...current, [skillId]: policy }))}
               onUse={createTask}
             />
           ) : null}
-          {view === "settings" ? <SettingsSurface /> : null}
+          {view === "settings" ? <SettingsSurface globalPolicy={globalPolicy} section={settingsSection} onGlobalPolicyChange={setGlobalPolicy} /> : null}
         </ThreadWorkspace>
       }
       right={null}
@@ -243,22 +295,28 @@ export function HumanWorkbenchPrototype() {
 function PrototypeSidebar({
   identities,
   librarySiteFilter,
+  settingsSection,
   selectedIdentityId,
   selectedTaskId,
+  taskList,
   view,
   onCreate,
   onOpenIdentity,
+  onOpenSettingsSection,
   onOpenSite,
   onOpenTask,
   onOpenView,
 }: {
   identities: Identity[];
   librarySiteFilter: string;
+  settingsSection: SettingsSection;
   selectedIdentityId: string;
   selectedTaskId: string;
+  taskList: PrototypeTask[];
   view: AppView;
   onCreate: () => void;
   onOpenIdentity: (identityId: string) => void;
+  onOpenSettingsSection: (section: SettingsSection) => void;
   onOpenSite: (site: string) => void;
   onOpenTask: (taskId: string) => void;
   onOpenView: (view: AppView) => void;
@@ -267,7 +325,7 @@ function PrototypeSidebar({
     <aside className="sidebar prototype-sidebar" aria-label="WebEnvoy navigation">
       <nav className="global-nav" aria-label="Global navigation">
         <SidebarNav active={view === "work"} icon={<SquarePen size={16} />} label="Work" onClick={() => onOpenView("work")} />
-        <SidebarNav active={view === "browser"} icon={<CircleUserRound size={16} />} label="Browser" onClick={() => onOpenView("browser")} />
+        <SidebarNav active={view === "browser"} icon={<CircleUserRound size={16} />} label="账号身份" onClick={() => onOpenView("browser")} />
         <SidebarNav active={view === "library"} icon={<Library size={16} />} label="Library" onClick={() => onOpenView("library")} />
       </nav>
 
@@ -278,7 +336,7 @@ function PrototypeSidebar({
             <button type="button" aria-label="新建" title="新建" onClick={onCreate}><Plus size={15} /></button>
           ) : null}
         </div>
-        {view === "work" ? tasks.map((task) => (
+        {view === "work" ? taskList.map((task) => (
           <button className={`prototype-sidebar-row ${selectedTaskId === task.id ? "selected" : ""}`} type="button" key={task.id} onClick={() => onOpenTask(task.id)}>
             <span className={`prototype-status-dot ${task.state}`} />
             <span><strong>{task.title}</strong><small>{task.site} · {task.source}</small></span>
@@ -295,13 +353,22 @@ function PrototypeSidebar({
             <Boxes size={14} /><span><strong>{site}</strong><small>{skills.filter((skill) => skill.site === site).length} 个技能</small></span>
           </button>
         )) : null}
-        {view === "settings" ? <div className="prototype-sidebar-row site-row selected"><BookOpen size={14} /><span><strong>授权策略</strong><small>含连接与诊断</small></span></div> : null}
+        {view === "settings" ? [
+          { section: "authorization" as const, label: "全局授权", icon: <ShieldCheck size={14} /> },
+          { section: "connections" as const, label: "连接", icon: <Cloud size={14} /> },
+          { section: "diagnostics" as const, label: "诊断", icon: <Stethoscope size={14} /> },
+        ].map((item) => (
+          <button className={`prototype-sidebar-row site-row ${settingsSection === item.section ? "selected" : ""}`} type="button" key={item.section} onClick={() => onOpenSettingsSection(item.section)}>
+            {item.icon}<span><strong>{item.label}</strong></span>
+          </button>
+        )) : null}
       </section>
 
-      <footer className="sidebar-user-footer">
-        <span className="user-avatar" aria-hidden="true">CH</span>
-        <span className="user-copy"><strong>Chen</strong><span>本机工作区</span></span>
-        <button className={view === "settings" ? "selected" : ""} type="button" aria-label="设置" onClick={() => onOpenView("settings")}><Settings size={16} /></button>
+      <footer className="sidebar-user-footer prototype-user-footer">
+        <button className="prototype-user-entry" type="button" aria-label="打开设置" onClick={() => onOpenSettingsSection("authorization")}>
+          <span className="user-avatar" aria-hidden="true">CH</span>
+          <span className="user-copy"><strong>Chen</strong></span>
+        </button>
       </footer>
     </aside>
   );

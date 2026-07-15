@@ -15,10 +15,10 @@ the status-heavy production pages.
 
 ## Captures
 
-Playwright captured and visually inspected desktop Work, Result Item, Browser,
-Library and Settings states at 1440 x 960, plus the create-task flow at
-820 x 720. The transient captures were removed after inspection; the runnable
-prototype is the review artifact.
+Playwright captured and visually inspected desktop Work, Result Item, Account
+Identity, Library and Settings states at 1440 x 960, plus Account Identity and
+create-task flows at 820 x 720. The transient captures are not part of the
+product artifact; the runnable prototype is the review artifact.
 
 ## Findings
 
@@ -35,15 +35,43 @@ Verified corrections:
 - Structured results open a readable Result Item.
 - Library site and business-tag filters work; `去使用` opens contract-driven
   task creation.
+- The primary navigation uses `账号身份`; the site account is explicitly named
+  `站点账号`.
+- Account Identity presents login, instance and recent-task summaries before
+  technical environment details, with working edit and environment-management
+  actions.
+- Identity edits persist site-account and environment fields in the prototype;
+  switching a repair-blocked identity to an available Provider also updates its
+  availability state.
+- Provider installation state is independent from identity state. The sample
+  data has one CloakBrowser-dependent identity while the running identities use
+  the already available official Chrome Provider.
+- Provider installation and repair are in the independent `环境依赖` tab, and
+  successful repair updates the Provider and affected identity state.
+- Clicking the avatar/name area opens Settings; no separate gear entry or local
+  workspace label remains.
+- Settings separates Global Authorization, Connections and Diagnostics. Global
+  Authorization contains no skill/task/one-time configuration or environment
+  dependency controls.
+- Skill authorization is configured in Library detail and task authorization
+  in Work creation; global and skill choices persist across navigation and the
+  task form shows the resolved inherited policy. One-time confirmation remains
+  an execution-time action.
+- Creating a task from an Account Identity chooses a compatible Site Skill and
+  preserves the identity. Submission creates a new sample task that displays
+  the selected skill, stable identity, business input and resolved task policy.
+- Provider recheck, service connection test, diagnostic recheck and diagnostic
+  export controls all return visible prototype feedback.
 - Missing compatible identity opens creation with the target site selected and
   returns to the originating task form.
 - Provider recovery changes the affected identity from repair-required to
   available after install and launch validation.
 - Human takeover distinguishes view, control, user completion, validation and
   task resume.
-- The 820 x 720 capture has no overlapping controls or clipped primary action.
-- A fresh browser session has no console errors; the only console entry is the
-  React development-mode informational message.
+- The 820 x 720 and 937 x 816 captures have no overlapping controls or clipped
+  primary action; Account Identity and Environment Dependencies collapse to the
+  available content width.
+- A fresh browser session has no console errors or warnings.
 
 ## Verification
 
