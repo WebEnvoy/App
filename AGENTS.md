@@ -19,7 +19,7 @@ App 可以承载 WebEnvoy Console、Harbor Profile / Runtime Session / Viewer UI
 - 只有用户显式从站点技能发起自动任务时，App 才向 Core 提交 task intent。
 - `Task = 站点技能 + 账号身份 + 业务输入` 是 App 用来组织体验的 Task Thread key；Core 仍拥有 task intent 和 run record truth。
 - App 必须能呈现 Agent/API/CLI/MCP/SDK/skills 等非 App 调用方产生的运行事实。
-- Work、Browser、Library 是当前三个业务域；Task Thread 只是 Work 的候选组织方式，必须经过 App #298 的 IA 与低保真场景验收后才能成为实现约束。
+- Work、Browser、Library 是当前三个业务域；Task Thread 只是 Work 的候选组织方式，必须经过 App #298 的用户确认 Story、canonical IA 与高保真原型用户验收后才能成为实现约束。
 - UI 实现前必须读取 `VISION.md`、`DESIGN.md` 和 `docs/adr/0009-human-workbench-information-architecture.md`。ADR 0008 和旧方向图只作历史输入。
 
 ## 目录方向
@@ -51,7 +51,7 @@ examples/
 - App 采用“跨平台 shell + 最小原生集成”：Electron / React / Radix 承载主要产品体验；原生层只封装进程、文件、通知、窗口、keychain、profile 路径等 OS 边界能力，不承载 task/run/result/capability/evidence/recovery 等 WebEnvoy 业务协议。
 - 不安装依赖、不初始化 Electron/Vite/React 项目、不创建组件库，除非当前 Work Item 明确是代码骨架或实现项。
 - Tauri/Rust、Next.js、重型设计系统、手写图标系统或外部 UI shell 迁入，需要新的 ADR 或对应 Work Item 明确接受。
-- UI 实现前必须完成低保真 IA、状态矩阵和 Browser/connection 优先级的产品设计 checkpoint；worker 不能自行把临时 UI 当最终方向。
+- UI 实现前必须完成用户确认 Story、canonical IA、状态矩阵和高保真原型用户验收；worker 不能自行把临时 UI 当最终方向。
 - App 只通过 Core、Harbor、Lode owner API 读取事实或发送用户意图；Electron shell 不能绕过 owner API，也不能替代 Core/Harbor/Lode。
 - App 只可保存 endpoint choice、recent views、filters、layout preference 和带 `source` / `fetched_at` / stale marker 的非敏感 display cache。
 - App 禁止保存 credential、cookie、token、browser profile storage、Core Run Record truth、Harbor runtime/session truth、Lode package/fixture body、raw evidence、完整 DOM、HAR、trace、video、network body 或下载文件。

@@ -6,9 +6,11 @@ This inventory records the App surface on `main` at `2d7f8c61` as input to App
 #298. It classifies existing content without changing production UI or treating
 fixtures as owner truth.
 
-Candidate classification vocabulary: keep, rename, move, collapse by default,
-diagnostics only, remove from the default product path. These candidates become
-IA decisions only after the Story Gate is confirmed by the user.
+Classification vocabulary: keep, rename, move, collapse by default, diagnostics
+only, remove from the default product path. The user confirmed the Story Gate on
+2026-07-15; the dispositions are consumed by
+`docs/design/human-workbench-information-architecture.md`. Final page composition
+still depends on the separate high-fidelity prototype Gate.
 
 ## Surface Inventory
 

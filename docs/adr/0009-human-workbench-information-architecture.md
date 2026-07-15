@@ -11,6 +11,10 @@ Accepted by App #306 as the direction for App #298 product correction, 2026-07-1
 Gate，并以高保真原型用户验收替代低保真场景验收。Loom review、自动 review、PR
 merge 或 agent 判断不能代替这两次用户确认。
 
+2026-07-15 Story Gate 已由用户明确确认。#300-#304 的 canonical IA candidate
+记录于 `docs/design/human-workbench-information-architecture.md`；该候选只允许进入
+#305 高保真原型，不能代替高保真原型的第二次用户验收。
+
 本 ADR 固化产品方向和下一轮设计约束，不实现生产 UI。它保留 ADR
 0005/0006/0008 的 owner truth、敏感数据和本地缓存边界，但 supersede 以下旧决策：
 
