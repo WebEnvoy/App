@@ -23,7 +23,7 @@ import {
   type AuthorizationPolicy,
   type Identity,
   type PrototypeRun,
-  type PrototypeResultSelection,
+  type PrototypePreviewSelection,
   type PrototypeTask,
   type Skill,
 } from "./prototypeData";
@@ -34,15 +34,13 @@ export function WorkSurface({
   mode,
   preferredIdentityId,
   selectedSkill,
-  selectedRunId,
   skillPolicy,
   task,
   onCreateIdentity,
   onCreateTask,
-  onOpenResult,
+  onOpenPreview,
   onOpenBrowser,
   onOpenLibrary,
-  onSelectRun,
   onTakeoverCompleted,
   onSelectSkill,
 }: {
@@ -51,15 +49,13 @@ export function WorkSurface({
   mode: "detail" | "create";
   preferredIdentityId: string;
   selectedSkill: Skill;
-  selectedRunId: string;
   skillPolicy: AuthorizationPolicy;
   task: PrototypeTask;
   onCreateIdentity: () => void;
   onCreateTask: (task: PrototypeTask) => void;
-  onOpenResult: (result: PrototypeResultSelection) => void;
+  onOpenPreview: (selection: PrototypePreviewSelection) => void;
   onOpenBrowser: () => void;
   onOpenLibrary: () => void;
-  onSelectRun: (runId: string) => void;
   onTakeoverCompleted: () => void;
   onSelectSkill: (skillId: string) => void;
 }) {
@@ -83,10 +79,8 @@ export function WorkSurface({
     <TaskDetail
       identities={identities}
       task={task}
-      selectedRunId={selectedRunId}
       onOpenBrowser={onOpenBrowser}
-      onOpenResult={onOpenResult}
-      onSelectRun={onSelectRun}
+      onOpenPreview={onOpenPreview}
       onTakeoverCompleted={onTakeoverCompleted}
     />
   );
@@ -95,30 +89,23 @@ export function WorkSurface({
 function TaskDetail({
   identities,
   task,
-  selectedRunId,
   onOpenBrowser,
-  onOpenResult,
-  onSelectRun,
+  onOpenPreview,
   onTakeoverCompleted,
 }: {
   identities: Identity[];
   task: PrototypeTask;
-  selectedRunId: string;
   onOpenBrowser: () => void;
-  onOpenResult: (result: PrototypeResultSelection) => void;
-  onSelectRun: (runId: string) => void;
+  onOpenPreview: (selection: PrototypePreviewSelection) => void;
   onTakeoverCompleted: () => void;
 }) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [takeoverStep, setTakeoverStep] = useState<"idle" | "opened" | "validating">("idle");
-  const waiting = task.kind === "takeover" && task.state === "waiting";
-  const resumed = task.kind === "takeover" && task.state === "running";
   const identity = identities.find((item) => item.id === task.identityId);
   const identityLabel = identity?.account ?? task.identity;
   const storedRuns = task.runs ?? [{ id: "run-current", label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent }];
-  const runs = resumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, state: "running" as const, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
-  const currentRun = runs.at(-1) ?? runs[0];
-  const newlyCreated = task.state === "running" && currentRun.artifactState === "pending";
+  const taskResumed = task.kind === "takeover" && task.state === "running";
+  const runs = taskResumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, state: "running" as const, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
 
   useEffect(() => setTakeoverStep("idle"), [task.id]);
 
@@ -131,24 +118,14 @@ function TaskDetail({
   return (
     <div className="prototype-page task-detail-page">
       <div className="prototype-task-thread-layout">
-        <PrototypeRunRail runs={runs} selectedRunId={selectedRunId} taskId={task.id} onSelectRun={onSelectRun} />
+        <PrototypeRunRail runs={runs} taskId={task.id} />
         <div className="prototype-task-thread-content">
           <header className="prototype-page-heading task-heading" data-content-search-unit-key={`${task.id}-context`}>
-            <div><div className="prototype-eyebrow">{task.site}</div><h1>{task.skill} · {identityLabel}</h1><p>{identity == null ? task.identity : `${task.identity} · ${identity.platformId ?? "平台 ID 待同步"}`}；每个任务回合使用独立业务输入。</p></div>
-            <span className={`prototype-state-chip ${waiting ? "waiting" : resumed ? "running" : task.state}`}>{resumed ? <LoaderCircle size={13} /> : task.state === "success" ? <Check size={13} /> : null}{resumed ? "已恢复 · 正在继续" : task.stateLabel}</span>
+            <div><div className="prototype-eyebrow">{task.site}</div><h1>{task.skill} · {identityLabel}</h1><p>{identity == null ? task.identity : `${task.identity} · ${identity.platformId ?? "平台 ID 待同步"}`}</p></div>
           </header>
 
-          {runs.slice(0, -1).map((run) => <section className="task-run-summary" data-content-search-unit-key={`${task.id}-${run.id}`} key={run.id}><div><span>{run.label}</span><strong>{run.input}</strong></div><RunStateChip run={run} /><p>{run.summary}</p></section>)}
-
-          <div className="task-current-run" data-content-search-unit-key={`${task.id}-${currentRun.id}`}>
-            <div className="task-run-label"><span>{currentRun.label}</span><strong>{currentRun.input}</strong><em>{waiting ? "等待人工处理" : currentRun.stateLabel}</em></div>
-            {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>{takeoverStep === "idle" ? "任务已暂停。打开对应账号的浏览器，登录后返回这里确认。" : takeoverStep === "opened" ? "浏览器已拉起；完成登录后点击“我已完成”。" : "正在校验登录与页面状态，成功后会继续当前回合。"}</p></div>{takeoverStep === "idle" ? <button className="prototype-button primary" type="button" onClick={() => { onOpenBrowser(); setTakeoverStep("opened"); }}>打开浏览器</button> : takeoverStep === "opened" ? <button className="prototype-button primary" type="button" onClick={() => setTakeoverStep("validating")}><Check size={14} />我已完成</button> : <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button>}</section> : null}
-            {newlyCreated ? <NewTaskRunning task={task} /> : null}
-            {!newlyCreated && task.kind === "collection" ? <CollectionResult run={currentRun} task={task} onOpenResult={onOpenResult} /> : null}
-            {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
-            {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
-            {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
-            {resumed ? <section className="prototype-section running-result"><div className="prototype-section-title"><div><h2>任务已继续</h2><p>登录状态校验成功，正在读取收藏夹内容。</p></div><span>3 / 18</span></div><div className="prototype-progress"><span style={{ width: "22%" }} /></div></section> : null}
+          <div className="task-turn-timeline">
+            {runs.map((run, index) => <TaskTurn key={run.id} run={run} task={task} latest={index === runs.length - 1} taskResumed={taskResumed} takeoverStep={takeoverStep} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} onTakeoverStepChange={setTakeoverStep} />)}
           </div>
 
           <section className={`task-source-strip ${task.authorization != null ? "with-authorization" : ""}`} data-content-search-unit-key={`${task.id}-sources`}><div><span>账号身份</span><strong>{identityLabel}</strong></div><div><span>站点技能</span><strong>{task.skill}</strong></div><div><span>创建来源</span><strong>{task.source}</strong></div><div><span>更新时间</span><strong>{task.updatedAt}</strong></div>{task.authorization != null ? <div><span>任务授权</span><strong>{task.authorization}</strong></div> : null}</section>
@@ -160,12 +137,76 @@ function TaskDetail({
   );
 }
 
+function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser, onOpenPreview, onTakeoverStepChange }: { run: PrototypeRun; task: PrototypeTask; latest: boolean; taskResumed: boolean; takeoverStep: "idle" | "opened" | "validating"; onOpenBrowser: () => void; onOpenPreview: (selection: PrototypePreviewSelection) => void; onTakeoverStepChange: (step: "idle" | "opened" | "validating") => void }) {
+  const waiting = latest && task.kind === "takeover" && task.state === "waiting";
+  const resumed = latest && taskResumed;
+  const newlyCreated = latest && !resumed && run.state === "running" && run.artifactState === "pending";
+  const progressSummary = run.state === "running" || run.state === "waiting";
+  const actions = taskExecutionActions(task, run, { newlyCreated, resumed, waiting });
+  const summaryCopy = taskSummaryCopy(run, { newlyCreated, resumed, waiting });
+  const previewTab = run.artifactSet === "article" ? "markdown" : "json";
+
+  return (
+    <article className="task-turn-detail" data-content-search-unit-key={`${task.id}-${run.id}`}>
+      <section className="task-turn-request"><span>{run.label}</span><h2>{run.input}</h2></section>
+      <section className="task-progress-block" aria-label={`${run.label}执行记录`}>
+        <details className="task-execution-disclosure">
+          <summary><span><ChevronDown size={14} />正在执行<small>{actions.length} 个动作</small></span><RunStateChip run={run} /></summary>
+          <ol>{actions.map((action, index) => <li key={`${action.label}-${index}`}><span className={`task-action-marker ${action.state}`} aria-hidden="true">{action.state === "running" ? <LoaderCircle size={12} /> : action.state === "success" ? <Check size={12} /> : <CircleAlert size={12} />}</span><div><strong>{action.label}</strong><p>{action.detail}</p></div></li>)}</ol>
+        </details>
+        {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>{takeoverStep === "idle" ? "任务已暂停。打开对应账号的浏览器，登录后返回这里确认。" : takeoverStep === "opened" ? "浏览器已拉起；完成登录后点击“我已完成”。" : "正在校验登录与页面状态，成功后会继续当前回合。"}</p></div>{takeoverStep === "idle" ? <button className="prototype-button primary" type="button" onClick={() => { onOpenBrowser(); onTakeoverStepChange("opened"); }}>打开浏览器</button> : takeoverStep === "opened" ? <button className="prototype-button primary" type="button" onClick={() => onTakeoverStepChange("validating")}><Check size={14} />我已完成</button> : <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button>}</section> : null}
+      </section>
+      <section className="task-summary-block" aria-label={`${run.label}${progressSummary ? "进度摘要" : "任务总结"}`}>
+        <header><div><span>{progressSummary ? "进度摘要" : "任务总结"}</span><h2>{summaryCopy}</h2></div>{run.artifactState !== "none" ? <button className="task-preview-button" type="button" aria-label={`在右侧打开${run.label}结果`} title="在右侧打开结果" onClick={() => onOpenPreview({ kind: "file", runId: run.id, tab: previewTab })}><ArrowUpRight size={15} /></button> : null}</header>
+        {newlyCreated ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "16%" }} /></div><span>准备中</span></div> : null}
+        {!newlyCreated && task.kind === "collection" ? <CollectionResult run={run} task={task} onOpenPreview={onOpenPreview} /> : null}
+        {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
+        {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
+        {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
+        {resumed ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "22%" }} /></div><span>已读取 3 / 18</span></div> : null}
+      </section>
+    </article>
+  );
+}
+
+type TaskExecutionAction = { label: string; detail: string; state: "success" | "running" | "waiting" | "failed" };
+
+function taskExecutionActions(task: PrototypeTask, run: PrototypeRun, state: { newlyCreated: boolean; resumed: boolean; waiting: boolean }): TaskExecutionAction[] {
+  const finalState = state.waiting || run.state === "not-submitted" ? "waiting" : run.state === "running" ? "running" : run.state === "partial" || run.state === "failed" ? "failed" : "success";
+  const commonStart: TaskExecutionAction[] = [{ label: "打开目标页面", detail: targetUrl(task.site, task.kind), state: "success" }];
+  if (state.newlyCreated) return [{ label: "准备账号环境", detail: `正在启动“${task.identity}”的浏览器环境。`, state: "running" }];
+  if (task.kind === "takeover") return [...commonStart, { label: "检查账号登录状态", detail: state.resumed ? "登录校验已通过，继续读取收藏夹。" : "登录状态已过期，任务已暂停。", state: finalState }];
+  if (task.kind === "download") return [...commonStart, { label: "解析文件地址", detail: "识别 4 个公开视频文件。", state: "success" }, { label: "下载文件", detail: "3 个文件已保存，1 个来源失效。", state: finalState }];
+  if (task.kind === "write") return [...commonStart, { label: "填写标题与正文", detail: run.input, state: "success" }, { label: "添加话题与图片", detail: "页面内容已完成填写。", state: "success" }, { label: "停在提交前", detail: "校验通过，尚未点击发布。", state: finalState }];
+  if (task.kind === "article") return [...commonStart, { label: "等待文章加载", detail: "正文与图片区域已加载。", state: "success" }, { label: "读取页面内容", detail: "正文、作者信息和图片已整理。", state: finalState }];
+  const submitAction = task.site === "淘宝" ? { label: "点击“上新商品”筛选", detail: "等待商品列表刷新。", state: "success" as const } : { label: "点击“搜索”按钮", detail: `提交“${task.skill}”操作。`, state: "success" as const };
+  return [...commonStart, { label: "填写业务输入", detail: run.input, state: "success" }, submitAction, { label: "向下滚动一屏", detail: "加载更多页面结果。", state: "success" }, { label: "读取并整理结果", detail: run.artifactCurrent != null && run.artifactTotal != null ? `已返回 ${run.artifactCurrent}/${run.artifactTotal} 条。` : run.summary, state: finalState }];
+}
+
+function targetUrl(site: string, kind: PrototypeTask["kind"]) {
+  if (site === "小红书") return kind === "write" ? "https://creator.xiaohongshu.com/publish/publish" : "https://www.xiaohongshu.com/explore";
+  if (site === "淘宝") return "https://www.taobao.com/";
+  if (site === "微信公众号") return "https://mp.weixin.qq.com/s/example";
+  if (site === "抖音") return "https://www.douyin.com/";
+  return `https://${site}/`;
+}
+
+function taskSummaryCopy(run: PrototypeRun, state: { newlyCreated: boolean; resumed: boolean; waiting: boolean }) {
+  if (state.waiting) return "当前回合正在等待登录恢复；完成登录并通过校验后会自动继续。";
+  if (state.resumed) return "登录校验已通过，当前回合已恢复执行。";
+  if (state.newlyCreated) return "任务已经开始；首批业务结果就绪后会显示在这里。";
+  if (run.state === "running" && run.artifactCurrent != null && run.artifactTotal != null) return `已返回 ${run.artifactCurrent}/${run.artifactTotal} 条结果，任务仍在继续。`;
+  if (run.state === "partial") return "已保存 3/4 个文件；未完成项保留在结果中，可单独重试。";
+  if (run.state === "not-submitted") return "内容已准备完成但尚未发布，当前状态保持为未提交。";
+  return run.summary;
+}
+
 function RunStateChip({ run }: { run: PrototypeRun }) {
   const icon = run.state === "success" ? <Check size={13} /> : run.state === "running" ? <LoaderCircle size={13} /> : <CircleAlert size={13} />;
   return <span className={`prototype-state-chip ${run.state}`}>{icon}{run.stateLabel}</span>;
 }
 
-function PrototypeRunRail({ runs, selectedRunId, taskId, onSelectRun }: { runs: PrototypeRun[]; selectedRunId: string; taskId: string; onSelectRun: (runId: string) => void }) {
+function PrototypeRunRail({ runs, taskId }: { runs: PrototypeRun[]; taskId: string }) {
   return (
     <nav className="thread-navigation-rail prototype-run-rail" aria-label="当前任务线程回合导航">
       <div className="thread-navigation-rail-list">
@@ -174,11 +215,10 @@ function PrototypeRunRail({ runs, selectedRunId, taskId, onSelectRun }: { runs: 
             <button
               className="thread-navigation-row"
               type="button"
-              aria-current={selectedRunId === run.id ? "true" : undefined}
               aria-label={`跳转到回合：${run.input}`}
               title={`${run.label} · ${run.input}`}
               key={run.id}
-              onClick={() => { onSelectRun(run.id); document.querySelector(`[data-content-search-unit-key="${taskId}-${run.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+              onClick={() => document.querySelector(`[data-content-search-unit-key="${taskId}-${run.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
             >
               <span className="thread-navigation-marker-frame"><span className="thread-navigation-marker" /></span>
             </button>
@@ -189,26 +229,18 @@ function PrototypeRunRail({ runs, selectedRunId, taskId, onSelectRun }: { runs: 
   );
 }
 
-function NewTaskRunning({ task }: { task: PrototypeTask }) {
-  return (
-    <section className="prototype-section running-result">
-      <div className="prototype-section-title"><div><h2>运行已开始</h2><p>正在使用“{task.identity}”执行“{task.skill}”。首批结果就绪后会显示在这里。</p></div><span>准备中</span></div>
-      <div className="prototype-progress"><span style={{ width: "16%" }} /></div>
-    </section>
-  );
-}
-
-function CollectionResult({ run, task, onOpenResult }: { run: PrototypeRun; task: PrototypeTask; onOpenResult: (result: PrototypeResultSelection) => void }) {
-  const running = task.state === "running";
+function CollectionResult({ run, task, onOpenPreview }: { run: PrototypeRun; task: PrototypeTask; onOpenPreview: (selection: PrototypePreviewSelection) => void }) {
+  const running = run.state === "running";
   const isProductCollection = task.site === "淘宝";
+  const resultName = isProductCollection ? "商品" : "笔记";
   const rows = isProductCollection ? productRows : resultRows;
 
   return (
     <section className="prototype-section result-section">
       <div className="prototype-section-title">
         <div>
-          <h2>本回合的采集结果</h2>
-          <p>{running ? `本回合已返回 ${run.artifactCurrent ?? rows.length}/${run.artifactTotal ?? "?"} 条商品 · 当前预览 ${rows.length} 条` : `本回合返回 ${run.artifactTotal ?? rows.length} 条笔记 · 当前预览 ${rows.length} 条`}</p>
+          <h2>采集结果</h2>
+          <p>{running ? `已返回 ${run.artifactCurrent ?? rows.length}/${run.artifactTotal ?? "?"} 条${resultName} · 当前预览 ${rows.length} 条` : `返回 ${run.artifactTotal ?? rows.length} 条${resultName} · 当前预览 ${rows.length} 条`}</p>
         </div>
         <div className="section-actions"><button className="prototype-button" type="button"><ListFilter size={14} />筛选</button><button className="prototype-button" type="button">导出</button></div>
       </div>
@@ -216,7 +248,7 @@ function CollectionResult({ run, task, onOpenResult }: { run: PrototypeRun; task
       <div className="prototype-table-wrap">
         <table className="prototype-table">
           <thead><tr>{(isProductCollection ? ["商品", "价格", "库存", "读取时间"] : ["笔记标题", "作者", "互动", "读取时间"]).map((heading) => <th key={heading}>{heading}</th>)}<th aria-label="操作" /></tr></thead>
-          <tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`在右侧预览 ${row[0]}`} title="在右侧预览" onClick={() => onOpenResult({ kind: isProductCollection ? "product" : "note", row, runId: run.id })}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
+          <tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`在右侧预览 ${row[0]}`} title="在右侧预览" onClick={() => onOpenPreview({ kind: isProductCollection ? "product" : "note", row, runId: run.id })}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
         </table>
       </div>
     </section>

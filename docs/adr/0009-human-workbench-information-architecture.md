@@ -77,6 +77,13 @@ Work 可按站点技能或账号身份组织同一批 Task Thread；切换只改
 正常页面不得默认显示 evidence ref、session ref、viewer ref、capture method、source
 locator、owner 说明或完整事件流。用户主动诊断时仍可查看或导出这些记录。
 
+中栏按时间顺序展示当前 Task Thread 的全部 Task Turn，每个回合按“业务输入 ->
+正在执行 -> 任务总结”组织。运行中和等待人工处理使用进度摘要；完成、部分完成、
+失败、取消和未提交使用诚实的终态总结。“正在执行”默认收起，展开后显示打开网址、
+滚动、点击、填写和读取等原子页面动作；原始参数、重复事件、日志和 trace 继续归入
+折叠诊断。回合导航只负责滚动定位，不切换中栏或右栏内容。右栏初始为空，只有用户
+从中栏明确打开结果或文件时才绑定对应回合。
+
 ### 结果渲染
 
 Work 优先渲染 Lode/Core 提供的公共业务类型：content、author/profile、comment、

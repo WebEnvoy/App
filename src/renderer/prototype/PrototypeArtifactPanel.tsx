@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import samplePagePreview from "../../../artifacts/app-208-real-read-task.png";
-import { productRows, resultRows, type ArtifactSet, type PrototypeResultSelection, type PrototypeRun, type PrototypeTask } from "./prototypeData";
+import { productRows, resultRows, type ArtifactSet, type PrototypePreviewSelection, type PrototypeRun, type PrototypeTask } from "./prototypeData";
 
 const downloadFiles = [
   { name: "新品发布会-主片.mp4", size: "126 MB", state: "已保存" },
@@ -18,6 +18,7 @@ type FileTabId = "json" | "markdown" | "image";
 type ResultTabId = `result:${string}`;
 type ArtifactTabId = FileTabId | ResultTabId;
 type RunTabState = { openTabIds: ArtifactTabId[]; activeTabId: ArtifactTabId | null };
+type ResultSelection = Extract<PrototypePreviewSelection, { kind: "note" | "product" }>;
 
 const artifactTabLabels: Record<FileTabId, string> = {
   json: "result.json",
@@ -25,34 +26,34 @@ const artifactTabLabels: Record<FileTabId, string> = {
   image: "page.png",
 };
 
-export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHost, task }: { requestKey: number; run: PrototypeRun; selectedResult: PrototypeResultSelection | null; tabHost: Element | null; task: PrototypeTask }) {
-  const artifactSet = run.artifactSet ?? task.artifactSet;
-  const state = run.artifactState ?? task.artifactState ?? (artifactSet == null ? "none" : "ready");
-  const artifact = state === "ready" && artifactSet != null ? createArtifact(run, artifactSet) : null;
-  const [resultTabs, setResultTabs] = useState<Record<ResultTabId, PrototypeResultSelection>>({});
-  const defaultTab: FileTabId | null = state === "ready" ? artifactSet === "article" ? "markdown" : "json" : null;
+export function PrototypeArtifactPanel({ requestKey, run, selection, tabHost, task }: { requestKey: number; run: PrototypeRun | null; selection: PrototypePreviewSelection | null; tabHost: Element | null; task: PrototypeTask }) {
+  const artifactSet = run?.artifactSet ?? (run == null ? undefined : task.artifactSet);
+  const state = run == null ? "none" : run.artifactState ?? task.artifactState ?? (artifactSet == null ? "none" : "ready");
+  const artifact = run != null && state === "ready" && artifactSet != null ? createArtifact(run, artifactSet) : null;
+  const [resultTabs, setResultTabs] = useState<Record<ResultTabId, ResultSelection>>({});
   const [tabStateByRun, setTabStateByRun] = useState<Record<string, RunTabState>>({});
-  const tabState = tabStateByRun[run.id] ?? initialRunTabState(defaultTab);
+  const tabState = run == null ? initialRunTabState() : tabStateByRun[run.id] ?? initialRunTabState();
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
   const panelContentRef = useRef<HTMLDivElement | null>(null);
   const previousRequestKeyRef = useRef(requestKey);
   const availableTabIds = useMemo<ArtifactTabId[]>(() => {
-    const result: ArtifactTabId[] = Object.entries(resultTabs).filter(([, selection]) => selection.runId === run.id).map(([tabId]) => tabId as ResultTabId);
+    if (run == null) return [];
+    const result: ArtifactTabId[] = Object.entries(resultTabs).filter(([, item]) => item.runId === run.id).map(([tabId]) => tabId as ResultTabId);
     if (artifact != null) result.push("json", "markdown");
     if (artifact != null && artifactSet === "xhs-notes") result.push("image");
     return result;
-  }, [artifact, artifactSet, resultTabs, run.id]);
+  }, [artifact, artifactSet, resultTabs, run]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (selectedResult == null) return;
-    const tabId = resultTabId(selectedResult);
-    setResultTabs((current) => ({ ...current, [tabId]: selectedResult }));
+    if (selection == null || run == null) return;
+    const tabId = selection.kind === "file" ? selection.tab : resultTabId(selection);
+    if (selection.kind !== "file") setResultTabs((current) => ({ ...current, [tabId as ResultTabId]: selection }));
     setTabStateByRun((current) => {
-      const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
+      const currentRun = current[run.id] ?? initialRunTabState();
       return { ...current, [run.id]: { openTabIds: currentRun.openTabIds.includes(tabId) ? currentRun.openTabIds : [...currentRun.openTabIds, tabId], activeTabId: tabId } };
     });
-  }, [defaultTab, requestKey, run.id, selectedResult]);
+  }, [requestKey, run, selection]);
 
   useEffect(() => {
     const activeTab = Array.from(tabHost?.querySelectorAll<HTMLElement>("[data-artifact-tab-id]") ?? []).find((element) => element.dataset.artifactTabId === tabState.activeTabId);
@@ -67,8 +68,9 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
   }, [requestKey]);
 
   function activateTab(tabId: ArtifactTabId) {
+    if (run == null) return;
     setTabStateByRun((current) => {
-      const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
+      const currentRun = current[run.id] ?? initialRunTabState();
       return { ...current, [run.id]: { ...currentRun, activeTabId: tabId } };
     });
   }
@@ -81,6 +83,7 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
   }
 
   function closeTab(tabId: ArtifactTabId) {
+    if (run == null) return;
     const index = tabState.openTabIds.indexOf(tabId);
     const nextTabs = tabState.openTabIds.filter((id) => id !== tabId);
     const nextActiveTab = tabState.activeTabId === tabId ? nextTabs[Math.min(index, nextTabs.length - 1)] ?? null : tabState.activeTabId;
@@ -91,8 +94,9 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
   }
 
   function openTab(tabId: ArtifactTabId) {
+    if (run == null) return;
     setTabStateByRun((current) => {
-      const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
+      const currentRun = current[run.id] ?? initialRunTabState();
       return { ...current, [run.id]: { openTabIds: currentRun.openTabIds.includes(tabId) ? currentRun.openTabIds : [...currentRun.openTabIds, tabId], activeTabId: tabId } };
     });
     setAddMenuOpen(false);
@@ -111,17 +115,17 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
           </div>,
           tabHost,
         )}
-        <div ref={panelContentRef} className="panel-tab-content" tabIndex={-1}>{tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
+        <div ref={panelContentRef} className="panel-tab-content" tabIndex={-1}>{run == null ? <ArtifactIdle /> : tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
       </Tabs.Root>
     </aside>
   );
 }
 
-function initialRunTabState(defaultTab: FileTabId | null): RunTabState {
-  return { openTabIds: defaultTab == null ? [] : [defaultTab], activeTabId: defaultTab };
+function initialRunTabState(): RunTabState {
+  return { openTabIds: [], activeTabId: null };
 }
 
-function resultTabId(result: PrototypeResultSelection): ResultTabId {
+function resultTabId(result: ResultSelection): ResultTabId {
   return `result:${result.runId}:${result.kind}:${result.row[0]}`;
 }
 
@@ -129,13 +133,13 @@ function isResultTabId(tabId: ArtifactTabId): tabId is ResultTabId {
   return tabId.startsWith("result:");
 }
 
-function tabLabel(tabId: ArtifactTabId, resultTabs: Record<ResultTabId, PrototypeResultSelection>) {
+function tabLabel(tabId: ArtifactTabId, resultTabs: Record<ResultTabId, ResultSelection>) {
   if (!isResultTabId(tabId)) return artifactTabLabels[tabId];
   const result = resultTabs[tabId];
   return result == null ? "结果详情" : `${result.kind === "product" ? "商品" : "笔记"} · ${result.row[0]}`;
 }
 
-function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtifact> | null, artifactSet: ArtifactSet | undefined, resultTabs: Record<ResultTabId, PrototypeResultSelection>, run: PrototypeRun, state: "ready" | "pending" | "none", task: PrototypeTask) {
+function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtifact> | null, artifactSet: ArtifactSet | undefined, resultTabs: Record<ResultTabId, ResultSelection>, run: PrototypeRun, state: "ready" | "pending" | "none", task: PrototypeTask) {
   if (isResultTabId(tabId)) return resultTabs[tabId] == null ? <ArtifactEmpty /> : <ResultItemPreview result={resultTabs[tabId]} />;
   if (artifact == null) return state === "pending" ? <ArtifactPending /> : <ArtifactEmpty />;
   if (tabId === "json") return <FilePreview icon={<Braces size={16} />} name="result.json" meta={artifact.jsonMeta}><pre>{JSON.stringify(artifact.payload, null, 2)}</pre></FilePreview>;
@@ -143,7 +147,7 @@ function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtif
   return <FilePreview icon={<ImageIcon size={16} />} name="page.png" meta="PNG · 1280 × 800"><img className="artifact-image-preview" src={samplePagePreview} alt="小红书采集任务页面截图样例" /></FilePreview>;
 }
 
-function ResultItemPreview({ result }: { result: PrototypeResultSelection }) {
+function ResultItemPreview({ result }: { result: ResultSelection }) {
   const { row } = result;
   const product = result.kind === "product";
   return (
@@ -199,6 +203,10 @@ function ArtifactMarkdown({ run, set, task }: { run: PrototypeRun; set: Artifact
 
 function ArtifactPending() {
   return <div className="artifact-empty"><LoaderCircle size={20} /><strong>文件尚未生成</strong><span>任务产出首个文件后会显示在这里。</span></div>;
+}
+
+function ArtifactIdle() {
+  return <div className="artifact-empty"><FileText size={20} /><strong>尚未打开预览</strong><span>从中栏的任务回合中打开结果或文件。</span></div>;
 }
 
 function ArtifactEmpty() {

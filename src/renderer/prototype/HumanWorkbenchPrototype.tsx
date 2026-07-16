@@ -26,8 +26,7 @@ import {
   type AuthorizationPolicy,
   type Identity,
   type ProxyProfile,
-  type PrototypeResultSelection,
-  type PrototypeRun,
+  type PrototypePreviewSelection,
   type PrototypeTask,
 } from "./prototypeData";
 import { WorkSurface } from "./WorkSurface";
@@ -48,7 +47,6 @@ export function HumanWorkbenchPrototype() {
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
   const [settingsReturnView, setSettingsReturnView] = useState<Exclude<AppView, "settings">>("work");
   const [selectedTaskId, setSelectedTaskId] = useState(tasks[0].id);
-  const [selectedRunId, setSelectedRunId] = useState(tasks[0].runs?.at(-1)?.id ?? "");
   const [taskList, setTaskList] = useState<PrototypeTask[]>(tasks);
   const [taskGrouping, setTaskGrouping] = useState<TaskGrouping>(readTaskGrouping);
   const [taskSort, setTaskSort] = useState<TaskSort>(readTaskSort);
@@ -66,11 +64,11 @@ export function HumanWorkbenchPrototype() {
   const [cloakProviderInstalled, setCloakProviderInstalled] = useState(false);
   const [globalPolicy, setGlobalPolicy] = useState<Exclude<AuthorizationPolicy, "inherit">>("ask");
   const [skillPolicies, setSkillPolicies] = useState<Record<string, AuthorizationPolicy>>({});
-  const [selectedResult, setSelectedResult] = useState<PrototypeResultSelection | null>(null);
+  const [previewSelection, setPreviewSelection] = useState<PrototypePreviewSelection | null>(null);
   const [resultPreviewRequestKey, setResultPreviewRequestKey] = useState(0);
   const [artifactTabHost, setArtifactTabHost] = useState<HTMLDivElement | null>(null);
   const selectedTask = taskList.find((task) => task.id === selectedTaskId) ?? taskList[0];
-  const selectedRun = selectedTask.runs?.find((run) => run.id === selectedRunId) ?? selectedTask.runs?.at(-1) ?? fallbackRun(selectedTask);
+  const previewRun = previewSelection == null ? null : selectedTask.runs?.find((run) => run.id === previewSelection.runId) ?? null;
   const selectedTaskIdentity = identityList.find((identity) => identity.id === selectedTask.identityId);
   const selectedIdentity =
     identityList.find((identity) => identity.id === selectedIdentityId) ?? identityList[0];
@@ -131,10 +129,8 @@ export function HumanWorkbenchPrototype() {
   }
 
   function openTask(taskId: string) {
-    const task = taskList.find((item) => item.id === taskId);
     setSelectedTaskId(taskId);
-    setSelectedRunId(task?.runs?.at(-1)?.id ?? "");
-    setSelectedResult(null);
+    setPreviewSelection(null);
     setWorkMode("detail");
     setView("work");
   }
@@ -152,7 +148,6 @@ export function HumanWorkbenchPrototype() {
     if (existingThread == null) {
       setTaskList((current) => [{ ...task, runs: [run] }, ...current]);
       setSelectedTaskId(task.id);
-      setSelectedRunId(run.id);
     } else {
       const appendedRun = { ...run, id: `run-${Date.now()}`, label: `回合 ${(existingThread.runs?.length ?? 0) + 1}` };
       setTaskList((current) => current.map((item) => item.id === existingThread.id ? {
@@ -167,16 +162,14 @@ export function HumanWorkbenchPrototype() {
         artifactState: task.artifactState,
       } : item));
       setSelectedTaskId(existingThread.id);
-      setSelectedRunId(appendedRun.id);
     }
-    setSelectedResult(null);
+    setPreviewSelection(null);
     setWorkMode("detail");
     setView("work");
   }
 
-  function openResult(result: PrototypeResultSelection) {
-    setSelectedRunId(result.runId);
-    setSelectedResult(result);
+  function openPreview(selection: PrototypePreviewSelection) {
+    setPreviewSelection(selection);
     setResultPreviewRequestKey((current) => current + 1);
   }
 
@@ -351,7 +344,6 @@ export function HumanWorkbenchPrototype() {
               preferredIdentityId={preferredIdentityId}
               selectedSkill={selectedSkill}
               skillPolicy={skillPolicies[selectedSkill.id] ?? "inherit"}
-              selectedRunId={selectedRun.id}
               task={selectedTask}
               onCreateIdentity={() => {
                 setIdentityCreationSite(selectedSkill.site);
@@ -360,18 +352,13 @@ export function HumanWorkbenchPrototype() {
                 setView("browser");
               }}
               onCreateTask={submitTask}
-              onOpenResult={openResult}
+              onOpenPreview={openPreview}
               onOpenBrowser={() => {
                 openIdentityInstance(selectedTask.identityId);
               }}
               onOpenLibrary={() => {
                 setLibraryMode("catalog");
                 setView("library");
-              }}
-              onSelectRun={(runId) => {
-                setSelectedRunId(runId);
-                setSelectedResult(null);
-                setResultPreviewRequestKey((current) => current + 1);
               }}
               onTakeoverCompleted={() => completeTakeover(selectedTask.id, selectedTask.identityId)}
               onSelectSkill={setSelectedSkillId}
@@ -435,7 +422,7 @@ export function HumanWorkbenchPrototype() {
           {view === "settings" ? <SettingsSurface globalPolicy={globalPolicy} proxies={proxyList} section={settingsSection} onGlobalPolicyChange={setGlobalPolicy} onProxiesChange={setProxyList} /> : null}
         </ThreadWorkspace>
       }
-      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} requestKey={resultPreviewRequestKey} run={selectedRun} selectedResult={selectedResult} tabHost={artifactTabHost} task={selectedTask} /></RightPanel> : null}
+      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} requestKey={resultPreviewRequestKey} run={previewRun} selection={previewSelection} tabHost={artifactTabHost} task={selectedTask} /></RightPanel> : null}
     />
   );
 }
@@ -450,10 +437,6 @@ function defaultIdentityPage(site: string) {
   if (site === "抖音") return "抖音首页";
   if (site === "淘宝") return "淘宝首页";
   return `${site} 首页`;
-}
-
-function fallbackRun(task: PrototypeTask): PrototypeRun {
-  return { id: "run-current", label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent };
 }
 
 function readTaskGrouping(): TaskGrouping {

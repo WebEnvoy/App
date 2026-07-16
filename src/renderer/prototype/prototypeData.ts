@@ -4,11 +4,9 @@ export type TaskKind = "collection" | "article" | "download" | "write" | "takeov
 export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
 export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
 
-export type PrototypeResultSelection = {
-  kind: "note" | "product";
-  row: string[];
-  runId: string;
-};
+export type PrototypePreviewSelection =
+  | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" }
+  | { kind: "note" | "product"; row: string[]; runId: string };
 
 export type PrototypeRun = {
   id: string;

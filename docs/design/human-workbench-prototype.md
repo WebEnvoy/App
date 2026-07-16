@@ -25,27 +25,32 @@ Open `http://127.0.0.1:5174/prototype.html`.
    menu, and switch grouping between Site Skill and Account Identity or sorting
    between priority and recent update; confirm every view shows the same
    threads, preserves the selected thread, and uses the left-edge rail to move
-   between task turns.
-3. Result consumption: inspect the structured result in the center, then switch
-   the task-turn-owned right file preview between JSON, rendered Markdown, and
-   page image; pending or absent files remain explicit empty states.
-4. Work creation: choose a Site Skill, use its declared fields, choose a
+   between task turns without replacing center or right-panel content.
+3. Task turns: confirm the center shows every turn in chronological order, with
+   each business input followed by a collapsed `正在执行` action record and a
+   terminal summary or live progress summary. Expand the action record to inspect
+   atomic page actions; waiting and partial outcomes remain honest.
+4. Result consumption: inspect the structured result in the center, then switch
+   the right file preview between JSON, rendered Markdown, and page image. The
+   right panel starts empty and changes only after an explicit center action;
+   rail navigation must not change it.
+5. Work creation: choose a Site Skill, use its declared fields, choose a
    compatible Account Identity and create the sample task.
-5. Account Identity: inspect independent login, environment, instance and
+6. Account Identity: inspect independent login, environment, instance and
    controller facts, edit the identity, and manage its environment from one
    surface.
-6. Environment Dependencies: switch from Account Identities to the independent
+7. Environment Dependencies: switch from Account Identities to the independent
    dependency tab, install CloakBrowser, wait for launch validation, and confirm
    the Provider becomes available while identities without confirmed login stay
    unavailable for task creation.
-7. Human takeover: open `读取收藏夹中的竞品笔记`, open the browser, take over,
+8. Human takeover: open `读取收藏夹中的竞品笔记`, open the browser, take over,
    choose `已完成，继续`, wait for validation and return to the resumed task.
-8. Library: filter by site and business tag, open a skill, and use `去使用`.
-9. Missing identity: use the Taobao skill, create a Taobao identity, and confirm
+9. Library: filter by site and business tag, open a skill, and use `去使用`.
+10. Missing identity: use the Taobao skill, create a Taobao identity, and confirm
    the prototype returns to the original task form with that identity selected.
-10. Authorization: change the global default in Settings, the skill default in
+11. Authorization: change the global default in Settings, the skill default in
    Library, and the task override in Work creation.
-11. Settings: click the avatar/name entry, then inspect Global Authorization,
+12. Settings: click the avatar/name entry, then inspect Global Authorization,
     Connections, and Diagnostics as separate pages.
 
 ## Deliberate Product Corrections
@@ -57,6 +62,12 @@ Open `http://127.0.0.1:5174/prototype.html`.
 - Work uses the existing Codex-like three-panel shell for task detail: grouped
   threads on the left, multiple task turns and business results in the center,
   and a generic multi-tab artifact preview on the right.
+- The current task thread owns the center timeline. The center keeps all task
+  turns in chronological order and each turn follows
+  request -> collapsed atomic action record -> terminal summary. Active and
+  waiting work uses a progress summary; raw parameters, logs and traces stay in
+  diagnostics. The rail only navigates this timeline; the right preview opens
+  only from an explicit center action.
 - A Task Thread is fixed by Site Skill + Account Identity. The left navigator
   can project the same threads by Site Skill or by Account Identity; switching
   grouping or sorting preserves selection and does not duplicate task facts.
