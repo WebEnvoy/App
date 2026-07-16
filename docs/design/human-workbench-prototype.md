@@ -21,10 +21,13 @@ Open `http://127.0.0.1:5174/prototype.html`.
 
 1. Work: open collection, readable content, download and not-submitted write
    results; expand diagnostics only when needed.
-2. Work navigation: browse tasks by site, Site Skill, and Account Identity;
-   use the left-edge rail to move between runs and task sections.
+2. Work navigation: hover or focus the task-list heading, open its overflow
+   menu, and switch grouping between Site Skill and Account Identity or sorting
+   between priority and recent update; confirm every view shows the same
+   threads, preserves the selected thread, and uses the left-edge rail to move
+   between task turns.
 3. Result consumption: inspect the structured result in the center, then switch
-   the task/Run-owned right file preview between JSON, rendered Markdown, and
+   the task-turn-owned right file preview between JSON, rendered Markdown, and
    page image; pending or absent files remain explicit empty states.
 4. Work creation: choose a Site Skill, use its declared fields, choose a
    compatible Account Identity and create the sample task.
@@ -52,8 +55,15 @@ Open `http://127.0.0.1:5174/prototype.html`.
 - Business results are the default Work body. Source facts are compact and
   runtime diagnostics are collapsed.
 - Work uses the existing Codex-like three-panel shell for task detail: grouped
-  tasks on the left, multiple runs and business results in the center, and a
-  generic multi-tab artifact preview on the right.
+  threads on the left, multiple task turns and business results in the center,
+  and a generic multi-tab artifact preview on the right.
+- A Task Thread is fixed by Site Skill + Account Identity. The left navigator
+  can project the same threads by Site Skill or by Account Identity; switching
+  grouping or sorting preserves selection and does not duplicate task facts.
+- Task grouping and sorting live in the list-heading overflow menu. The heading
+  reveals overflow and new-task actions on hover or keyboard focus, following
+  the existing Codex-like project-list interaction instead of showing a
+  persistent segmented control.
 - Work, Account Identity and Library are the only primary product domains.
   Settings is a utility destination opened from the user identity area.
 - Account Identity keeps site-account facts, instance actions and environment

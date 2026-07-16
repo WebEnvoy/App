@@ -17,7 +17,7 @@ App 可以承载 WebEnvoy Console、Harbor Profile / Runtime Session / Viewer UI
 - App 面向人类业务用户，不是 Agent 容器；Agent 通过 API、CLI、MCP、SDK 或 skills 使用 WebEnvoy。
 - App 自动任务入口只执行 Lode 提供的站点能力入口；当前实现先消费 capability package metadata，后续可升级为 workflow package。手动浏览实例属于 Browser/Harbor session 管理路径，不创建 Core Task/Run，不产生 Result Envelope，也不代表 Lode capability 被执行。
 - 只有用户显式从站点技能发起自动任务时，App 才向 Core 提交 task intent。
-- `Task = 站点技能 + 账号身份 + 业务输入` 是 App 用来组织体验的 Task Thread key；Core 仍拥有 task intent 和 run record truth。
+- `Task Thread = 站点技能 + 账号身份` 是 App 的稳定组织键；每次业务输入形成线程内一个 Task Turn，并映射到 Core 拥有的 task intent 和 run record truth。
 - App 必须能呈现 Agent/API/CLI/MCP/SDK/skills 等非 App 调用方产生的运行事实。
 - Work、Browser、Library 是当前三个业务域；Task Thread 只是 Work 的候选组织方式，必须经过 App #298 的用户确认 Story、canonical IA 与高保真原型用户验收后才能成为实现约束。
 - UI 实现前必须读取 `VISION.md`、`DESIGN.md` 和 `docs/adr/0009-human-workbench-information-architecture.md`。ADR 0008 和旧方向图只作历史输入。

@@ -55,9 +55,13 @@ App/CLI/MCP/API/SDK/Agent Task -> App 查看运行与结果
 App 自动任务仍满足：
 
 ```text
-站点技能 + 账号身份 + 业务输入 = Task
-Task 的一次执行尝试 = Run
+站点技能 + 账号身份 = Task Thread
+Task Thread + 一次业务输入 = Task Turn
+Task Turn 的一次执行尝试 = Run
 ```
+
+Work 可按站点技能或账号身份组织同一批 Task Thread；切换只改变前端分组，
+不复制 Task、Run 或结果事实。
 
 手动浏览实例属于 Browser，不伪装成 Core Task/Run/Result。
 

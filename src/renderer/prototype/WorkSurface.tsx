@@ -115,7 +115,7 @@ function TaskDetail({
   const resumed = task.kind === "takeover" && task.state === "running";
   const identity = identities.find((item) => item.id === task.identityId);
   const identityLabel = identity?.account ?? task.identity;
-  const storedRuns = task.runs ?? [{ id: "run-current", label: "本次运行", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent }];
+  const storedRuns = task.runs ?? [{ id: "run-current", label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent }];
   const runs = resumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, state: "running" as const, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
   const currentRun = runs.at(-1) ?? runs[0];
   const newlyCreated = task.state === "running" && currentRun.artifactState === "pending";
@@ -134,7 +134,7 @@ function TaskDetail({
         <PrototypeRunRail runs={runs} selectedRunId={selectedRunId} taskId={task.id} onSelectRun={onSelectRun} />
         <div className="prototype-task-thread-content">
           <header className="prototype-page-heading task-heading" data-content-search-unit-key={`${task.id}-context`}>
-            <div><div className="prototype-eyebrow">{task.site}</div><h1>{task.skill} · {identityLabel}</h1><p>{identity == null ? task.identity : `${task.identity} · ${identity.platformId ?? "平台 ID 待同步"}`}；同一线程的每次运行只调整业务输入。</p></div>
+            <div><div className="prototype-eyebrow">{task.site}</div><h1>{task.skill} · {identityLabel}</h1><p>{identity == null ? task.identity : `${task.identity} · ${identity.platformId ?? "平台 ID 待同步"}`}；每个任务回合使用独立业务输入。</p></div>
             <span className={`prototype-state-chip ${waiting ? "waiting" : resumed ? "running" : task.state}`}>{resumed ? <LoaderCircle size={13} /> : task.state === "success" ? <Check size={13} /> : null}{resumed ? "已恢复 · 正在继续" : task.stateLabel}</span>
           </header>
 
@@ -142,7 +142,7 @@ function TaskDetail({
 
           <div className="task-current-run" data-content-search-unit-key={`${task.id}-${currentRun.id}`}>
             <div className="task-run-label"><span>{currentRun.label}</span><strong>{currentRun.input}</strong><em>{waiting ? "等待人工处理" : currentRun.stateLabel}</em></div>
-            {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>{takeoverStep === "idle" ? "任务已暂停。打开对应账号的浏览器，登录后返回这里确认。" : takeoverStep === "opened" ? "浏览器已拉起；完成登录后点击“我已完成”。" : "正在校验登录与页面状态，成功后会继续当前运行。"}</p></div>{takeoverStep === "idle" ? <button className="prototype-button primary" type="button" onClick={() => { onOpenBrowser(); setTakeoverStep("opened"); }}>打开浏览器</button> : takeoverStep === "opened" ? <button className="prototype-button primary" type="button" onClick={() => setTakeoverStep("validating")}><Check size={14} />我已完成</button> : <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button>}</section> : null}
+            {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>{takeoverStep === "idle" ? "任务已暂停。打开对应账号的浏览器，登录后返回这里确认。" : takeoverStep === "opened" ? "浏览器已拉起；完成登录后点击“我已完成”。" : "正在校验登录与页面状态，成功后会继续当前回合。"}</p></div>{takeoverStep === "idle" ? <button className="prototype-button primary" type="button" onClick={() => { onOpenBrowser(); setTakeoverStep("opened"); }}>打开浏览器</button> : takeoverStep === "opened" ? <button className="prototype-button primary" type="button" onClick={() => setTakeoverStep("validating")}><Check size={14} />我已完成</button> : <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button>}</section> : null}
             {newlyCreated ? <NewTaskRunning task={task} /> : null}
             {!newlyCreated && task.kind === "collection" ? <CollectionResult run={currentRun} task={task} onOpenResult={onOpenResult} /> : null}
             {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
@@ -167,7 +167,7 @@ function RunStateChip({ run }: { run: PrototypeRun }) {
 
 function PrototypeRunRail({ runs, selectedRunId, taskId, onSelectRun }: { runs: PrototypeRun[]; selectedRunId: string; taskId: string; onSelectRun: (runId: string) => void }) {
   return (
-    <nav className="thread-navigation-rail prototype-run-rail" aria-label="当前任务线程运行导航">
+    <nav className="thread-navigation-rail prototype-run-rail" aria-label="当前任务线程回合导航">
       <div className="thread-navigation-rail-list">
         <div className="thread-navigation-rail-rows">
           {runs.map((run) => (
@@ -175,7 +175,7 @@ function PrototypeRunRail({ runs, selectedRunId, taskId, onSelectRun }: { runs: 
               className="thread-navigation-row"
               type="button"
               aria-current={selectedRunId === run.id ? "true" : undefined}
-              aria-label={`跳转到运行：${run.input}`}
+              aria-label={`跳转到回合：${run.input}`}
               title={`${run.label} · ${run.input}`}
               key={run.id}
               onClick={() => { onSelectRun(run.id); document.querySelector(`[data-content-search-unit-key="${taskId}-${run.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
@@ -207,8 +207,8 @@ function CollectionResult({ run, task, onOpenResult }: { run: PrototypeRun; task
     <section className="prototype-section result-section">
       <div className="prototype-section-title">
         <div>
-          <h2>本次运行的采集结果</h2>
-          <p>{running ? `本次运行已返回 ${run.artifactCurrent ?? rows.length}/${run.artifactTotal ?? "?"} 条商品 · 当前预览 ${rows.length} 条` : `本次运行返回 ${run.artifactTotal ?? rows.length} 条笔记 · 当前预览 ${rows.length} 条`}</p>
+          <h2>本回合的采集结果</h2>
+          <p>{running ? `本回合已返回 ${run.artifactCurrent ?? rows.length}/${run.artifactTotal ?? "?"} 条商品 · 当前预览 ${rows.length} 条` : `本回合返回 ${run.artifactTotal ?? rows.length} 条笔记 · 当前预览 ${rows.length} 条`}</p>
         </div>
         <div className="section-actions"><button className="prototype-button" type="button"><ListFilter size={14} />筛选</button><button className="prototype-button" type="button">导出</button></div>
       </div>
@@ -293,7 +293,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
       summary: `已使用“${businessInput}”创建任务，结果会在此页面持续更新。`,
       kind,
       authorization: authorizationPolicyLabels[resolvedPolicy],
-      runs: [{ id: "run-01", label: "本次运行", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${identity.account}”执行“${selectedSkill.name}”。`, artifactSet: kind === "article" ? "article" : kind === "download" ? "download-files" : kind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending" }],
+      runs: [{ id: "run-01", label: "本回合", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${identity.account}”执行“${selectedSkill.name}”。`, artifactSet: kind === "article" ? "article" : kind === "download" ? "download-files" : kind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending" }],
       artifactSet: kind === "article" ? "article" : kind === "download" ? "download-files" : kind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes",
       artifactState: "pending",
     });

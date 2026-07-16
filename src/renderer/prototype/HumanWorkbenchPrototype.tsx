@@ -1,27 +1,22 @@
 import {
   ArrowLeft,
   ArrowRight,
-  BriefcaseBusiness,
   CircleUserRound,
-  Images,
-  Languages,
   Library,
-  MessageCircle,
-  Music2,
-  Network,
   Plus,
-  Search,
   Settings,
-  ShieldCheck,
-  ShoppingBag,
   SquarePen,
-  Stethoscope,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell, LeftPanel, RightPanel, ThreadWorkspace } from "../shellPrimitives";
 import { BrowserSurface } from "./BrowserSurface";
 import { LibrarySurface, SettingsSurface } from "./LibrarySettingsSurfaces";
+import {
+  PrototypeSidebar,
+  type TaskGrouping,
+  type TaskSort,
+} from "./PrototypeSidebar";
 import { PrototypeArtifactPanel } from "./PrototypeArtifactPanel";
 import {
   identities as initialIdentities,
@@ -42,6 +37,9 @@ type BrowserMode = "detail" | "create" | "repair" | "edit" | "dependencies";
 type LibraryMode = "catalog" | "detail" | "create";
 type SettingsSection = "general" | "authorization" | "proxies" | "diagnostics";
 
+const TASK_GROUPING_KEY = "webenvoy.prototype.task-grouping";
+const TASK_SORT_KEY = "webenvoy.prototype.task-sort";
+
 export function HumanWorkbenchPrototype() {
   const [view, setView] = useState<AppView>("work");
   const [workMode, setWorkMode] = useState<WorkMode>("detail");
@@ -52,6 +50,8 @@ export function HumanWorkbenchPrototype() {
   const [selectedTaskId, setSelectedTaskId] = useState(tasks[0].id);
   const [selectedRunId, setSelectedRunId] = useState(tasks[0].runs?.at(-1)?.id ?? "");
   const [taskList, setTaskList] = useState<PrototypeTask[]>(tasks);
+  const [taskGrouping, setTaskGrouping] = useState<TaskGrouping>(readTaskGrouping);
+  const [taskSort, setTaskSort] = useState<TaskSort>(readTaskSort);
   const [selectedIdentityId, setSelectedIdentityId] = useState(initialIdentities[0].id);
   const [selectedSkillId, setSelectedSkillId] = useState(skills[0].id);
   const [librarySiteFilter, setLibrarySiteFilter] = useState("全部");
@@ -75,6 +75,22 @@ export function HumanWorkbenchPrototype() {
   const selectedIdentity =
     identityList.find((identity) => identity.id === selectedIdentityId) ?? identityList[0];
   const selectedSkill = skills.find((skill) => skill.id === selectedSkillId) ?? skills[0];
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TASK_GROUPING_KEY, taskGrouping);
+    } catch {
+      // A display preference must not block the prototype.
+    }
+  }, [taskGrouping]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TASK_SORT_KEY, taskSort);
+    } catch {
+      // A display preference must not block the prototype.
+    }
+  }, [taskSort]);
 
   const pageTitle = useMemo(() => {
     if (view === "work") {
@@ -132,13 +148,13 @@ export function HumanWorkbenchPrototype() {
 
   function submitTask(task: PrototypeTask) {
     const existingThread = taskList.find((item) => item.site === task.site && item.skill === task.skill && item.identityId === task.identityId);
-    const run = task.runs?.[0] ?? { id: `run-${Date.now()}`, label: "本次运行", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary };
+    const run = task.runs?.[0] ?? { id: `run-${Date.now()}`, label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary };
     if (existingThread == null) {
       setTaskList((current) => [{ ...task, runs: [run] }, ...current]);
       setSelectedTaskId(task.id);
       setSelectedRunId(run.id);
     } else {
-      const appendedRun = { ...run, id: `run-${Date.now()}`, label: `运行 ${(existingThread.runs?.length ?? 0) + 1}` };
+      const appendedRun = { ...run, id: `run-${Date.now()}`, label: `回合 ${(existingThread.runs?.length ?? 0) + 1}` };
       setTaskList((current) => current.map((item) => item.id === existingThread.id ? {
         ...item,
         state: task.state,
@@ -189,7 +205,7 @@ export function HumanWorkbenchPrototype() {
       stateLabel: "正在继续",
       updatedAt: "刚刚",
       summary: "登录状态校验成功，任务已恢复执行。",
-      runs: (task.runs ?? []).map((run, index, runs) => index === runs.length - 1 ? { ...run, state: "running", stateLabel: "正在继续", summary: "登录状态校验成功，当前运行已恢复。", artifactState: "pending" } : run),
+      runs: (task.runs ?? []).map((run, index, runs) => index === runs.length - 1 ? { ...run, state: "running", stateLabel: "正在继续", summary: "登录状态校验成功，当前回合已恢复。", artifactState: "pending" } : run),
       artifactState: "pending",
     } : task));
     setIdentityList((current) => current.map((identity) => identity.id === identityId ? {
@@ -265,6 +281,8 @@ export function HumanWorkbenchPrototype() {
             selectedIdentityId={selectedIdentity.id}
             selectedTaskId={selectedTask.id}
             taskList={taskList}
+            taskGrouping={taskGrouping}
+            taskSort={taskSort}
             view={view}
             onCreate={() => {
               if (view === "browser") {
@@ -292,6 +310,8 @@ export function HumanWorkbenchPrototype() {
             onOpenTask={openTask}
             onOpenSettingsSection={openSettings}
             onOpenView={openView}
+            onTaskGroupingChange={setTaskGrouping}
+            onTaskSortChange={setTaskSort}
           />
         </LeftPanel>
       }
@@ -433,125 +453,21 @@ function defaultIdentityPage(site: string) {
 }
 
 function fallbackRun(task: PrototypeTask): PrototypeRun {
-  return { id: "run-current", label: "本次运行", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent };
+  return { id: "run-current", label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent };
 }
 
-function PrototypeSidebar({
-  identities,
-  librarySiteFilter,
-  settingsSection,
-  selectedIdentityId,
-  selectedTaskId,
-  taskList,
-  view,
-  onCreate,
-  onCreateSkill,
-  onOpenIdentity,
-  onOpenSettingsSection,
-  onOpenSite,
-  onOpenTask,
-  onOpenView,
-  onSearchSkills,
-}: {
-  identities: Identity[];
-  librarySiteFilter: string;
-  settingsSection: SettingsSection;
-  selectedIdentityId: string;
-  selectedTaskId: string;
-  taskList: PrototypeTask[];
-  view: AppView;
-  onCreate: () => void;
-  onCreateSkill: () => void;
-  onOpenIdentity: (identityId: string) => void;
-  onOpenSettingsSection: (section: SettingsSection) => void;
-  onOpenSite: (site: string) => void;
-  onOpenTask: (taskId: string) => void;
-  onOpenView: (view: AppView) => void;
-  onSearchSkills: () => void;
-}) {
-  return (
-    <aside className="sidebar prototype-sidebar" aria-label="WebEnvoy navigation">
-      <nav className="global-nav" aria-label="全局导航">
-        <SidebarNav active={view === "work"} icon={<SquarePen size={16} />} label="任务" onClick={() => onOpenView("work")} />
-        <SidebarNav active={view === "browser"} icon={<CircleUserRound size={16} />} label="账号身份" onClick={() => onOpenView("browser")} />
-        <SidebarNav active={view === "library"} icon={<Library size={16} />} label="站点技能" onClick={() => onOpenView("library")} />
-      </nav>
-
-      <section className="prototype-sidebar-context codex-scrollbar">
-        <div className="section-heading">
-          <span>{view === "browser" ? "账号身份" : view === "library" ? "站点技能" : view === "settings" ? "设置" : "任务线程"}</span>
-          {view === "library" ? <span className="section-heading-actions"><button type="button" aria-label="搜索全部站点技能" title="搜索" onClick={onSearchSkills}><Search size={14} /></button><button type="button" aria-label="新增站点技能" title="新增" onClick={onCreateSkill}><Plus size={14} /></button></span> : null}
-          {view !== "library" && view !== "settings" ? (
-            <button type="button" aria-label="新建" title="新建" onClick={onCreate}><Plus size={15} /></button>
-          ) : null}
-        </div>
-        {view === "work" ? <TaskTree identities={identities} selectedTaskId={selectedTaskId} taskList={taskList} onOpenTask={onOpenTask} /> : null}
-        {view === "browser" ? identities.map((identity) => (
-          <button className={`prototype-sidebar-row ${selectedIdentityId === identity.id ? "selected" : ""}`} type="button" key={identity.id} onClick={() => onOpenIdentity(identity.id)}>
-            <span className="prototype-account-mark">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
-            <span><strong>{identity.account}</strong><small>{identity.name} · {identity.stateLabel}</small></span>
-          </button>
-        )) : null}
-        {view === "library" ? <button className={`prototype-sidebar-row site-row discovery-row ${librarySiteFilter === "全部" ? "selected" : ""}`} type="button" onClick={() => onOpenSite("全部")}><Search size={14} /><span><strong>发现全部</strong><small>所有站点与技能</small></span></button> : null}
-        {view === "library" ? ["小红书", "微信公众号", "抖音", "淘宝", "BOSS 直聘"].map((site) => (
-          <button className={`prototype-sidebar-row site-row ${librarySiteFilter === site ? "selected" : ""}`} type="button" key={site} onClick={() => onOpenSite(site)}>
-            <SiteGlyph site={site} /><span><strong>{site}</strong><small>{skills.filter((skill) => skill.site === site).length} 个技能</small></span>
-          </button>
-        )) : null}
-        {view === "settings" ? [
-          { section: "general" as const, label: "通用", icon: <Languages size={14} /> },
-          { section: "authorization" as const, label: "全局授权", icon: <ShieldCheck size={14} /> },
-          { section: "proxies" as const, label: "代理", icon: <Network size={14} /> },
-          { section: "diagnostics" as const, label: "诊断", icon: <Stethoscope size={14} /> },
-        ].map((item) => (
-          <button className={`prototype-sidebar-row site-row ${settingsSection === item.section ? "selected" : ""}`} type="button" aria-label={item.label} key={item.section} onClick={() => onOpenSettingsSection(item.section)}>
-            {item.icon}<span><strong>{item.label}</strong></span>
-          </button>
-        )) : null}
-      </section>
-
-      <footer className="sidebar-user-footer prototype-user-footer">
-        <button className="prototype-user-entry" type="button" aria-label="打开设置" onClick={() => onOpenSettingsSection("general")}>
-          <span className="user-avatar" aria-hidden="true">CH</span>
-          <span className="user-copy"><strong>Chen</strong></span>
-        </button>
-      </footer>
-    </aside>
-  );
+function readTaskGrouping(): TaskGrouping {
+  try {
+    return window.localStorage.getItem(TASK_GROUPING_KEY) === "identity" ? "identity" : "skill";
+  } catch {
+    return "skill";
+  }
 }
 
-function TaskTree({ identities, selectedTaskId, taskList, onOpenTask }: { identities: Identity[]; selectedTaskId: string; taskList: PrototypeTask[]; onOpenTask: (taskId: string) => void }) {
-  const sites = Array.from(new Set(taskList.map((task) => task.site)));
-  return sites.map((site) => {
-    const siteTasks = taskList.filter((task) => task.site === site);
-    const siteSkills = Array.from(new Set(siteTasks.map((task) => task.skill)));
-    return (
-      <div className="prototype-task-tree-site" key={site}>
-        <div className="prototype-task-tree-label"><SiteGlyph site={site} /><strong>{site}</strong></div>
-        {siteSkills.map((skill) => (
-          <div className="prototype-task-tree-skill" key={skill}>
-            <span>{skill}</span>
-            {siteTasks.filter((task) => task.skill === skill).map((task) => (
-              <button className={`prototype-sidebar-row task-tree-leaf ${selectedTaskId === task.id ? "selected" : ""}`} type="button" key={task.id} onClick={() => onOpenTask(task.id)}>
-                <span className={`prototype-status-dot ${task.state}`} />
-                <span><strong>{identities.find((identity) => identity.id === task.identityId)?.account ?? task.identity}</strong><small>{task.runs?.at(-1)?.input ?? task.title} · {task.source}</small></span>
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  });
-}
-
-function SiteGlyph({ site }: { site: string }) {
-  if (site === "小红书") return <Images size={14} />;
-  if (site === "微信公众号") return <MessageCircle size={14} />;
-  if (site === "抖音") return <Music2 size={14} />;
-  if (site === "淘宝") return <ShoppingBag size={14} />;
-  return <BriefcaseBusiness size={14} />;
-}
-
-function SidebarNav({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
-  return <button className={`nav-item ${active ? "nav-item-active" : ""}`} type="button" onClick={onClick}>{icon}{label}</button>;
+function readTaskSort(): TaskSort {
+  try {
+    return window.localStorage.getItem(TASK_SORT_KEY) === "priority" ? "priority" : "recent";
+  } catch {
+    return "recent";
+  }
 }

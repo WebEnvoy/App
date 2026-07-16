@@ -59,18 +59,22 @@ App/CLI/MCP/API/SDK/Agent Task -> Work -> result or recovery
 ## Object Relationships
 
 ```text
-Site Skill + Account Identity + declared business input = Task
-Task -> one or more Runs -> Result -> optional Result Items
+Site Skill + Account Identity = Task Thread
+Task Thread -> one or more Task Turns
+Task Turn + declared business input -> one or more Runs -> Result -> optional Result Items
 
 Account Identity -> one persistent Browser Environment
 Browser Environment -> zero or one active controllable Instance
-Task/Run -> references an Account Identity and may temporarily control its Instance
+Task Turn/Run -> references an Account Identity and may temporarily control its Instance
 ```
 
-- A Task is the stable unit of user intent. A retry with unchanged business
-  input creates another Run under the same Task.
-- Changing material business input creates a new Task, prefilled from the old
-  one when appropriate.
+- A Task Thread is the stable App projection for one Site Skill and one Account
+  Identity. It does not replace Core task or run truth.
+- A Task Turn is one business-input submission from App, CLI, MCP, API, SDK or
+  Agent. Changing material business input creates another Turn in the matching
+  Thread.
+- A retry or resume with unchanged business input creates another Run under the
+  same Turn.
 - A manual Browser instance is not a Task, Run or Result.
 - Reopening an identity with an active instance reuses that instance and offers
   view, takeover or stop. It never silently starts a competing instance against
@@ -85,17 +89,36 @@ Task/Run -> references an Account Identity and may temporarily control its Insta
 
 | Page | Purpose | Primary action | Secondary paths |
 | --- | --- | --- | --- |
-| Task list | Observe tasks from every supported entry point | Open the current business state; create task | Search; filter by state, site or source |
-| Create task | Create a bounded task from a skill contract | Create task | Choose skill; create, login or repair identity |
-| Task detail | Consume results or resolve the current interruption | Open result or perform the recommended recovery | Retry; open browser; view source; expand details |
+| Task thread list | Observe task threads from every supported entry point | Open the current business state; create a task turn | Search; switch grouping; filter by state, site or source |
+| Create task | Create a bounded task turn from a skill contract | Create task turn | Choose skill; create, login or repair identity |
+| Task thread detail | Consume turn results or resolve the current interruption | Open result or perform the recommended recovery | Retry; open browser; view source; expand details |
 | Result item detail | Consume one record, content item, author or media object | Read or open the business object | Open source page; return to result collection |
 
-Task detail owns result, failure, progress and Run history. Result, failure and
-Run do not become peer-level global pages.
+Task Thread detail owns Turn history, result, failure, progress and Run detail.
+Turn, Result, failure and Run do not become peer-level global pages.
 
 The create-task page has no generic chat composer. After selecting a Site Skill,
 it renders only the fields, controls, defaults, options and validation rules
 declared by that skill. It lists only compatible Account Identities.
+
+The Work navigator offers two projections of the same Task Threads:
+
+```text
+By Site Skill: Site Skill -> Account Identity Thread
+By Identity: Account Identity -> Site Skill Thread
+```
+
+A Site Skill already carries its site ownership. The Site Skill projection does
+not add a redundant outer Site level; the skill heading shows its site identity
+inline for disambiguation.
+
+Grouping and sorting are presentation preferences. They live in the task-list
+heading overflow menu instead of occupying persistent sidebar width; the same
+hover/focus action area also exposes new-task creation. Switching either
+preference preserves the selected Thread and Turn, never duplicates task or
+result facts, and remembers the last choice locally. Sorting supports priority
+and recent-update order. New business input from any supported entry point is
+appended as a Turn to the matching Site Skill and Account Identity Thread.
 
 ### Browser
 
@@ -193,9 +216,10 @@ Browser identity -> Choose skill
 
 ### Observe an External-Entry Task
 
-Tasks from CLI, MCP, API, SDK or Agent appear in the same Work list and detail
-experience. Source is a label and source-summary fact, not a separate product
-area. A stable link or notification may open Task detail directly.
+Task Turns from CLI, MCP, API, SDK or Agent appear in the matching Site Skill +
+Account Identity Thread and use the same Work detail experience. Source is a
+label and source-summary fact, not a separate product area. A stable link or
+notification may open the matching Thread and Turn directly.
 
 ### Human Takeover and Resume
 

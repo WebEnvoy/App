@@ -117,8 +117,8 @@ export const tasks: PrototypeTask[] = [
     artifactState: "ready",
     artifactTotal: 12,
     runs: [
-      { id: "run-01", label: "首次采集", input: "关键词：AI 工具 · 数量：8", state: "success", stateLabel: "已完成 · 8 条", summary: "首次运行读取 8 条笔记。", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8 },
-      { id: "run-02", label: "再次采集", input: "关键词：AI 工具 · 数量：12", state: "success", stateLabel: "已完成 · 12 条", summary: "本次运行读取 12 条笔记并更新结构化结果。", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12 },
+      { id: "run-01", label: "首次采集", input: "关键词：AI 工具 · 数量：8", state: "success", stateLabel: "已完成 · 8 条", summary: "首个回合读取 8 条笔记。", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8 },
+      { id: "run-02", label: "再次采集", input: "关键词：AI 工具 · 数量：12", state: "success", stateLabel: "已完成 · 12 条", summary: "本回合读取 12 条笔记并更新结构化结果。", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12 },
     ],
   },
   {
@@ -134,7 +134,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 13:18",
     summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
     kind: "article",
-    runs: [{ id: "run-01", label: "本次运行", input: "产品周报第 28 期文章链接", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", artifactSet: "article", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "本回合", input: "产品周报第 28 期文章链接", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", artifactSet: "article", artifactState: "ready" }],
     artifactSet: "article",
     artifactState: "ready",
   },
@@ -151,7 +151,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 12:46",
     summary: "3 个文件已保存，1 个文件因来源失效未完成，可单独重试。",
     kind: "download",
-    runs: [{ id: "run-01", label: "本次运行", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3 }],
+    runs: [{ id: "run-01", label: "本回合", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3 }],
     artifactSet: "download-files",
     artifactState: "ready",
   },
@@ -168,7 +168,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 11:20",
     summary: "标题、正文和 4 个话题已填入页面并校验，尚未点击发布。",
     kind: "write",
-    runs: [{ id: "run-01", label: "本次运行", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", artifactSet: "write-preview", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "本回合", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", artifactSet: "write-preview", artifactState: "ready" }],
     artifactSet: "write-preview",
     artifactState: "ready",
   },
@@ -185,7 +185,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "10 分钟前",
     summary: "账号登录状态已过期。任务已暂停，登录完成并校验成功后会继续。",
     kind: "takeover",
-    runs: [{ id: "run-01", label: "本次运行", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none" }],
+    runs: [{ id: "run-01", label: "本回合", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none" }],
     artifactState: "none",
   },
   {
@@ -207,7 +207,7 @@ export const tasks: PrototypeTask[] = [
     artifactCurrent: 36,
     runs: [
       { id: "run-01", label: "昨日同步", input: "店铺上新 · 昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "昨日同步已完成，结果仍可查看。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64 },
-      { id: "run-02", label: "本次同步", input: "店铺上新 · 今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "本次运行正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36 },
+      { id: "run-02", label: "本次同步", input: "店铺上新 · 今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "本回合正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36 },
     ],
   },
 ];
