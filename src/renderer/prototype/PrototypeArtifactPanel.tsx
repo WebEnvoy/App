@@ -1,6 +1,7 @@
 import { Braces, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import samplePagePreview from "../../../artifacts/app-208-real-read-task.png";
 import { productRows, resultRows, type ArtifactSet, type PrototypeResultSelection, type PrototypeRun, type PrototypeTask } from "./prototypeData";
@@ -23,7 +24,7 @@ const artifactTabLabels: Record<FileTabId, string> = {
   image: "page.png",
 };
 
-export function PrototypeArtifactPanel({ requestKey, run, selectedResult, task }: { requestKey: number; run: PrototypeRun; selectedResult: PrototypeResultSelection | null; task: PrototypeTask }) {
+export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHost, task }: { requestKey: number; run: PrototypeRun; selectedResult: PrototypeResultSelection | null; tabHost: Element | null; task: PrototypeTask }) {
   const artifactSet = run.artifactSet ?? task.artifactSet;
   const state = run.artifactState ?? task.artifactState ?? (artifactSet == null ? "none" : "ready");
   const artifact = state === "ready" && artifactSet != null ? createArtifact(run, artifactSet) : null;
@@ -70,11 +71,14 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, task }
 
   return (
     <aside className="prototype-artifact-panel codex-scrollbar" aria-label="任务文件预览">
-      <div className="panel-tabs prototype-controlled-tabs">
-        <div className="panel-tab-strip">
+      {tabHost == null ? null : createPortal(
+        <div className="panel-tab-strip prototype-artifact-tab-strip">
           <div className="panel-tab-scroll"><div className="panel-tab-list" role="tablist" aria-label="任务文件预览">{tabState.openTabIds.map((tabId) => <div className={`prototype-closable-tab ${tabState.activeTabId === tabId ? "active" : ""}`} key={tabId}><button className="panel-tab-trigger" type="button" role="tab" aria-selected={tabState.activeTabId === tabId} onClick={() => setTabStateByRun((current) => ({ ...current, [run.id]: { ...tabState, activeTabId: tabId } }))}><span className="panel-tab-label">{tabLabel(tabId, resultTabs)}</span></button><button className="prototype-tab-close" type="button" aria-label={`关闭 ${tabLabel(tabId, resultTabs)}`} title="关闭" onClick={() => closeTab(tabId)}><X size={12} /></button></div>)}</div></div>
           <div className="prototype-tab-add-wrap"><button className="prototype-tab-add" type="button" aria-label="打开文件" title="打开文件" disabled={closedTabIds.length === 0} onClick={() => setAddMenuOpen((open) => !open)}><Plus size={14} /></button>{addMenuOpen ? <div className="prototype-tab-add-menu">{closedTabIds.map((tabId) => <button type="button" key={tabId} onClick={() => openTab(tabId)}>{tabLabel(tabId, resultTabs)}</button>)}</div> : null}</div>
-        </div>
+        </div>,
+        tabHost,
+      )}
+      <div className="panel-tabs prototype-controlled-tabs">
         <div className="panel-tab-content">{tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
       </div>
     </aside>

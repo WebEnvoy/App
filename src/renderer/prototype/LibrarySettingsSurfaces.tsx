@@ -4,7 +4,6 @@ import {
   ChevronDown,
   CircleAlert,
   CircleCheck,
-  Cloud,
   Download,
   Globe2,
   Images,
@@ -28,7 +27,7 @@ import { skills, type AuthorizationPolicy, type ProxyProfile, type Skill } from 
 
 const tags = ["全部", "数据采集", "内容发布", "内容下载", "内容浏览"];
 type LibraryMode = "catalog" | "detail" | "create";
-type SettingsSection = "general" | "authorization" | "proxies" | "connections" | "diagnostics";
+type SettingsSection = "general" | "authorization" | "proxies" | "diagnostics";
 
 export function LibrarySurface({ mode, siteFilter, selectedSkill, skillPolicies, onModeChange, onSelectSkill, onSkillPolicyChange, onUse }: {
   mode: LibraryMode;
@@ -98,7 +97,7 @@ function SkillDetail({ policy, skill, onBack, onPolicyChange, onUse }: { policy:
       {skill.availability === "unavailable" ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>目标站点当前访问受限</strong><p>本技能保留为延期项，当前不会创建生产任务。</p></div></section> : null}
       <div className="skill-detail-grid"><section className="prototype-section"><h2>这个技能能做什么</h2><p className="lead-copy">{skill.description}</p><dl className="prototype-detail-list"><div><dt>需要提供</dt><dd>{skill.inputLabel}</dd></div><div><dt>返回结果</dt><dd>{skill.output}</dd></div><div><dt>兼容账号</dt><dd>{skill.site} · 登录状态可用</dd></div></dl></section><section className="prototype-section"><h2>创建任务时的输入</h2><div className="sample-contract-field"><label>{skill.inputLabel}</label><div>{skill.inputPlaceholder}</div></div><p className="muted-copy">输入字段、选项与校验由技能合同定义。</p></section></div>
       <section className="prototype-section skill-authorization-section"><div className="prototype-section-title"><div><h2>技能授权</h2><p>只影响“{skill.name}”，任务创建时仍可覆盖。</p></div></div><label>默认策略<select value={policy} onChange={(event) => onPolicyChange(event.target.value as AuthorizationPolicy)}><option value="inherit">继承全局设置</option><option value="full">完全访问</option><option value="ask">写入批准</option><option value="read">只读</option><option value="strict">每一步都要批准</option></select></label><span>技能声明范围：{skill.tags.includes("内容发布") ? "读取、准备、提交" : "读取"}</span></section>
-      <section className="prototype-disclosure"><button type="button"><ChevronDown size={15} />版本、维护与诊断<span>当前版本 1.4.2 · 由 Lode 提供</span></button></section>
+      <section className="prototype-disclosure"><button type="button"><ChevronDown size={15} />版本、维护与诊断<span>当前版本 1.4.2 · 已安装</span></button></section>
     </div>
   );
 }
@@ -106,13 +105,12 @@ function SkillDetail({ policy, skill, onBack, onPolicyChange, onUse }: { policy:
 function CreateSkillSurface({ onDone }: { onDone: () => void }) {
   const [site, setSite] = useState("小红书");
   const [source, setSource] = useState("");
-  return <div className="prototype-page create-skill-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">站点技能</div><h1>新增站点技能</h1><p>从本机目录或软件包地址导入一个 Lode 站点技能。</p></div></header><form className="prototype-form" onSubmit={(event) => { event.preventDefault(); onDone(); }}><fieldset><legend>技能来源</legend><label>目标站点<select value={site} onChange={(event) => setSite(event.target.value)}><option>小红书</option><option>微信公众号</option><option>抖音</option><option>淘宝</option></select></label><label>本机目录或软件包地址<input required value={source} placeholder="选择目录或输入软件包地址" onChange={(event) => setSource(event.target.value)} /></label></fieldset><div className="form-footer"><span>导入后会先检查元数据和输入合同。</span><button className="prototype-button primary" type="submit" disabled={source.trim() === ""}><Plus size={14} />添加技能</button></div></form></div>;
+  return <div className="prototype-page create-skill-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">站点技能</div><h1>新增站点技能</h1><p>从本机目录或软件包地址导入站点技能。</p></div></header><form className="prototype-form" onSubmit={(event) => { event.preventDefault(); onDone(); }}><fieldset><legend>技能来源</legend><label>目标站点<select value={site} onChange={(event) => setSite(event.target.value)}><option>小红书</option><option>微信公众号</option><option>抖音</option><option>淘宝</option></select></label><label>本机目录或软件包地址<input required value={source} placeholder="选择目录或输入软件包地址" onChange={(event) => setSource(event.target.value)} /></label></fieldset><div className="form-footer"><span>导入后会先检查元数据和输入合同。</span><button className="prototype-button primary" type="submit" disabled={source.trim() === ""}><Plus size={14} />添加技能</button></div></form></div>;
 }
 
 export function SettingsSurface({ globalPolicy, proxies, section, onGlobalPolicyChange, onProxiesChange }: { globalPolicy: Exclude<AuthorizationPolicy, "inherit">; proxies: ProxyProfile[]; section: SettingsSection; onGlobalPolicyChange: (policy: Exclude<AuthorizationPolicy, "inherit">) => void; onProxiesChange: Dispatch<SetStateAction<ProxyProfile[]>> }) {
   if (section === "general") return <GeneralSettings />;
   if (section === "proxies") return <ProxySettings proxies={proxies} onProxiesChange={onProxiesChange} />;
-  if (section === "connections") return <ConnectionSettings />;
   if (section === "diagnostics") return <DiagnosticsSettings />;
   return <GlobalAuthorizationSettings policy={globalPolicy} onPolicyChange={onGlobalPolicyChange} />;
 }
@@ -144,19 +142,10 @@ function PolicyButton({ active, detail, label, onClick }: { active: boolean; det
   return <button className={active ? "selected" : ""} type="button" onClick={onClick}><strong>{label}</strong><span>{detail}</span></button>;
 }
 
-function ConnectionSettings() {
-  return <div className="prototype-page settings-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>连接</h1><p>管理 App 使用的本机服务连接。</p></div></header><section className="settings-main settings-single-column"><ServiceConnection name="Core" detail="任务与结果" endpoint="http://127.0.0.1:8787" /><ServiceConnection name="Harbor" detail="账号身份与浏览器实例" endpoint="http://127.0.0.1:8788" /><ServiceConnection name="Lode" detail="站点技能" endpoint="http://127.0.0.1:8789" /></section></div>;
-}
-
-function ServiceConnection({ detail, endpoint, name }: { detail: string; endpoint: string; name: string }) {
-  const [checked, setChecked] = useState(false);
-  return <div className="service-connection-row"><span className="service-icon"><Cloud size={17} /></span><div><h2>{name}</h2><p>{detail}</p><small>{checked ? "刚刚验证连接" : endpoint}</small></div><span className="prototype-state-chip available"><CircleCheck size={13} />已连接</span><button className="prototype-button" type="button" onClick={() => setChecked(true)}><RefreshCw size={14} />{checked ? "连接正常" : "测试连接"}</button></div>;
-}
-
 function DiagnosticsSettings() {
   const [checked, setChecked] = useState(false);
   const [exported, setExported] = useState(false);
-  return <div className="prototype-page settings-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>诊断</h1><p>在任务或环境出现问题时检查本机组件并导出诊断信息。</p></div></header><section className="diagnostics-summary"><span className="diagnostics-icon"><Stethoscope size={20} /></span><div><h2>所有组件运行正常</h2><p>{checked ? "刚刚重新检查完成" : "最近检查：刚刚"} · Core、Harbor、Lode 与浏览器 Provider 均可访问</p></div><button className="prototype-button" type="button" onClick={() => setChecked(true)}><RefreshCw size={14} />{checked ? "检查完成" : "重新检查"}</button></section><section className="prototype-section diagnostic-actions"><div><h2>诊断包</h2><p>{exported ? "诊断包已保存到下载目录。" : "导出运行日志和组件状态。"}</p></div><button className="prototype-button" type="button" onClick={() => setExported(true)}><Download size={14} />{exported ? "已导出" : "导出诊断包"}</button></section></div>;
+  return <div className="prototype-page settings-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>诊断</h1><p>在任务或环境出现问题时检查本机组件并导出诊断信息。</p></div></header><section className="diagnostics-summary"><span className="diagnostics-icon"><Stethoscope size={20} /></span><div><h2>所有组件运行正常</h2><p>{checked ? "刚刚重新检查完成" : "最近检查：刚刚"} · 任务、账号环境、站点技能和浏览器均可用</p></div><button className="prototype-button" type="button" onClick={() => setChecked(true)}><RefreshCw size={14} />{checked ? "检查完成" : "重新检查"}</button></section><section className="prototype-section diagnostic-actions"><div><h2>诊断包</h2><p>{exported ? "诊断包已保存到下载目录。" : "导出运行日志和组件状态。"}</p></div><button className="prototype-button" type="button" onClick={() => setExported(true)}><Download size={14} />{exported ? "已导出" : "导出诊断包"}</button></section></div>;
 }
 
 function SiteGlyph({ site, size }: { site: string; size: number }) {

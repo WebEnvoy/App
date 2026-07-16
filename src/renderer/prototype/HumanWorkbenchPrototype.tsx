@@ -3,7 +3,6 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   CircleUserRound,
-  Cloud,
   Images,
   Languages,
   Library,
@@ -41,7 +40,7 @@ import { WorkSurface } from "./WorkSurface";
 type WorkMode = "detail" | "create";
 type BrowserMode = "detail" | "create" | "repair" | "edit" | "dependencies";
 type LibraryMode = "catalog" | "detail" | "create";
-type SettingsSection = "general" | "authorization" | "proxies" | "connections" | "diagnostics";
+type SettingsSection = "general" | "authorization" | "proxies" | "diagnostics";
 
 export function HumanWorkbenchPrototype() {
   const [view, setView] = useState<AppView>("work");
@@ -68,6 +67,7 @@ export function HumanWorkbenchPrototype() {
   const [skillPolicies, setSkillPolicies] = useState<Record<string, AuthorizationPolicy>>({});
   const [selectedResult, setSelectedResult] = useState<PrototypeResultSelection | null>(null);
   const [resultPreviewRequestKey, setResultPreviewRequestKey] = useState(0);
+  const [artifactTabHost, setArtifactTabHost] = useState<HTMLDivElement | null>(null);
   const selectedTask = taskList.find((task) => task.id === selectedTaskId) ?? taskList[0];
   const selectedRun = selectedTask.runs?.find((run) => run.id === selectedRunId) ?? selectedTask.runs?.at(-1) ?? fallbackRun(selectedTask);
   const selectedTaskIdentity = identityList.find((identity) => identity.id === selectedTask.identityId);
@@ -94,7 +94,7 @@ export function HumanWorkbenchPrototype() {
     if (settingsSection === "general") return "通用";
     if (settingsSection === "authorization") return "全局授权";
     if (settingsSection === "proxies") return "代理管理";
-    return settingsSection === "connections" ? "连接" : "诊断";
+    return "诊断";
   }, [browserMode, libraryMode, librarySiteFilter, selectedIdentity.account, selectedIdentity.name, selectedSkill.name, selectedTask.identity, selectedTask.skill, selectedTaskIdentity?.account, settingsSection, view, workMode]);
 
   function openView(nextView: AppView) {
@@ -300,7 +300,7 @@ export function HumanWorkbenchPrototype() {
             </div>
           </div>
           <div className="topbar-right-slot prototype-right-topbar">
-            {view === "work" && workMode === "detail" ? <><span className="prototype-right-topbar-title">预览</span>{panelControls.rightFullscreen}{panelControls.right}</> : null}
+            {view === "work" && workMode === "detail" ? <><div className="prototype-right-tab-host" ref={setArtifactTabHost} />{panelControls.rightFullscreen}{panelControls.right}</> : null}
           </div>
         </header>
       )}
@@ -399,7 +399,7 @@ export function HumanWorkbenchPrototype() {
           {view === "settings" ? <SettingsSurface globalPolicy={globalPolicy} proxies={proxyList} section={settingsSection} onGlobalPolicyChange={setGlobalPolicy} onProxiesChange={setProxyList} /> : null}
         </ThreadWorkspace>
       }
-      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} requestKey={resultPreviewRequestKey} run={selectedRun} selectedResult={selectedResult} task={selectedTask} /></RightPanel> : null}
+      right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} requestKey={resultPreviewRequestKey} run={selectedRun} selectedResult={selectedResult} tabHost={artifactTabHost} task={selectedTask} /></RightPanel> : null}
     />
   );
 }
@@ -482,7 +482,6 @@ function PrototypeSidebar({
           { section: "general" as const, label: "通用", icon: <Languages size={14} /> },
           { section: "authorization" as const, label: "全局授权", icon: <ShieldCheck size={14} /> },
           { section: "proxies" as const, label: "代理", icon: <Network size={14} /> },
-          { section: "connections" as const, label: "连接", icon: <Cloud size={14} /> },
           { section: "diagnostics" as const, label: "诊断", icon: <Stethoscope size={14} /> },
         ].map((item) => (
           <button className={`prototype-sidebar-row site-row ${settingsSection === item.section ? "selected" : ""}`} type="button" aria-label={item.label} key={item.section} onClick={() => onOpenSettingsSection(item.section)}>

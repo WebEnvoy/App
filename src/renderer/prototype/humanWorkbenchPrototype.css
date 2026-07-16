@@ -16,6 +16,13 @@ input:focus-visible {
   outline-offset: 1px;
 }
 
+.prototype-topbar {
+  grid-template-columns:
+    max(var(--header-left-slot-width), 188px)
+    minmax(0, 1fr)
+    minmax(0, var(--header-right-slot-width));
+}
+
 .prototype-topbar .topbar-center-surface {
   background: var(--we-surface-primary);
 }
@@ -28,8 +35,9 @@ input:focus-visible {
 }
 
 .prototype-center-actions { display: flex; min-width: 0; margin-left: auto; }
-.prototype-right-topbar { justify-content: space-between; padding-left: 10px; border-left: 1px solid var(--we-border); }
-.prototype-right-topbar-title { min-width: 0; flex: 1 1 auto; overflow: hidden; color: var(--we-foreground-muted); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.prototype-right-topbar { gap: 0; justify-content: flex-start; overflow: visible; padding-left: 0; border-left: 1px solid var(--we-border); }
+.prototype-right-tab-host { min-width: 0; height: 100%; flex: 1 1 auto; }
+.prototype-right-tab-host .panel-tab-strip { position: static; height: 100%; padding-left: 8px; }
 
 .prototype-sidebar {
   padding-top: 42px;
