@@ -10,6 +10,7 @@
 .prototype-task-thread-content > * { width: 100%; min-width: 0; max-width: 100%; }
 .prototype-task-thread-layout .thread-navigation-rail { top: 50vh; }
 .prototype-run-rail .thread-navigation-row { height: 24px; }
+.prototype-run-rail .thread-navigation-marker { --marker-progress: 0.5; opacity: 0.6; }
 .task-turn-timeline { display: grid; }
 .task-turn-detail { display: grid; scroll-margin-top: 56px; }
 .task-turn-detail + .task-turn-detail { margin-top: 30px; padding-top: 30px; border-top: 1px solid var(--we-border); }
