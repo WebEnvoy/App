@@ -146,7 +146,7 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
             <div><dt>代理</dt><dd>{identity.proxy ?? "团队推荐线路"} · 可用</dd></div>
             <div><dt>启动页面</dt><dd>{identity.startPage ?? "站点首页"}</dd></div>
           </dl>
-          <details className="identity-profile-details"><summary>浏览器配置详情</summary><dl className="prototype-detail-list"><div><dt>平台</dt><dd>{identity.platform ?? "跟随 Provider"}</dd></div><div><dt>指纹摘要</dt><dd>{identity.fingerprint ?? "Provider 默认指纹"}</dd></div><div><dt>User agent</dt><dd>{identity.userAgent ?? "跟随 Provider 稳定版本"}</dd></div><div><dt>屏幕</dt><dd>{identity.screen ?? "跟随本机显示器"}</dd></div><div><dt>硬件并发</dt><dd>{identity.hardwareConcurrency ?? "Provider 推荐"}</dd></div><div><dt>GPU</dt><dd>{identity.gpuPreset ?? "Provider 推荐"}</dd></div><div><dt>页面交互</dt><dd>{identity.interactionPreset ?? "标准"}</dd></div><div><dt>当前页面</dt><dd>{identity.currentPage ?? "未打开"}</dd></div><div><dt>最近正常</dt><dd>{identity.lastHealthyAt ?? "尚未验证"}</dd></div><div><dt>存储</dt><dd>本机持久环境 · 已隔离</dd></div></dl></details>
+          <details className="identity-profile-details"><summary>浏览器配置详情</summary><dl className="prototype-detail-list"><div><dt>平台</dt><dd>{identity.platform ?? "跟随 Provider"}</dd></div><div><dt>指纹摘要</dt><dd>{identity.fingerprint ?? "Provider 默认指纹"}</dd></div><div><dt>User agent</dt><dd>{identity.userAgent ?? "跟随 Provider 稳定版本"}</dd></div><div><dt>屏幕</dt><dd>{identity.screen ?? "跟随本机显示器"}</dd></div><div><dt>硬件并发</dt><dd>{identity.hardwareConcurrency ?? "Provider 推荐"}</dd></div><div><dt>GPU</dt><dd>{identity.gpuPreset ?? "Provider 推荐"}</dd></div><div><dt>操作速度</dt><dd>{normalizeInteractionPreset(identity.interactionPreset)}</dd></div><div><dt>当前页面</dt><dd>{identity.currentPage ?? "未打开"}</dd></div><div><dt>最近正常</dt><dd>{identity.lastHealthyAt ?? "尚未验证"}</dd></div><div><dt>存储</dt><dd>本机持久环境 · 已隔离</dd></div></dl></details>
         </section>
       </div>
     </div>
@@ -156,13 +156,23 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
 function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onManageProxies, onSave }: { cloakProviderInstalled: boolean; identity: Identity; proxies: ProxyProfile[]; onDelete: (identityId: string) => void; onManageProxies: () => void; onSave: (identity: Identity) => void }) {
   const [name, setName] = useState(identity.name);
   const [provider, setProvider] = useState(identity.provider);
+  const [profile, setProfile] = useState<ProfilePreset>(() => profileFromIdentity(identity));
   const [region, setRegion] = useState(identity.region ?? "中国大陆");
   const [language, setLanguage] = useState(identity.language ?? "简体中文");
   const [timezone, setTimezone] = useState(identity.timezone ?? "跟随 IP");
   const [proxy, setProxy] = useState(identity.proxy ?? "团队推荐线路");
   const [startPage, setStartPage] = useState(identity.startPage ?? defaultStartPage(identity.site));
   const [tags, setTags] = useState((identity.tags ?? []).join("，"));
+  const [interactionPreset, setInteractionPreset] = useState(normalizeInteractionPreset(identity.interactionPreset));
+  const [fingerprintSeed, setFingerprintSeed] = useState(identity.fingerprintSeed ?? createFingerprintSeed());
+  const [randomized, setRandomized] = useState(false);
   const [pathOpened, setPathOpened] = useState(false);
+
+  function randomizeProfile() {
+    setProfile(randomProfileAlternative(profile));
+    setFingerprintSeed(createFingerprintSeed());
+    setRandomized(true);
+  }
 
   function saveChanges() {
     const providerUnavailable = provider === "CloakBrowser" && !cloakProviderInstalled;
@@ -179,6 +189,12 @@ function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onM
       timezone,
       proxy,
       startPage,
+      platform: profile.platform,
+      screen: profile.screen,
+      hardwareConcurrency: profile.hardwareConcurrency,
+      gpuPreset: profile.gpuPreset,
+      interactionPreset,
+      fingerprintSeed,
       tags: tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean),
       state: providerUnavailable ? "repair" : providerReset ? loginConfirmed ? "available" : "login" : identity.state,
       stateLabel: providerUnavailable ? "需要修复" : providerReset ? loginConfirmed ? "可用" : "需要登录" : identity.stateLabel,
@@ -198,7 +214,9 @@ function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onM
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>编辑 {identity.account}</h1><p>在一个页面统一管理站点账号信息和持久浏览器环境。</p></div></header>
       <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); saveChanges(); }}>
         <fieldset><legend>{identity.loginState === "not-required" ? "浏览器身份" : "站点账号"}</legend><div className="site-account-profile editable-account-profile"><span className="identity-avatar account-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span><div><strong>{identity.account}</strong><span>{identity.site} · {identity.loginState === "not-required" ? "无需登录" : identity.platformId ?? "平台 ID 待同步"}</span></div><span className={`prototype-state-chip ${identity.loginState === "logged-in" || identity.loginState === "not-required" ? "available" : "login"}`}>{identity.loginState === "logged-in" ? "已登录" : identity.loginState === "not-required" ? "无需登录" : "待登录"}</span></div><p className="muted-copy">{identity.loginState === "not-required" ? "这个环境不预置站点登录状态；以后仍可在浏览器中人工登录。" : "昵称、头像、平台 ID 和登录状态由登录校验同步，不能在本地修改。"}</p><div className="inline-form-grid"><label>本地身份名称<input required value={name} onChange={(event) => setName(event.target.value)} /></label><label>标签<input value={tags} placeholder="内容运营，品牌号" onChange={(event) => setTags(event.target.value)} /></label></div></fieldset>
-        <fieldset><legend>浏览器环境</legend><label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value)}><option value="CloakBrowser" disabled={!cloakProviderInstalled}>CloakBrowser{cloakProviderInstalled ? "" : "（未安装）"}</option><option value="官方 Chrome">官方 Chrome</option></select></label><div className="inline-form-grid three"><label>地区<select value={region} onChange={(event) => setRegion(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>中国大陆</option><option>美国</option><option>日本</option></select></label><label>语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>简体中文</option><option>English</option></select></label><label>时区<select value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>Asia/Shanghai</option><option>America/Los_Angeles</option></select></label></div><div className="inline-form-grid"><label>代理<select value={proxy} onChange={(event) => setProxy(event.target.value)}>{proxyOptions(proxies)}<option>不使用代理</option></select><button className="inline-link field-link" type="button" onClick={onManageProxies}>新增或管理代理</button></label><label>启动页面<input type="url" value={startPage} onChange={(event) => setStartPage(event.target.value)} /></label></div></fieldset>
+        <fieldset><legend>登录目标</legend><label>目标网站 URL<input type="url" value={startPage} onChange={(event) => setStartPage(event.target.value)} /></label></fieldset>
+        <fieldset><legend>浏览器 Provider</legend><ProviderChoices cloakProviderInstalled={cloakProviderInstalled} provider={provider} onChange={setProvider} /></fieldset>
+        <ProfileEnvironmentFields profile={profile} proxy={proxy} proxies={proxies} region={region} language={language} timezone={timezone} interactionPreset={interactionPreset} fingerprintSeed={fingerprintSeed} randomized={randomized} onManageProxies={onManageProxies} onProfileChange={setProfile} onProxyChange={setProxy} onRegionChange={setRegion} onLanguageChange={setLanguage} onTimezoneChange={setTimezone} onInteractionPresetChange={setInteractionPreset} onFingerprintSeedChange={setFingerprintSeed} onRandomize={randomizeProfile} />
         <fieldset><legend>本机环境</legend><div className="environment-path-row"><span><strong>数据目录</strong><small>~/Library/Application Support/WebEnvoy/profiles/{identity.id}</small></span><button className="prototype-button" type="button" onClick={() => setPathOpened(true)}>{pathOpened ? "已在访达中显示" : "在访达中显示"}</button></div><p className="muted-copy">删除身份、清理本机环境等操作集中在这里管理。</p></fieldset>
         <div className="form-footer"><button className="prototype-button danger" type="button" onClick={() => onDelete(identity.id)}>删除账号身份</button><button className="prototype-button primary" type="submit">保存更改</button></div>
       </form>
@@ -242,7 +260,7 @@ function CreateIdentity({ cloakProviderInstalled, initialSite, proxies, onCreate
   const [language, setLanguage] = useState("跟随 IP");
   const [timezone, setTimezone] = useState("跟随 IP");
   const [proxy, setProxy] = useState("团队推荐线路");
-  const [interactionPreset, setInteractionPreset] = useState("标准");
+  const [interactionPreset, setInteractionPreset] = useState("正常速度");
   const [fingerprintSeed, setFingerprintSeed] = useState(createFingerprintSeed);
   const [randomized, setRandomized] = useState(false);
   const site = loginRequirement === "required" ? siteFromUrl(loginUrl, initialSite) : initialSite;
@@ -250,9 +268,7 @@ function CreateIdentity({ cloakProviderInstalled, initialSite, proxies, onCreate
   const canCreate = loginRequirement === "required" ? urlValid : name.trim() !== "";
 
   function randomizeProfile() {
-    const alternatives = profilePresets.filter((preset) => preset.platform !== profile.platform || preset.gpuPreset !== profile.gpuPreset);
-    const next = alternatives[Math.floor(Math.random() * alternatives.length)] ?? profilePresets[0];
-    setProfile(next);
+    setProfile(randomProfileAlternative(profile));
     setFingerprintSeed(createFingerprintSeed());
     setRandomized(true);
   }
@@ -280,11 +296,86 @@ function CreateIdentity({ cloakProviderInstalled, initialSite, proxies, onCreate
       <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); submitIdentity(); }}>
         <fieldset><legend>使用方式</legend><div className="identity-login-choice"><button className={loginRequirement === "required" ? "selected" : ""} type="button" onClick={() => setLoginRequirement("required")}><KeyRound size={17} /><span><strong>需要账号登录</strong><small>打开目标网址，登录后同步账号信息</small></span></button><button className={loginRequirement === "not-required" ? "selected" : ""} type="button" onClick={() => setLoginRequirement("not-required")}><Monitor size={17} /><span><strong>无需账号登录</strong><small>创建一个不预置登录状态的浏览器身份</small></span></button></div></fieldset>
         <fieldset><legend>{loginRequirement === "required" ? "登录目标" : "身份名称"}</legend>{loginRequirement === "required" ? <><label>目标网站 URL<input required type="url" value={loginUrl} placeholder="https://www.example.com/login" onChange={(event) => setLoginUrl(event.target.value)} /></label><p className={`identity-url-status ${urlValid ? "valid" : "invalid"}`}>{urlValid ? `已识别为 ${site}；创建后将用新环境打开此网址。` : "请输入以 http:// 或 https:// 开头的完整网址。"}</p></> : <label>身份名称<input required value={name} placeholder={`例如：${initialSite}公开浏览`} onChange={(event) => setName(event.target.value)} /></label>}</fieldset>
-        <fieldset><legend>浏览器 Provider</legend><div className="provider-choice-list"><label className={provider === "CloakBrowser" ? "selected" : ""}><input type="radio" name="provider" disabled={!cloakProviderInstalled} checked={provider === "CloakBrowser"} onChange={() => setProvider("CloakBrowser")} /><ShieldCheck size={18} /><span><strong>CloakBrowser</strong><small>{cloakProviderInstalled ? "独立进程运行 · 由 App 启动和管理" : "尚未安装 · 首次使用从官方渠道下载"}</small></span></label><label className={provider === "官方 Chrome" ? "selected" : ""}><input type="radio" name="provider" checked={provider === "官方 Chrome"} onChange={() => setProvider("官方 Chrome")} /><Monitor size={18} /><span><strong>官方 Chrome</strong><small>使用本机安装 · 部分环境能力受限</small></span></label></div></fieldset>
-        <fieldset><div className="profile-fieldset-heading"><legend>浏览器环境</legend><button className="prototype-button compact" type="button" onClick={randomizeProfile}><Dices size={14} />一键随机</button></div><div className="inline-form-grid"><label>平台<select value={profile.platform} onChange={(event) => setProfile(profilePresets.find((preset) => preset.platform === event.target.value) ?? profilePresets[0])}><option>Windows</option><option>macOS</option><option>Linux</option></select></label><label>代理<select value={proxy} onChange={(event) => setProxy(event.target.value)}>{proxyOptions(proxies)}<option>不使用代理</option></select><button className="inline-link field-link" type="button" onClick={onManageProxies}>新增或管理代理</button></label></div><label className="profile-auto-row"><input type="checkbox" checked={region === "跟随 IP" && language === "跟随 IP" && timezone === "跟随 IP"} onChange={(event) => { if (event.target.checked) { setRegion("跟随 IP"); setLanguage("跟随 IP"); setTimezone("跟随 IP"); } else { setRegion("中国大陆"); setLanguage("简体中文"); setTimezone("Asia/Shanghai"); } }} /><span><strong>根据代理 IP 自动设置</strong><small>保持地区、语言和时区一致</small></span></label><div className="inline-form-grid three"><label>地区<select value={region} onChange={(event) => setRegion(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>中国大陆</option><option>美国</option><option>日本</option></select></label><label>语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>简体中文</option><option>English</option></select></label><label>时区<select value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>Asia/Shanghai</option><option>America/Los_Angeles</option></select></label></div>{randomized ? <p className="profile-randomized"><Check size={13} />已生成一组相互兼容的设备参数</p> : null}<details className="profile-advanced-settings"><summary>高级设置<span>指纹、屏幕与设备参数</span></summary><div className="profile-advanced-body"><div className="inline-form-grid three"><label>屏幕分辨率<select value={profile.screen} onChange={(event) => setProfile((current) => ({ ...current, screen: event.target.value }))}><option>1920 × 1080</option><option>1440 × 900</option><option>1366 × 768</option></select></label><label>硬件并发<select value={profile.hardwareConcurrency} onChange={(event) => setProfile((current) => ({ ...current, hardwareConcurrency: event.target.value }))}><option>4 核</option><option>8 核</option><option>12 核</option><option>16 核</option></select></label><label>GPU 预设<select value={profile.gpuPreset} onChange={(event) => setProfile((current) => ({ ...current, gpuPreset: event.target.value }))}>{gpuPresets(profile.platform).map((preset) => <option key={preset}>{preset}</option>)}</select></label></div><div className="inline-form-grid"><label>页面交互<select value={interactionPreset} onChange={(event) => setInteractionPreset(event.target.value)}><option>标准</option><option>谨慎</option></select></label><div className="fingerprint-seed-row"><span><strong>指纹种子</strong><small>自动生成；创建后保持稳定</small></span><button className="prototype-button compact" type="button" onClick={() => setFingerprintSeed(createFingerprintSeed())}><RefreshCw size={13} />重新生成</button></div></div></div></details></fieldset>
+        <fieldset><legend>浏览器 Provider</legend><ProviderChoices cloakProviderInstalled={cloakProviderInstalled} provider={provider} onChange={setProvider} /></fieldset>
+        <ProfileEnvironmentFields profile={profile} proxy={proxy} proxies={proxies} region={region} language={language} timezone={timezone} interactionPreset={interactionPreset} fingerprintSeed={fingerprintSeed} randomized={randomized} onManageProxies={onManageProxies} onProfileChange={setProfile} onProxyChange={setProxy} onRegionChange={setRegion} onLanguageChange={setLanguage} onTimezoneChange={setTimezone} onInteractionPresetChange={setInteractionPreset} onFingerprintSeedChange={setFingerprintSeed} onRandomize={randomizeProfile} />
         <div className="form-footer"><span>{loginRequirement === "required" ? "创建后将拉起独立浏览器，由你完成登录。" : "创建后可直接用于不要求登录的站点技能。"}</span><button className="prototype-button primary" type="submit" disabled={!canCreate}><UserRoundPlus size={14} />{loginRequirement === "required" ? "创建环境并去登录" : "创建环境"}</button></div>
       </form>
     </div>
+  );
+}
+
+function ProviderChoices({ cloakProviderInstalled, provider, onChange }: { cloakProviderInstalled: boolean; provider: string; onChange: (provider: string) => void }) {
+  return (
+    <div className="provider-choice-list">
+      <label className={provider === "CloakBrowser" ? "selected" : ""}>
+        <input type="radio" name="provider" disabled={!cloakProviderInstalled} checked={provider === "CloakBrowser"} onChange={() => onChange("CloakBrowser")} />
+        <ShieldCheck size={18} />
+        <span><strong>CloakBrowser</strong><small>{cloakProviderInstalled ? "独立进程运行 · 由 App 启动和管理" : "尚未安装 · 首次使用从官方渠道下载"}</small></span>
+      </label>
+      <label className={provider === "官方 Chrome" ? "selected" : ""}>
+        <input type="radio" name="provider" checked={provider === "官方 Chrome"} onChange={() => onChange("官方 Chrome")} />
+        <Monitor size={18} />
+        <span><strong>官方 Chrome</strong><small>使用本机安装 · 部分环境能力受限</small></span>
+      </label>
+    </div>
+  );
+}
+
+type ProfileEnvironmentFieldsProps = {
+  profile: ProfilePreset;
+  proxy: string;
+  proxies: ProxyProfile[];
+  region: string;
+  language: string;
+  timezone: string;
+  interactionPreset: string;
+  fingerprintSeed: string;
+  randomized: boolean;
+  onManageProxies: () => void;
+  onProfileChange: (profile: ProfilePreset) => void;
+  onProxyChange: (proxy: string) => void;
+  onRegionChange: (region: string) => void;
+  onLanguageChange: (language: string) => void;
+  onTimezoneChange: (timezone: string) => void;
+  onInteractionPresetChange: (preset: string) => void;
+  onFingerprintSeedChange: (seed: string) => void;
+  onRandomize: () => void;
+};
+
+function ProfileEnvironmentFields({ profile, proxy, proxies, region, language, timezone, interactionPreset, fingerprintSeed, randomized, onManageProxies, onProfileChange, onProxyChange, onRegionChange, onLanguageChange, onTimezoneChange, onInteractionPresetChange, onFingerprintSeedChange, onRandomize }: ProfileEnvironmentFieldsProps) {
+  const followsIp = region === "跟随 IP" && language === "跟随 IP" && timezone === "跟随 IP";
+  const knownScreens = ["1920 × 1080", "1440 × 900", "1366 × 768"];
+  const knownConcurrency = ["4 核", "8 核", "12 核", "16 核"];
+  return (
+    <fieldset className="profile-environment-fieldset">
+      <legend>浏览器环境</legend>
+      <button className="prototype-button compact profile-randomize-button" type="button" onClick={onRandomize}><Dices size={14} />一键随机</button>
+      <div className="inline-form-grid">
+        <label>平台<select value={profile.platform} onChange={(event) => onProfileChange(profilePresets.find((preset) => preset.platform === event.target.value) ?? profilePresets[0])}><option>Windows</option><option>macOS</option><option>Linux</option></select></label>
+        <div className="profile-proxy-field"><label>代理<select value={proxy} onChange={(event) => onProxyChange(event.target.value)}>{proxyOptions(proxies)}<option>不使用代理</option></select></label><button className="inline-link field-link" type="button" onClick={onManageProxies}>新增或管理代理</button></div>
+      </div>
+      <label className="profile-auto-row"><input type="checkbox" checked={followsIp} onChange={(event) => { if (event.target.checked) { onRegionChange("跟随 IP"); onLanguageChange("跟随 IP"); onTimezoneChange("跟随 IP"); } else { onRegionChange("中国大陆"); onLanguageChange("简体中文"); onTimezoneChange("Asia/Shanghai"); } }} /><span><strong>根据代理 IP 自动设置</strong><small>保持地区、语言和时区一致</small></span></label>
+      <div className="inline-form-grid three">
+        <label>地区<select value={region} onChange={(event) => onRegionChange(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>中国大陆</option><option>美国</option><option>日本</option></select></label>
+        <label>语言<select value={language} onChange={(event) => onLanguageChange(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>简体中文</option><option>English</option></select></label>
+        <label>时区<select value={timezone} onChange={(event) => onTimezoneChange(event.target.value)}><option>跟随 IP</option><option>跟随本机</option><option>Asia/Shanghai</option><option>America/Los_Angeles</option></select></label>
+      </div>
+      {randomized ? <p className="profile-randomized"><Check size={13} />已生成一组相互兼容的设备参数</p> : null}
+      <details className="profile-advanced-settings">
+        <summary>高级设置<span>指纹、屏幕与设备参数</span></summary>
+        <div className="profile-advanced-body">
+          <div className="inline-form-grid three">
+            <label>屏幕分辨率<select value={profile.screen} onChange={(event) => onProfileChange({ ...profile, screen: event.target.value })}>{knownScreens.includes(profile.screen) ? null : <option>{profile.screen}</option>}{knownScreens.map((screen) => <option key={screen}>{screen}</option>)}</select></label>
+            <label>硬件并发<select value={profile.hardwareConcurrency} onChange={(event) => onProfileChange({ ...profile, hardwareConcurrency: event.target.value })}>{knownConcurrency.includes(profile.hardwareConcurrency) ? null : <option>{profile.hardwareConcurrency}</option>}{knownConcurrency.map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label>GPU 预设<select value={profile.gpuPreset} onChange={(event) => onProfileChange({ ...profile, gpuPreset: event.target.value })}>{gpuPresets(profile.platform).includes(profile.gpuPreset) ? null : <option>{profile.gpuPreset}</option>}{gpuPresets(profile.platform).map((preset) => <option key={preset}>{preset}</option>)}</select></label>
+          </div>
+          <div className="inline-form-grid">
+            <label>操作速度<select value={interactionPreset} onChange={(event) => onInteractionPresetChange(event.target.value)}><option value="正常速度">正常速度</option><option value="降低速度">降低速度（操作间隔更长）</option></select></label>
+            <div className="fingerprint-seed-row"><span><strong>指纹种子</strong><small>当前尾号 {fingerprintSeed.slice(-8)} · 保存后保持稳定</small></span><button className="prototype-button compact" type="button" onClick={() => onFingerprintSeedChange(createFingerprintSeed())}><RefreshCw size={13} />重新生成</button></div>
+          </div>
+        </div>
+      </details>
+    </fieldset>
   );
 }
 
@@ -337,6 +428,27 @@ function siteFromUrl(value: string, fallback: string) {
 
 function createFingerprintSeed() {
   return `fp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function profileFromIdentity(identity: Identity): ProfilePreset {
+  const inferredPlatform = identity.userAgent?.includes("macOS") ? "macOS" : identity.userAgent?.includes("Linux") ? "Linux" : "Windows";
+  const platform = identity.platform ?? inferredPlatform;
+  const fallback = profilePresets.find((preset) => preset.platform === platform) ?? profilePresets[0];
+  return {
+    platform,
+    screen: identity.screen?.split(" · ")[0] ?? fallback.screen,
+    hardwareConcurrency: identity.hardwareConcurrency ?? fallback.hardwareConcurrency,
+    gpuPreset: identity.gpuPreset ?? fallback.gpuPreset,
+  };
+}
+
+function randomProfileAlternative(current: ProfilePreset) {
+  const alternatives = profilePresets.filter((preset) => preset.platform !== current.platform || preset.gpuPreset !== current.gpuPreset);
+  return alternatives[Math.floor(Math.random() * alternatives.length)] ?? profilePresets[0];
+}
+
+function normalizeInteractionPreset(value?: string) {
+  return value === "谨慎" || value === "降低速度" ? "降低速度" : "正常速度";
 }
 
 function gpuPresets(platform: NonNullable<Identity["platform"]>) {

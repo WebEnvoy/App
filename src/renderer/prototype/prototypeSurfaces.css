@@ -237,7 +237,9 @@
 .environment-path-row strong { color: var(--we-foreground); font-size: 12px; }
 .environment-path-row small { overflow-wrap: anywhere; color: var(--we-foreground-muted); font-size: 10px; }
 .prototype-button.danger { color: var(--we-status-error); }
-.field-link { width: max-content; margin-top: 2px; }
+.profile-proxy-field { display: grid; min-width: 0; gap: 5px; align-content: start; }
+.profile-proxy-field > label { min-width: 0; }
+.field-link { width: max-content; max-width: 100%; margin: 0; line-height: 1.35; text-align: left; }
 
 .provider-choice-list { display: grid; gap: 8px; }
 .provider-choice-list > label { display: grid; grid-template-columns: 18px 22px minmax(0, 1fr); gap: 10px; align-items: center; padding: 11px; border: 1px solid var(--we-border); border-radius: 8px; color: var(--we-foreground); }
@@ -255,8 +257,8 @@
 .identity-url-status { display: flex; align-items: center; gap: 6px; font-size: 10px; }
 .identity-url-status.valid { color: var(--we-status-success); }
 .identity-url-status.invalid { color: var(--we-status-error); }
-.profile-fieldset-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.profile-fieldset-heading legend { margin: 0; }
+.profile-environment-fieldset { position: relative; }
+.profile-randomize-button { position: absolute; top: 12px; right: 0; }
 .profile-auto-row { display: flex !important; align-items: center; gap: 9px; width: max-content; max-width: 100%; }
 .prototype-form .profile-auto-row > input { width: 15px; min-height: 15px; flex: 0 0 15px; }
 .profile-auto-row > span { display: grid; gap: 2px; }
@@ -284,7 +286,6 @@
 
 @media (max-width: 620px) {
   .identity-login-choice { grid-template-columns: 1fr; }
-  .profile-fieldset-heading,
   .form-footer { align-items: flex-start; flex-direction: column; }
   .inline-form-grid,
   .inline-form-grid.three { grid-template-columns: 1fr; }
