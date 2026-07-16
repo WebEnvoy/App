@@ -1,6 +1,6 @@
 body {
   min-width: 0;
-  min-height: 620px;
+  min-height: 0;
 }
 
 button,
@@ -20,7 +20,7 @@ input:focus-visible {
   grid-template-columns:
     max(var(--header-left-slot-width), 188px)
     minmax(0, 1fr)
-    minmax(0, var(--header-right-slot-width));
+    minmax(36px, var(--header-right-slot-width));
 }
 
 .prototype-topbar .topbar-center-surface {
@@ -38,6 +38,7 @@ input:focus-visible {
 .prototype-right-topbar { gap: 0; justify-content: flex-start; overflow: visible; padding-left: 0; border-left: 1px solid var(--we-border); }
 .prototype-right-tab-host { min-width: 0; height: 100%; flex: 1 1 auto; }
 .prototype-right-tab-host .panel-tab-strip { position: static; height: 100%; padding-left: 8px; }
+.app-shell[data-right-panel-open="false"] .prototype-right-tab-host { display: none; }
 
 .prototype-sidebar {
   padding-top: 42px;

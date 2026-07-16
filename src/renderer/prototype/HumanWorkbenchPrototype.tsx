@@ -17,7 +17,7 @@ import {
   SquarePen,
   Stethoscope,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { AppShell, LeftPanel, RightPanel, ThreadWorkspace } from "../shellPrimitives";
 import { BrowserSurface } from "./BrowserSurface";
@@ -48,6 +48,7 @@ export function HumanWorkbenchPrototype() {
   const [browserMode, setBrowserMode] = useState<BrowserMode>("detail");
   const [libraryMode, setLibraryMode] = useState<LibraryMode>("catalog");
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
+  const [settingsReturnView, setSettingsReturnView] = useState<Exclude<AppView, "settings">>("work");
   const [selectedTaskId, setSelectedTaskId] = useState(tasks[0].id);
   const [selectedRunId, setSelectedRunId] = useState(tasks[0].runs?.at(-1)?.id ?? "");
   const [taskList, setTaskList] = useState<PrototypeTask[]>(tasks);
@@ -105,6 +106,12 @@ export function HumanWorkbenchPrototype() {
       setLibraryMode("catalog");
       setLibrarySiteFilter("全部");
     }
+  }
+
+  function openSettings(section: SettingsSection) {
+    setSettingsSection(section);
+    if (view !== "settings") setSettingsReturnView(view);
+    setView("settings");
   }
 
   function openTask(taskId: string) {
@@ -226,15 +233,28 @@ export function HumanWorkbenchPrototype() {
     if (view === "work" && workMode === "create") setWorkMode("detail");
     else if (view === "browser" && browserMode !== "detail") setBrowserMode("detail");
     else if (view === "library" && libraryMode !== "catalog") setLibraryMode("catalog");
+    else if (view === "settings") setView(settingsReturnView);
   }
+
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape" || view !== "settings" || isTextEditingTarget(event.target)) return;
+      event.preventDefault();
+      setView(settingsReturnView);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [settingsReturnView, view]);
 
   const canGoBack =
     (view === "work" && workMode === "create") ||
     (view === "browser" && browserMode !== "detail") ||
-    (view === "library" && libraryMode !== "catalog");
+    (view === "library" && libraryMode !== "catalog") ||
+    view === "settings";
 
   return (
     <AppShell
+      collapsePanelsOnNarrow
       rightPanelOpenRequestKey={resultPreviewRequestKey}
       left={
         <LeftPanel>
@@ -270,10 +290,7 @@ export function HumanWorkbenchPrototype() {
               setView("library");
             }}
             onOpenTask={openTask}
-            onOpenSettingsSection={(section) => {
-              setSettingsSection(section);
-              setView("settings");
-            }}
+            onOpenSettingsSection={openSettings}
             onOpenView={openView}
           />
         </LeftPanel>
@@ -351,8 +368,7 @@ export function HumanWorkbenchPrototype() {
               onCreate={saveIdentity}
               onModeChange={setBrowserMode}
               onManageProxies={() => {
-                setSettingsSection("proxies");
-                setView("settings");
+                openSettings("proxies");
               }}
               onOpenInstance={openIdentityInstance}
               onProviderRepaired={() => {
@@ -402,6 +418,10 @@ export function HumanWorkbenchPrototype() {
       right={view === "work" && workMode === "detail" ? <RightPanel><PrototypeArtifactPanel key={selectedTask.id} requestKey={resultPreviewRequestKey} run={selectedRun} selectedResult={selectedResult} tabHost={artifactTabHost} task={selectedTask} /></RightPanel> : null}
     />
   );
+}
+
+function isTextEditingTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']") != null;
 }
 
 function defaultIdentityPage(site: string) {

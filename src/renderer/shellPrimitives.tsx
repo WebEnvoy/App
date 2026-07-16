@@ -34,9 +34,11 @@ const RIGHT_PANEL_RESERVED_WIDTH = 352;
 const RIGHT_PANEL_COLLAPSE_WIDTH = RIGHT_PANEL_MIN_WIDTH * PANEL_COLLAPSE_SCALE;
 const RIGHT_PANEL_WIDTH_KEY = "webenvoy.shell.v3.right-panel-width";
 const RIGHT_PANEL_RATIO_KEY = "webenvoy.shell.v3.right-panel-ratio";
+const NARROW_RIGHT_PANEL_MAX_RATIO = 0.42;
 const PANEL_ANIMATION_DURATION_MS = 500;
 
 type AppShellProps = {
+  collapsePanelsOnNarrow?: boolean;
   left: ReactNode;
   header: (panelControls: ShellPanelControls) => ReactNode;
   workspace: ReactNode;
@@ -44,7 +46,7 @@ type AppShellProps = {
   rightPanelOpenRequestKey?: number;
 };
 
-export function AppShell({ left, header, workspace, right, rightPanelOpenRequestKey }: AppShellProps) {
+export function AppShell({ collapsePanelsOnNarrow = false, left, header, workspace, right, rightPanelOpenRequestKey }: AppShellProps) {
   const [isLeftOpen, setLeftOpen] = useState(true);
   const [isRightOpen, setRightOpen] = useState(true);
   const [isLeftPreviewOpen, setLeftPreviewOpen] = useState(false);
@@ -75,7 +77,11 @@ export function AppShell({ left, header, workspace, right, rightPanelOpenRequest
   const contentRegionBodyRef = useRef<HTMLDivElement | null>(null);
   const leftPreviewExitTimerRef = useRef<number | null>(null);
   const hasRightPanel = right != null;
-  const rightPanelMaxWidth = getAvailableRightPanelWidth(contentRegionWidth, isRightFullscreen);
+  const rightPanelMaxWidth = getResponsiveRightPanelMaxWidth(
+    contentRegionWidth,
+    isRightFullscreen,
+    collapsePanelsOnNarrow,
+  );
   const resolvedRightPanelRatio =
     rightWidthRatio ?? widthToRightPanelWidthRatio(RIGHT_PANEL_DEFAULT_WIDTH, contentRegionWidth);
   const effectiveRightWidth =
@@ -83,7 +89,9 @@ export function AppShell({ left, header, workspace, right, rightPanelOpenRequest
       ? rightPanelWidthRatioToPixels(resolvedRightPanelRatio, contentRegionWidth)
       : rightWidth;
   const fullscreenRightWidth = getAvailableRightPanelWidth(contentRegionWidth, true);
-  const visibleRightWidth = isRightFullscreen ? fullscreenRightWidth : effectiveRightWidth;
+  const visibleRightWidth = isRightFullscreen
+    ? fullscreenRightWidth
+    : Math.min(effectiveRightWidth, rightPanelMaxWidth);
   const rightPanelAnimation = usePanelAnimation(isRightOpen);
   const renderedRightWidth = Math.max(0, Math.min(1, rightPanelAnimation.progress)) * visibleRightWidth;
 
@@ -129,6 +137,23 @@ export function AppShell({ left, header, workspace, right, rightPanelOpenRequest
       setRightOpen(true);
     }
   }, [hasRightPanel, rightPanelOpenRequestKey]);
+
+  useEffect(() => {
+    if (!collapsePanelsOnNarrow) return;
+    const narrowWindow = window.matchMedia("(max-width: 960px)");
+    const veryNarrowWindow = window.matchMedia("(max-width: 720px)");
+    const syncPanels = () => {
+      if (narrowWindow.matches) setLeftOpen(false);
+      if (veryNarrowWindow.matches) setRightOpen(false);
+    };
+    syncPanels();
+    narrowWindow.addEventListener("change", syncPanels);
+    veryNarrowWindow.addEventListener("change", syncPanels);
+    return () => {
+      narrowWindow.removeEventListener("change", syncPanels);
+      veryNarrowWindow.removeEventListener("change", syncPanels);
+    };
+  }, [collapsePanelsOnNarrow, hasRightPanel]);
 
   useEffect(() => {
     return () => {
@@ -522,8 +547,10 @@ export function ResizablePanel({
   return (
     <div
       className={`resizable-panel ${className}`}
+      aria-hidden={!isOpen}
       data-open={isOpen ? "true" : "false"}
       data-resizing={isResizing ? "true" : "false"}
+      inert={!isOpen}
       style={
         {
           opacity: progress,
@@ -925,6 +952,26 @@ function getAvailableRightPanelWidth(mainContentWidth: number, isFullWidth = fal
         isFullWidth ? mainContentWidth : mainContentWidth - RIGHT_PANEL_RESERVED_WIDTH,
       )
     : RIGHT_PANEL_DEFAULT_WIDTH;
+}
+
+function getResponsiveRightPanelMaxWidth(
+  mainContentWidth: number,
+  isFullWidth: boolean,
+  collapsePanelsOnNarrow: boolean,
+) {
+  const availableWidth = getAvailableRightPanelWidth(mainContentWidth, isFullWidth);
+  if (
+    isFullWidth ||
+    !collapsePanelsOnNarrow ||
+    mainContentWidth <= 0 ||
+    mainContentWidth > 960
+  ) {
+    return availableWidth;
+  }
+  return Math.max(
+    Math.min(RIGHT_PANEL_MIN_WIDTH, availableWidth),
+    Math.floor(mainContentWidth * NARROW_RIGHT_PANEL_MAX_RATIO),
+  );
 }
 
 function clamp01(value: number) {

@@ -1,6 +1,7 @@
+import * as Tabs from "@radix-ui/react-tabs";
 import { Braces, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import samplePagePreview from "../../../artifacts/app-208-real-read-task.png";
@@ -32,6 +33,9 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
   const defaultTab: FileTabId | null = state === "ready" ? artifactSet === "article" ? "markdown" : "json" : null;
   const [tabStateByRun, setTabStateByRun] = useState<Record<string, RunTabState>>({});
   const tabState = tabStateByRun[run.id] ?? initialRunTabState(defaultTab);
+  const addButtonRef = useRef<HTMLButtonElement | null>(null);
+  const panelContentRef = useRef<HTMLDivElement | null>(null);
+  const previousRequestKeyRef = useRef(requestKey);
   const availableTabIds = useMemo<ArtifactTabId[]>(() => {
     const result: ArtifactTabId[] = Object.entries(resultTabs).filter(([, selection]) => selection.runId === run.id).map(([tabId]) => tabId as ResultTabId);
     if (artifact != null) result.push("json", "markdown");
@@ -50,13 +54,40 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
     });
   }, [defaultTab, requestKey, run.id, selectedResult]);
 
-  function closeTab(tabId: ArtifactTabId) {
+  useEffect(() => {
+    const activeTab = Array.from(tabHost?.querySelectorAll<HTMLElement>("[data-artifact-tab-id]") ?? []).find((element) => element.dataset.artifactTabId === tabState.activeTabId);
+    activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tabHost, tabState.activeTabId, tabState.openTabIds.length]);
+
+  useEffect(() => {
+    if (previousRequestKeyRef.current === requestKey) return;
+    previousRequestKeyRef.current = requestKey;
+    const frame = window.requestAnimationFrame(() => panelContentRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestKey]);
+
+  function activateTab(tabId: ArtifactTabId) {
     setTabStateByRun((current) => {
       const currentRun = current[run.id] ?? initialRunTabState(defaultTab);
-      const index = currentRun.openTabIds.indexOf(tabId);
-      const nextTabs = currentRun.openTabIds.filter((id) => id !== tabId);
-      return { ...current, [run.id]: { openTabIds: nextTabs, activeTabId: currentRun.activeTabId === tabId ? nextTabs[Math.min(index, nextTabs.length - 1)] ?? null : currentRun.activeTabId } };
+      return { ...current, [run.id]: { ...currentRun, activeTabId: tabId } };
     });
+  }
+
+  function focusTab(tabId: ArtifactTabId | null) {
+    if (tabId == null) return;
+    window.requestAnimationFrame(() => {
+      Array.from(tabHost?.querySelectorAll<HTMLElement>("[data-artifact-tab-id]") ?? []).find((element) => element.dataset.artifactTabId === tabId)?.focus();
+    });
+  }
+
+  function closeTab(tabId: ArtifactTabId) {
+    const index = tabState.openTabIds.indexOf(tabId);
+    const nextTabs = tabState.openTabIds.filter((id) => id !== tabId);
+    const nextActiveTab = tabState.activeTabId === tabId ? nextTabs[Math.min(index, nextTabs.length - 1)] ?? null : tabState.activeTabId;
+    setTabStateByRun((current) => {
+      return { ...current, [run.id]: { openTabIds: nextTabs, activeTabId: nextActiveTab } };
+    });
+    focusTab(nextActiveTab);
   }
 
   function openTab(tabId: ArtifactTabId) {
@@ -65,22 +96,23 @@ export function PrototypeArtifactPanel({ requestKey, run, selectedResult, tabHos
       return { ...current, [run.id]: { openTabIds: currentRun.openTabIds.includes(tabId) ? currentRun.openTabIds : [...currentRun.openTabIds, tabId], activeTabId: tabId } };
     });
     setAddMenuOpen(false);
+    focusTab(tabId);
   }
 
   const closedTabIds = availableTabIds.filter((id) => !tabState.openTabIds.includes(id));
 
   return (
     <aside className="prototype-artifact-panel codex-scrollbar" aria-label="任务文件预览">
-      {tabHost == null ? null : createPortal(
-        <div className="panel-tab-strip prototype-artifact-tab-strip">
-          <div className="panel-tab-scroll"><div className="panel-tab-list" role="tablist" aria-label="任务文件预览">{tabState.openTabIds.map((tabId) => <div className={`prototype-closable-tab ${tabState.activeTabId === tabId ? "active" : ""}`} key={tabId}><button className="panel-tab-trigger" type="button" role="tab" aria-selected={tabState.activeTabId === tabId} onClick={() => setTabStateByRun((current) => ({ ...current, [run.id]: { ...tabState, activeTabId: tabId } }))}><span className="panel-tab-label">{tabLabel(tabId, resultTabs)}</span></button><button className="prototype-tab-close" type="button" aria-label={`关闭 ${tabLabel(tabId, resultTabs)}`} title="关闭" onClick={() => closeTab(tabId)}><X size={12} /></button></div>)}</div></div>
-          <div className="prototype-tab-add-wrap"><button className="prototype-tab-add" type="button" aria-label="打开文件" title="打开文件" disabled={closedTabIds.length === 0} onClick={() => setAddMenuOpen((open) => !open)}><Plus size={14} /></button>{addMenuOpen ? <div className="prototype-tab-add-menu">{closedTabIds.map((tabId) => <button type="button" key={tabId} onClick={() => openTab(tabId)}>{tabLabel(tabId, resultTabs)}</button>)}</div> : null}</div>
-        </div>,
-        tabHost,
-      )}
-      <div className="panel-tabs prototype-controlled-tabs">
-        <div className="panel-tab-content">{tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
-      </div>
+      <Tabs.Root className="panel-tabs prototype-controlled-tabs" value={tabState.activeTabId ?? ""} onValueChange={(value) => activateTab(value as ArtifactTabId)}>
+        {tabHost == null ? null : createPortal(
+          <div className="panel-tab-strip prototype-artifact-tab-strip">
+            <div className="panel-tab-scroll"><Tabs.List className="panel-tab-list" aria-label="任务文件预览">{tabState.openTabIds.map((tabId) => <div className={`prototype-closable-tab ${tabState.activeTabId === tabId ? "active" : ""}`} key={tabId}><Tabs.Trigger className="panel-tab-trigger" data-artifact-tab-id={tabId} title={tabLabel(tabId, resultTabs)} value={tabId}><span className="panel-tab-label">{tabLabel(tabId, resultTabs)}</span></Tabs.Trigger><button className="prototype-tab-close" type="button" aria-label={`关闭 ${tabLabel(tabId, resultTabs)}`} title="关闭" onClick={() => closeTab(tabId)}><X size={12} /></button></div>)}</Tabs.List></div>
+            <div className="prototype-tab-add-wrap" onKeyDown={(event) => { if (event.key === "Escape" && addMenuOpen) { event.preventDefault(); setAddMenuOpen(false); addButtonRef.current?.focus(); } }}><button ref={addButtonRef} className="prototype-tab-add" type="button" aria-label="打开文件" title="打开文件" disabled={closedTabIds.length === 0} onClick={() => setAddMenuOpen((open) => !open)}><Plus size={14} /></button>{addMenuOpen ? <div className="prototype-tab-add-menu">{closedTabIds.map((tabId) => <button type="button" key={tabId} onClick={() => openTab(tabId)}>{tabLabel(tabId, resultTabs)}</button>)}</div> : null}</div>
+          </div>,
+          tabHost,
+        )}
+        <div ref={panelContentRef} className="panel-tab-content" tabIndex={-1}>{tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
+      </Tabs.Root>
     </aside>
   );
 }
