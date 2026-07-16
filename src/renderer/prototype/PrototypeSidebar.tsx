@@ -230,8 +230,12 @@ function TaskTree({ grouping, sort, identities, selectedTaskId, taskList, onOpen
     const skillTasks = orderedTasks.filter((task) => task.site === site && task.skill === skill);
     return (
       <div className="prototype-task-tree-site task-skill-group" key={skillKey}>
-        <div className="prototype-task-tree-label"><SiteGlyph site={site} /><span><strong>{skill}</strong><small>{site}</small></span></div>
-        {skillTasks.map((task) => <TaskThreadRow key={task.id} primary={identities.find((identity) => identity.id === task.identityId)?.account ?? task.identity} selected={selectedTaskId === task.id} task={task} onOpenTask={onOpenTask} />)}
+        <div className="prototype-task-tree-label"><SiteGlyph site={site} /><strong>{skill}</strong></div>
+        {skillTasks.map((task) => {
+          const identity = identities.find((item) => item.id === task.identityId);
+          const primary = identity?.account ?? task.identity;
+          return <TaskThreadRow avatar={identity?.accountAvatar ?? primary.slice(0, 1)} key={task.id} primary={primary} selected={selectedTaskId === task.id} task={task} onOpenTask={onOpenTask} />;
+        })}
       </div>
     );
   });
@@ -265,10 +269,10 @@ function taskRecency(label: string) {
   return 0;
 }
 
-function TaskThreadRow({ primary, selected, task, onOpenTask }: { primary: string; selected: boolean; task: PrototypeTask; onOpenTask: (taskId: string) => void }) {
+function TaskThreadRow({ avatar, primary, selected, task, onOpenTask }: { avatar?: string; primary: string; selected: boolean; task: PrototypeTask; onOpenTask: (taskId: string) => void }) {
   const turnCount = task.runs?.length ?? 1;
   const latestInput = task.runs?.at(-1)?.input ?? task.title;
-  return <button className={`prototype-sidebar-row task-tree-leaf ${selected ? "selected" : ""}`} type="button" aria-label={`${primary}，${turnCount} 个回合，${task.stateLabel}`} title={latestInput} onClick={() => onOpenTask(task.id)}><span className={`prototype-status-dot ${task.state}`} aria-hidden="true" /><span><strong>{primary}</strong><small>{turnCount} 回合 · {latestInput}</small></span></button>;
+  return <button className={`prototype-sidebar-row task-tree-leaf ${selected ? "selected" : ""}`} type="button" aria-label={`${primary}，${turnCount} 个回合，${task.stateLabel}`} title={latestInput} onClick={() => onOpenTask(task.id)}>{avatar == null ? <span className={`prototype-status-dot ${task.state}`} aria-hidden="true" /> : <span className="prototype-account-mark prototype-thread-avatar" aria-hidden="true">{avatar}</span>}<span><strong>{primary}</strong></span></button>;
 }
 
 function SiteGlyph({ site }: { site: string }) {

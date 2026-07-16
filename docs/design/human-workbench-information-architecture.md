@@ -109,8 +109,9 @@ By Identity: Account Identity -> Site Skill Thread
 ```
 
 A Site Skill already carries its site ownership. The Site Skill projection does
-not add a redundant outer Site level; the skill heading shows its site identity
-inline for disambiguation.
+not add a redundant outer Site level; its heading uses only the site icon and
+skill name. Identity threads use an avatar plus account name without a secondary
+business-input line.
 
 Grouping and sorting are presentation preferences. They live in the task-list
 heading overflow menu instead of occupying persistent sidebar width; the same

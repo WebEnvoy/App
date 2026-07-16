@@ -181,11 +181,10 @@ input:focus-visible {
 .prototype-task-tree-label svg { color: var(--we-foreground-muted); }
 .prototype-task-tree-label > span:last-child { display: grid; min-width: 0; gap: 1px; }
 .prototype-task-tree-label > span:last-child small { color: var(--we-foreground-muted); font-size: 10px; font-weight: 500; }
-.prototype-task-tree-label.task-identity-group > span:last-child { display: grid; min-width: 0; gap: 1px; }
-.prototype-task-tree-label.task-identity-group small { color: var(--we-foreground-muted); font-size: 10px; font-weight: 500; }
 .prototype-task-tree-skill { display: grid; gap: 1px; }
 .prototype-task-tree-skill > span { padding: 3px 8px 3px 29px; color: var(--we-foreground-muted); font-size: 10px; font-weight: 700; }
 .prototype-sidebar-row.task-tree-leaf { padding-left: 24px; }
+.prototype-account-mark.prototype-thread-avatar { width: 18px; height: 18px; border-radius: 5px; font-size: 9px; }
 
 .prototype-page {
   width: min(100%, 1120px);
