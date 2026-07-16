@@ -68,9 +68,14 @@ export type Identity = {
   startPage?: string;
   tags?: string[];
   fingerprint?: string;
+  fingerprintSeed?: string;
+  platform?: "Windows" | "macOS" | "Linux";
   userAgent?: string;
   screen?: string;
-  loginState?: "logged-in" | "login-required" | "unknown";
+  hardwareConcurrency?: string;
+  gpuPreset?: string;
+  interactionPreset?: string;
+  loginState?: "logged-in" | "login-required" | "not-required" | "unknown";
   sessionState?: "idle" | "running" | "failed";
   controller?: string;
   currentPage?: string;
@@ -94,8 +99,17 @@ export type Skill = {
   inputLabel: string;
   inputPlaceholder: string;
   output: string;
+  requiresLogin: boolean;
   availability: "available" | "unavailable";
 };
+
+export function identityCanUseSkill(identity: Identity, skill: Skill) {
+  const loginReady = identity.loginState === "logged-in" || (!skill.requiresLogin && identity.loginState === "not-required");
+  return identity.site === skill.site
+    && (identity.state === "available" || identity.state === "running")
+    && identity.sessionState !== "failed"
+    && loginReady;
+}
 
 export const tasks: PrototypeTask[] = [
   {
@@ -300,6 +314,7 @@ export const skills: Skill[] = [
     inputLabel: "搜索关键词",
     inputPlaceholder: "例如：AI 工具",
     output: "笔记列表、内容详情、作者与互动数据",
+    requiresLogin: false,
     availability: "available",
   },
   {
@@ -311,6 +326,7 @@ export const skills: Skill[] = [
     inputLabel: "笔记标题",
     inputPlaceholder: "输入本次发布的标题",
     output: "提交状态与页面结果",
+    requiresLogin: true,
     availability: "available",
   },
   {
@@ -322,6 +338,7 @@ export const skills: Skill[] = [
     inputLabel: "文章链接",
     inputPlaceholder: "粘贴 mp.weixin.qq.com 文章链接",
     output: "可阅读文章、作者、发布时间与图片",
+    requiresLogin: false,
     availability: "available",
   },
   {
@@ -333,6 +350,7 @@ export const skills: Skill[] = [
     inputLabel: "视频链接",
     inputPlaceholder: "粘贴一个或多个公开视频链接",
     output: "视频文件、文件名、大小与保存位置",
+    requiresLogin: false,
     availability: "available",
   },
   {
@@ -344,6 +362,7 @@ export const skills: Skill[] = [
     inputLabel: "店铺链接",
     inputPlaceholder: "粘贴目标店铺首页链接",
     output: "结构化商品列表",
+    requiresLogin: false,
     availability: "available",
   },
   {
@@ -355,6 +374,7 @@ export const skills: Skill[] = [
     inputLabel: "职位关键词",
     inputPlaceholder: "暂不可用",
     output: "职位列表与详情",
+    requiresLogin: false,
     availability: "unavailable",
   },
 ];

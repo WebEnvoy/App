@@ -141,10 +141,20 @@ login state, provider and recent use. Each row leads with account name, site,
 availability and one primary action. Proxy, fingerprint, paths and raw provider
 facts stay in detail or diagnostics.
 
-Identity configuration leads with name, site, account label and provider.
-Proxy, region, language, timezone and fingerprint are environment settings.
-Only fields supported by the selected provider are shown. Recommended presets
-are preferred; advanced settings remain available without dominating creation.
+Identity configuration first asks whether the environment needs a maintained
+site login. A login-required identity asks for the target URL, opens that URL in
+the newly created isolated browser and derives account avatar, nickname,
+platform ID and login state only after user login and validation. A no-login
+identity asks only for a local name and is compatible only with skills that do
+not require login.
+
+Provider, platform, proxy, GeoIP, region, language, timezone, screen,
+hardware concurrency, GPU preset and fingerprint seed are browser-environment
+settings. Only fields supported by the selected provider are shown. Recommended
+presets are preferred; one-click randomization changes only a coherent device
+tuple and seed, never proxy, geography or login target. Advanced settings remain
+collapsed by default. Provider paths, internal ports, viewer/CDP endpoints and
+raw credentials are not product configuration fields.
 
 ### Library
 

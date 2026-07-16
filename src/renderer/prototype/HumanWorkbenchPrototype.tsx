@@ -20,6 +20,7 @@ import {
 import { PrototypeArtifactPanel } from "./PrototypeArtifactPanel";
 import {
   identities as initialIdentities,
+  identityCanUseSkill,
   skills,
   tasks,
   type AppView,
@@ -230,11 +231,13 @@ export function HumanWorkbenchPrototype() {
     setIdentityList((current) => [identity, ...current]);
     setSelectedIdentityId(identity.id);
     setBrowserMode("detail");
-    if (returnToTaskCreation) {
+    if (returnToTaskCreation && identity.loginState !== "login-required") {
       setReturnToTaskCreation(false);
       setPreferredIdentityId(identity.id);
       setWorkMode("create");
       setView("work");
+    } else if (returnToTaskCreation) {
+      setReturnToTaskCreation(false);
     }
   }
 
@@ -326,7 +329,7 @@ export function HumanWorkbenchPrototype() {
             <h2>{pageTitle}</h2>
             <div className="prototype-center-actions">
               {view === "work" ? <button className="prototype-button compact primary" type="button" onClick={() => createTask()}><Plus size={14} />创建任务</button> : null}
-              {view === "browser" ? <button className="prototype-button compact" type="button" onClick={() => { setIdentityCreationSite("小红书"); setReturnToTaskCreation(false); setBrowserMode("create"); }}><Plus size={14} />创建身份</button> : null}
+              {view === "browser" && browserMode !== "create" ? <button className="prototype-button compact" type="button" onClick={() => { setIdentityCreationSite("小红书"); setReturnToTaskCreation(false); setBrowserMode("create"); }}><Plus size={14} />创建身份</button> : null}
             </div>
           </div>
           <div className="topbar-right-slot prototype-right-topbar">
@@ -382,9 +385,9 @@ export function HumanWorkbenchPrototype() {
                 setCloakProviderInstalled(true);
                 setIdentityList((current) => current.map((identity) => identity.provider === "CloakBrowser" && identity.state === "repair" ? {
                   ...identity,
-                  state: identity.loginState === "logged-in" ? "available" : "login",
-                  stateLabel: identity.loginState === "logged-in" ? "可用" : "需要登录",
-                  detail: identity.loginState === "logged-in" ? "空闲 · Provider 刚刚完成验证" : "Provider 已验证 · 等待登录确认",
+                  state: identity.loginState === "logged-in" || identity.loginState === "not-required" ? "available" : "login",
+                  stateLabel: identity.loginState === "logged-in" || identity.loginState === "not-required" ? "可用" : "需要登录",
+                  detail: identity.loginState === "logged-in" || identity.loginState === "not-required" ? "空闲 · Provider 刚刚完成验证" : "Provider 已验证 · 等待登录确认",
                   sessionState: "idle",
                   controller: "空闲",
                   lastHealthyAt: "尚未启动",
@@ -402,7 +405,7 @@ export function HumanWorkbenchPrototype() {
                 setBrowserMode("detail");
               }}
               onUseSkill={() => {
-                const compatibleSkill = skills.find((skill) => skill.site === selectedIdentity.site && skill.availability === "available");
+                const compatibleSkill = skills.find((skill) => skill.availability === "available" && identityCanUseSkill(selectedIdentity, skill));
                 if (compatibleSkill != null) createTask(compatibleSkill.id, selectedIdentity.id);
               }}
             />

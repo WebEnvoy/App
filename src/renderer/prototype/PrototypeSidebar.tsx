@@ -97,7 +97,7 @@ export function PrototypeSidebar({
         {view === "browser" ? identities.map((identity) => (
           <button className={`prototype-sidebar-row ${selectedIdentityId === identity.id ? "selected" : ""}`} type="button" key={identity.id} onClick={() => onOpenIdentity(identity.id)}>
             <span className="prototype-account-mark">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
-            <span><strong>{identity.account}</strong><small>{identity.name} · {identity.stateLabel}</small></span>
+            <span><strong>{identity.account}</strong><small>{identity.loginState === "not-required" ? identity.site : identity.name} · {identity.stateLabel}</small></span>
           </button>
         )) : null}
         {view === "library" ? <button className={`prototype-sidebar-row site-row discovery-row ${librarySiteFilter === "全部" ? "selected" : ""}`} type="button" onClick={() => onOpenSite("全部")}><Search size={14} /><span><strong>发现全部</strong><small>所有站点与技能</small></span></button> : null}

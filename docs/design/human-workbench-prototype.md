@@ -39,18 +39,23 @@ Open `http://127.0.0.1:5174/prototype.html`.
 6. Account Identity: inspect independent login, environment, instance and
    controller facts, edit the identity, and manage its environment from one
    surface.
-7. Environment Dependencies: switch from Account Identities to the independent
+7. Identity creation: confirm the center toolbar does not repeat the current
+   create action; switch between login-required and no-login flows. The former
+   requires a target URL and offers `创建环境并去登录`; the latter requires only a
+   local name. Use one-click randomization, then expand Advanced Settings to
+   inspect the coherent device tuple without changing proxy or geography.
+8. Environment Dependencies: switch from Account Identities to the independent
    dependency tab, install CloakBrowser, wait for launch validation, and confirm
-   the Provider becomes available while identities without confirmed login stay
-   unavailable for task creation.
-8. Human takeover: open `读取收藏夹中的竞品笔记`, open the browser, take over,
+   the Provider becomes available while login-required identities without a
+   confirmed login stay unavailable for task creation.
+9. Human takeover: open `读取收藏夹中的竞品笔记`, open the browser, take over,
    choose `已完成，继续`, wait for validation and return to the resumed task.
-9. Library: filter by site and business tag, open a skill, and use `去使用`.
-10. Missing identity: use the Taobao skill, create a Taobao identity, and confirm
+10. Library: filter by site and business tag, open a skill, and use `去使用`.
+11. Missing identity: use the Taobao skill, create a Taobao identity, and confirm
    the prototype returns to the original task form with that identity selected.
-11. Authorization: change the global default in Settings, the skill default in
+12. Authorization: change the global default in Settings, the skill default in
    Library, and the task override in Work creation.
-12. Settings: click the avatar/name entry, then inspect Global Authorization,
+13. Settings: click the avatar/name entry, then inspect Global Authorization,
     Connections, and Diagnostics as separate pages.
 
 ## Deliberate Product Corrections
@@ -80,6 +85,12 @@ Open `http://127.0.0.1:5174/prototype.html`.
 - Account Identity keeps site-account facts, instance actions and environment
   management together. Provider installation and repair live in a sibling
   Environment Dependencies tab.
+- Account Identity creation separates login-required and no-login environments.
+  Login-required creation starts from a target URL and opens the isolated
+  browser; no-login creation uses a local name and is admitted only to skills
+  that do not require login. CloakBrowser-compatible device settings support a
+  coherent one-click random preset, while detailed fingerprint fields remain
+  collapsed by default.
 - Harbor/CloakBrowser profile and session research informs the independent
   login, environment, instance, controller and health facts. Raw paths,
   endpoints and full fingerprint fields remain folded into technical detail.

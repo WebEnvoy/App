@@ -17,6 +17,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import {
   authorizationPolicyLabels,
+  identityCanUseSkill,
   productRows,
   resultRows,
   skills,
@@ -298,7 +299,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
   const [identityId, setIdentityId] = useState(preferredIdentityId);
   const [taskPolicy, setTaskPolicy] = useState<AuthorizationPolicy>("inherit");
   useEffect(() => setBusinessInput(""), [selectedSkill.id]);
-  const compatibleIdentities = identities.filter((identity) => identity.site === selectedSkill.site && (identity.state === "available" || identity.state === "running") && identity.loginState === "logged-in" && identity.sessionState !== "failed");
+  const compatibleIdentities = identities.filter((identity) => identityCanUseSkill(identity, selectedSkill));
   const inheritedPolicy = skillPolicy === "inherit" ? globalPolicy : skillPolicy;
   const resolvedPolicy = taskPolicy === "inherit" ? inheritedPolicy : taskPolicy;
   useEffect(() => {
