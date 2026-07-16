@@ -1,21 +1,16 @@
 import {
-  BriefcaseBusiness,
   Check,
   CircleAlert,
   Dices,
   Download,
   Import,
-  Images,
   KeyRound,
   LoaderCircle,
   Monitor,
-  MessageCircle,
-  Music2,
   Pencil,
   Play,
   RefreshCw,
   ShieldCheck,
-  ShoppingBag,
   UserRoundPlus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -92,7 +87,6 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
       <IdentitySectionTabs active="identities" onModeChange={onModeChange} />
       <header className="prototype-page-heading identity-heading">
         <div className="identity-title-group">
-            <span className="identity-site-mark"><SiteGlyph site={identity.site} /></span>
             <span className="identity-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
             <div>
               <div className="prototype-eyebrow">{identity.site}</div>
@@ -102,15 +96,12 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
         </div>
         <div className="identity-heading-actions">
           <button className="prototype-button" type="button" onClick={() => onModeChange("edit")}><Pencil size={14} />编辑身份</button>
-          <span className={`prototype-state-chip ${loginReady ? identity.state : "login"}`}>{loginReady && !unavailable && !sessionFailed ? <Check size={13} /> : <CircleAlert size={13} />}{identity.stateLabel}</span>
         </div>
       </header>
 
       <section className="identity-status-line" aria-label="账号身份状态">
         <span className={loginReady ? "ready" : "needs-action"}>{loginReady ? <Check size={13} /> : <CircleAlert size={13} />}<strong>{loginLabel}</strong><small>{loginNote}</small></span>
-        <span className={unavailable ? "needs-action" : "ready"}><ShieldCheck size={13} /><strong>{unavailable ? "Provider 未安装" : "环境可用"}</strong><small>{identity.provider}</small></span>
-        <span className={sessionFailed ? "needs-action" : running ? "running" : "neutral"}><Monitor size={13} /><strong>{sessionFailed ? "实例启动失败" : running ? "实例运行中" : "实例空闲"}</strong><small>{identity.currentPage ?? "未打开"}</small></span>
-        <span className={identity.controller === "任务占用" ? "running" : "neutral"}><KeyRound size={13} /><strong>控制者</strong><small>{identity.controller ?? "空闲"}</small></span>
+        <span className={unavailable ? "needs-action" : "ready"}><ShieldCheck size={13} /><strong>{unavailable ? "Provider 未安装" : "环境可用"}</strong></span>
       </section>
 
       <section className="identity-instance-section">
@@ -127,18 +118,7 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
         </div>
       </section>
 
-      <div className="identity-management-grid">
-        <section className="prototype-section identity-facts-section">
-          <div className="prototype-section-title"><div><h2>{identity.loginState === "not-required" ? "浏览器身份" : "站点账号"}</h2><p>{identity.loginState === "not-required" ? "不预置站点登录状态" : "登录校验后从目标站点同步，只读展示"}</p></div></div>
-          <div className="site-account-profile"><span className="identity-avatar account-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span><div><strong>{identity.account}</strong><span>{identity.loginState === "not-required" ? "本地身份" : identity.platformId ?? "平台 ID 待登录后同步"}</span></div><span className={`prototype-state-chip ${loginReady ? "available" : "login"}`}>{loginReady ? <Check size={13} /> : <CircleAlert size={13} />}{loginLabel}</span></div>
-          <dl className="prototype-detail-list">
-            <div><dt>目标站点</dt><dd>{identity.site}</dd></div>
-            <div><dt>平台 ID</dt><dd>{identity.loginState === "not-required" ? "不适用" : identity.platformId ?? "待同步"}</dd></div>
-            <div><dt>本地名称</dt><dd>{identity.name}</dd></div>
-            <div><dt>标签</dt><dd>{(identity.tags ?? [identity.site, identity.account]).join(" · ")}</dd></div>
-          </dl>
-        </section>
-        <section className="prototype-section identity-facts-section">
+        <section className="prototype-section identity-environment-section">
           <div className="prototype-section-title"><div><h2>环境配置</h2><p>Provider、代理、地区与浏览器参数</p></div></div>
           <dl className="prototype-detail-list">
             <div><dt>Provider</dt><dd>{identity.provider}</dd></div>
@@ -148,7 +128,6 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
           </dl>
           <details className="identity-profile-details"><summary>浏览器配置详情</summary><dl className="prototype-detail-list"><div><dt>平台</dt><dd>{identity.platform ?? "跟随 Provider"}</dd></div><div><dt>指纹摘要</dt><dd>{identity.fingerprint ?? "Provider 默认指纹"}</dd></div><div><dt>User agent</dt><dd>{identity.userAgent ?? "跟随 Provider 稳定版本"}</dd></div><div><dt>屏幕</dt><dd>{identity.screen ?? "跟随本机显示器"}</dd></div><div><dt>硬件并发</dt><dd>{identity.hardwareConcurrency ?? "Provider 推荐"}</dd></div><div><dt>GPU</dt><dd>{identity.gpuPreset ?? "Provider 推荐"}</dd></div><div><dt>操作速度</dt><dd>{normalizeInteractionPreset(identity.interactionPreset)}</dd></div><div><dt>当前页面</dt><dd>{identity.currentPage ?? "未打开"}</dd></div><div><dt>最近正常</dt><dd>{identity.lastHealthyAt ?? "尚未验证"}</dd></div><div><dt>存储</dt><dd>本机持久环境 · 已隔离</dd></div></dl></details>
         </section>
-      </div>
     </div>
   );
 }
@@ -459,12 +438,4 @@ function gpuPresets(platform: NonNullable<Identity["platform"]>) {
 
 function proxyOptions(proxies: ProxyProfile[]) {
   return proxies.map((proxy) => <option value={proxy.name} key={proxy.id}>{proxy.name}{proxy.state === "可用" ? "" : `（${proxy.state}）`}</option>);
-}
-
-function SiteGlyph({ site }: { site: string }) {
-  if (site === "小红书") return <Images size={15} />;
-  if (site === "微信公众号") return <MessageCircle size={15} />;
-  if (site === "抖音") return <Music2 size={15} />;
-  if (site === "淘宝") return <ShoppingBag size={15} />;
-  return <BriefcaseBusiness size={15} />;
 }
