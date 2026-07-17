@@ -63,7 +63,7 @@ export function WorkSurface({
   skillPolicy?: ExecutionPolicy;
   task: PrototypeTask;
   tasks: PrototypeTask[];
-  threadExecutionModes: Record<string, ExecutionMode>;
+  threadExecutionModes: Record<string, Partial<ExecutionPolicy>>;
   onCreateIdentity: () => void;
   onCreateTask: (task: PrototypeTask) => void;
   onOpenPreview: (selection: PrototypePreviewSelection) => void;
@@ -226,15 +226,16 @@ function taskInputValidation(fields: TaskInputField[]): string | null {
   return null;
 }
 
-export function PrototypeTaskThreadComposer({ actionCategory, executionLocked, executionMode, executionSource, identityLabel, task, onExecutionModeChange, onSaveAsSkillVersion, onStop, onSubmit }: {
+export function PrototypeTaskThreadComposer({ actionCategories, actionCategory, executionLocked, executionModes, executionSources, identityLabel, task, onExecutionModeChange, onSaveAsSkillDefaults, onStop, onSubmit }: {
+  actionCategories: ActionCategory[];
   actionCategory: ActionCategory;
   executionLocked: boolean;
-  executionMode: ExecutionMode;
-  executionSource: string;
+  executionModes: ExecutionPolicy;
+  executionSources: Record<ActionCategory, string>;
   identityLabel: string;
   task: PrototypeTask;
-  onExecutionModeChange: (mode: ExecutionMode) => void;
-  onSaveAsSkillVersion: () => void;
+  onExecutionModeChange: (category: ActionCategory, mode: ExecutionMode) => void;
+  onSaveAsSkillDefaults: () => void;
   onStop: () => void;
   onSubmit: (input: string, quantity?: number, attachments?: string[], executionSource?: string) => void;
 }) {
@@ -246,6 +247,9 @@ export function PrototypeTaskThreadComposer({ actionCategory, executionLocked, e
   const rejectButtonRef = useRef<HTMLButtonElement | null>(null);
   const wasRunningRef = useRef(task.state === "running");
   const fields = taskInputFields(task, draft);
+  const executionMode = executionModes[actionCategory];
+  const executionSource = executionSources[actionCategory];
+  const hasThreadOverrides = actionCategories.some((category) => executionSources[category] === "当前线程");
   const quantity = Number(draft.quantity);
   const validationError = taskInputValidation(fields);
   const inputValid = validationError == null;
@@ -315,7 +319,7 @@ export function PrototypeTaskThreadComposer({ actionCategory, executionLocked, e
         {fields.map((field) => field.key == null ? <div className="prototype-composer-static" key={field.label}><span>{field.label}</span><strong>{field.value}</strong></div> : <label key={field.label}><span>{field.label}</span>{field.control === "textarea" ? <textarea data-webenvoy-composer="" rows={2} disabled={running || pendingDecision} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }} /> : <input data-webenvoy-composer={field.key === "primary" ? "" : undefined} type={field.control ?? "text"} min={field.control === "number" ? 1 : undefined} max={field.control === "number" ? 100 : undefined} disabled={running || pendingDecision} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} />}</label>)}
       </div>}
       <div className="composer-toolbar">
-        <div className="composer-inline-controls"><input ref={fileInputRef} className="prototype-composer-file-input" type="file" multiple onChange={(event) => setAttachments(Array.from(event.target.files ?? []).map((file) => file.name))} /><button className="composer-icon-button" type="button" aria-label="添加附件" title="添加附件" disabled={running || pendingDecision} onClick={() => fileInputRef.current?.click()}><Paperclip size={15} /></button><span className="prototype-composer-context" title={`${identityLabel} · ${task.skill}`}>{identityLabel} · {task.skill}</span>{executionLocked ? <span className="composer-execution-locked" title={executionSource}><CircleAlert size={14} /><span>{executionModeLabels[executionMode]} · {executionSource}</span></span> : <details className="composer-execution-menu"><summary title={`当前来源：${executionSource}`}>{actionCategory === "sensitive" && executionMode === "auto" ? <CircleAlert className="danger" size={14} /> : <ShieldCheck size={14} />}<span>{executionModeLabels[executionMode]} · {executionSource}</span><ChevronDown size={12} /></summary><div><strong>{actionCategoryLabels[actionCategory]}</strong><div className="execution-mode-options">{(["auto", "confirm", "block"] as ExecutionMode[]).map((mode) => <button aria-pressed={executionMode === mode} className={executionMode === mode ? "selected" : ""} type="button" key={mode} onClick={(event) => { onExecutionModeChange(mode); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{executionModeLabels[mode]}</button>)}</div>{actionCategory === "sensitive" && executionMode === "auto" ? <p className="execution-risk"><CircleAlert size={13} />敏感或不可逆动作将自动执行</p> : null}<small>修改仅用于当前线程后续回合</small>{executionSource === "当前线程" ? <button className="save-skill-policy" type="button" onClick={(event) => { onSaveAsSkillVersion(); event.currentTarget.closest("details")?.removeAttribute("open"); }}>另存为技能配置版本</button> : null}</div></details>}</div>
+        <div className="composer-inline-controls"><input ref={fileInputRef} className="prototype-composer-file-input" type="file" multiple onChange={(event) => setAttachments(Array.from(event.target.files ?? []).map((file) => file.name))} /><button className="composer-icon-button" type="button" aria-label="添加附件" title="添加附件" disabled={running || pendingDecision} onClick={() => fileInputRef.current?.click()}><Paperclip size={15} /></button><span className="prototype-composer-context" title={`${identityLabel} · ${task.skill}`}>{identityLabel} · {task.skill}</span>{executionLocked ? <span className="composer-execution-locked" title={executionSource}><CircleAlert size={14} /><span>{executionModeLabels[executionMode]} · {executionSource}</span></span> : <details className="composer-execution-menu"><summary title={`当前动作：${actionCategoryLabels[actionCategory]}；来源：${executionSource}`}>{actionCategory === "sensitive" && executionMode === "auto" ? <CircleAlert className="danger" size={14} /> : <ShieldCheck size={14} />}<span>{actionCategoryLabels[actionCategory]} · {executionModeLabels[executionMode]} · {executionSource}</span><ChevronDown size={12} /></summary><div><small>当前技能的线程执行设置</small>{actionCategories.map((category) => <div className="composer-execution-row" key={category}><span><strong>{actionCategoryLabels[category]}</strong><small>{executionSources[category]}</small></span><div className="execution-mode-options" role="group" aria-label={`${actionCategoryLabels[category]}执行方式`}>{(["auto", "confirm", "block"] as ExecutionMode[]).map((mode) => <button aria-pressed={executionModes[category] === mode} className={executionModes[category] === mode ? "selected" : ""} type="button" key={mode} onClick={() => onExecutionModeChange(category, mode)}>{executionModeLabels[mode]}</button>)}</div></div>)}{actionCategories.some((category) => category === "sensitive" && executionModes[category] === "auto") ? <p className="execution-risk"><CircleAlert size={13} />敏感或不可逆动作将自动执行</p> : null}<small>修改仅用于当前线程后续回合</small>{hasThreadOverrides ? <button className="save-skill-policy" type="button" onClick={(event) => { onSaveAsSkillDefaults(); event.currentTarget.closest("details")?.removeAttribute("open"); }}>保存为该技能的默认设置</button> : null}</div></details>}</div>
         <div className="composer-expanding-controls"><span className={`composer-validation ${canSubmit ? "ready" : "blocked"}`} aria-live="polite">{status}</span></div>
         <div className="composer-actions">{running ? <button className="composer-send composer-stop" type="button" aria-label="停止当前回合" title="停止当前回合" onClick={onStop}><Square size={13} /></button> : <button className="composer-send" type="submit" aria-label="提交任务回合" title={status} disabled={!canSubmit}><ArrowUp size={16} /></button>}</div>
       </div>
@@ -446,7 +450,7 @@ function WriteResult() {
   );
 }
 
-function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, tasks, threadExecutionModes, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: ExecutionPolicy; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy?: ExecutionPolicy; tasks: PrototypeTask[]; threadExecutionModes: Record<string, ExecutionMode>; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
+function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, tasks, threadExecutionModes, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: ExecutionPolicy; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy?: ExecutionPolicy; tasks: PrototypeTask[]; threadExecutionModes: Record<string, Partial<ExecutionPolicy>>; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
   const [businessInput, setBusinessInput] = useState("");
   const [identityId, setIdentityId] = useState(preferredIdentityId);
   const [pendingDecision, setPendingDecision] = useState(false);
@@ -457,9 +461,10 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
   const existingThread = tasks.find((task) => task.site === selectedSkill.site && task.skill === selectedSkill.name && task.identityId === identityId);
   const taskKind: PrototypeTask["kind"] = selectedSkill.id === "wechat-read" ? "article" : selectedSkill.tags.includes("内容发布") ? "write" : selectedSkill.tags.includes("内容下载") ? "download" : "collection";
   const actionCategory = actionCategoryForTask(taskKind);
-  const threadExecutionMode = existingThread == null ? undefined : threadExecutionModes[existingThread.id];
-  const executionMode = threadExecutionMode ?? skillPolicy?.[actionCategory] ?? globalPolicy[actionCategory];
-  const executionSource = threadExecutionMode != null ? "当前线程" : skillPolicy == null ? "全局默认" : "技能配置";
+  const actionDeclared = selectedSkill.actionCategories.includes(actionCategory);
+  const threadExecutionMode = existingThread == null ? undefined : threadExecutionModes[existingThread.id]?.[actionCategory];
+  const executionMode = actionDeclared ? threadExecutionMode ?? skillPolicy?.[actionCategory] ?? globalPolicy[actionCategory] : "block";
+  const executionSource = actionDeclared ? threadExecutionMode != null ? "当前线程" : skillPolicy == null ? "全局默认" : "我的技能默认" : "技能声明不匹配";
 
   useEffect(() => {
     setBusinessInput("");

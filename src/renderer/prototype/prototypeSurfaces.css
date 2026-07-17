@@ -31,9 +31,13 @@
 .composer-execution-locked > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer-execution-menu > summary .danger,
 .execution-risk { color: var(--we-status-error); }
-.composer-execution-menu > div { position: absolute; bottom: 36px; left: 0; z-index: 8; display: grid; width: 270px; gap: 9px; padding: 11px; border: 1px solid var(--we-border); border-radius: 10px; background: var(--we-surface-overlay); box-shadow: var(--we-shadow-popover); }
+.composer-execution-menu > div { position: absolute; bottom: 36px; left: 50%; z-index: 8; display: grid; width: min(300px, calc(100vw - 32px)); gap: 9px; padding: 11px; transform: translateX(-50%); border: 1px solid var(--we-border); border-radius: 10px; background: var(--we-surface-overlay); box-shadow: var(--we-shadow-popover); }
 .composer-execution-menu > div > strong { font-size: 11px; }
 .composer-execution-menu > div > small { color: var(--we-foreground-muted); font-size: 10px; }
+.composer-execution-row { display: grid; min-width: 0; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 8px; }
+.composer-execution-row > span { display: grid; min-width: 0; gap: 2px; }
+.composer-execution-row > span strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.composer-execution-row > span small { color: var(--we-foreground-muted); font-size: 9px; }
 .execution-mode-options { display: flex; gap: 4px; }
 .execution-mode-options button { min-width: 0; flex: 1 1 0; border: 1px solid var(--we-border); }
 .execution-mode-options button.selected { border-color: var(--we-focus-border); color: var(--we-foreground); background: var(--we-status-info-background); }
