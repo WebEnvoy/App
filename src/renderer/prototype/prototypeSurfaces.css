@@ -1,4 +1,24 @@
 .task-detail-page { container-type: inline-size; }
+.prototype-thread-composer { height: auto; min-height: 124px; }
+.prototype-composer-fields { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(88px, 0.34fr); gap: 8px; }
+.prototype-composer-fields.single { grid-template-columns: minmax(0, 1fr); }
+.prototype-composer-fields label,
+.prototype-composer-static { display: grid; min-width: 0; gap: 3px; }
+.prototype-composer-fields label > span,
+.prototype-composer-static > span { color: var(--we-foreground-muted); font-size: 10px; font-weight: 700; }
+.prototype-composer-fields input,
+.prototype-thread-composer .prototype-composer-fields textarea { width: 100%; height: 36px; min-height: 36px; padding: 7px 8px; resize: none; border: 1px solid var(--we-border); border-radius: 6px; outline: none; color: var(--we-foreground); background: var(--we-surface-primary); font-size: 12px; line-height: 1.4; }
+.prototype-thread-composer .prototype-composer-fields textarea { height: 42px; }
+.prototype-composer-fields input:focus,
+.prototype-thread-composer .prototype-composer-fields textarea:focus { border-color: var(--we-focus-border); }
+.prototype-composer-static strong { display: flex; min-height: 36px; align-items: center; padding: 7px 8px; border: 1px solid var(--we-border-subtle); border-radius: 6px; color: var(--we-foreground-muted); background: var(--we-surface-secondary); font-size: 11px; }
+.prototype-composer-file-input { display: none; }
+.prototype-composer-attachments { display: flex; min-width: 0; gap: 5px; overflow-x: auto; }
+.prototype-composer-attachment { display: flex; flex: 0 0 auto; max-width: 180px; align-items: center; gap: 3px; padding: 3px 4px 3px 7px; border: 1px solid var(--we-border); border-radius: 6px; color: var(--we-foreground-muted); background: var(--we-surface-secondary); font-size: 10px; }
+.prototype-composer-attachment > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prototype-composer-attachment > button { display: inline-grid; width: 16px; height: 16px; flex: 0 0 16px; place-items: center; padding: 0; border: 0; border-radius: 4px; color: inherit; background: transparent; }
+.prototype-composer-attachment > button:hover { color: var(--we-foreground); background: var(--we-list-hover-background); }
+.thread-workspace:has(.prototype-thread-composer) .main-content-frame { padding-bottom: 176px; }
 .prototype-task-thread-layout { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
 .prototype-task-thread-content { display: grid; min-width: 0; align-content: start; gap: 14px; }
 .prototype-task-thread-content > * { width: 100%; min-width: 0; max-width: 100%; }

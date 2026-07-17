@@ -1,4 +1,5 @@
 import {
+  ArrowUp,
   ArrowUpRight,
   Check,
   CheckCircle2,
@@ -10,11 +11,13 @@ import {
   FolderOpen,
   ListFilter,
   LoaderCircle,
+  Paperclip,
   Play,
   ShieldCheck,
   Square,
+  X,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
   authorizationPolicyLabels,
@@ -170,22 +173,87 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
 }
 
 function TaskInputCard({ task, run }: { task: PrototypeTask; run: PrototypeRun }) {
-  const fields = taskInputFields(task, run);
+  const fields = [...taskInputFields(task, { primary: run.input, quantity: run.artifactTotal?.toString() ?? "" }), ...(run.attachments?.length ? [{ label: "附件", value: run.attachments.join("、") }] : [])];
   return (
     <section className={`task-input-card ${task.kind}`} aria-label={`${task.skill}输入`}>
       <div className="task-input-kind"><span>{task.skill}</span></div>
-      <dl>{fields.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      <dl>{fields.map((field) => <div key={field.label}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}</dl>
     </section>
   );
 }
 
-function taskInputFields(task: PrototypeTask, run: PrototypeRun): Array<[string, string]> {
-  if (task.kind === "collection" && task.site === "淘宝") return [["时间范围", run.input], ["采集字段", "标题、价格、库存"]];
-  if (task.kind === "collection") return [["关键词", run.input], ["数量", `${run.artifactTotal ?? task.artifactTotal ?? 0} 条`]];
-  if (task.kind === "article") return [["文章", run.input], ["来源", targetUrl(task.site, task.kind)]];
-  if (task.kind === "download") return [["素材链接", run.input], ["保存方式", "下载到本机"]];
-  if (task.kind === "write") return [["草稿", run.input], ["提交方式", "仅填写，不发布"]];
-  return [["目标收藏夹", run.input], ["账号身份", task.identity]];
+type TaskInputDraft = { primary: string; quantity: string };
+type TaskInputField = { key?: keyof TaskInputDraft; label: string; value: string; placeholder?: string; control?: "text" | "url" | "number" | "textarea" };
+
+function taskInputFields(task: PrototypeTask, draft: TaskInputDraft): TaskInputField[] {
+  if (task.kind === "collection" && task.site === "淘宝") return [{ key: "primary", label: "时间范围", value: draft.primary, placeholder: "例如：今日或最近 7 天" }, { label: "采集字段", value: "标题、价格、库存" }];
+  if (task.kind === "collection") return [{ key: "primary", label: "关键词", value: draft.primary, placeholder: "例如：AI 工具" }, { key: "quantity", label: "数量", value: draft.quantity, placeholder: "1-100", control: "number" }];
+  if (task.kind === "article") return [{ key: "primary", label: "文章网址", value: draft.primary, placeholder: "https://mp.weixin.qq.com/...", control: "url" }];
+  if (task.kind === "download") return [{ key: "primary", label: "素材网址", value: draft.primary, placeholder: "每行一个公开视频网址", control: "textarea" }];
+  if (task.kind === "write") return [{ key: "primary", label: "草稿正文", value: draft.primary, placeholder: "输入要填写到页面的草稿正文", control: "textarea" }];
+  return [{ key: "primary", label: "目标收藏夹", value: draft.primary, placeholder: "输入收藏夹名称或网址" }];
+}
+
+function taskInputValidation(fields: TaskInputField[]): string | null {
+  const emptyField = fields.find((field) => field.key != null && field.value.trim() === "");
+  if (emptyField != null) return `请填写${emptyField.label}`;
+  const urlField = fields.find((field) => field.control === "url");
+  if (urlField != null) {
+    try {
+      const url = new URL(urlField.value);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return `请输入有效的${urlField.label}`;
+    } catch {
+      return `请输入有效的${urlField.label}`;
+    }
+  }
+  const numberField = fields.find((field) => field.control === "number");
+  if (numberField != null) {
+    const value = Number(numberField.value);
+    if (!Number.isInteger(value) || value < 1 || value > 100) return `${numberField.label}需为 1-100 的整数`;
+  }
+  return null;
+}
+
+export function PrototypeTaskThreadComposer({ task, onSubmit }: { task: PrototypeTask; onSubmit: (input: string, quantity?: number, attachments?: string[]) => void }) {
+  const [draft, setDraft] = useState<TaskInputDraft>({ primary: "", quantity: "" });
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fields = taskInputFields(task, draft);
+  const quantity = Number(draft.quantity);
+  const validationError = taskInputValidation(fields);
+  const inputValid = validationError == null;
+  const blocked = task.state === "waiting";
+  const canSubmit = inputValid && !blocked;
+  const status = blocked ? "账号需要登录，恢复后可提交" : inputValid ? attachments.length > 0 ? `输入已校验 · ${attachments.length} 个附件` : "输入已校验" : validationError;
+
+  useEffect(() => {
+    setDraft({ primary: "", quantity: "" });
+    setAttachments([]);
+  }, [task.id]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    onSubmit(draft.primary.trim(), task.kind === "collection" && task.site !== "淘宝" ? quantity : undefined, attachments);
+    setDraft({ primary: "", quantity: "" });
+    setAttachments([]);
+    if (fileInputRef.current != null) fileInputRef.current.value = "";
+  }
+
+  return (
+    <form className="thread-composer prototype-thread-composer" aria-label={`${task.skill}业务输入`} onSubmit={submit}>
+      <div className={`prototype-composer-fields ${fields.length === 1 ? "single" : ""}`}>
+        {fields.map((field) => field.key == null ? <div className="prototype-composer-static" key={field.label}><span>{field.label}</span><strong>{field.value}</strong></div> : <label key={field.label}><span>{field.label}</span>{field.control === "textarea" ? <textarea data-webenvoy-composer="" rows={2} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }} /> : <input data-webenvoy-composer={field.key === "primary" ? "" : undefined} type={field.control ?? "text"} min={field.control === "number" ? 1 : undefined} max={field.control === "number" ? 100 : undefined} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} />}</label>)}
+      </div>
+      {attachments.length > 0 ? <div className="prototype-composer-attachments">{attachments.map((name, index) => <div className="prototype-composer-attachment" key={`${name}-${index}`}><span>{name}</span><button type="button" aria-label={`移除附件 ${name}`} title="移除附件" onClick={() => setAttachments((current) => current.filter((_, attachmentIndex) => attachmentIndex !== index))}><X size={11} /></button></div>)}</div> : null}
+      <div className="composer-toolbar">
+        <div className="composer-inline-controls"><input ref={fileInputRef} className="prototype-composer-file-input" type="file" multiple onChange={(event) => setAttachments(Array.from(event.target.files ?? []).map((file) => file.name))} /><button className="composer-icon-button" type="button" aria-label="添加附件" title="添加附件" onClick={() => fileInputRef.current?.click()}><Paperclip size={15} /></button></div>
+        <div className="composer-expanding-controls" />
+        <div className="composer-actions"><button className="composer-send" type="submit" aria-label="提交任务回合" title={status} disabled={!canSubmit}><ArrowUp size={16} /></button></div>
+      </div>
+      <p className={`composer-submit-status ${canSubmit ? "ready" : "blocked"}`} aria-live="polite">{status}</p>
+    </form>
+  );
 }
 
 type TaskExecutionAction = { label: string; detail: string; state: "success" | "running" | "waiting" | "failed" };

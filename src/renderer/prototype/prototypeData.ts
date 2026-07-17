@@ -16,6 +16,7 @@ export type PrototypeRun = {
   stateLabel: string;
   summary: string;
   duration?: string;
+  attachments?: string[];
   artifactSet?: ArtifactSet;
   artifactState?: "ready" | "pending" | "none";
   artifactTotal?: number;
@@ -147,7 +148,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 13:18",
     summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
     kind: "article",
-    runs: [{ id: "run-01", label: "文章读取", input: "产品周报第 28 期文章链接", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", artifactSet: "article", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", artifactSet: "article", artifactState: "ready" }],
     artifactSet: "article",
     artifactState: "ready",
   },

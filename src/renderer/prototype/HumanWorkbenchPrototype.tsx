@@ -28,9 +28,10 @@ import {
   type Identity,
   type ProxyProfile,
   type PrototypePreviewSelection,
+  type PrototypeRun,
   type PrototypeTask,
 } from "./prototypeData";
-import { WorkSurface } from "./WorkSurface";
+import { PrototypeTaskThreadComposer, WorkSurface } from "./WorkSurface";
 
 type WorkMode = "detail" | "create";
 type BrowserMode = "detail" | "create" | "repair" | "edit" | "dependencies";
@@ -167,6 +168,34 @@ export function HumanWorkbenchPrototype() {
     setPreviewSelection(null);
     setWorkMode("detail");
     setView("work");
+  }
+
+  function submitTaskTurn(input: string, quantity?: number, attachments?: string[]) {
+    const runId = `run-${Date.now()}`;
+    const run: PrototypeRun = {
+      id: runId,
+      label: selectedTask.skill,
+      input,
+      state: "running",
+      stateLabel: "正在运行",
+      summary: `正在执行“${selectedTask.skill}”。`,
+      attachments,
+      artifactSet: selectedTask.artifactSet,
+      artifactState: "pending",
+      artifactTotal: quantity,
+    };
+    setTaskList((current) => current.map((task) => task.id === selectedTask.id ? {
+      ...task,
+      state: "running",
+      stateLabel: "正在运行",
+      updatedAt: "刚刚",
+      summary: `已提交“${input}”，结果会在当前线程持续更新。`,
+      runs: [...(task.runs ?? []), run],
+      artifactState: "pending",
+      artifactTotal: quantity ?? task.artifactTotal,
+    } : task));
+    setPreviewSelection(null);
+    window.setTimeout(() => document.querySelector(`[data-content-search-unit-key="${selectedTask.id}-${runId}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   function openPreview(selection: PrototypePreviewSelection) {
@@ -338,7 +367,7 @@ export function HumanWorkbenchPrototype() {
         </header>
       )}
       workspace={
-        <ThreadWorkspace>
+        <ThreadWorkspace composer={view === "work" && workMode === "detail" ? <PrototypeTaskThreadComposer task={selectedTask} onSubmit={submitTaskTurn} /> : undefined}>
           {view === "work" ? (
             <WorkSurface
               globalPolicy={globalPolicy}
