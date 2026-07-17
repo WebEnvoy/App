@@ -65,15 +65,6 @@ export function BrowserSurface({
   return <IdentityDetail identity={identity} onModeChange={onModeChange} onOpenInstance={onOpenInstance} onUseSkill={onUseSkill} />;
 }
 
-function IdentitySectionTabs({ active, onModeChange }: { active: "identities" | "dependencies"; onModeChange: (mode: BrowserMode) => void }) {
-  return (
-    <nav className="identity-section-tabs" aria-label="账号身份管理">
-      <button className={active === "identities" ? "selected" : ""} type="button" onClick={() => onModeChange("detail")}>账号身份</button>
-      <button className={active === "dependencies" ? "selected" : ""} type="button" onClick={() => onModeChange("dependencies")}>环境依赖</button>
-    </nav>
-  );
-}
-
 function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: { identity: Identity; onModeChange: (mode: BrowserMode) => void; onOpenInstance: (identityId: string) => void; onUseSkill: () => void }) {
   const unavailable = identity.state === "repair";
   const running = identity.sessionState === "running";
@@ -84,7 +75,6 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
   const loginNote = identity.loginState === "logged-in" ? "14:31 确认" : identity.loginState === "not-required" ? "可直接使用" : identity.loginState === "login-required" ? "等待登录确认" : unavailable ? "待 Provider 恢复后确认" : "等待登录确认";
   return (
     <div className="prototype-page identity-detail-page">
-      <IdentitySectionTabs active="identities" onModeChange={onModeChange} />
       <header className="prototype-page-heading identity-heading">
         <div className="identity-title-group">
             <span className="identity-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
@@ -119,7 +109,7 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
       </section>
 
         <section className="prototype-section identity-environment-section">
-          <div className="prototype-section-title"><div><h2>环境配置</h2><p>Provider、代理、地区与浏览器参数</p></div></div>
+          <div className="prototype-section-title"><div><h2>环境配置</h2><p>Provider、代理、地区与浏览器参数</p></div><button className="inline-link" type="button" onClick={() => onModeChange("dependencies")}>检查环境依赖</button></div>
           <dl className="prototype-detail-list">
             <div><dt>Provider</dt><dd>{identity.provider}</dd></div>
             <div><dt>地区与语言</dt><dd>{identity.region ?? "跟随 IP"} · {identity.language ?? "跟随 IP"} · {identity.timezone ?? "跟随 IP"}</dd></div>
@@ -209,8 +199,7 @@ function EnvironmentDependencies({ cloakProviderInstalled, identities, onModeCha
   const [lastChecked, setLastChecked] = useState<"cloak" | "chrome" | null>(null);
   return (
     <div className="prototype-page environment-dependencies-page">
-      <IdentitySectionTabs active="dependencies" onModeChange={onModeChange} />
-      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>环境依赖</h1><p>集中检测、安装、更新和修复本机浏览器 Provider。</p></div></header>
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">本机环境</div><h1>环境依赖</h1><p>集中检测、安装、更新和修复本机浏览器 Provider。</p></div></header>
       <div className="provider-dependency-list">
         <section className={`provider-dependency-row ${cloakNeedsRepair ? "needs-action" : ""}`}><span className="provider-dependency-icon"><ShieldCheck size={20} /></span><div><h2>CloakBrowser</h2><p>{cloakNeedsRepair ? "未安装" : "版本 126.4 · 启动验证通过"} · {cloakDependents} 个账号身份使用</p><small>{lastChecked === "cloak" ? "刚刚完成检测" : "首次使用时从 CloakBrowser 官方渠道下载，不随 App 分发"}</small></div><span className={`prototype-state-chip ${cloakNeedsRepair ? "repair" : "available"}`}>{cloakNeedsRepair ? <CircleAlert size={13} /> : <Check size={13} />}{cloakNeedsRepair ? "需要安装" : "可用"}</span><button className={`prototype-button ${cloakNeedsRepair ? "primary" : ""}`} type="button" onClick={() => cloakNeedsRepair ? onModeChange("repair") : setLastChecked("cloak")}>{cloakNeedsRepair ? <Download size={14} /> : <RefreshCw size={14} />}{cloakNeedsRepair ? "从官方渠道安装" : lastChecked === "cloak" ? "检测完成" : "重新检测"}</button></section>
         <section className="provider-dependency-row"><span className="provider-dependency-icon"><Monitor size={20} /></span><div><h2>官方 Chrome</h2><p>版本 126.0.6478.127 · 启动验证通过</p><small>{lastChecked === "chrome" ? "刚刚完成检测" : "/Applications/Google Chrome.app"}</small></div><span className="prototype-state-chip available"><Check size={13} />可用</span><button className="prototype-button" type="button" onClick={() => setLastChecked("chrome")}><RefreshCw size={14} />{lastChecked === "chrome" ? "检测完成" : "重新检测"}</button></section>
@@ -328,7 +317,7 @@ function ProfileEnvironmentFields({ profile, proxy, proxies, region, language, t
   return (
     <fieldset className="profile-environment-fieldset">
       <legend>浏览器环境</legend>
-      <button className="prototype-button compact profile-randomize-button" type="button" onClick={onRandomize}><Dices size={14} />一键随机</button>
+      <div className="profile-environment-actions"><button className="prototype-button compact" type="button" onClick={onRandomize}><Dices size={14} />一键随机</button></div>
       <div className="inline-form-grid">
         <label>平台<select value={profile.platform} onChange={(event) => onProfileChange(profilePresets.find((preset) => preset.platform === event.target.value) ?? profilePresets[0])}><option>Windows</option><option>macOS</option><option>Linux</option></select></label>
         <div className="profile-proxy-field"><label>代理<select value={proxy} onChange={(event) => onProxyChange(event.target.value)}>{proxyOptions(proxies)}<option>不使用代理</option></select></label><button className="inline-link field-link" type="button" onClick={onManageProxies}>新增或管理代理</button></div>

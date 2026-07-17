@@ -44,6 +44,14 @@ input:focus-visible {
 }
 
 .prototype-center-actions { display: flex; min-width: 0; margin-left: auto; }
+.identity-copy-menu { position: relative; }
+.identity-copy-menu > summary { list-style: none; cursor: pointer; }
+.identity-copy-menu > summary::-webkit-details-marker { display: none; }
+.identity-copy-menu > div { position: absolute; top: 31px; right: 0; z-index: 20; display: grid; width: 224px; padding: 5px; border: 1px solid var(--we-border); border-radius: 7px; background: var(--we-surface-primary); box-shadow: 0 10px 28px rgb(15 23 42 / 0.18); }
+.identity-copy-menu > div > button { display: grid; gap: 2px; padding: 8px; border-radius: 5px; color: var(--we-foreground); background: transparent; text-align: left; }
+.identity-copy-menu > div > button:hover { background: var(--we-list-hover-background); }
+.identity-copy-menu > div strong { font-size: 11px; }
+.identity-copy-menu > div small { color: var(--we-foreground-muted); font-size: 10px; font-weight: 500; }
 .prototype-right-topbar { gap: 0; justify-content: flex-start; overflow: visible; padding-left: 0; border-left: 1px solid var(--we-border); }
 .prototype-right-tab-host { min-width: 0; height: 100%; flex: 1 1 auto; }
 .prototype-right-tab-host .panel-tab-strip { position: static; height: 100%; padding-left: 8px; }
@@ -184,6 +192,16 @@ input:focus-visible {
 .prototype-sidebar-row.site-row {
   grid-template-columns: 22px minmax(0, 1fr);
 }
+
+.prototype-sidebar-row.identity-sidebar-row { grid-template-columns: 22px minmax(0, 1fr) 16px; }
+.identity-row-status { display: grid; width: 16px; height: 16px; place-items: center; color: var(--we-foreground-muted); }
+.identity-row-status.available { color: var(--we-status-success); }
+.identity-row-status.running { color: var(--we-status-info); }
+.identity-row-status.warning { color: var(--we-status-warning); }
+.identity-row-status.error { color: var(--we-status-error); }
+.identity-row-status.running svg { animation: identity-status-spin 1.4s linear infinite; }
+
+@keyframes identity-status-spin { to { transform: rotate(360deg); } }
 
 .prototype-task-tree-site { display: grid; gap: 2px; margin-bottom: 8px; }
 .prototype-task-tree-label { display: flex; align-items: center; gap: 7px; padding: 7px 8px 4px; color: var(--we-foreground); font-size: 12px; }

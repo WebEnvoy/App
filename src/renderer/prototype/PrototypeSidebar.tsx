@@ -1,11 +1,14 @@
 import {
   BriefcaseBusiness,
   Check,
+  CircleAlert,
+  CircleCheck,
   CircleUserRound,
   Ellipsis,
   Images,
   Languages,
   Library,
+  LoaderCircle,
   MessageCircle,
   Music2,
   Network,
@@ -28,6 +31,7 @@ import {
 
 export type TaskGrouping = "skill" | "identity";
 export type TaskSort = "priority" | "recent";
+type IdentitySort = "recent" | "site";
 
 type SettingsSection = "general" | "authorization" | "proxies" | "diagnostics";
 
@@ -74,6 +78,9 @@ export function PrototypeSidebar({
   onTaskGroupingChange,
   onTaskSortChange,
 }: PrototypeSidebarProps) {
+  const [identitySort, setIdentitySort] = useState<IdentitySort>("recent");
+  const orderedIdentities = sortIdentities(identities, taskList, identitySort);
+
   return (
     <aside className="sidebar prototype-sidebar" aria-label="WebEnvoy navigation">
       <nav className="global-nav" aria-label="全局导航">
@@ -86,18 +93,21 @@ export function PrototypeSidebar({
         <SidebarHeading
           taskGrouping={taskGrouping}
           taskSort={taskSort}
+          identitySort={identitySort}
           view={view}
           onCreate={onCreate}
           onCreateSkill={onCreateSkill}
           onSearchSkills={onSearchSkills}
           onTaskGroupingChange={onTaskGroupingChange}
           onTaskSortChange={onTaskSortChange}
+          onIdentitySortChange={setIdentitySort}
         />
         {view === "work" ? <TaskTree grouping={taskGrouping} sort={taskSort} identities={identities} selectedTaskId={selectedTaskId} taskList={taskList} onOpenTask={onOpenTask} /> : null}
-        {view === "browser" ? identities.map((identity) => (
-          <button className={`prototype-sidebar-row ${selectedIdentityId === identity.id ? "selected" : ""}`} type="button" key={identity.id} onClick={() => onOpenIdentity(identity.id)}>
+        {view === "browser" ? orderedIdentities.map((identity) => (
+          <button className={`prototype-sidebar-row identity-sidebar-row ${selectedIdentityId === identity.id ? "selected" : ""}`} type="button" aria-label={`${identity.account}，${identity.site}，${identity.stateLabel}`} key={identity.id} onClick={() => onOpenIdentity(identity.id)}>
             <span className="prototype-account-mark">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
-            <span><strong>{identity.account}</strong><small>{identity.loginState === "not-required" ? identity.site : identity.name} · {identity.stateLabel}</small></span>
+            <span><strong>{identity.account}</strong><small>{identity.loginState === "not-required" ? identity.site : identity.name}</small></span>
+            <IdentityStatusIcon identity={identity} />
           </button>
         )) : null}
         {view === "library" ? ["小红书", "微信公众号", "抖音", "淘宝", "BOSS 直聘"].map((site) => (
@@ -127,7 +137,7 @@ export function PrototypeSidebar({
   );
 }
 
-function SidebarHeading({ taskGrouping, taskSort, view, onCreate, onCreateSkill, onSearchSkills, onTaskGroupingChange, onTaskSortChange }: Pick<PrototypeSidebarProps, "taskGrouping" | "taskSort" | "view" | "onCreate" | "onCreateSkill" | "onSearchSkills" | "onTaskGroupingChange" | "onTaskSortChange">) {
+function SidebarHeading({ identitySort, taskGrouping, taskSort, view, onCreate, onCreateSkill, onIdentitySortChange, onSearchSkills, onTaskGroupingChange, onTaskSortChange }: Pick<PrototypeSidebarProps, "taskGrouping" | "taskSort" | "view" | "onCreate" | "onCreateSkill" | "onSearchSkills" | "onTaskGroupingChange" | "onTaskSortChange"> & { identitySort: IdentitySort; onIdentitySortChange: (sort: IdentitySort) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuHostRef = useRef<HTMLSpanElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -178,11 +188,33 @@ function SidebarHeading({ taskGrouping, taskSort, view, onCreate, onCreateSkill,
     );
   }
 
+  if (view === "browser") {
+    return (
+      <div className="section-heading task-list-heading">
+        <span>账号身份</span>
+        <span className="section-heading-actions task-list-heading-actions" ref={menuHostRef} onKeyDown={navigateMenu}>
+          <button ref={menuButtonRef} type="button" aria-label="整理账号身份" title="整理" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Ellipsis size={15} /></button>
+          <button type="button" aria-label="新建账号身份" title="新建" onClick={onCreate}><Plus size={15} /></button>
+          {menuOpen ? <IdentityListMenu sort={identitySort} onSortChange={(sort) => { onIdentitySortChange(sort); closeMenu(); }} /> : null}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="section-heading">
-      <span>{view === "browser" ? "账号身份" : view === "library" ? "站点技能" : "设置"}</span>
+      <span>{view === "library" ? "站点技能" : "设置"}</span>
       {view === "library" ? <span className="section-heading-actions"><button type="button" aria-label="搜索全部站点技能" title="搜索" onClick={onSearchSkills}><Search size={14} /></button><button type="button" aria-label="新增站点技能" title="新增" onClick={onCreateSkill}><Plus size={14} /></button></span> : null}
-      {view === "browser" ? <button type="button" aria-label="新建" title="新建" onClick={onCreate}><Plus size={15} /></button> : null}
+    </div>
+  );
+}
+
+function IdentityListMenu({ sort, onSortChange }: { sort: IdentitySort; onSortChange: (sort: IdentitySort) => void }) {
+  return (
+    <div className="task-list-menu" role="menu" aria-label="账号身份排序方式">
+      <span className="task-list-menu-label">排序方式</span>
+      <MenuChoice checked={sort === "recent"} label="最近使用" onClick={() => onSortChange("recent")} />
+      <MenuChoice checked={sort === "site"} label="站点名称" onClick={() => onSortChange("site")} />
     </div>
   );
 }
@@ -266,6 +298,31 @@ function taskRecency(label: string) {
   const today = label.match(/^今天 (\d{2}):(\d{2})$/);
   if (today != null) return 10_000 + Number(today[1]) * 60 + Number(today[2]);
   return 0;
+}
+
+function sortIdentities(identities: Identity[], taskList: PrototypeTask[], sort: IdentitySort) {
+  const latestUse = new Map(identities.map((identity) => [identity.id, Math.max(0, ...taskList.filter((task) => task.identityId === identity.id).map((task) => taskRecency(task.updatedAt)))]));
+  return identities.map((identity, index) => ({ identity, index })).sort((left, right) => {
+    if (sort === "site") {
+      const siteDifference = left.identity.site.localeCompare(right.identity.site, "zh-CN");
+      if (siteDifference !== 0) return siteDifference;
+    } else {
+      const recencyDifference = (latestUse.get(right.identity.id) ?? 0) - (latestUse.get(left.identity.id) ?? 0);
+      if (recencyDifference !== 0) return recencyDifference;
+    }
+    return left.index - right.index;
+  }).map(({ identity }) => identity);
+}
+
+function IdentityStatusIcon({ identity }: { identity: Identity }) {
+  const status = identity.state === "repair" || identity.sessionState === "failed"
+    ? { className: "error", label: "需要修复", icon: <CircleAlert size={14} /> }
+    : identity.loginState === "login-required" || identity.loginState === "unknown"
+      ? { className: "warning", label: "需要登录", icon: <CircleAlert size={14} /> }
+      : identity.state === "running" || identity.sessionState === "running"
+        ? { className: "running", label: "运行中", icon: <LoaderCircle size={14} /> }
+        : { className: "available", label: "可用", icon: <CircleCheck size={14} /> };
+  return <span className={`identity-row-status ${status.className}`} role="img" aria-label={status.label} title={status.label}>{status.icon}</span>;
 }
 
 function TaskThreadRow({ avatar, primary, selected, task, onOpenTask }: { avatar?: string; primary: string; selected: boolean; task: PrototypeTask; onOpenTask: (taskId: string) => void }) {

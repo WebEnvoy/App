@@ -1,9 +1,10 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
   CircleUserRound,
+  Copy,
   Library,
-  Plus,
   Settings,
   SquarePen,
 } from "lucide-react";
@@ -299,6 +300,33 @@ export function HumanWorkbenchPrototype() {
     }
   }
 
+  function duplicateIdentity(includeAccountProfile: boolean) {
+    const source = selectedIdentity;
+    const loginNotRequired = source.loginState === "not-required" || !includeAccountProfile;
+    const providerUnavailable = source.provider === "CloakBrowser" && !cloakProviderInstalled;
+    const duplicate: Identity = {
+      ...source,
+      id: `identity-${Date.now()}`,
+      name: includeAccountProfile ? `${source.name} 副本` : `${source.site} 环境副本`,
+      account: includeAccountProfile ? source.account : `${source.site} 环境副本`,
+      accountAvatar: includeAccountProfile ? source.accountAvatar : source.site.slice(0, 1),
+      platformId: includeAccountProfile ? source.platformId : undefined,
+      tags: includeAccountProfile ? source.tags : [source.site],
+      fingerprintSeed: undefined,
+      fingerprint: "待首次启动生成",
+      loginState: loginNotRequired ? "not-required" : "login-required",
+      sessionState: providerUnavailable ? "failed" : "idle",
+      state: providerUnavailable ? "repair" : loginNotRequired ? "available" : "login",
+      stateLabel: providerUnavailable ? "需要修复" : loginNotRequired ? "可用" : "需要登录",
+      controller: "空闲",
+      currentPage: undefined,
+      lastHealthyAt: "尚未启动",
+      detail: providerUnavailable ? "环境已复制 · CloakBrowser 未安装" : includeAccountProfile ? "环境已复制 · 需要重新登录" : "环境配置已复制 · 未包含账号资料",
+    };
+    setIdentityList((current) => [duplicate, ...current]);
+    setSelectedIdentityId(duplicate.id);
+  }
+
   function goBack() {
     if (view === "work" && workMode === "create") setWorkMode("detail");
     else if (view === "browser" && browserMode !== "detail") setBrowserMode("detail");
@@ -387,7 +415,15 @@ export function HumanWorkbenchPrototype() {
             </span>
             <h2>{pageTitle}</h2>
             <div className="prototype-center-actions">
-              {view === "browser" && browserMode !== "create" ? <button className="prototype-button compact" type="button" onClick={() => { setIdentityCreationSite("小红书"); setReturnToTaskCreation(false); setBrowserMode("create"); }}><Plus size={14} />创建身份</button> : null}
+              {view === "browser" && browserMode === "detail" ? (
+                <details className="identity-copy-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
+                  <summary className="prototype-button compact" role="button"><Copy size={14} />创建副本<ChevronDown size={12} /></summary>
+                  <div role="menu" aria-label="创建账号身份副本">
+                    <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(false); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>仅复制环境配置</strong><small>不包含账号资料和登录状态</small></button>
+                    <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>复制账号资料与环境</strong><small>保留公开资料，但需要重新登录</small></button>
+                  </div>
+                </details>
+              ) : null}
             </div>
           </div>
           <div className="topbar-right-slot prototype-right-topbar">
