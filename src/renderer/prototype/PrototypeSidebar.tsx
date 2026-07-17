@@ -108,7 +108,7 @@ export function PrototypeSidebar({
         )) : null}
         {view === "settings" ? [
           { section: "general" as const, label: "通用", icon: <Languages size={14} /> },
-          { section: "authorization" as const, label: "全局授权", icon: <ShieldCheck size={14} /> },
+          { section: "authorization" as const, label: "执行方式", icon: <ShieldCheck size={14} /> },
           { section: "proxies" as const, label: "代理", icon: <Network size={14} /> },
           { section: "diagnostics" as const, label: "诊断", icon: <Stethoscope size={14} /> },
         ].map((item) => (

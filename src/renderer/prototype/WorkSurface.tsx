@@ -20,12 +20,16 @@ import {
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
-  authorizationPolicyLabels,
+  actionCategoryForTask,
+  actionCategoryLabels,
+  executionModeLabels,
   identityCanUseSkill,
   productRows,
   resultRows,
   skills,
-  type AuthorizationPolicy,
+  type ActionCategory,
+  type ExecutionMode,
+  type ExecutionPolicy,
   type Identity,
   type PrototypeRun,
   type PrototypePreviewSelection,
@@ -41,6 +45,8 @@ export function WorkSurface({
   selectedSkill,
   skillPolicy,
   task,
+  tasks,
+  threadExecutionModes,
   onCreateIdentity,
   onCreateTask,
   onOpenPreview,
@@ -49,13 +55,15 @@ export function WorkSurface({
   onTakeoverCompleted,
   onSelectSkill,
 }: {
-  globalPolicy: Exclude<AuthorizationPolicy, "inherit">;
+  globalPolicy: ExecutionPolicy;
   identities: Identity[];
   mode: "detail" | "create";
   preferredIdentityId: string;
   selectedSkill: Skill;
-  skillPolicy: AuthorizationPolicy;
+  skillPolicy?: ExecutionPolicy;
   task: PrototypeTask;
+  tasks: PrototypeTask[];
+  threadExecutionModes: Record<string, ExecutionMode>;
   onCreateIdentity: () => void;
   onCreateTask: (task: PrototypeTask) => void;
   onOpenPreview: (selection: PrototypePreviewSelection) => void;
@@ -72,6 +80,8 @@ export function WorkSurface({
         preferredIdentityId={preferredIdentityId}
         selectedSkill={selectedSkill}
         skillPolicy={skillPolicy}
+        tasks={tasks}
+        threadExecutionModes={threadExecutionModes}
         onCreateIdentity={onCreateIdentity}
         onCreateTask={onCreateTask}
         onOpenLibrary={onOpenLibrary}
@@ -129,7 +139,7 @@ function TaskDetail({
             {runs.map((run, index) => <TaskTurn key={`${task.id}-${run.id}`} run={run} task={task} latest={index === runs.length - 1} taskResumed={taskResumed} takeoverStep={takeoverStep} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} onTakeoverStepChange={setTakeoverStep} />)}
           </div>
 
-          <section className={`task-source-strip ${task.authorization != null ? "with-authorization" : ""}`} data-content-search-unit-key={`${task.id}-sources`}><div><span>账号身份</span><strong>{identityLabel}</strong></div><div><span>站点技能</span><strong>{task.skill}</strong></div><div><span>创建来源</span><strong>{task.source}</strong></div><div><span>更新时间</span><strong>{task.updatedAt}</strong></div>{task.authorization != null ? <div><span>任务授权</span><strong>{task.authorization}</strong></div> : null}</section>
+          <section className="task-source-strip" data-content-search-unit-key={`${task.id}-sources`}><div><span>账号身份</span><strong>{identityLabel}</strong></div><div><span>站点技能</span><strong>{task.skill}</strong></div><div><span>创建来源</span><strong>{task.source}</strong></div><div><span>更新时间</span><strong>{task.updatedAt}</strong></div></section>
 
           <section className="prototype-disclosure" data-content-search-unit-key={`${task.id}-diagnostics`}><button type="button" onClick={() => setDiagnosticsOpen((open) => !open)}><ChevronDown size={15} className={diagnosticsOpen ? "rotated" : ""} />运行详情与诊断<span>仅在排查问题时查看</span></button>{diagnosticsOpen ? <div className="diagnostic-detail"><p><strong>最近阶段</strong> 页面读取与结果标准化</p><p><strong>来源摘要</strong> 目标页面在 {task.updatedAt} 完成确认</p><p><strong>内部记录</strong> 已保留，可从诊断导出；默认不占用业务结果区域。</p></div> : null}</section>
         </div>
@@ -148,10 +158,12 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
   const previewTab = run.artifactSet === "article" ? "markdown" : run.artifactSet === "download-files" ? "media" : "json";
   const executionState = run.state === "running" ? "running" : run.state === "waiting" ? "waiting" : "complete";
   const executionLabel = executionState === "running" ? "正在执行" : executionState === "waiting" ? "等待处理" : "已处理";
+  const hasResult = run.artifactState !== "none";
 
   return (
     <article className="task-turn-detail" data-content-search-unit-key={`${task.id}-${run.id}`}>
       <TaskInputCard task={task} run={run} />
+      <div className="task-turn-execution-record"><ShieldCheck size={13} /><span>{run.executionMode != null && run.executionSource != null ? `${actionCategoryLabels[actionCategoryForTask(task.kind)]} · ${task.site} · ${executionModeLabels[run.executionMode]} · ${run.executionSource}` : `${actionCategoryLabels[actionCategoryForTask(task.kind)]} · ${task.site} · 历史回合未记录执行方式`}</span></div>
       <section className="task-progress-block" aria-label={`${run.label}执行记录`}>
         <details className="task-execution-disclosure">
           <summary><span className={`task-execution-status ${executionState}`}><ChevronDown size={14} /><strong>{executionLabel}</strong><small>{executionState === "complete" ? run.duration ?? "耗时未知" : executionState === "running" ? `${actions.length} 个动作` : "需要人工处理"}</small></span></summary>
@@ -162,10 +174,10 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
       <section className="task-summary-block" aria-label={`${run.label}${progressSummary ? "进度" : "结果"}`}>
         <header><div className={`task-summary-heading ${run.state}`}><span className="task-summary-state-icon" aria-hidden="true">{run.state === "success" || run.state === "not-submitted" ? <CheckCircle2 size={17} /> : run.state === "running" ? <LoaderCircle size={17} /> : <CircleAlert size={17} />}</span><h2>{summaryCopy}</h2></div>{run.artifactState !== "none" ? <button className="task-preview-button" type="button" aria-label={`在右侧打开${run.label}结果`} title="在右侧打开结果" onClick={() => onOpenPreview({ kind: "file", runId: run.id, tab: previewTab })}><ArrowUpRight size={15} /></button> : null}</header>
         {newlyCreated ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "16%" }} /></div><span>准备中</span></div> : null}
-        {!newlyCreated && task.kind === "collection" ? <CollectionResult run={run} task={task} onOpenPreview={onOpenPreview} /> : null}
-        {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
-        {!newlyCreated && task.kind === "download" ? <DownloadResult /> : null}
-        {!newlyCreated && task.kind === "write" ? <WriteResult /> : null}
+        {!newlyCreated && hasResult && task.kind === "collection" ? <CollectionResult run={run} task={task} onOpenPreview={onOpenPreview} /> : null}
+        {!newlyCreated && hasResult && task.kind === "article" ? <ArticleResult /> : null}
+        {!newlyCreated && hasResult && task.kind === "download" ? <DownloadResult /> : null}
+        {!newlyCreated && hasResult && task.kind === "write" ? <WriteResult /> : null}
         {resumed ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "22%" }} /></div><span>已读取 3 / 18</span></div> : null}
       </section>
     </article>
@@ -214,44 +226,99 @@ function taskInputValidation(fields: TaskInputField[]): string | null {
   return null;
 }
 
-export function PrototypeTaskThreadComposer({ task, onSubmit }: { task: PrototypeTask; onSubmit: (input: string, quantity?: number, attachments?: string[]) => void }) {
+export function PrototypeTaskThreadComposer({ actionCategory, executionLocked, executionMode, executionSource, identityLabel, task, onExecutionModeChange, onSaveAsSkillVersion, onStop, onSubmit }: {
+  actionCategory: ActionCategory;
+  executionLocked: boolean;
+  executionMode: ExecutionMode;
+  executionSource: string;
+  identityLabel: string;
+  task: PrototypeTask;
+  onExecutionModeChange: (mode: ExecutionMode) => void;
+  onSaveAsSkillVersion: () => void;
+  onStop: () => void;
+  onSubmit: (input: string, quantity?: number, attachments?: string[], executionSource?: string) => void;
+}) {
   const [draft, setDraft] = useState<TaskInputDraft>({ primary: "", quantity: "" });
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [pendingDecision, setPendingDecision] = useState(false);
+  const [decisionStatus, setDecisionStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const rejectButtonRef = useRef<HTMLButtonElement | null>(null);
+  const wasRunningRef = useRef(task.state === "running");
   const fields = taskInputFields(task, draft);
   const quantity = Number(draft.quantity);
   const validationError = taskInputValidation(fields);
   const inputValid = validationError == null;
-  const blocked = task.state === "waiting";
-  const canSubmit = inputValid && !blocked;
-  const status = blocked ? "账号需要登录，恢复后可提交" : inputValid ? attachments.length > 0 ? `输入已校验 · ${attachments.length} 个附件` : "输入已校验" : validationError;
+  const running = task.state === "running";
+  const blocked = task.state === "waiting" || executionMode === "block";
+  const canSubmit = inputValid && !blocked && !running && !pendingDecision;
+  const status = executionLocked ? "技能声明不匹配，已停止执行" : task.state === "waiting" ? "账号需要登录，恢复后可提交" : executionMode === "block" ? "当前业务动作已设为禁止" : running ? "当前回合正在执行" : decisionStatus || (inputValid ? "输入已校验" : validationError);
 
   useEffect(() => {
     setDraft({ primary: "", quantity: "" });
     setAttachments([]);
+    setPendingDecision(false);
+    setDecisionStatus("");
   }, [task.id]);
+
+  useEffect(() => {
+    setPendingDecision(false);
+    setDecisionStatus("");
+  }, [actionCategory, executionMode, identityLabel, task.site]);
+
+  useEffect(() => {
+    if (pendingDecision) rejectButtonRef.current?.focus();
+  }, [pendingDecision]);
+
+  useEffect(() => {
+    if (wasRunningRef.current && !running) window.setTimeout(focusPrimaryInput, 0);
+    wasRunningRef.current = running;
+  }, [running]);
+
+  useEffect(() => {
+    if (!pendingDecision) return;
+    const timer = window.setTimeout(() => {
+      setPendingDecision(false);
+      setDecisionStatus("确认已超时，输入仍保留");
+      window.setTimeout(focusPrimaryInput, 0);
+    }, 60_000);
+    return () => window.clearTimeout(timer);
+  }, [pendingDecision]);
+
+  function focusPrimaryInput() {
+    document.querySelector<HTMLElement>("[data-webenvoy-composer]")?.focus();
+  }
+
+  function commit(executionRecordSource = executionSource) {
+    onSubmit(draft.primary.trim(), task.kind === "collection" && task.site !== "淘宝" ? quantity : undefined, attachments, executionRecordSource);
+    setDraft({ primary: "", quantity: "" });
+    setAttachments([]);
+    setPendingDecision(false);
+    setDecisionStatus("");
+    if (fileInputRef.current != null) fileInputRef.current.value = "";
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) return;
-    onSubmit(draft.primary.trim(), task.kind === "collection" && task.site !== "淘宝" ? quantity : undefined, attachments);
-    setDraft({ primary: "", quantity: "" });
-    setAttachments([]);
-    if (fileInputRef.current != null) fileInputRef.current.value = "";
+    if (executionMode === "confirm") {
+      setPendingDecision(true);
+      return;
+    }
+    commit();
   }
 
   return (
     <form className="thread-composer prototype-thread-composer" aria-label={`${task.skill}业务输入`} onSubmit={submit}>
-      <div className={`prototype-composer-fields ${fields.length === 1 ? "single" : ""}`}>
-        {fields.map((field) => field.key == null ? <div className="prototype-composer-static" key={field.label}><span>{field.label}</span><strong>{field.value}</strong></div> : <label key={field.label}><span>{field.label}</span>{field.control === "textarea" ? <textarea data-webenvoy-composer="" rows={2} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }} /> : <input data-webenvoy-composer={field.key === "primary" ? "" : undefined} type={field.control ?? "text"} min={field.control === "number" ? 1 : undefined} max={field.control === "number" ? 100 : undefined} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} />}</label>)}
-      </div>
-      {attachments.length > 0 ? <div className="prototype-composer-attachments">{attachments.map((name, index) => <div className="prototype-composer-attachment" key={`${name}-${index}`}><span>{name}</span><button type="button" aria-label={`移除附件 ${name}`} title="移除附件" onClick={() => setAttachments((current) => current.filter((_, attachmentIndex) => attachmentIndex !== index))}><X size={11} /></button></div>)}</div> : null}
+      {attachments.length > 0 ? <div className="prototype-composer-attachments">{attachments.map((name, index) => <div className="prototype-composer-attachment" key={`${name}-${index}`}><span>{name}</span><button type="button" aria-label={`移除附件 ${name}`} title="移除附件" disabled={running || pendingDecision} onClick={() => setAttachments((current) => current.filter((_, attachmentIndex) => attachmentIndex !== index))}><X size={11} /></button></div>)}</div> : null}
+      {pendingDecision ? <section className="composer-action-confirmation" aria-label="确认当前动作"><div><CircleAlert size={16} /><span><strong>{actionCategoryLabels[actionCategory]}</strong><small>{identityLabel} · {task.site} · {draft.primary}{attachments.length > 0 ? ` · ${attachments.length} 个附件` : ""}</small></span></div><div><button ref={rejectButtonRef} type="button" onClick={() => { setPendingDecision(false); setDecisionStatus("已拒绝这一次，输入仍保留"); window.setTimeout(focusPrimaryInput, 0); }}>拒绝这一次</button><button className="primary" type="button" onClick={() => commit("当前动作决定")}>允许这一次</button></div></section> : <div className={`prototype-composer-fields ${fields.length === 1 ? "single" : ""}`}>
+        {fields.map((field) => field.key == null ? <div className="prototype-composer-static" key={field.label}><span>{field.label}</span><strong>{field.value}</strong></div> : <label key={field.label}><span>{field.label}</span>{field.control === "textarea" ? <textarea data-webenvoy-composer="" rows={2} disabled={running || pendingDecision} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) event.currentTarget.form?.requestSubmit(); }} /> : <input data-webenvoy-composer={field.key === "primary" ? "" : undefined} type={field.control ?? "text"} min={field.control === "number" ? 1 : undefined} max={field.control === "number" ? 100 : undefined} disabled={running || pendingDecision} value={field.value} placeholder={field.placeholder} onChange={(event) => setDraft((current) => ({ ...current, [field.key!]: event.target.value }))} />}</label>)}
+      </div>}
       <div className="composer-toolbar">
-        <div className="composer-inline-controls"><input ref={fileInputRef} className="prototype-composer-file-input" type="file" multiple onChange={(event) => setAttachments(Array.from(event.target.files ?? []).map((file) => file.name))} /><button className="composer-icon-button" type="button" aria-label="添加附件" title="添加附件" onClick={() => fileInputRef.current?.click()}><Paperclip size={15} /></button></div>
-        <div className="composer-expanding-controls" />
-        <div className="composer-actions"><button className="composer-send" type="submit" aria-label="提交任务回合" title={status} disabled={!canSubmit}><ArrowUp size={16} /></button></div>
+        <div className="composer-inline-controls"><input ref={fileInputRef} className="prototype-composer-file-input" type="file" multiple onChange={(event) => setAttachments(Array.from(event.target.files ?? []).map((file) => file.name))} /><button className="composer-icon-button" type="button" aria-label="添加附件" title="添加附件" disabled={running || pendingDecision} onClick={() => fileInputRef.current?.click()}><Paperclip size={15} /></button><span className="prototype-composer-context" title={`${identityLabel} · ${task.skill}`}>{identityLabel} · {task.skill}</span>{executionLocked ? <span className="composer-execution-locked" title={executionSource}><CircleAlert size={14} /><span>{executionModeLabels[executionMode]} · {executionSource}</span></span> : <details className="composer-execution-menu"><summary title={`当前来源：${executionSource}`}>{actionCategory === "sensitive" && executionMode === "auto" ? <CircleAlert className="danger" size={14} /> : <ShieldCheck size={14} />}<span>{executionModeLabels[executionMode]} · {executionSource}</span><ChevronDown size={12} /></summary><div><strong>{actionCategoryLabels[actionCategory]}</strong><div className="execution-mode-options">{(["auto", "confirm", "block"] as ExecutionMode[]).map((mode) => <button aria-pressed={executionMode === mode} className={executionMode === mode ? "selected" : ""} type="button" key={mode} onClick={(event) => { onExecutionModeChange(mode); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{executionModeLabels[mode]}</button>)}</div>{actionCategory === "sensitive" && executionMode === "auto" ? <p className="execution-risk"><CircleAlert size={13} />敏感或不可逆动作将自动执行</p> : null}<small>修改仅用于当前线程后续回合</small>{executionSource === "当前线程" ? <button className="save-skill-policy" type="button" onClick={(event) => { onSaveAsSkillVersion(); event.currentTarget.closest("details")?.removeAttribute("open"); }}>另存为技能配置版本</button> : null}</div></details>}</div>
+        <div className="composer-expanding-controls"><span className={`composer-validation ${canSubmit ? "ready" : "blocked"}`} aria-live="polite">{status}</span></div>
+        <div className="composer-actions">{running ? <button className="composer-send composer-stop" type="button" aria-label="停止当前回合" title="停止当前回合" onClick={onStop}><Square size={13} /></button> : <button className="composer-send" type="submit" aria-label="提交任务回合" title={status} disabled={!canSubmit}><ArrowUp size={16} /></button>}</div>
       </div>
-      <p className={`composer-submit-status ${canSubmit ? "ready" : "blocked"}`} aria-live="polite">{status}</p>
     </form>
   );
 }
@@ -374,47 +441,84 @@ function WriteResult() {
     <section className="prototype-section write-result">
       <div className="write-state"><Square size={16} /><div><strong>未提交</strong><span>页面内容已填写并通过校验，没有点击发布。</span></div></div>
       <div className="write-preview"><div><span>目标账号</span><strong>小红书运营号 A</strong></div><div><span>标题</span><strong>三个让我每天省下两小时的 AI 工具</strong></div><div><span>正文</span><p>最近把日常资料整理、内容归档和选题研究重新做了一遍……</p></div><div><span>话题</span><strong>#AI工具　#效率提升　#内容创作　#工作流</strong></div></div>
-      <div className="write-actions"><button className="prototype-button" type="button">返回编辑</button><button className="prototype-button primary" type="button"><ShieldCheck size={14} />按当前策略继续</button></div>
+      <div className="write-actions"><button className="prototype-button" type="button">返回编辑</button><button className="prototype-button primary" type="button"><Play size={14} />继续处理</button></div>
     </section>
   );
 }
 
-function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: Exclude<AuthorizationPolicy, "inherit">; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy: AuthorizationPolicy; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
+function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, tasks, threadExecutionModes, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: ExecutionPolicy; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy?: ExecutionPolicy; tasks: PrototypeTask[]; threadExecutionModes: Record<string, ExecutionMode>; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
   const [businessInput, setBusinessInput] = useState("");
   const [identityId, setIdentityId] = useState(preferredIdentityId);
-  const [taskPolicy, setTaskPolicy] = useState<AuthorizationPolicy>("inherit");
-  useEffect(() => setBusinessInput(""), [selectedSkill.id]);
+  const [pendingDecision, setPendingDecision] = useState(false);
+  const [decisionStatus, setDecisionStatus] = useState("");
+  const rejectButtonRef = useRef<HTMLButtonElement | null>(null);
   const compatibleIdentities = identities.filter((identity) => identityCanUseSkill(identity, selectedSkill));
-  const inheritedPolicy = skillPolicy === "inherit" ? globalPolicy : skillPolicy;
-  const resolvedPolicy = taskPolicy === "inherit" ? inheritedPolicy : taskPolicy;
+  const selectedIdentity = compatibleIdentities.find((identity) => identity.id === identityId);
+  const existingThread = tasks.find((task) => task.site === selectedSkill.site && task.skill === selectedSkill.name && task.identityId === identityId);
+  const taskKind: PrototypeTask["kind"] = selectedSkill.id === "wechat-read" ? "article" : selectedSkill.tags.includes("内容发布") ? "write" : selectedSkill.tags.includes("内容下载") ? "download" : "collection";
+  const actionCategory = actionCategoryForTask(taskKind);
+  const threadExecutionMode = existingThread == null ? undefined : threadExecutionModes[existingThread.id];
+  const executionMode = threadExecutionMode ?? skillPolicy?.[actionCategory] ?? globalPolicy[actionCategory];
+  const executionSource = threadExecutionMode != null ? "当前线程" : skillPolicy == null ? "全局默认" : "技能配置";
+
+  useEffect(() => {
+    setBusinessInput("");
+    setPendingDecision(false);
+    setDecisionStatus("");
+  }, [selectedSkill.id]);
+
   useEffect(() => {
     const preferredIsCompatible = compatibleIdentities.some((identity) => identity.id === preferredIdentityId);
     setIdentityId(preferredIsCompatible ? preferredIdentityId : compatibleIdentities[0]?.id ?? "");
   }, [preferredIdentityId, selectedSkill.id]);
 
-  function submitTask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const identity = compatibleIdentities.find((item) => item.id === identityId);
-    if (identity == null) return;
-    const kind = selectedSkill.id === "wechat-read" ? "article" : selectedSkill.tags.includes("内容发布") ? "write" : selectedSkill.tags.includes("内容下载") ? "download" : "collection";
+  useEffect(() => {
+    setPendingDecision(false);
+    setDecisionStatus("");
+  }, [executionMode, identityId]);
+
+  useEffect(() => {
+    if (pendingDecision) rejectButtonRef.current?.focus();
+  }, [pendingDecision]);
+
+  useEffect(() => {
+    if (!pendingDecision) return;
+    const timer = window.setTimeout(() => {
+      setPendingDecision(false);
+      setDecisionStatus("确认已超时，输入仍保留");
+    }, 60_000);
+    return () => window.clearTimeout(timer);
+  }, [pendingDecision]);
+
+  function createTask(executionRecordSource = executionSource) {
+    if (selectedIdentity == null) return;
     onCreateTask({
       id: `task-${Date.now()}`,
       title: `${selectedSkill.name} · ${businessInput}`,
       skill: selectedSkill.name,
       site: selectedSkill.site,
-      identity: identity.account,
-      identityId: identity.id,
+      identity: selectedIdentity.account,
+      identityId: selectedIdentity.id,
       source: "App",
       state: "running",
       stateLabel: "正在运行",
       updatedAt: "刚刚",
       summary: `已使用“${businessInput}”创建任务，结果会在此页面持续更新。`,
-      kind,
-      authorization: authorizationPolicyLabels[resolvedPolicy],
-      runs: [{ id: "run-01", label: "本回合", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${identity.account}”执行“${selectedSkill.name}”。`, artifactSet: kind === "article" ? "article" : kind === "download" ? "download-files" : kind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending" }],
-      artifactSet: kind === "article" ? "article" : kind === "download" ? "download-files" : kind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes",
+      kind: taskKind,
+      runs: [{ id: "run-01", label: "本回合", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${selectedIdentity.account}”执行“${selectedSkill.name}”。`, artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending", executionMode, executionSource: executionRecordSource }],
+      artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes",
       artifactState: "pending",
     });
+  }
+
+  function submitTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedIdentity == null || executionMode === "block") return;
+    if (executionMode === "confirm") {
+      setPendingDecision(true);
+      return;
+    }
+    createTask();
   }
 
   return (
@@ -422,10 +526,10 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">任务</div><h1>创建任务</h1><p>任务输入由站点技能定义，不使用开放式指令。</p></div></header>
       <div className="create-task-layout">
         <form className="prototype-form" onSubmit={submitTask}>
-          <fieldset><legend>1. 选择站点技能</legend><label>站点技能<select value={selectedSkill.id} onChange={(event) => onSelectSkill(event.target.value)}>{skills.filter((skill) => skill.availability === "available").map((skill) => <option key={skill.id} value={skill.id}>{skill.site} · {skill.name}</option>)}</select></label><button className="inline-link" type="button" onClick={onOpenLibrary}>浏览全部站点技能</button></fieldset>
-          <fieldset><legend>2. 选择账号身份</legend>{compatibleIdentities.length > 0 ? <label>账号身份<select value={identityId} onChange={(event) => setIdentityId(event.target.value)}>{compatibleIdentities.map((identity) => <option key={identity.id} value={identity.id}>{identity.account} · {identity.platformId ?? identity.name} · {identity.stateLabel}</option>)}</select></label> : <div className="empty-inline"><CircleAlert size={16} /><span>没有兼容的账号身份</span><button type="button" onClick={onCreateIdentity}>创建账号身份</button></div>}</fieldset>
-          <fieldset><legend>3. 填写业务输入</legend><label>{selectedSkill.inputLabel}<input required value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} /></label>{selectedSkill.id === "xhs-search" ? <div className="inline-form-grid"><label>结果数量<select defaultValue="20"><option>20</option><option>50</option><option>100</option></select></label><label>排序<select defaultValue="综合"><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}</fieldset>
-          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><label>本任务授权<select value={taskPolicy} onChange={(event) => setTaskPolicy(event.target.value as AuthorizationPolicy)}><option value="inherit">继承技能设置（{authorizationPolicyLabels[inheritedPolicy]}）</option><option value="full">完全访问</option><option value="ask">写入批准</option><option value="read">只读</option><option value="strict">每一步都要批准</option></select></label><p className="muted-copy">只影响这个任务；需要单次确认的动作会在执行时询问。</p><button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0}><Play size={14} />创建并运行</button></fieldset>
+          <fieldset><legend>1. 选择站点技能</legend><label>站点技能<select disabled={pendingDecision} value={selectedSkill.id} onChange={(event) => onSelectSkill(event.target.value)}>{skills.filter((skill) => skill.availability === "available").map((skill) => <option key={skill.id} value={skill.id}>{skill.site} · {skill.name}</option>)}</select></label><button className="inline-link" type="button" disabled={pendingDecision} onClick={onOpenLibrary}>浏览全部站点技能</button></fieldset>
+          <fieldset><legend>2. 选择账号身份</legend>{compatibleIdentities.length > 0 ? <label>账号身份<select disabled={pendingDecision} value={identityId} onChange={(event) => setIdentityId(event.target.value)}>{compatibleIdentities.map((identity) => <option key={identity.id} value={identity.id}>{identity.account} · {identity.platformId ?? identity.name} · {identity.stateLabel}</option>)}</select></label> : <div className="empty-inline"><CircleAlert size={16} /><span>没有兼容的账号身份</span><button type="button" disabled={pendingDecision} onClick={onCreateIdentity}>创建账号身份</button></div>}</fieldset>
+          <fieldset><legend>3. 填写业务输入</legend><label>{selectedSkill.inputLabel}<input required disabled={pendingDecision} value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} /></label>{selectedSkill.id === "xhs-search" ? <div className="inline-form-grid"><label>结果数量<select defaultValue="20" disabled={pendingDecision}><option>20</option><option>50</option><option>100</option></select></label><label>排序<select defaultValue="综合" disabled={pendingDecision}><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}</fieldset>
+          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><div className="task-review-row"><span>{actionCategoryLabels[actionCategory]}</span><strong>{executionModeLabels[executionMode]} · {executionSource}</strong></div>{executionMode === "block" ? <p className="muted-copy action-stopped"><CircleAlert size={14} />当前业务动作已设为禁止，任务不会开始。</p> : null}{decisionStatus !== "" ? <p className="muted-copy">{decisionStatus}</p> : null}{pendingDecision ? <section className="composer-action-confirmation create-action-confirmation" aria-label="确认当前动作"><div><CircleAlert size={16} /><span><strong>{actionCategoryLabels[actionCategory]}</strong><small>{selectedIdentity?.account} · {selectedSkill.site} · {businessInput}</small></span></div><div><button ref={rejectButtonRef} type="button" onClick={() => { setPendingDecision(false); setDecisionStatus("已拒绝这一次，业务输入仍保留"); }}>拒绝这一次</button><button className="primary" type="button" onClick={() => createTask("当前动作决定")}>允许这一次</button></div></section> : <button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0 || executionMode === "block"}><Play size={14} />创建并运行</button>}</fieldset>
         </form>
         <aside className="create-task-summary"><div className="skill-mark"><Download size={18} /></div><h2>{selectedSkill.name}</h2><p>{selectedSkill.description}</p><dl><div><dt>站点</dt><dd>{selectedSkill.site}</dd></div><div><dt>业务输入</dt><dd>{selectedSkill.inputLabel}</dd></div><div><dt>结果</dt><dd>{selectedSkill.output}</dd></div></dl></aside>
       </div>

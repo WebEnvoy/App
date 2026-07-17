@@ -19,12 +19,16 @@ import {
 } from "./PrototypeSidebar";
 import { PrototypeArtifactPanel } from "./PrototypeArtifactPanel";
 import {
+  actionCategoryForTask,
+  defaultExecutionPolicy,
   identities as initialIdentities,
   identityCanUseSkill,
+  recommendedExecutionPolicy,
   skills,
   tasks,
   type AppView,
-  type AuthorizationPolicy,
+  type ExecutionMode,
+  type ExecutionPolicy,
   type Identity,
   type ProxyProfile,
   type PrototypePreviewSelection,
@@ -64,8 +68,9 @@ export function HumanWorkbenchPrototype() {
   const [returnToTaskCreation, setReturnToTaskCreation] = useState(false);
   const [preferredIdentityId, setPreferredIdentityId] = useState("");
   const [cloakProviderInstalled, setCloakProviderInstalled] = useState(false);
-  const [globalPolicy, setGlobalPolicy] = useState<Exclude<AuthorizationPolicy, "inherit">>("ask");
-  const [skillPolicies, setSkillPolicies] = useState<Record<string, AuthorizationPolicy>>({});
+  const [globalPolicy, setGlobalPolicy] = useState<ExecutionPolicy>({ ...defaultExecutionPolicy });
+  const [skillPolicies, setSkillPolicies] = useState<Record<string, ExecutionPolicy>>(() => Object.fromEntries(skills.filter((skill) => skill.availability === "available").map((skill) => [skill.id, recommendedExecutionPolicy(skill)])));
+  const [threadExecutionModes, setThreadExecutionModes] = useState<Record<string, ExecutionMode>>({});
   const [previewSelection, setPreviewSelection] = useState<PrototypePreviewSelection | null>(null);
   const [resultPreviewRequestKey, setResultPreviewRequestKey] = useState(0);
   const [artifactTabHost, setArtifactTabHost] = useState<HTMLDivElement | null>(null);
@@ -75,6 +80,11 @@ export function HumanWorkbenchPrototype() {
   const selectedIdentity =
     identityList.find((identity) => identity.id === selectedIdentityId) ?? identityList[0];
   const selectedSkill = skills.find((skill) => skill.id === selectedSkillId) ?? skills[0];
+  const selectedTaskSkill = skills.find((skill) => skill.name === selectedTask.skill && skill.site === selectedTask.site);
+  const selectedTaskCategory = actionCategoryForTask(selectedTask.kind);
+  const selectedTaskSkillPolicy = selectedTaskSkill == null ? undefined : skillPolicies[selectedTaskSkill.id];
+  const selectedTaskExecutionMode = selectedTaskSkill == null ? "block" : threadExecutionModes[selectedTask.id] ?? selectedTaskSkillPolicy?.[selectedTaskCategory] ?? globalPolicy[selectedTaskCategory];
+  const selectedTaskExecutionSource = selectedTaskSkill == null ? "技能声明不匹配" : threadExecutionModes[selectedTask.id] != null ? "当前线程" : selectedTaskSkillPolicy != null ? "技能配置" : "全局默认";
 
   useEffect(() => {
     try {
@@ -109,7 +119,7 @@ export function HumanWorkbenchPrototype() {
       return librarySiteFilter === "全部" ? "发现站点技能" : librarySiteFilter;
     }
     if (settingsSection === "general") return "通用";
-    if (settingsSection === "authorization") return "全局授权";
+    if (settingsSection === "authorization") return "执行方式";
     if (settingsSection === "proxies") return "代理管理";
     return "诊断";
   }, [browserMode, libraryMode, librarySiteFilter, selectedIdentity.account, selectedIdentity.name, selectedSkill.name, selectedTask.identity, selectedTask.skill, selectedTaskIdentity?.account, settingsSection, view, workMode]);
@@ -158,7 +168,6 @@ export function HumanWorkbenchPrototype() {
         stateLabel: task.stateLabel,
         updatedAt: task.updatedAt,
         summary: task.summary,
-        authorization: task.authorization,
         runs: [...(item.runs ?? []), appendedRun],
         artifactSet: task.artifactSet,
         artifactState: task.artifactState,
@@ -170,7 +179,7 @@ export function HumanWorkbenchPrototype() {
     setView("work");
   }
 
-  function submitTaskTurn(input: string, quantity?: number, attachments?: string[]) {
+  function submitTaskTurn(input: string, quantity?: number, attachments?: string[], executionSource?: string) {
     const runId = `run-${Date.now()}`;
     const run: PrototypeRun = {
       id: runId,
@@ -183,6 +192,8 @@ export function HumanWorkbenchPrototype() {
       artifactSet: selectedTask.artifactSet,
       artifactState: "pending",
       artifactTotal: quantity,
+      executionMode: selectedTaskExecutionMode,
+      executionSource: executionSource ?? selectedTaskExecutionSource,
     };
     setTaskList((current) => current.map((task) => task.id === selectedTask.id ? {
       ...task,
@@ -196,6 +207,18 @@ export function HumanWorkbenchPrototype() {
     } : task));
     setPreviewSelection(null);
     window.setTimeout(() => document.querySelector(`[data-content-search-unit-key="${selectedTask.id}-${runId}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  function stopTaskTurn() {
+    setTaskList((current) => current.map((task) => task.id === selectedTask.id ? {
+      ...task,
+      state: "failed",
+      stateLabel: "已停止",
+      updatedAt: "刚刚",
+      summary: "当前回合已由用户停止。",
+      runs: (task.runs ?? []).map((run, index, runs) => index === runs.length - 1 && run.state === "running" ? { ...run, state: "failed", stateLabel: "已停止", summary: "当前回合已由用户停止。", artifactState: "none" } : run),
+      artifactState: "none",
+    } : task));
   }
 
   function openPreview(selection: PrototypePreviewSelection) {
@@ -367,7 +390,11 @@ export function HumanWorkbenchPrototype() {
         </header>
       )}
       workspace={
-        <ThreadWorkspace composer={view === "work" && workMode === "detail" ? <PrototypeTaskThreadComposer task={selectedTask} onSubmit={submitTaskTurn} /> : undefined}>
+        <ThreadWorkspace composer={view === "work" && workMode === "detail" ? <PrototypeTaskThreadComposer actionCategory={selectedTaskCategory} executionLocked={selectedTaskSkill == null} executionMode={selectedTaskExecutionMode} executionSource={selectedTaskExecutionSource} identityLabel={selectedTaskIdentity?.account ?? selectedTask.identity} task={selectedTask} onExecutionModeChange={(mode) => setThreadExecutionModes((current) => ({ ...current, [selectedTask.id]: mode }))} onSaveAsSkillVersion={() => {
+          if (selectedTaskSkill == null) return;
+          setSkillPolicies((current) => ({ ...current, [selectedTaskSkill.id]: { ...(current[selectedTaskSkill.id] ?? globalPolicy), [selectedTaskCategory]: selectedTaskExecutionMode } }));
+          setThreadExecutionModes((current) => { const next = { ...current }; delete next[selectedTask.id]; return next; });
+        }} onStop={stopTaskTurn} onSubmit={submitTaskTurn} /> : undefined}>
           {view === "work" ? (
             <WorkSurface
               globalPolicy={globalPolicy}
@@ -375,8 +402,10 @@ export function HumanWorkbenchPrototype() {
               mode={workMode}
               preferredIdentityId={preferredIdentityId}
               selectedSkill={selectedSkill}
-              skillPolicy={skillPolicies[selectedSkill.id] ?? "inherit"}
+              skillPolicy={skillPolicies[selectedSkill.id]}
               task={selectedTask}
+              tasks={taskList}
+              threadExecutionModes={threadExecutionModes}
               onCreateIdentity={() => {
                 setIdentityCreationSite(selectedSkill.site);
                 setReturnToTaskCreation(true);

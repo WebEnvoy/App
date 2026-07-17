@@ -1,5 +1,7 @@
 export type AppView = "work" | "browser" | "library" | "settings";
-export type AuthorizationPolicy = "inherit" | "full" | "ask" | "read" | "strict";
+export type ActionCategory = "observe" | "prepare" | "external" | "sensitive";
+export type ExecutionMode = "auto" | "confirm" | "block";
+export type ExecutionPolicy = Record<ActionCategory, ExecutionMode>;
 export type TaskKind = "collection" | "article" | "download" | "write" | "takeover";
 export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
 export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
@@ -21,6 +23,8 @@ export type PrototypeRun = {
   artifactState?: "ready" | "pending" | "none";
   artifactTotal?: number;
   artifactCurrent?: number;
+  executionMode?: ExecutionMode;
+  executionSource?: string;
 };
 
 export type ProxyProfile = {
@@ -44,7 +48,6 @@ export type PrototypeTask = {
   updatedAt: string;
   summary: string;
   kind: TaskKind;
-  authorization?: string;
   runs?: PrototypeRun[];
   artifactSet?: ArtifactSet;
   artifactState?: "ready" | "pending" | "none";
@@ -84,12 +87,33 @@ export type Identity = {
   lastHealthyAt?: string;
 };
 
-export const authorizationPolicyLabels: Record<AuthorizationPolicy, string> = {
-  inherit: "继承上一级设置",
-  full: "完全访问",
-  ask: "写入批准",
-  read: "只读",
-  strict: "每一步都要批准",
+export const actionCategories: ActionCategory[] = ["observe", "prepare", "external", "sensitive"];
+
+export const actionCategoryLabels: Record<ActionCategory, string> = {
+  observe: "观察与整理",
+  prepare: "准备但不提交",
+  external: "对外生效",
+  sensitive: "敏感或不可逆",
+};
+
+export const actionCategoryDetails: Record<ActionCategory, string> = {
+  observe: "读取、筛选并整理站点内容",
+  prepare: "填写或生成内容，但停在提交前",
+  external: "发布、发送或提交后对外可见",
+  sensitive: "删除、付款或其他难以撤销的动作",
+};
+
+export const executionModeLabels: Record<ExecutionMode, string> = {
+  auto: "自动",
+  confirm: "确认",
+  block: "禁止",
+};
+
+export const defaultExecutionPolicy: ExecutionPolicy = {
+  observe: "auto",
+  prepare: "auto",
+  external: "confirm",
+  sensitive: "confirm",
 };
 
 export type Skill = {
@@ -113,6 +137,16 @@ export function identityCanUseSkill(identity: Identity, skill: Skill) {
     && loginReady;
 }
 
+export function actionCategoryForTask(kind: TaskKind): ActionCategory {
+  return kind === "write" ? "prepare" : "observe";
+}
+
+export function recommendedExecutionPolicy(skill: Skill): ExecutionPolicy {
+  return skill.tags.includes("内容发布")
+    ? { observe: "auto", prepare: "auto", external: "confirm", sensitive: "confirm" }
+    : { observe: "auto", prepare: "auto", external: "block", sensitive: "block" };
+}
+
 export const tasks: PrototypeTask[] = [
   {
     id: "xhs-notes",
@@ -131,8 +165,8 @@ export const tasks: PrototypeTask[] = [
     artifactState: "ready",
     artifactTotal: 12,
     runs: [
-      { id: "run-01", label: "8 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8 },
-      { id: "run-02", label: "12 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12 },
+      { id: "run-01", label: "8 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8, executionMode: "auto", executionSource: "技能配置" },
+      { id: "run-02", label: "12 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12, executionMode: "auto", executionSource: "技能配置" },
     ],
   },
   {
@@ -148,7 +182,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 13:18",
     summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
     kind: "article",
-    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", artifactSet: "article", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", artifactSet: "article", artifactState: "ready", executionMode: "auto", executionSource: "技能配置" }],
     artifactSet: "article",
     artifactState: "ready",
   },
@@ -165,7 +199,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 12:46",
     summary: "3 个文件已保存，1 个文件因来源失效未完成，可单独重试。",
     kind: "download",
-    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3 }],
+    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3, executionMode: "auto", executionSource: "技能配置" }],
     artifactSet: "download-files",
     artifactState: "ready",
   },
@@ -182,7 +216,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 11:20",
     summary: "标题、正文和 4 个话题已填入页面并校验，尚未点击发布。",
     kind: "write",
-    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", artifactSet: "write-preview", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", artifactSet: "write-preview", artifactState: "ready", executionMode: "auto", executionSource: "技能配置" }],
     artifactSet: "write-preview",
     artifactState: "ready",
   },
@@ -199,7 +233,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "10 分钟前",
     summary: "账号登录状态已过期。任务已暂停，登录完成并校验成功后会继续。",
     kind: "takeover",
-    runs: [{ id: "run-01", label: "收藏夹读取", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none" }],
+    runs: [{ id: "run-01", label: "收藏夹读取", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none", executionMode: "auto", executionSource: "技能配置" }],
     artifactState: "none",
   },
   {
@@ -220,8 +254,8 @@ export const tasks: PrototypeTask[] = [
     artifactTotal: 80,
     artifactCurrent: 36,
     runs: [
-      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64 },
-      { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36 },
+      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, executionMode: "auto", executionSource: "技能配置" },
+      { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36, executionMode: "auto", executionSource: "技能配置" },
     ],
   },
 ];
@@ -324,10 +358,22 @@ export const skills: Skill[] = [
     name: "发布笔记",
     site: "小红书",
     tags: ["内容发布"],
-    description: "填写标题、正文、图片与话题，并按授权策略决定是否提交。",
+    description: "填写标题、正文、图片与话题，并按当前执行方式决定是否提交。",
     inputLabel: "笔记标题",
     inputPlaceholder: "输入本次发布的标题",
     output: "提交状态与页面结果",
+    requiresLogin: true,
+    availability: "available",
+  },
+  {
+    id: "xhs-favorites",
+    name: "收藏夹浏览",
+    site: "小红书",
+    tags: ["内容浏览", "数据采集"],
+    description: "读取指定收藏夹中的笔记，并保留内容、作者与来源信息。",
+    inputLabel: "目标收藏夹",
+    inputPlaceholder: "输入收藏夹名称或网址",
+    output: "收藏笔记列表、内容详情与来源信息",
     requiresLogin: true,
     availability: "available",
   },
