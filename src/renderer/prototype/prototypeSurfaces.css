@@ -225,6 +225,9 @@
 .running-result { max-width: 760px; }
 .running-result .prototype-progress { margin-top: 18px; }
 
+.main-content-frame:has(.create-task-page),
+.create-task-page { background: var(--we-surface-primary); }
+.main-content-frame:has(.create-task-page) { min-height: 100%; }
 .create-task-page { width: min(100%, 960px); display: grid; min-height: 100%; grid-template-rows: minmax(300px, 1fr) auto; gap: 28px; padding-bottom: 28px; }
 .create-task-empty { display: grid; align-self: center; justify-items: center; gap: 22px; padding-top: 20px; }
 .create-task-empty-icon { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--we-border); border-radius: 50%; color: var(--we-foreground-muted); }
@@ -236,7 +239,7 @@
 .create-task-suggestions button > span { display: grid; min-width: 0; gap: 3px; color: var(--we-foreground); }
 .create-task-suggestions strong { overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
 .create-task-suggestions small { color: var(--we-foreground-muted); font-size: 10px; }
-.create-task-launcher { width: min(100%, 740px); height: auto; min-height: 148px; margin: 0 auto; gap: 9px; }
+.create-task-launcher { width: min(100%, 740px); height: auto; min-height: 148px; margin: 0 auto; gap: 9px; box-shadow: none; }
 .create-task-context-row { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .create-task-options { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .create-task-context-row label,
