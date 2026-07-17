@@ -300,28 +300,27 @@ export function HumanWorkbenchPrototype() {
     }
   }
 
-  function duplicateIdentity(includeAccountProfile: boolean) {
+  function duplicateIdentity(completeCopy: boolean) {
     const source = selectedIdentity;
-    const loginNotRequired = source.loginState === "not-required" || !includeAccountProfile;
     const providerUnavailable = source.provider === "CloakBrowser" && !cloakProviderInstalled;
+    const copiedLoginState = completeCopy ? source.loginState ?? "unknown" : "not-required";
+    const loginReady = copiedLoginState === "logged-in" || copiedLoginState === "not-required";
     const duplicate: Identity = {
       ...source,
       id: `identity-${Date.now()}`,
-      name: includeAccountProfile ? `${source.name} 副本` : `${source.site} 环境副本`,
-      account: includeAccountProfile ? source.account : `${source.site} 环境副本`,
-      accountAvatar: includeAccountProfile ? source.accountAvatar : source.site.slice(0, 1),
-      platformId: includeAccountProfile ? source.platformId : undefined,
-      tags: includeAccountProfile ? source.tags : [source.site],
-      fingerprintSeed: undefined,
-      fingerprint: "待首次启动生成",
-      loginState: loginNotRequired ? "not-required" : "login-required",
+      name: completeCopy ? `${source.name} 副本` : `${source.site} 环境副本`,
+      account: completeCopy ? source.account : `${source.site} 环境副本`,
+      accountAvatar: completeCopy ? source.accountAvatar : source.site.slice(0, 1),
+      platformId: completeCopy ? source.platformId : undefined,
+      tags: completeCopy ? source.tags : [source.site],
+      loginState: copiedLoginState,
       sessionState: providerUnavailable ? "failed" : "idle",
-      state: providerUnavailable ? "repair" : loginNotRequired ? "available" : "login",
-      stateLabel: providerUnavailable ? "需要修复" : loginNotRequired ? "可用" : "需要登录",
+      state: providerUnavailable ? "repair" : loginReady ? "available" : "login",
+      stateLabel: providerUnavailable ? "需要修复" : loginReady ? "可用" : "需要登录",
       controller: "空闲",
       currentPage: undefined,
       lastHealthyAt: "尚未启动",
-      detail: providerUnavailable ? "环境已复制 · CloakBrowser 未安装" : includeAccountProfile ? "环境已复制 · 需要重新登录" : "环境配置已复制 · 未包含账号资料",
+      detail: providerUnavailable ? "环境已复制 · CloakBrowser 未安装" : completeCopy ? "完整副本已创建 · 登录状态已保留" : "环境配置已复制 · 未包含账号资料和站点数据",
     };
     setIdentityList((current) => [duplicate, ...current]);
     setSelectedIdentityId(duplicate.id);
@@ -419,8 +418,8 @@ export function HumanWorkbenchPrototype() {
                 <details className="identity-copy-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
                   <summary className="prototype-button compact" role="button"><Copy size={14} />创建副本<ChevronDown size={12} /></summary>
                   <div role="menu" aria-label="创建账号身份副本">
-                    <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(false); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>仅复制环境配置</strong><small>不包含账号资料和登录状态</small></button>
-                    <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>复制账号资料与环境</strong><small>保留公开资料，但需要重新登录</small></button>
+                    <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>完整复制</strong><small>包含账号资料、登录状态和环境配置</small></button>
+                    <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(false); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>仅复制环境配置</strong><small>不包含账号资料和站点数据</small></button>
                   </div>
                 </details>
               ) : null}
