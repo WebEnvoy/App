@@ -44,7 +44,7 @@ input:focus-visible {
   white-space: nowrap;
 }
 
-.prototype-center-actions { display: flex; min-width: 0; margin-left: auto; }
+.prototype-center-actions { display: flex; min-width: 0; align-items: center; gap: 2px; margin-left: auto; }
 .identity-copy-menu { position: relative; }
 .identity-copy-menu > summary { list-style: none; cursor: pointer; }
 .identity-copy-menu > summary::-webkit-details-marker { display: none; }
@@ -194,19 +194,18 @@ input:focus-visible {
   grid-template-columns: 22px minmax(0, 1fr);
 }
 
-.prototype-sidebar-row.identity-sidebar-row { grid-template-columns: 22px minmax(0, 1fr) 16px; }
-.identity-row-status { display: grid; width: 16px; height: 16px; place-items: center; color: var(--we-foreground-muted); }
-.identity-row-status.available { color: var(--we-status-success); }
-.identity-row-status.running { color: var(--we-status-info); }
-.identity-row-status.warning { color: var(--we-status-warning); }
-.identity-row-status.error { color: var(--we-status-error); }
-.identity-row-status.running svg { animation: identity-status-spin 1.4s linear infinite; }
+.identity-catalog-status.running svg { animation: identity-status-spin 1.4s linear infinite; }
 
 @keyframes identity-status-spin { to { transform: rotate(360deg); } }
 
 .prototype-task-tree-site { display: grid; gap: 2px; margin-bottom: 8px; }
 .prototype-task-tree-label { display: flex; align-items: center; gap: 7px; padding: 7px 8px 4px; color: var(--we-foreground); font-size: 12px; }
 .prototype-task-tree-label svg { color: var(--we-foreground-muted); }
+.skill-group-heading > strong { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-group-add { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: 5px; opacity: 0; color: var(--we-foreground-muted); background: transparent; pointer-events: none; transition: opacity 120ms ease; }
+.skill-group-heading:hover .skill-group-add,
+.skill-group-heading:focus-within .skill-group-add { opacity: 1; pointer-events: auto; }
+.skill-group-add:hover { color: var(--we-foreground); background: var(--we-list-hover-background); }
 .prototype-task-tree-label > span:last-child { display: grid; min-width: 0; gap: 1px; }
 .prototype-task-tree-label > span:last-child small { color: var(--we-foreground-muted); font-size: 10px; font-weight: 500; }
 .prototype-task-tree-skill { display: grid; gap: 1px; }

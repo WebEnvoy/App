@@ -1,10 +1,10 @@
 import {
   ArrowLeft,
   ArrowRight,
-  ChevronDown,
   CircleUserRound,
   Copy,
   Library,
+  Pencil,
   Settings,
   SquarePen,
 } from "lucide-react";
@@ -39,7 +39,7 @@ import {
 import { PrototypeTaskThreadComposer, WorkSurface } from "./WorkSurface";
 
 type WorkMode = "detail" | "create";
-type BrowserMode = "detail" | "create" | "repair" | "edit" | "dependencies";
+type BrowserMode = "catalog" | "detail" | "create" | "repair" | "edit" | "dependencies";
 type LibraryMode = "catalog" | "detail" | "create";
 type SettingsSection = "general" | "authorization" | "proxies" | "diagnostics";
 
@@ -112,6 +112,7 @@ export function HumanWorkbenchPrototype() {
       return workMode === "create" ? "创建任务" : `${selectedTask.skill} · ${selectedTaskIdentity?.account ?? selectedTask.identity}`;
     }
     if (view === "browser") {
+      if (browserMode === "catalog") return "账号身份";
       if (browserMode === "create") return "创建账号身份";
       if (browserMode === "repair") return "修复浏览器 Provider";
       if (browserMode === "edit") return `编辑 ${selectedIdentity.name}`;
@@ -132,7 +133,7 @@ export function HumanWorkbenchPrototype() {
   function openView(nextView: AppView) {
     setView(nextView);
     if (nextView === "work") setWorkMode("create");
-    if (nextView === "browser") setBrowserMode("detail");
+    if (nextView === "browser") setBrowserMode("catalog");
     if (nextView === "library") {
       setLibraryMode("catalog");
       setLibrarySiteFilter("全部");
@@ -157,6 +158,14 @@ export function HumanWorkbenchPrototype() {
     setPreferredIdentityId(identityId ?? "");
     setWorkMode("create");
     setView("work");
+  }
+
+  function createTaskForSkill(site: string, skillName: string) {
+    const skill = skills.find((item) => item.site === site && item.name === skillName && item.availability === "available");
+    if (skill == null) return;
+    const usedIdentityIds = new Set(taskList.filter((task) => task.site === site && task.skill === skillName).map((task) => task.identityId));
+    const alternativeIdentity = identityList.find((identity) => identityCanUseSkill(identity, skill) && !usedIdentityIds.has(identity.id));
+    createTask(skill.id, alternativeIdentity?.id);
   }
 
   function submitTask(task: PrototypeTask, executionModes?: Partial<ExecutionPolicy>) {
@@ -328,7 +337,8 @@ export function HumanWorkbenchPrototype() {
 
   function goBack() {
     if (view === "work" && workMode === "create") setWorkMode("detail");
-    else if (view === "browser" && browserMode !== "detail") setBrowserMode("detail");
+    else if (view === "browser" && browserMode === "detail") setBrowserMode("catalog");
+    else if (view === "browser" && browserMode !== "catalog") setBrowserMode(browserMode === "create" ? "catalog" : "detail");
     else if (view === "library" && libraryMode !== "catalog") setLibraryMode("catalog");
     else if (view === "settings") setView(settingsReturnView);
   }
@@ -345,7 +355,7 @@ export function HumanWorkbenchPrototype() {
 
   const canGoBack =
     (view === "work" && workMode === "create") ||
-    (view === "browser" && browserMode !== "detail") ||
+    (view === "browser" && browserMode !== "catalog") ||
     (view === "library" && libraryMode !== "catalog") ||
     view === "settings";
 
@@ -358,37 +368,14 @@ export function HumanWorkbenchPrototype() {
         <LeftPanel>
           <PrototypeSidebar
             identities={identityList}
-            librarySiteFilter={librarySiteFilter}
             settingsSection={settingsSection}
-            selectedIdentityId={selectedIdentity.id}
             selectedTaskId={selectedTask.id}
             taskList={taskList}
             taskGrouping={taskGrouping}
             taskSort={taskSort}
             view={view}
-            onCreate={() => {
-              if (view === "browser") {
-                setIdentityCreationSite("小红书");
-                setReturnToTaskCreation(false);
-                setBrowserMode("create");
-              }
-              else createTask();
-            }}
-            onOpenIdentity={openIdentity}
-            onOpenSite={(site) => {
-              setLibrarySiteFilter(site);
-              setLibraryMode("catalog");
-              setView("library");
-            }}
-            onCreateSkill={() => {
-              setLibraryMode("create");
-              setView("library");
-            }}
-            onSearchSkills={() => {
-              setLibrarySiteFilter("全部");
-              setLibraryMode("catalog");
-              setView("library");
-            }}
+            onCreate={() => createTask()}
+            onCreateTaskForSkill={createTaskForSkill}
             onOpenTask={openTask}
             onOpenSettingsSection={openSettings}
             onOpenView={openView}
@@ -415,13 +402,13 @@ export function HumanWorkbenchPrototype() {
             <h2>{pageTitle}</h2>
             <div className="prototype-center-actions">
               {view === "browser" && browserMode === "detail" ? (
-                <details className="identity-copy-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
-                  <summary className="prototype-button compact" role="button"><Copy size={14} />创建副本<ChevronDown size={12} /></summary>
+                <><button className="topbar-icon-button" type="button" aria-label="编辑身份" title="编辑身份" onClick={() => setBrowserMode("edit")}><Pencil size={14} /></button><details className="identity-copy-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute("open"); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus(); } }}>
+                  <summary className="topbar-icon-button" role="button" aria-label="创建副本" title="创建副本"><Copy size={14} /></summary>
                   <div role="menu" aria-label="创建账号身份副本">
                     <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(true); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>完整复制</strong><small>包含账号资料、登录状态和环境配置</small></button>
                     <button type="button" role="menuitem" onClick={(event) => { duplicateIdentity(false); event.currentTarget.closest("details")?.removeAttribute("open"); }}><strong>仅复制环境配置</strong><small>不包含账号资料和站点数据</small></button>
                   </div>
-                </details>
+                </details></>
               ) : null}
             </div>
           </div>
@@ -474,8 +461,15 @@ export function HumanWorkbenchPrototype() {
               initialIdentitySite={identityCreationSite}
               mode={browserMode}
               proxies={proxyList}
+              tasks={taskList}
               onCreate={saveIdentity}
+              onCreateRequested={() => {
+                setIdentityCreationSite("小红书");
+                setReturnToTaskCreation(false);
+                setBrowserMode("create");
+              }}
               onModeChange={setBrowserMode}
+              onOpenIdentity={openIdentity}
               onManageProxies={() => {
                 openSettings("proxies");
               }}

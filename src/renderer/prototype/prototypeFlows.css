@@ -56,6 +56,24 @@
 .availability > span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .availability.unavailable { color: var(--we-status-warning); }
 
+.identity-catalog-toolbar { margin-bottom: 20px; }
+.identity-catalog-groups { display: grid; gap: 26px; }
+.identity-catalog-group { display: grid; gap: 8px; }
+.identity-catalog-group > h2 { padding: 0 4px; font-size: 14px; }
+.identity-catalog-list { border-top: 1px solid var(--we-border); }
+.identity-catalog-row { display: flex; min-width: 0; align-items: center; gap: 14px; padding: 11px 4px; border-bottom: 1px solid var(--we-border-subtle); }
+.identity-catalog-main { display: grid; min-width: 0; flex: 1 1 auto; grid-template-columns: 36px minmax(0, 1fr); gap: 11px; align-items: center; color: var(--we-foreground); background: transparent; text-align: left; }
+.identity-catalog-main > span:last-child { display: grid; min-width: 0; gap: 4px; }
+.identity-catalog-main strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.identity-catalog-main small { overflow: hidden; color: var(--we-foreground-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.identity-avatar.compact { width: 36px; height: 36px; font-size: 11px; }
+.identity-catalog-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; }
+.identity-catalog-status { display: inline-flex; align-items: center; gap: 5px; color: var(--we-foreground-muted); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.identity-catalog-status.available { color: var(--we-status-success); }
+.identity-catalog-status.running { color: var(--we-status-info); }
+.identity-catalog-status.warning { color: var(--we-status-warning); }
+.identity-catalog-status.error { color: var(--we-status-error); }
+
 .prototype-empty { display: grid; place-items: center; gap: 8px; min-height: 280px; color: var(--we-foreground-muted); text-align: center; }
 .prototype-empty h2 { color: var(--we-foreground); font-size: 15px; }
 .prototype-empty p { font-size: 12px; }
@@ -221,6 +239,8 @@
 @media (max-width: 680px) {
   .skill-row { align-items: flex-start; flex-direction: column; }
   .skill-row-actions { width: 100%; justify-content: flex-end; }
+  .identity-catalog-row { align-items: flex-start; flex-direction: column; }
+  .identity-catalog-actions { width: 100%; justify-content: flex-end; }
   .skill-detail-grid { grid-template-columns: 1fr; gap: 0; }
   .recovery-focus { grid-template-columns: 52px minmax(0, 1fr); }
   .recovery-focus .prototype-button { grid-column: 2; justify-self: start; }

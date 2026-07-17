@@ -1,23 +1,24 @@
 import {
   Check,
   CircleAlert,
+  CircleCheck,
   Dices,
   Download,
   Import,
   KeyRound,
   LoaderCircle,
   Monitor,
-  Pencil,
   Play,
   RefreshCw,
+  Search,
   ShieldCheck,
   UserRoundPlus,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type { Identity, ProxyProfile } from "./prototypeData";
+import type { Identity, PrototypeTask, ProxyProfile } from "./prototypeData";
 
-type BrowserMode = "detail" | "create" | "repair" | "edit" | "dependencies";
+type BrowserMode = "catalog" | "detail" | "create" | "repair" | "edit" | "dependencies";
 
 type BrowserSurfaceProps = {
   cloakProviderInstalled: boolean;
@@ -26,10 +27,13 @@ type BrowserSurfaceProps = {
   initialIdentitySite: string;
   mode: BrowserMode;
   proxies: ProxyProfile[];
+  tasks: PrototypeTask[];
   onCreate: (identity: Identity) => void;
+  onCreateRequested: () => void;
   onDeleteIdentity: (identityId: string) => void;
   onManageProxies: () => void;
   onModeChange: (mode: BrowserMode) => void;
+  onOpenIdentity: (identityId: string) => void;
   onOpenInstance: (identityId: string) => void;
   onProviderRepaired: () => void;
   onUpdateIdentity: (identity: Identity) => void;
@@ -43,15 +47,19 @@ export function BrowserSurface({
   initialIdentitySite,
   mode,
   proxies,
+  tasks,
   onCreate,
+  onCreateRequested,
   onDeleteIdentity,
   onManageProxies,
   onModeChange,
+  onOpenIdentity,
   onOpenInstance,
   onProviderRepaired,
   onUpdateIdentity,
   onUseSkill,
 }: BrowserSurfaceProps) {
+  if (mode === "catalog") return <IdentityCatalog identities={identities} tasks={tasks} onCreate={onCreateRequested} onOpenIdentity={onOpenIdentity} />;
   if (mode === "create") return <CreateIdentity cloakProviderInstalled={cloakProviderInstalled} initialSite={initialIdentitySite} proxies={proxies} onCreate={onCreate} onManageProxies={onManageProxies} />;
   if (mode === "repair") {
     return <ProviderRecovery onDone={() => { onProviderRepaired(); onModeChange("dependencies"); }} />;
@@ -63,6 +71,69 @@ export function BrowserSurface({
     return <EnvironmentDependencies cloakProviderInstalled={cloakProviderInstalled} identities={identities} onModeChange={onModeChange} />;
   }
   return <IdentityDetail identity={identity} onModeChange={onModeChange} onOpenInstance={onOpenInstance} onUseSkill={onUseSkill} />;
+}
+
+type IdentitySort = "recent" | "site";
+
+function IdentityCatalog({ identities, tasks, onCreate, onOpenIdentity }: { identities: Identity[]; tasks: PrototypeTask[]; onCreate: () => void; onOpenIdentity: (identityId: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<IdentitySort>("recent");
+  const orderedIdentities = useMemo(() => sortIdentities(identities, tasks, sort).filter((identity) => `${identity.account}${identity.name}${identity.site}`.toLowerCase().includes(query.trim().toLowerCase())), [identities, query, sort, tasks]);
+  const groups = sort === "site"
+    ? Array.from(new Set(orderedIdentities.map((identity) => identity.site))).map((site) => ({ label: site, identities: orderedIdentities.filter((identity) => identity.site === site) }))
+    : [{ label: "最近使用", identities: orderedIdentities }];
+
+  return (
+    <div className="prototype-page identity-catalog-page">
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>账号身份</h1><p>管理站点账号、登录状态和本机浏览器环境。</p></div><button className="prototype-button primary" type="button" onClick={onCreate}><UserRoundPlus size={14} />创建账号身份</button></header>
+      <div className="library-toolbar identity-catalog-toolbar">
+        <label className="prototype-search"><Search size={15} /><input aria-label="搜索账号身份" value={query} placeholder="搜索账号、身份名称或站点" onChange={(event) => setQuery(event.target.value)} /></label>
+        <div className="tag-filter" role="group" aria-label="账号身份排序方式"><button className={sort === "recent" ? "selected" : ""} type="button" aria-pressed={sort === "recent"} onClick={() => setSort("recent")}>最近使用</button><button className={sort === "site" ? "selected" : ""} type="button" aria-pressed={sort === "site"} onClick={() => setSort("site")}>站点名称</button></div>
+      </div>
+      {orderedIdentities.length === 0 ? <div className="prototype-empty"><Search size={24} /><h2>没有匹配的账号身份</h2><p>{query}</p><button className="prototype-button" type="button" onClick={() => setQuery("")}>清除搜索</button></div> : null}
+      <div className="identity-catalog-groups">{groups.map((group) => group.identities.length > 0 ? <section className="identity-catalog-group" key={group.label}><h2>{group.label}</h2><div className="identity-catalog-list">{group.identities.map((item) => <IdentityCatalogRow identity={item} key={item.id} onOpen={() => onOpenIdentity(item.id)} />)}</div></section> : null)}</div>
+    </div>
+  );
+}
+
+function IdentityCatalogRow({ identity, onOpen }: { identity: Identity; onOpen: () => void }) {
+  const status = identityStatus(identity);
+  return (
+    <div className="identity-catalog-row">
+      <button className="identity-catalog-main" type="button" onClick={onOpen}><span className="identity-avatar compact">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span><span><strong>{identity.account}</strong><small>{identity.name} · {identity.site} · {identity.provider}</small></span></button>
+      <div className="identity-catalog-actions"><span className={`identity-catalog-status ${status.className}`} role="status">{status.icon}{status.label}</span><button className="prototype-button compact" type="button" onClick={onOpen}>打开</button></div>
+    </div>
+  );
+}
+
+function identityStatus(identity: Identity) {
+  if (identity.state === "repair" || identity.sessionState === "failed") return { className: "error", label: "需要修复", icon: <CircleAlert size={13} /> };
+  if (identity.loginState === "login-required" || identity.loginState === "unknown") return { className: "warning", label: "需要登录", icon: <CircleAlert size={13} /> };
+  if (identity.state === "running" || identity.sessionState === "running") return { className: "running", label: "运行中", icon: <LoaderCircle size={13} /> };
+  return { className: "available", label: "可用", icon: <CircleCheck size={13} /> };
+}
+
+function sortIdentities(identities: Identity[], tasks: PrototypeTask[], sort: IdentitySort) {
+  const latestUse = new Map(identities.map((identity) => [identity.id, Math.max(0, ...tasks.filter((task) => task.identityId === identity.id).map((task) => taskRecency(task.updatedAt)))]));
+  return identities.map((identity, index) => ({ identity, index })).sort((left, right) => {
+    if (sort === "site") {
+      const siteDifference = left.identity.site.localeCompare(right.identity.site, "zh-CN");
+      if (siteDifference !== 0) return siteDifference;
+    } else {
+      const recencyDifference = (latestUse.get(right.identity.id) ?? 0) - (latestUse.get(left.identity.id) ?? 0);
+      if (recencyDifference !== 0) return recencyDifference;
+    }
+    return left.index - right.index;
+  }).map(({ identity }) => identity);
+}
+
+function taskRecency(label: string) {
+  if (label === "刚刚") return 20_000;
+  const minutesAgo = label.match(/^(\d+) 分钟前$/);
+  if (minutesAgo != null) return 19_000 - Number(minutesAgo[1]);
+  const today = label.match(/^今天 (\d{2}):(\d{2})$/);
+  if (today != null) return 10_000 + Number(today[1]) * 60 + Number(today[2]);
+  return 0;
 }
 
 function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: { identity: Identity; onModeChange: (mode: BrowserMode) => void; onOpenInstance: (identityId: string) => void; onUseSkill: () => void }) {
@@ -83,9 +154,6 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
               <h1>{identity.account}</h1>
               <p>{identity.name} · {identity.loginState === "not-required" ? "无需登录" : identity.platformId ?? "平台 ID 待同步"}</p>
           </div>
-        </div>
-        <div className="identity-heading-actions">
-          <button className="prototype-button" type="button" onClick={() => onModeChange("edit")}><Pencil size={14} />编辑身份</button>
         </div>
       </header>
 
