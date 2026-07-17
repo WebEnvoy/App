@@ -1,5 +1,5 @@
 import * as Tabs from "@radix-ui/react-tabs";
-import { Braces, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Plus, X } from "lucide-react";
+import { Braces, ExternalLink, FileArchive, FileText, Image as ImageIcon, LoaderCircle, Music2, Plus, RotateCw, Video, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -9,12 +9,12 @@ import { productRows, resultRows, type ArtifactSet, type PrototypePreviewSelecti
 
 const downloadFiles = [
   { name: "新品发布会-主片.mp4", size: "126 MB", state: "已保存" },
-  { name: "产品特写-竖版.mp4", size: "84 MB", state: "已保存" },
-  { name: "用户访谈-片段.mp4", size: "42 MB", state: "已保存" },
-  { name: "幕后花絮.mp4", size: null, state: "来源已失效" },
+  { name: "新品发布会-封面.png", size: "8 MB", state: "已保存" },
+  { name: "产品讲解-音轨.mp3", size: "42 MB", state: "已保存" },
+  { name: "活动素材-源文件.zip", size: null, state: "来源已失效" },
 ];
 
-type FileTabId = "json" | "markdown" | "image";
+type FileTabId = "json" | "markdown" | "image" | "media";
 type ResultTabId = `result:${string}`;
 type ArtifactTabId = FileTabId | ResultTabId;
 type RunTabState = { openTabIds: ArtifactTabId[]; activeTabId: ArtifactTabId | null };
@@ -24,6 +24,7 @@ const artifactTabLabels: Record<FileTabId, string> = {
   json: "result.json",
   markdown: "summary.md",
   image: "page.png",
+  media: "媒体与文件",
 };
 
 export function PrototypeArtifactPanel({ requestKey, run, selection, tabHost, task }: { requestKey: number; run: PrototypeRun | null; selection: PrototypePreviewSelection | null; tabHost: Element | null; task: PrototypeTask }) {
@@ -41,6 +42,7 @@ export function PrototypeArtifactPanel({ requestKey, run, selection, tabHost, ta
     const result: ArtifactTabId[] = Object.entries(resultTabs).filter(([, item]) => item.runId === run.id).map(([tabId]) => tabId as ResultTabId);
     if (artifact != null) result.push("json", "markdown");
     if (artifact != null && artifactSet === "xhs-notes") result.push("image");
+    if (artifact != null && artifactSet === "download-files") result.push("media");
     return result;
   }, [artifact, artifactSet, resultTabs, run]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -144,7 +146,38 @@ function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtif
   if (artifact == null) return state === "pending" ? <ArtifactPending /> : <ArtifactEmpty />;
   if (tabId === "json") return <FilePreview icon={<Braces size={16} />} name="result.json" meta={artifact.jsonMeta}><pre>{JSON.stringify(artifact.payload, null, 2)}</pre></FilePreview>;
   if (tabId === "markdown") return <FilePreview icon={<FileText size={16} />} name="summary.md" meta="Markdown"><ArtifactMarkdown run={run} task={task} set={artifactSet} /></FilePreview>;
+  if (tabId === "media") return <FilePreview icon={<Video size={16} />} name="媒体与文件" meta={`${downloadFiles.length} 个文件`}><MediaFilePreview /></FilePreview>;
   return <FilePreview icon={<ImageIcon size={16} />} name="page.png" meta="PNG · 1280 × 800"><img className="artifact-image-preview" src={samplePagePreview} alt="小红书采集任务页面截图样例" /></FilePreview>;
+}
+
+function MediaFilePreview() {
+  const [feedback, setFeedback] = useState<string | null>(null);
+  return (
+    <div className="artifact-media-list">
+      {downloadFiles.map((file) => {
+        const kind = mediaKind(file.name);
+        const unavailable = file.state !== "已保存";
+        return (
+          <div className="artifact-media-row" key={file.name}>
+            <span className={`artifact-media-icon ${kind.id}`} aria-hidden="true">{kind.icon}</span>
+            <div><strong>{file.name}</strong><span>{kind.label} · {file.size ?? "大小未知"}</span></div>
+            <span className={unavailable ? "failed" : "saved"}>{file.state}</span>
+            <button className="prototype-button compact" type="button" onClick={() => setFeedback(unavailable ? `正在重新获取 ${file.name}` : `已请求系统打开 ${file.name}`)}>{unavailable ? <RotateCw size={13} /> : <ExternalLink size={13} />}{unavailable ? "重新获取" : "打开文件"}</button>
+          </div>
+        );
+      })}
+      <p className="artifact-media-fallback">音视频、图片和压缩包由系统应用打开；不支持内联预览的格式仍保留文件信息和恢复入口。</p>
+      {feedback == null ? null : <p className="artifact-media-feedback" role="status">{feedback}</p>}
+    </div>
+  );
+}
+
+function mediaKind(name: string) {
+  const extension = name.split(".").pop()?.toLowerCase();
+  if (["png", "jpg", "jpeg", "webp", "gif"].includes(extension ?? "")) return { id: "image", label: "图片", icon: <ImageIcon size={17} /> };
+  if (["mp3", "wav", "m4a", "aac"].includes(extension ?? "")) return { id: "audio", label: "音频", icon: <Music2 size={17} /> };
+  if (["mp4", "mov", "webm", "mkv"].includes(extension ?? "")) return { id: "video", label: "视频", icon: <Video size={17} /> };
+  return { id: "file", label: "文件", icon: <FileArchive size={17} /> };
 }
 
 function ResultItemPreview({ result }: { result: ResultSelection }) {

@@ -5,7 +5,7 @@ export type TaskState = "success" | "running" | "partial" | "waiting" | "failed"
 export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
 
 export type PrototypePreviewSelection =
-  | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" }
+  | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" | "media" }
   | { kind: "note" | "product"; row: string[]; runId: string };
 
 export type PrototypeRun = {
@@ -15,6 +15,7 @@ export type PrototypeRun = {
   state: TaskState;
   stateLabel: string;
   summary: string;
+  duration?: string;
   artifactSet?: ArtifactSet;
   artifactState?: "ready" | "pending" | "none";
   artifactTotal?: number;
@@ -129,8 +130,8 @@ export const tasks: PrototypeTask[] = [
     artifactState: "ready",
     artifactTotal: 12,
     runs: [
-      { id: "run-01", label: "首次采集", input: "关键词：AI 工具 · 数量：8", state: "success", stateLabel: "已完成 · 8 条", summary: "首个回合读取 8 条笔记。", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8 },
-      { id: "run-02", label: "再次采集", input: "关键词：AI 工具 · 数量：12", state: "success", stateLabel: "已完成 · 12 条", summary: "本回合读取 12 条笔记并更新结构化结果。", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12 },
+      { id: "run-01", label: "8 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8 },
+      { id: "run-02", label: "12 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12 },
     ],
   },
   {
@@ -146,7 +147,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 13:18",
     summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
     kind: "article",
-    runs: [{ id: "run-01", label: "本回合", input: "产品周报第 28 期文章链接", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", artifactSet: "article", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "文章读取", input: "产品周报第 28 期文章链接", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", artifactSet: "article", artifactState: "ready" }],
     artifactSet: "article",
     artifactState: "ready",
   },
@@ -163,7 +164,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 12:46",
     summary: "3 个文件已保存，1 个文件因来源失效未完成，可单独重试。",
     kind: "download",
-    runs: [{ id: "run-01", label: "本回合", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3 }],
+    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3 }],
     artifactSet: "download-files",
     artifactState: "ready",
   },
@@ -180,7 +181,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 11:20",
     summary: "标题、正文和 4 个话题已填入页面并校验，尚未点击发布。",
     kind: "write",
-    runs: [{ id: "run-01", label: "本回合", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", artifactSet: "write-preview", artifactState: "ready" }],
+    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", artifactSet: "write-preview", artifactState: "ready" }],
     artifactSet: "write-preview",
     artifactState: "ready",
   },
@@ -197,7 +198,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "10 分钟前",
     summary: "账号登录状态已过期。任务已暂停，登录完成并校验成功后会继续。",
     kind: "takeover",
-    runs: [{ id: "run-01", label: "本回合", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none" }],
+    runs: [{ id: "run-01", label: "收藏夹读取", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none" }],
     artifactState: "none",
   },
   {
@@ -218,8 +219,8 @@ export const tasks: PrototypeTask[] = [
     artifactTotal: 80,
     artifactCurrent: 36,
     runs: [
-      { id: "run-01", label: "昨日同步", input: "店铺上新 · 昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "昨日同步已完成，结果仍可查看。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64 },
-      { id: "run-02", label: "本次同步", input: "店铺上新 · 今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "本回合正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36 },
+      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64 },
+      { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36 },
     ],
   },
 ];
@@ -385,10 +386,26 @@ export const resultRows = [
   ["AI 工具怎么选：先看这三个场景", "小北效率论", "1,284", "今天 14:21"],
   ["从资料收集到内容发布的自动化", "运营手记", "986", "今天 14:16"],
   ["普通人也能搭好的 AI 信息流", "小林同学", "735", "今天 14:12"],
+  ["把网页资料变成结构化数据", "效率研究所", "682", "今天 14:08"],
+  ["内容团队的 AI 协作清单", "产品手记", "641", "今天 14:02"],
+  ["从搜索到交付：自动化实录", "阿凯聊工具", "598", "今天 13:57"],
+  ["我如何整理一百篇行业笔记", "数据小站", "544", "今天 13:51"],
+  ["AI 阅读工作流的三个误区", "小周效率论", "509", "今天 13:45"],
+  ["适合运营团队的本地工具", "运营新知", "476", "今天 13:39"],
+  ["信息采集任务如何验收", "交付笔记", "421", "今天 13:32"],
 ];
 
 export const productRows = [
   ["便携补光灯", "¥129", "有货", "今天 14:31"],
   ["无线领夹麦克风", "¥239", "有货", "今天 14:29"],
   ["桌面直播支架", "¥89", "补货中", "今天 14:27"],
+  ["USB 采集卡", "¥169", "有货", "今天 14:25"],
+  ["柔光箱套装", "¥199", "有货", "今天 14:22"],
+  ["提词器支架", "¥149", "有货", "今天 14:19"],
+  ["桌面麦克风", "¥299", "补货中", "今天 14:16"],
+  ["环形补光灯", "¥159", "有货", "今天 14:12"],
+  ["直播背景布", "¥79", "有货", "今天 14:08"],
+  ["手机监看屏", "¥349", "有货", "今天 14:05"],
+  ["便携三脚架", "¥119", "有货", "今天 14:01"],
+  ["桌面理线器", "¥39", "补货中", "今天 13:58"],
 ];

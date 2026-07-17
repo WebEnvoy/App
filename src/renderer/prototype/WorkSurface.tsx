@@ -1,6 +1,7 @@
 import {
   ArrowUpRight,
   Check,
+  CheckCircle2,
   ChevronDown,
   CircleAlert,
   Download,
@@ -104,7 +105,7 @@ function TaskDetail({
   const [takeoverStep, setTakeoverStep] = useState<"idle" | "opened" | "validating">("idle");
   const identity = identities.find((item) => item.id === task.identityId);
   const identityLabel = identity?.account ?? task.identity;
-  const storedRuns = task.runs ?? [{ id: "run-current", label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent }];
+  const storedRuns = task.runs ?? [{ id: "run-current", label: task.title, input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent }];
   const taskResumed = task.kind === "takeover" && task.state === "running";
   const runs = taskResumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, state: "running" as const, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
 
@@ -121,12 +122,8 @@ function TaskDetail({
       <div className="prototype-task-thread-layout">
         <PrototypeRunRail runs={runs} taskId={task.id} />
         <div className="prototype-task-thread-content">
-          <header className="prototype-page-heading task-heading" data-content-search-unit-key={`${task.id}-context`}>
-            <div><div className="prototype-eyebrow">{task.site}</div><h1>{task.skill} · {identityLabel}</h1><p>{identity == null ? task.identity : `${task.identity} · ${identity.platformId ?? "平台 ID 待同步"}`}</p></div>
-          </header>
-
           <div className="task-turn-timeline">
-            {runs.map((run, index) => <TaskTurn key={run.id} run={run} task={task} latest={index === runs.length - 1} taskResumed={taskResumed} takeoverStep={takeoverStep} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} onTakeoverStepChange={setTakeoverStep} />)}
+            {runs.map((run, index) => <TaskTurn key={`${task.id}-${run.id}`} run={run} task={task} latest={index === runs.length - 1} taskResumed={taskResumed} takeoverStep={takeoverStep} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} onTakeoverStepChange={setTakeoverStep} />)}
           </div>
 
           <section className={`task-source-strip ${task.authorization != null ? "with-authorization" : ""}`} data-content-search-unit-key={`${task.id}-sources`}><div><span>账号身份</span><strong>{identityLabel}</strong></div><div><span>站点技能</span><strong>{task.skill}</strong></div><div><span>创建来源</span><strong>{task.source}</strong></div><div><span>更新时间</span><strong>{task.updatedAt}</strong></div>{task.authorization != null ? <div><span>任务授权</span><strong>{task.authorization}</strong></div> : null}</section>
@@ -145,20 +142,22 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
   const progressSummary = run.state === "running" || run.state === "waiting";
   const actions = taskExecutionActions(task, run, { newlyCreated, resumed, waiting });
   const summaryCopy = taskSummaryCopy(run, { newlyCreated, resumed, waiting });
-  const previewTab = run.artifactSet === "article" ? "markdown" : "json";
+  const previewTab = run.artifactSet === "article" ? "markdown" : run.artifactSet === "download-files" ? "media" : "json";
+  const executionState = run.state === "running" ? "running" : run.state === "waiting" ? "waiting" : "complete";
+  const executionLabel = executionState === "running" ? "正在执行" : executionState === "waiting" ? "等待处理" : "已处理";
 
   return (
     <article className="task-turn-detail" data-content-search-unit-key={`${task.id}-${run.id}`}>
-      <section className="task-turn-request"><span>{run.label}</span><h2>{run.input}</h2></section>
+      <TaskInputCard task={task} run={run} />
       <section className="task-progress-block" aria-label={`${run.label}执行记录`}>
         <details className="task-execution-disclosure">
-          <summary><span><ChevronDown size={14} />正在执行<small>{actions.length} 个动作</small></span><RunStateChip run={run} /></summary>
+          <summary><span className={`task-execution-status ${executionState}`}><ChevronDown size={14} /><strong>{executionLabel}</strong><small>{executionState === "complete" ? run.duration ?? "耗时未知" : executionState === "running" ? `${actions.length} 个动作` : "需要人工处理"}</small></span></summary>
           <ol>{actions.map((action, index) => <li key={`${action.label}-${index}`}><span className={`task-action-marker ${action.state}`} aria-hidden="true">{action.state === "running" ? <LoaderCircle size={12} /> : action.state === "success" ? <Check size={12} /> : <CircleAlert size={12} />}</span><div><strong>{action.label}</strong><p>{action.detail}</p></div></li>)}</ol>
         </details>
         {waiting ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>需要你完成登录</strong><p>{takeoverStep === "idle" ? "任务已暂停。打开对应账号的浏览器，登录后返回这里确认。" : takeoverStep === "opened" ? "浏览器已拉起；完成登录后点击“我已完成”。" : "正在校验登录与页面状态，成功后会继续当前回合。"}</p></div>{takeoverStep === "idle" ? <button className="prototype-button primary" type="button" onClick={() => { onOpenBrowser(); onTakeoverStepChange("opened"); }}>打开浏览器</button> : takeoverStep === "opened" ? <button className="prototype-button primary" type="button" onClick={() => onTakeoverStepChange("validating")}><Check size={14} />我已完成</button> : <button className="prototype-button" type="button" disabled><LoaderCircle size={14} />正在校验</button>}</section> : null}
       </section>
-      <section className="task-summary-block" aria-label={`${run.label}${progressSummary ? "进度摘要" : "任务总结"}`}>
-        <header><div><span>{progressSummary ? "进度摘要" : "任务总结"}</span><h2>{summaryCopy}</h2></div>{run.artifactState !== "none" ? <button className="task-preview-button" type="button" aria-label={`在右侧打开${run.label}结果`} title="在右侧打开结果" onClick={() => onOpenPreview({ kind: "file", runId: run.id, tab: previewTab })}><ArrowUpRight size={15} /></button> : null}</header>
+      <section className="task-summary-block" aria-label={`${run.label}${progressSummary ? "进度" : "结果"}`}>
+        <header><div className={`task-summary-heading ${run.state}`}><span className="task-summary-state-icon" aria-hidden="true">{run.state === "success" || run.state === "not-submitted" ? <CheckCircle2 size={17} /> : run.state === "running" ? <LoaderCircle size={17} /> : <CircleAlert size={17} />}</span><h2>{summaryCopy}</h2></div>{run.artifactState !== "none" ? <button className="task-preview-button" type="button" aria-label={`在右侧打开${run.label}结果`} title="在右侧打开结果" onClick={() => onOpenPreview({ kind: "file", runId: run.id, tab: previewTab })}><ArrowUpRight size={15} /></button> : null}</header>
         {newlyCreated ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "16%" }} /></div><span>准备中</span></div> : null}
         {!newlyCreated && task.kind === "collection" ? <CollectionResult run={run} task={task} onOpenPreview={onOpenPreview} /> : null}
         {!newlyCreated && task.kind === "article" ? <ArticleResult /> : null}
@@ -168,6 +167,25 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
       </section>
     </article>
   );
+}
+
+function TaskInputCard({ task, run }: { task: PrototypeTask; run: PrototypeRun }) {
+  const fields = taskInputFields(task, run);
+  return (
+    <section className={`task-input-card ${task.kind}`} aria-label={`${task.skill}输入`}>
+      <div className="task-input-kind"><span>{task.skill}</span></div>
+      <dl>{fields.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    </section>
+  );
+}
+
+function taskInputFields(task: PrototypeTask, run: PrototypeRun): Array<[string, string]> {
+  if (task.kind === "collection" && task.site === "淘宝") return [["时间范围", run.input], ["采集字段", "标题、价格、库存"]];
+  if (task.kind === "collection") return [["关键词", run.input], ["数量", `${run.artifactTotal ?? task.artifactTotal ?? 0} 条`]];
+  if (task.kind === "article") return [["文章", run.input], ["来源", targetUrl(task.site, task.kind)]];
+  if (task.kind === "download") return [["素材链接", run.input], ["保存方式", "下载到本机"]];
+  if (task.kind === "write") return [["草稿", run.input], ["提交方式", "仅填写，不发布"]];
+  return [["目标收藏夹", run.input], ["账号身份", task.identity]];
 }
 
 type TaskExecutionAction = { label: string; detail: string; state: "success" | "running" | "waiting" | "failed" };
@@ -193,18 +211,13 @@ function targetUrl(site: string, kind: PrototypeTask["kind"]) {
 }
 
 function taskSummaryCopy(run: PrototypeRun, state: { newlyCreated: boolean; resumed: boolean; waiting: boolean }) {
-  if (state.waiting) return "当前回合正在等待登录恢复；完成登录并通过校验后会自动继续。";
-  if (state.resumed) return "登录校验已通过，当前回合已恢复执行。";
-  if (state.newlyCreated) return "任务已经开始；首批业务结果就绪后会显示在这里。";
+  if (state.waiting) return "正在等待登录恢复；完成登录并通过校验后会自动继续。";
+  if (state.resumed) return "登录校验已通过，任务已恢复执行。";
+  if (state.newlyCreated) return "任务已经开始；业务结果就绪后会显示在这里。";
   if (run.state === "running" && run.artifactCurrent != null && run.artifactTotal != null) return `已返回 ${run.artifactCurrent}/${run.artifactTotal} 条结果，任务仍在继续。`;
   if (run.state === "partial") return "已保存 3/4 个文件；未完成项保留在结果中，可单独重试。";
   if (run.state === "not-submitted") return "内容已准备完成但尚未发布，当前状态保持为未提交。";
   return run.summary;
-}
-
-function RunStateChip({ run }: { run: PrototypeRun }) {
-  const icon = run.state === "success" ? <Check size={13} /> : run.state === "running" ? <LoaderCircle size={13} /> : <CircleAlert size={13} />;
-  return <span className={`prototype-state-chip ${run.state}`}>{icon}{run.stateLabel}</span>;
 }
 
 function PrototypeRunRail({ runs, taskId }: { runs: PrototypeRun[]; taskId: string }) {
@@ -231,17 +244,20 @@ function PrototypeRunRail({ runs, taskId }: { runs: PrototypeRun[]; taskId: stri
 }
 
 function CollectionResult({ run, task, onOpenPreview }: { run: PrototypeRun; task: PrototypeTask; onOpenPreview: (selection: PrototypePreviewSelection) => void }) {
+  const [visibleCount, setVisibleCount] = useState(5);
   const running = run.state === "running";
   const isProductCollection = task.site === "淘宝";
-  const resultName = isProductCollection ? "商品" : "笔记";
   const rows = isProductCollection ? productRows : resultRows;
+  const total = running ? run.artifactCurrent ?? rows.length : run.artifactTotal ?? rows.length;
+  const availableRows = rows.slice(0, Math.min(total, rows.length));
+  const visibleRows = availableRows.slice(0, visibleCount);
+  const nextCount = Math.min(5, availableRows.length - visibleRows.length);
 
   return (
     <section className="prototype-section result-section">
       <div className="prototype-section-title">
         <div>
           <h2>采集结果</h2>
-          <p>{running ? `已返回 ${run.artifactCurrent ?? rows.length}/${run.artifactTotal ?? "?"} 条${resultName} · 当前预览 ${rows.length} 条` : `返回 ${run.artifactTotal ?? rows.length} 条${resultName} · 当前预览 ${rows.length} 条`}</p>
         </div>
         <div className="section-actions"><button className="prototype-button" type="button"><ListFilter size={14} />筛选</button><button className="prototype-button" type="button">导出</button></div>
       </div>
@@ -249,9 +265,10 @@ function CollectionResult({ run, task, onOpenPreview }: { run: PrototypeRun; tas
       <div className="prototype-table-wrap">
         <table className="prototype-table">
           <thead><tr>{(isProductCollection ? ["商品", "价格", "库存", "读取时间"] : ["笔记标题", "作者", "互动", "读取时间"]).map((heading) => <th key={heading}>{heading}</th>)}<th aria-label="操作" /></tr></thead>
-          <tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`在右侧预览 ${row[0]}`} title="在右侧预览" onClick={() => onOpenPreview({ kind: isProductCollection ? "product" : "note", row, runId: run.id })}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
+          <tbody>{visibleRows.map((row) => <tr key={row[0]}>{row.map((cell) => <td key={cell}>{cell}</td>)}<td><button type="button" aria-label={`在右侧预览 ${row[0]}`} title="在右侧预览" onClick={() => onOpenPreview({ kind: isProductCollection ? "product" : "note", row, runId: run.id })}><ArrowUpRight size={14} /></button></td></tr>)}</tbody>
         </table>
       </div>
+      <footer className="result-table-footer"><span>共 {total} 条数据</span>{nextCount > 0 ? <button className="prototype-button compact" type="button" onClick={() => setVisibleCount((count) => count + nextCount)}>再展示 {nextCount} 条</button> : null}</footer>
     </section>
   );
 }
@@ -272,9 +289,9 @@ function ArticleResult() {
 function DownloadResult() {
   const files = [
     ["新品发布会-主片.mp4", "126 MB", "已保存"],
-    ["产品特写-竖版.mp4", "84 MB", "已保存"],
-    ["用户访谈-片段.mp4", "42 MB", "已保存"],
-    ["幕后花絮.mp4", "—", "来源已失效"],
+    ["新品发布会-封面.png", "8 MB", "已保存"],
+    ["产品讲解-音轨.mp3", "42 MB", "已保存"],
+    ["活动素材-源文件.zip", "—", "来源已失效"],
   ];
   return (
     <section className="prototype-section">
