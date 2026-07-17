@@ -33,6 +33,7 @@ input:focus-visible {
 .prototype-right-topbar:empty { display: none; }
 
 .prototype-topbar .topbar-center-surface {
+  overflow: visible;
   background: var(--we-surface-primary);
 }
 
