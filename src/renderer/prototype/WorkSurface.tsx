@@ -1,18 +1,22 @@
 import {
   ArrowUp,
   ArrowUpRight,
+  BookOpenText,
+  Bookmark,
   Check,
   CheckCircle2,
   ChevronDown,
   CircleAlert,
-  Download,
   ExternalLink,
   FileText,
   FolderOpen,
   ListFilter,
+  Library,
   LoaderCircle,
   Paperclip,
+  PenLine,
   Play,
+  Search,
   ShieldCheck,
   Square,
   X,
@@ -464,6 +468,12 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
   const taskKind: PrototypeTask["kind"] = selectedSkill.id === "wechat-read" ? "article" : selectedSkill.tags.includes("内容发布") ? "write" : selectedSkill.tags.includes("内容下载") ? "download" : "collection";
   const actionCategory = actionCategoryForTask(taskKind);
   const actionDeclared = selectedSkill.actionCategories.includes(actionCategory);
+  const suggestedTasks = [
+    { skillId: "xhs-search", identityId: "xhs-a" },
+    { skillId: "xhs-publish", identityId: "xhs-a" },
+    { skillId: "wechat-read", identityId: "wechat-brand" },
+    { skillId: "xhs-favorites", identityId: "xhs-a" },
+  ];
   const threadExecutionMode = existingThread == null ? undefined : threadExecutionModes[existingThread.id]?.[actionCategory];
   const executionMode = actionDeclared ? threadExecutionMode ?? skillPolicy?.[actionCategory] ?? globalPolicy[actionCategory] : "block";
   const executionSource = actionDeclared ? threadExecutionMode != null ? "当前线程" : skillPolicy == null ? "全局默认" : "我的技能默认" : "技能声明不匹配";
@@ -530,16 +540,35 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
 
   return (
     <div className="prototype-page create-task-page">
-      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">任务</div><h1>创建任务</h1><p>任务输入由站点技能定义，不使用开放式指令。</p></div></header>
-      <div className="create-task-layout">
-        <form className="prototype-form" onSubmit={submitTask}>
-          <fieldset><legend>1. 选择站点技能</legend><label>站点技能<select disabled={pendingDecision} value={selectedSkill.id} onChange={(event) => onSelectSkill(event.target.value)}>{skills.filter((skill) => skill.availability === "available").map((skill) => <option key={skill.id} value={skill.id}>{skill.site} · {skill.name}</option>)}</select></label><button className="inline-link" type="button" disabled={pendingDecision} onClick={onOpenLibrary}>浏览全部站点技能</button></fieldset>
-          <fieldset><legend>2. 选择账号身份</legend>{compatibleIdentities.length > 0 ? <label>账号身份<select disabled={pendingDecision} value={identityId} onChange={(event) => setIdentityId(event.target.value)}>{compatibleIdentities.map((identity) => <option key={identity.id} value={identity.id}>{identity.account} · {identity.platformId ?? identity.name} · {identity.stateLabel}</option>)}</select></label> : <div className="empty-inline"><CircleAlert size={16} /><span>没有兼容的账号身份</span><button type="button" disabled={pendingDecision} onClick={onCreateIdentity}>创建账号身份</button></div>}</fieldset>
-          <fieldset><legend>3. 填写业务输入</legend><label>{selectedSkill.inputLabel}<input required disabled={pendingDecision} value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} /></label>{selectedSkill.id === "xhs-search" ? <div className="inline-form-grid"><label>结果数量<select defaultValue="20" disabled={pendingDecision}><option>20</option><option>50</option><option>100</option></select></label><label>排序<select defaultValue="综合" disabled={pendingDecision}><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}</fieldset>
-          <fieldset><legend>4. 检查并创建</legend><div className="task-review-row"><span>预期结果</span><strong>{selectedSkill.output}</strong></div><div className="task-review-row"><span>{actionCategoryLabels[actionCategory]}</span><strong>{executionModeLabels[executionMode]} · {executionSource}</strong></div>{executionMode === "block" ? <p className="muted-copy action-stopped"><CircleAlert size={14} />当前业务动作已设为禁止，任务不会开始。</p> : null}{decisionStatus !== "" ? <p className="muted-copy">{decisionStatus}</p> : null}{pendingDecision ? <section className="composer-action-confirmation create-action-confirmation" aria-label="确认当前动作"><div><CircleAlert size={16} /><span><strong>{actionCategoryLabels[actionCategory]}</strong><small>{selectedIdentity?.account} · {selectedSkill.site} · {businessInput}</small></span></div><div><button ref={rejectButtonRef} type="button" onClick={() => { setPendingDecision(false); setDecisionStatus("已拒绝这一次，业务输入仍保留"); }}>拒绝这一次</button><button className="primary" type="button" onClick={() => createTask("当前动作决定")}>允许这一次</button></div></section> : <button className="prototype-button primary create-submit" type="submit" disabled={businessInput.trim() === "" || compatibleIdentities.length === 0 || executionMode === "block"}><Play size={14} />创建并运行</button>}</fieldset>
-        </form>
-        <aside className="create-task-summary"><div className="skill-mark"><Download size={18} /></div><h2>{selectedSkill.name}</h2><p>{selectedSkill.description}</p><dl><div><dt>站点</dt><dd>{selectedSkill.site}</dd></div><div><dt>业务输入</dt><dd>{selectedSkill.inputLabel}</dd></div><div><dt>结果</dt><dd>{selectedSkill.output}</dd></div></dl></aside>
-      </div>
+      <section className="create-task-empty" aria-labelledby="create-task-heading">
+        <span className="create-task-empty-icon" aria-hidden="true"><Square size={22} /></span>
+        <h1 id="create-task-heading">这次要让网站完成什么？</h1>
+        <div className="create-task-suggestions">
+          {suggestedTasks.map(({ skillId, identityId: suggestedIdentityId }) => {
+            const skill = skills.find((item) => item.id === skillId);
+            const identity = identities.find((item) => item.id === suggestedIdentityId);
+            if (skill == null || identity == null || !identityCanUseSkill(identity, skill)) return null;
+            const icon = skillId === "xhs-search" ? <Search size={16} /> : skillId === "wechat-read" ? <BookOpenText size={16} /> : skillId === "xhs-favorites" ? <Bookmark size={16} /> : <PenLine size={16} />;
+            const selected = selectedSkill.id === skill.id && identityId === identity.id;
+            return <button aria-pressed={selected} className={selected ? "selected" : ""} type="button" key={`${skill.id}-${identity.id}`} onClick={() => { onSelectSkill(skill.id); setIdentityId(identity.id); }}>{icon}<span><strong>{skill.name}</strong><small>{identity.account} · {skill.site}</small></span></button>;
+          })}
+        </div>
+      </section>
+
+      <form className="thread-composer create-task-launcher" aria-label="创建任务" onSubmit={submitTask}>
+        <div className="create-task-context-row">
+          <label><span>站点技能</span><select disabled={pendingDecision} value={selectedSkill.id} onChange={(event) => onSelectSkill(event.target.value)}>{skills.filter((skill) => skill.availability === "available").map((skill) => <option key={skill.id} value={skill.id}>{skill.site} · {skill.name}</option>)}</select></label>
+          {compatibleIdentities.length > 0 ? <label><span>账号身份</span><select disabled={pendingDecision} value={identityId} onChange={(event) => setIdentityId(event.target.value)}>{compatibleIdentities.map((identity) => <option key={identity.id} value={identity.id}>{identity.account} · {identity.platformId ?? identity.name}</option>)}</select></label> : <div className="empty-inline"><CircleAlert size={16} /><span>没有兼容的账号身份</span><button type="button" disabled={pendingDecision} onClick={onCreateIdentity}>创建账号身份</button></div>}
+        </div>
+        <label className="create-task-business-input"><span>{selectedSkill.inputLabel}</span>{taskKind === "write" || taskKind === "download" ? <textarea required disabled={pendingDecision} value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} /> : <input required disabled={pendingDecision} value={businessInput} placeholder={selectedSkill.inputPlaceholder} onChange={(event) => setBusinessInput(event.target.value)} />}</label>
+        {selectedSkill.id === "xhs-search" ? <div className="create-task-options"><label><span>结果数量</span><select defaultValue="20" disabled={pendingDecision}><option>20</option><option>50</option><option>100</option></select></label><label><span>排序</span><select defaultValue="综合" disabled={pendingDecision}><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}
+        {pendingDecision ? <section className="composer-action-confirmation create-action-confirmation" aria-label="确认当前动作"><div><CircleAlert size={16} /><span><strong>{actionCategoryLabels[actionCategory]}</strong><small>{selectedIdentity?.account} · {selectedSkill.site} · {businessInput}</small></span></div><div><button ref={rejectButtonRef} type="button" onClick={() => { setPendingDecision(false); setDecisionStatus("已拒绝这一次，业务输入仍保留"); }}>拒绝这一次</button><button className="primary" type="button" onClick={() => createTask("当前动作决定")}>允许这一次</button></div></section> : null}
+        <div className="composer-toolbar">
+          <div className="composer-inline-controls"><button className="composer-icon-button" type="button" title="浏览站点技能" aria-label="浏览站点技能" disabled={pendingDecision} onClick={onOpenLibrary}><Library size={15} /></button><span className="prototype-composer-context">{selectedSkill.site} · {selectedSkill.name}</span><span className="composer-execution-locked"><ShieldCheck size={14} /><span>{actionCategoryLabels[actionCategory]} · {executionModeLabels[executionMode]} · {executionSource}</span></span></div>
+          <div className="composer-expanding-controls"><span className={`composer-validation ${businessInput.trim() !== "" && compatibleIdentities.length > 0 && executionMode !== "block" ? "ready" : "blocked"}`}>{decisionStatus || (executionMode === "block" ? "当前业务动作已禁止" : compatibleIdentities.length === 0 ? "请选择兼容的账号身份" : businessInput.trim() === "" ? `请填写${selectedSkill.inputLabel}` : "输入已校验")}</span></div>
+          <div className="composer-actions"><button className="composer-send" type="submit" title="创建并运行" aria-label="创建并运行" disabled={pendingDecision || businessInput.trim() === "" || compatibleIdentities.length === 0 || executionMode === "block"}><ArrowUp size={15} /></button></div>
+        </div>
+      </form>
     </div>
   );
 }

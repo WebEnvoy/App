@@ -130,7 +130,7 @@ export function HumanWorkbenchPrototype() {
 
   function openView(nextView: AppView) {
     setView(nextView);
-    if (nextView === "work") setWorkMode("detail");
+    if (nextView === "work") setWorkMode("create");
     if (nextView === "browser") setBrowserMode("detail");
     if (nextView === "library") {
       setLibraryMode("catalog");
@@ -385,7 +385,6 @@ export function HumanWorkbenchPrototype() {
             </span>
             <h2>{pageTitle}</h2>
             <div className="prototype-center-actions">
-              {view === "work" ? <button className="prototype-button compact primary" type="button" onClick={() => createTask()}><Plus size={14} />创建任务</button> : null}
               {view === "browser" && browserMode !== "create" ? <button className="prototype-button compact" type="button" onClick={() => { setIdentityCreationSite("小红书"); setReturnToTaskCreation(false); setBrowserMode("create"); }}><Plus size={14} />创建身份</button> : null}
             </div>
           </div>
