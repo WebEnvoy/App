@@ -158,9 +158,11 @@ export function HumanWorkbenchPrototype() {
     setView("work");
   }
 
-  function submitTask(task: PrototypeTask) {
+  function submitTask(task: PrototypeTask, executionModes?: Partial<ExecutionPolicy>) {
     const existingThread = taskList.find((item) => item.site === task.site && item.skill === task.skill && item.identityId === task.identityId);
+    const threadId = existingThread?.id ?? task.id;
     const run = task.runs?.[0] ?? { id: `run-${Date.now()}`, label: "本回合", input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary };
+    if (executionModes != null && Object.keys(executionModes).length > 0) setThreadExecutionModes((current) => ({ ...current, [threadId]: { ...current[threadId], ...executionModes } }));
     if (existingThread == null) {
       setTaskList((current) => [{ ...task, runs: [run] }, ...current]);
       setSelectedTaskId(task.id);

@@ -26,6 +26,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "../ThreadNavigationRail";
 
 import {
+  actionCategories,
   actionCategoryForTask,
   actionCategoryLabels,
   executionModeLabels,
@@ -71,7 +72,7 @@ export function WorkSurface({
   tasks: PrototypeTask[];
   threadExecutionModes: Record<string, Partial<ExecutionPolicy>>;
   onCreateIdentity: () => void;
-  onCreateTask: (task: PrototypeTask) => void;
+  onCreateTask: (task: PrototypeTask, executionModes?: Partial<ExecutionPolicy>) => void;
   onOpenPreview: (selection: PrototypePreviewSelection) => void;
   onOpenBrowser: () => void;
   onOpenLibrary: () => void;
@@ -456,12 +457,13 @@ function WriteResult() {
   );
 }
 
-function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, tasks, threadExecutionModes, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: ExecutionPolicy; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy?: ExecutionPolicy; tasks: PrototypeTask[]; threadExecutionModes: Record<string, Partial<ExecutionPolicy>>; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
+function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, selectedSkill, skillPolicy, tasks, threadExecutionModes, onCreateIdentity, onCreateTask, onOpenLibrary, onSelectSkill }: { globalPolicy: ExecutionPolicy; identities: Identity[]; preferredIdentityId: string; selectedSkill: Skill; skillPolicy?: ExecutionPolicy; tasks: PrototypeTask[]; threadExecutionModes: Record<string, Partial<ExecutionPolicy>>; onCreateIdentity: () => void; onCreateTask: (task: PrototypeTask, executionModes?: Partial<ExecutionPolicy>) => void; onOpenLibrary: () => void; onSelectSkill: (skillId: string) => void }) {
   const [businessInput, setBusinessInput] = useState("");
   const [identityId, setIdentityId] = useState(preferredIdentityId);
   const [pendingDecision, setPendingDecision] = useState(false);
   const [decisionStatus, setDecisionStatus] = useState("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [creationExecutionModes, setCreationExecutionModes] = useState<Partial<ExecutionPolicy>>({});
   const rejectButtonRef = useRef<HTMLButtonElement | null>(null);
   const compatibleIdentities = identities.filter((identity) => identityCanUseSkill(identity, selectedSkill));
   const selectedIdentity = compatibleIdentities.find((identity) => identity.id === identityId);
@@ -475,15 +477,17 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
     { skillId: "wechat-read", identityId: "wechat-brand" },
     { skillId: "xhs-favorites", identityId: "xhs-a" },
   ];
-  const threadExecutionMode = existingThread == null ? undefined : threadExecutionModes[existingThread.id]?.[actionCategory];
-  const executionMode = actionDeclared ? threadExecutionMode ?? skillPolicy?.[actionCategory] ?? globalPolicy[actionCategory] : "block";
-  const executionSource = actionDeclared ? threadExecutionMode != null ? "当前线程" : skillPolicy == null ? "全局默认" : "我的技能默认" : "技能声明不匹配";
+  const executionModes = Object.fromEntries(actionCategories.map((category) => [category, selectedSkill.actionCategories.includes(category) ? creationExecutionModes[category] ?? (existingThread == null ? undefined : threadExecutionModes[existingThread.id]?.[category]) ?? skillPolicy?.[category] ?? globalPolicy[category] : "block"])) as ExecutionPolicy;
+  const executionSources = Object.fromEntries(actionCategories.map((category) => [category, selectedSkill.actionCategories.includes(category) ? creationExecutionModes[category] != null || (existingThread != null && threadExecutionModes[existingThread.id]?.[category] != null) ? "当前线程" : skillPolicy == null ? "全局默认" : "我的技能默认" : "技能声明不匹配"])) as Record<ActionCategory, string>;
+  const executionMode = executionModes[actionCategory];
+  const executionSource = executionSources[actionCategory];
 
   useEffect(() => {
     setBusinessInput("");
     setPendingDecision(false);
     setDecisionStatus("");
     setSubmitAttempted(false);
+    setCreationExecutionModes({});
   }, [selectedSkill.id]);
 
   useEffect(() => {
@@ -495,7 +499,14 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
     setPendingDecision(false);
     setDecisionStatus("");
     setSubmitAttempted(false);
-  }, [executionMode, identityId]);
+    setCreationExecutionModes({});
+  }, [identityId]);
+
+  useEffect(() => {
+    setPendingDecision(false);
+    setDecisionStatus("");
+    setSubmitAttempted(false);
+  }, [executionMode]);
 
   useEffect(() => {
     if (pendingDecision) rejectButtonRef.current?.focus();
@@ -528,7 +539,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
       runs: [{ id: "run-01", label: "本回合", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${selectedIdentity.account}”执行“${selectedSkill.name}”。`, artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending", executionMode, executionSource: executionRecordSource }],
       artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes",
       artifactState: "pending",
-    });
+    }, creationExecutionModes);
   }
 
   function submitTask(event: FormEvent<HTMLFormElement>) {
@@ -568,7 +579,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
         {selectedSkill.id === "xhs-search" ? <div className="create-task-options"><label><span>结果数量</span><select defaultValue="20" disabled={pendingDecision}><option>20</option><option>50</option><option>100</option></select></label><label><span>排序</span><select defaultValue="综合" disabled={pendingDecision}><option>综合</option><option>最新</option><option>最多点赞</option></select></label></div> : null}
         {pendingDecision ? <section className="composer-action-confirmation create-action-confirmation" aria-label="确认当前动作"><div><CircleAlert size={16} /><span><strong>{actionCategoryLabels[actionCategory]}</strong><small>{selectedIdentity?.account} · {selectedSkill.site} · {businessInput}</small></span></div><div><button ref={rejectButtonRef} type="button" onClick={() => { setPendingDecision(false); setDecisionStatus("已拒绝这一次，业务输入仍保留"); }}>拒绝这一次</button><button className="primary" type="button" onClick={() => createTask("当前动作决定")}>允许这一次</button></div></section> : null}
         <div className="composer-toolbar">
-          <div className="composer-inline-controls"><button className="composer-icon-button" type="button" title="浏览站点技能" aria-label="浏览站点技能" disabled={pendingDecision} onClick={onOpenLibrary}><Library size={15} /></button><span className="prototype-composer-context">{selectedSkill.site} · {selectedSkill.name}</span><span className="composer-execution-locked"><ShieldCheck size={14} /><span>{actionCategoryLabels[actionCategory]} · {executionModeLabels[executionMode]} · {executionSource}</span></span></div>
+          <div className="composer-inline-controls"><button className="composer-icon-button" type="button" title="浏览站点技能" aria-label="浏览站点技能" disabled={pendingDecision} onClick={onOpenLibrary}><Library size={15} /></button><span className="prototype-composer-context">{selectedSkill.site} · {selectedSkill.name}</span>{actionDeclared ? <details className="composer-execution-menu"><summary title={`当前动作：${actionCategoryLabels[actionCategory]}；来源：${executionSource}`}>{actionCategory === "sensitive" && executionMode === "auto" ? <CircleAlert className="danger" size={14} /> : <ShieldCheck size={14} />}<span>{actionCategoryLabels[actionCategory]} · {executionModeLabels[executionMode]} · {executionSource}</span><ChevronDown size={12} /></summary><div><small>{existingThread == null ? "新任务线程的执行设置" : "当前任务线程的执行设置"}</small>{selectedSkill.actionCategories.map((category) => <div className="composer-execution-row" key={category}><span><strong>{actionCategoryLabels[category]}</strong><small>{executionSources[category]}</small></span><div className="execution-mode-options" role="group" aria-label={`${actionCategoryLabels[category]}执行方式`}>{(["auto", "confirm", "block"] as ExecutionMode[]).map((mode) => <button aria-pressed={executionModes[category] === mode} className={executionModes[category] === mode ? "selected" : ""} disabled={pendingDecision} type="button" key={mode} onClick={() => setCreationExecutionModes((current) => ({ ...current, [category]: mode }))}>{executionModeLabels[mode]}</button>)}</div></div>)}{selectedSkill.actionCategories.some((category) => category === "sensitive" && executionModes[category] === "auto") ? <p className="execution-risk"><CircleAlert size={13} />危险行为将自动执行</p> : null}<small>{existingThread == null ? "创建后用于该线程的后续回合" : "提交后用于该线程的后续回合"}</small></div></details> : <span className="composer-execution-locked" title={executionSource}><CircleAlert size={14} /><span>{executionModeLabels[executionMode]} · {executionSource}</span></span>}</div>
           <div className="composer-expanding-controls">{decisionStatus || executionMode === "block" || compatibleIdentities.length === 0 || (submitAttempted && businessInput.trim() === "") ? <span className="composer-validation blocked" aria-live="polite">{decisionStatus || (executionMode === "block" ? "当前业务动作已禁止" : compatibleIdentities.length === 0 ? "请选择兼容的账号身份" : `请填写${selectedSkill.inputLabel}`)}</span> : null}</div>
           <div className="composer-actions"><button className="composer-send" type="submit" title="创建并运行" aria-label="创建并运行" disabled={pendingDecision || compatibleIdentities.length === 0 || executionMode === "block"}><ArrowUp size={15} /></button></div>
         </div>

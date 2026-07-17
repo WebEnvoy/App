@@ -240,6 +240,7 @@
 .create-task-suggestions strong { overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
 .create-task-suggestions small { color: var(--we-foreground-muted); font-size: 10px; }
 .create-task-launcher { width: min(100%, 740px); height: auto; min-height: 148px; margin: 0 auto; gap: 9px; box-shadow: none; }
+.create-task-launcher .composer-toolbar { overflow: visible; }
 .create-task-context-row { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .create-task-options { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .create-task-context-row label,
