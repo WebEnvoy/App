@@ -393,7 +393,8 @@ input:focus-visible {
   border-bottom: 1px solid var(--we-border);
 }
 
-.prototype-disclosure > button {
+.prototype-disclosure > button,
+.prototype-disclosure > summary {
   display: flex;
   width: 100%;
   min-height: 42px;
@@ -405,11 +406,16 @@ input:focus-visible {
   font-size: 12px;
   font-weight: 700;
   text-align: left;
+  cursor: pointer;
+  list-style: none;
 }
 
+.prototype-disclosure > summary::-webkit-details-marker { display: none; }
 .prototype-disclosure > button span { margin-left: auto; color: var(--we-foreground-muted); font-weight: 500; }
+.prototype-disclosure > summary small { margin-left: auto; color: var(--we-foreground-muted); font-weight: 500; }
 .prototype-disclosure svg { transition: transform 160ms ease; }
-.prototype-disclosure svg.rotated { transform: rotate(180deg); }
+.prototype-disclosure svg.rotated,
+.prototype-disclosure[open] > summary svg { transform: rotate(180deg); }
 
 .diagnostic-detail {
   display: grid;

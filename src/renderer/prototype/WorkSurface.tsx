@@ -99,7 +99,6 @@ export function WorkSurface({
 
   return (
     <TaskDetail
-      identities={identities}
       task={task}
       onOpenBrowser={onOpenBrowser}
       onOpenPreview={onOpenPreview}
@@ -109,22 +108,17 @@ export function WorkSurface({
 }
 
 function TaskDetail({
-  identities,
   task,
   onOpenBrowser,
   onOpenPreview,
   onTakeoverCompleted,
 }: {
-  identities: Identity[];
   task: PrototypeTask;
   onOpenBrowser: () => void;
   onOpenPreview: (selection: PrototypePreviewSelection) => void;
   onTakeoverCompleted: () => void;
 }) {
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [takeoverStep, setTakeoverStep] = useState<"idle" | "opened" | "validating">("idle");
-  const identity = identities.find((item) => item.id === task.identityId);
-  const identityLabel = identity?.account ?? task.identity;
   const storedRuns = task.runs ?? [{ id: "run-current", label: task.title, input: task.title, state: task.state, stateLabel: task.stateLabel, summary: task.summary, artifactSet: task.artifactSet, artifactState: task.artifactState, artifactTotal: task.artifactTotal, artifactCurrent: task.artifactCurrent }];
   const taskResumed = task.kind === "takeover" && task.state === "running";
   const runs = taskResumed ? storedRuns.map((run, index) => index === storedRuns.length - 1 ? { ...run, state: "running" as const, stateLabel: "正在继续", summary: "登录状态校验成功，任务已恢复执行。" } : run) : storedRuns;
@@ -145,10 +139,7 @@ function TaskDetail({
           <div className="task-turn-timeline">
             {runs.map((run, index) => <TaskTurn key={`${task.id}-${run.id}`} run={run} task={task} latest={index === runs.length - 1} taskResumed={taskResumed} takeoverStep={takeoverStep} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} onTakeoverStepChange={setTakeoverStep} />)}
           </div>
-
-          <section className="task-source-strip" data-content-search-unit-key={`${task.id}-sources`}><div><span>账号身份</span><strong>{identityLabel}</strong></div><div><span>站点技能</span><strong>{task.skill}</strong></div><div><span>创建来源</span><strong>{task.source}</strong></div><div><span>更新时间</span><strong>{task.updatedAt}</strong></div></section>
-
-          <section className="prototype-disclosure" data-content-search-unit-key={`${task.id}-diagnostics`}><button type="button" onClick={() => setDiagnosticsOpen((open) => !open)}><ChevronDown size={15} className={diagnosticsOpen ? "rotated" : ""} />运行详情与诊断<span>仅在排查问题时查看</span></button>{diagnosticsOpen ? <div className="diagnostic-detail"><p><strong>最近阶段</strong> 页面读取与结果标准化</p><p><strong>来源摘要</strong> 目标页面在 {task.updatedAt} 完成确认</p><p><strong>内部记录</strong> 已保留，可从诊断导出；默认不占用业务结果区域。</p></div> : null}</section>
+          <p className="task-thread-origin">由 {task.source} 创建</p>
         </div>
       </div>
     </div>
@@ -187,6 +178,15 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
         {!newlyCreated && hasResult && task.kind === "write" ? <WriteResult /> : null}
         {resumed ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "22%" }} /></div><span>已读取 3 / 18</span></div> : null}
       </section>
+      <details className="prototype-disclosure task-run-diagnostics">
+        <summary><ChevronDown size={15} /><span>运行详情与诊断</span><small>仅在排查问题时查看</small></summary>
+        <div className="diagnostic-detail">
+          <p><strong>运行状态</strong>{run.stateLabel}</p>
+          <p><strong>执行耗时</strong>{run.duration ?? (run.state === "running" ? "正在计时" : "未记录")}</p>
+          <p><strong>执行方式</strong>{run.executionMode != null && run.executionSource != null ? `${executionModeLabels[run.executionMode]} · ${run.executionSource}` : "历史回合未记录"}</p>
+          <p><strong>内部记录</strong>此回合的执行记录已保留，可用于问题排查。</p>
+        </div>
+      </details>
     </article>
   );
 }

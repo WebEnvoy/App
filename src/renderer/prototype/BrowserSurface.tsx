@@ -148,11 +148,10 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
     <div className="prototype-page identity-detail-page">
       <header className="prototype-page-heading identity-heading">
         <div className="identity-title-group">
-            <span className="identity-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
-            <div>
-              <div className="prototype-eyebrow">{identity.site}</div>
-              <h1>{identity.account}</h1>
-              <p>{identity.name} · {identity.loginState === "not-required" ? "无需登录" : identity.platformId ?? "平台 ID 待同步"}</p>
+          <span className="identity-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span>
+          <div className="identity-title-copy">
+            <h1>{identity.account}</h1>
+            <p><span className="identity-site-tag">{identity.site}</span>{identity.name} · {identity.loginState === "not-required" ? "无需登录" : identity.platformId ?? "平台 ID 待同步"}</p>
           </div>
         </div>
       </header>
