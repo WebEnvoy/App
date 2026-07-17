@@ -100,7 +100,6 @@ export function PrototypeSidebar({
             <span><strong>{identity.account}</strong><small>{identity.loginState === "not-required" ? identity.site : identity.name} · {identity.stateLabel}</small></span>
           </button>
         )) : null}
-        {view === "library" ? <button className={`prototype-sidebar-row site-row discovery-row ${librarySiteFilter === "全部" ? "selected" : ""}`} type="button" onClick={() => onOpenSite("全部")}><Search size={14} /><span><strong>发现全部</strong><small>所有站点与技能</small></span></button> : null}
         {view === "library" ? ["小红书", "微信公众号", "抖音", "淘宝", "BOSS 直聘"].map((site) => (
           <button className={`prototype-sidebar-row site-row ${librarySiteFilter === site ? "selected" : ""}`} type="button" key={site} onClick={() => onOpenSite(site)}>
             <SiteGlyph site={site} /><span><strong>{site}</strong><small>{skills.filter((skill) => skill.site === site).length} 个技能</small></span>

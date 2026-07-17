@@ -30,20 +30,25 @@ type PointerRailTarget = {
 
 export function ThreadNavigationRail({
   activeItemId,
+  ariaLabel = "Core-owned run navigation",
   items,
+  minimumItemCount = 4,
   onActiveItemChange,
 }: {
   activeItemId?: string;
+  ariaLabel?: string;
   items: ThreadNavigationItem[];
+  minimumItemCount?: number;
   onActiveItemChange?: (itemId: string) => void;
 }) {
-  if (items.length < 4) {
+  if (items.length < minimumItemCount) {
     return null;
   }
 
   return (
     <ThreadNavigationRailBody
       activeItemId={activeItemId}
+      ariaLabel={ariaLabel}
       items={items}
       onActiveItemChange={onActiveItemChange}
     />
@@ -52,10 +57,12 @@ export function ThreadNavigationRail({
 
 function ThreadNavigationRailBody({
   activeItemId: controlledActiveItemId,
+  ariaLabel,
   items,
   onActiveItemChange,
 }: {
   activeItemId?: string;
+  ariaLabel: string;
   items: ThreadNavigationItem[];
   onActiveItemChange?: (itemId: string) => void;
 }) {
@@ -326,7 +333,7 @@ function ThreadNavigationRailBody({
   const tooltipItem = hoverTarget?.item;
 
   return (
-    <nav className="thread-navigation-rail" aria-label="Core-owned run navigation">
+    <nav className="thread-navigation-rail" aria-label={ariaLabel}>
       <div
         className="thread-navigation-rail-list vertical-scroll-fade-mask hide-scrollbar"
         data-scrubbing={scrubbedItemId == null ? undefined : true}

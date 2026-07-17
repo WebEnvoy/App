@@ -90,14 +90,14 @@ export type Identity = {
 export const actionCategories: ActionCategory[] = ["observe", "prepare", "external", "sensitive"];
 
 export const actionCategoryLabels: Record<ActionCategory, string> = {
-  observe: "浏览和读取",
+  observe: "读取和下载",
   prepare: "填写但不提交",
   external: "发布或提交",
   sensitive: "危险行为",
 };
 
 export const actionCategoryDetails: Record<ActionCategory, string> = {
-  observe: "浏览网页并读取、筛选或整理内容",
+  observe: "浏览网页，读取、筛选、整理或下载内容",
   prepare: "填写或生成内容，不点击提交",
   external: "发布、发送或提交，让内容对外生效",
   sensitive: "删除、付款或其他难以撤销的操作",

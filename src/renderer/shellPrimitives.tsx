@@ -39,6 +39,7 @@ const PANEL_ANIMATION_DURATION_MS = 500;
 
 type AppShellProps = {
   collapsePanelsOnNarrow?: boolean;
+  initialRightOpen?: boolean;
   left: ReactNode;
   header: (panelControls: ShellPanelControls) => ReactNode;
   workspace: ReactNode;
@@ -46,9 +47,9 @@ type AppShellProps = {
   rightPanelOpenRequestKey?: number;
 };
 
-export function AppShell({ collapsePanelsOnNarrow = false, left, header, workspace, right, rightPanelOpenRequestKey }: AppShellProps) {
+export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = true, left, header, workspace, right, rightPanelOpenRequestKey }: AppShellProps) {
   const [isLeftOpen, setLeftOpen] = useState(true);
-  const [isRightOpen, setRightOpen] = useState(true);
+  const [isRightOpen, setRightOpen] = useState(initialRightOpen);
   const [isLeftPreviewOpen, setLeftPreviewOpen] = useState(false);
   const [isLeftPreviewRendered, setLeftPreviewRendered] = useState(false);
   const [isRightFullscreen, setRightFullscreen] = useState(false);
@@ -76,6 +77,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, left, header, workspa
   const [hoveredFocusArea, setHoveredFocusArea] = useState<FocusAreaName>("thread-workspace");
   const contentRegionBodyRef = useRef<HTMLDivElement | null>(null);
   const leftPreviewExitTimerRef = useRef<number | null>(null);
+  const handledRightPanelOpenRequestKeyRef = useRef<number | undefined>(undefined);
   const hasRightPanel = right != null;
   const rightPanelMaxWidth = getResponsiveRightPanelMaxWidth(
     contentRegionWidth,
@@ -133,9 +135,9 @@ export function AppShell({ collapsePanelsOnNarrow = false, left, header, workspa
   }, [hasRightPanel, isRightOpen]);
 
   useEffect(() => {
-    if (rightPanelOpenRequestKey != null && hasRightPanel) {
-      setRightOpen(true);
-    }
+    if (!hasRightPanel || rightPanelOpenRequestKey == null || handledRightPanelOpenRequestKeyRef.current === rightPanelOpenRequestKey) return;
+    handledRightPanelOpenRequestKeyRef.current = rightPanelOpenRequestKey;
+    setRightOpen(true);
   }, [hasRightPanel, rightPanelOpenRequestKey]);
 
   useEffect(() => {

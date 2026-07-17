@@ -323,7 +323,8 @@ export function HumanWorkbenchPrototype() {
   return (
     <AppShell
       collapsePanelsOnNarrow
-      rightPanelOpenRequestKey={resultPreviewRequestKey}
+      initialRightOpen={false}
+      rightPanelOpenRequestKey={resultPreviewRequestKey || undefined}
       left={
         <LeftPanel>
           <PrototypeSidebar

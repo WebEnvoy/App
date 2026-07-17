@@ -56,10 +56,6 @@
 .prototype-task-thread-layout { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
 .prototype-task-thread-content { display: grid; min-width: 0; align-content: start; gap: 14px; }
 .prototype-task-thread-content > * { width: 100%; min-width: 0; max-width: 100%; }
-.prototype-task-thread-layout .thread-navigation-rail { top: 50vh; }
-.prototype-run-rail { margin-left: calc(0px - clamp(22px, 4vw, 54px)); }
-.prototype-run-rail .thread-navigation-row { height: 24px; }
-.prototype-run-rail .thread-navigation-marker { --marker-progress: 0.5; opacity: 0.6; }
 .task-turn-timeline { display: grid; }
 .task-turn-detail { display: grid; scroll-margin-top: 56px; }
 .task-turn-detail + .task-turn-detail { margin-top: 30px; padding-top: 30px; border-top: 1px solid var(--we-border); }
@@ -364,10 +360,6 @@
   .file-result-row { grid-template-columns: 24px minmax(0, 1fr) max-content; }
   .file-result-row > .saved,
   .file-result-row > .failed { display: none; }
-}
-
-@media (max-width: 850px) {
-  .prototype-run-rail { margin-left: -20px; }
 }
 
 @container (max-width: 760px) {

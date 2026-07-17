@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { ThreadNavigationRail, type ThreadNavigationItem } from "../ThreadNavigationRail";
+
 import {
   actionCategoryForTask,
   actionCategoryLabels,
@@ -360,25 +362,25 @@ function taskSummaryCopy(run: PrototypeRun, state: { newlyCreated: boolean; resu
 }
 
 function PrototypeRunRail({ runs, taskId }: { runs: PrototypeRun[]; taskId: string }) {
+  const navigationItems: ThreadNavigationItem[] = runs.map((run) => ({
+    id: `${taskId}-${run.id}`,
+    getLabel: () => run.input,
+    hasOutput: run.artifactState === "ready",
+    getPreview: () => ({
+      response: run.summary,
+      outputs: [
+        { type: "state", label: run.stateLabel },
+        ...(run.duration == null ? [] : [{ type: "duration", label: run.duration }]),
+      ],
+    }),
+  }));
+
   return (
-    <nav className="thread-navigation-rail prototype-run-rail" aria-label="当前任务线程回合导航">
-      <div className="thread-navigation-rail-list">
-        <div className="thread-navigation-rail-rows">
-          {runs.map((run) => (
-            <button
-              className="thread-navigation-row"
-              type="button"
-              aria-label={`跳转到回合：${run.input}`}
-              title={`${run.label} · ${run.input}`}
-              key={run.id}
-              onClick={() => document.querySelector(`[data-content-search-unit-key="${taskId}-${run.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            >
-              <span className="thread-navigation-marker-frame"><span className="thread-navigation-marker" /></span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </nav>
+    <ThreadNavigationRail
+      ariaLabel="当前任务线程回合导航"
+      items={navigationItems}
+      minimumItemCount={1}
+    />
   );
 }
 
