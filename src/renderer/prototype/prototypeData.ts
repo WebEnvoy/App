@@ -18,6 +18,7 @@ export type PrototypeRun = {
   stateLabel: string;
   summary: string;
   duration?: string;
+  endedAt?: string;
   attachments?: string[];
   artifactSet?: ArtifactSet;
   artifactState?: "ready" | "pending" | "none";
@@ -166,8 +167,8 @@ export const tasks: PrototypeTask[] = [
     artifactState: "ready",
     artifactTotal: 12,
     runs: [
-      { id: "run-01", label: "8 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8, executionMode: "auto", executionSource: "我的技能默认" },
-      { id: "run-02", label: "12 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-01", label: "8 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", endedAt: "今天 14:28", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-02", label: "12 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", endedAt: "今天 14:32", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12, executionMode: "auto", executionSource: "我的技能默认" },
     ],
   },
   {
@@ -183,7 +184,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 13:18",
     summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
     kind: "article",
-    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", artifactSet: "article", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", endedAt: "今天 13:18", artifactSet: "article", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
     artifactSet: "article",
     artifactState: "ready",
   },
@@ -200,7 +201,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 12:46",
     summary: "3 个文件已保存，1 个文件因来源失效未完成，可单独重试。",
     kind: "download",
-    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3, executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", endedAt: "今天 12:46", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3, executionMode: "auto", executionSource: "我的技能默认" }],
     artifactSet: "download-files",
     artifactState: "ready",
   },
@@ -217,7 +218,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 11:20",
     summary: "标题、正文和 4 个话题已填入页面并校验，尚未点击发布。",
     kind: "write",
-    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", artifactSet: "write-preview", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", endedAt: "今天 11:20", artifactSet: "write-preview", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
     artifactSet: "write-preview",
     artifactState: "ready",
   },
@@ -255,7 +256,7 @@ export const tasks: PrototypeTask[] = [
     artifactTotal: 80,
     artifactCurrent: 36,
     runs: [
-      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", endedAt: "昨天 23:58", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, executionMode: "auto", executionSource: "我的技能默认" },
       { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36, executionMode: "auto", executionSource: "我的技能默认" },
     ],
   },

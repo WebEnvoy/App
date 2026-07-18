@@ -178,15 +178,7 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
         {!newlyCreated && hasResult && task.kind === "write" ? <WriteResult /> : null}
         {resumed ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "22%" }} /></div><span>已读取 3 / 18</span></div> : null}
       </section>
-      <details className="prototype-disclosure task-run-diagnostics">
-        <summary><ChevronDown size={15} /><span>运行详情与诊断</span><small>仅在排查问题时查看</small></summary>
-        <div className="diagnostic-detail">
-          <p><strong>运行状态</strong>{run.stateLabel}</p>
-          <p><strong>执行耗时</strong>{run.duration ?? (run.state === "running" ? "正在计时" : "未记录")}</p>
-          <p><strong>执行方式</strong>{run.executionMode != null && run.executionSource != null ? `${executionModeLabels[run.executionMode]} · ${run.executionSource}` : "历史回合未记录"}</p>
-          <p><strong>内部记录</strong>此回合的执行记录已保留，可用于问题排查。</p>
-        </div>
-      </details>
+      {run.endedAt != null ? <footer className="task-turn-timestamp"><time>结束于 {run.endedAt}</time></footer> : null}
     </article>
   );
 }

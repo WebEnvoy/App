@@ -103,6 +103,7 @@
 .task-summary-heading.failed .task-summary-state-icon { color: var(--we-status-error); }
 .task-summary-block > header h2 { max-width: 760px; font-size: 15px; line-height: 1.5; }
 .task-summary-block > .prototype-section { padding-top: 4px; }
+.task-turn-timestamp { padding-top: 16px; color: var(--we-foreground-subtle); font-size: 10px; text-align: right; }
 .task-preview-button { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border-radius: 6px; color: var(--we-foreground-muted); background: transparent; }
 .task-preview-button:hover { color: var(--we-foreground); background: var(--we-list-hover-background); }
 .task-progress-snapshot { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 12px; align-items: center; padding: 4px 0 8px; }
@@ -168,7 +169,6 @@
 .artifact-result-facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 11px; }
 
 .task-thread-origin { margin: 18px 0 0; color: var(--we-foreground-subtle); font-size: 10px; text-align: right; }
-.task-run-diagnostics { margin-top: 18px; }
 
 .article-result {
   max-width: 720px;

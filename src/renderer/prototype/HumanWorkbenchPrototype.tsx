@@ -232,7 +232,7 @@ export function HumanWorkbenchPrototype() {
       stateLabel: "已停止",
       updatedAt: "刚刚",
       summary: "当前回合已由用户停止。",
-      runs: (task.runs ?? []).map((run, index, runs) => index === runs.length - 1 && run.state === "running" ? { ...run, state: "failed", stateLabel: "已停止", summary: "当前回合已由用户停止。", artifactState: "none" } : run),
+      runs: (task.runs ?? []).map((run, index, runs) => index === runs.length - 1 && run.state === "running" ? { ...run, state: "failed", stateLabel: "已停止", summary: "当前回合已由用户停止。", endedAt: "刚刚", artifactState: "none" } : run),
       artifactState: "none",
     } : task));
   }
