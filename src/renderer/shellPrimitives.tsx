@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type {
   CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
   ReactNode,
@@ -44,10 +45,11 @@ type AppShellProps = {
   header: (panelControls: ShellPanelControls) => ReactNode;
   workspace: ReactNode;
   right: ReactNode | null;
+  rightPanelCloseRequestKey?: number;
   rightPanelOpenRequestKey?: number;
 };
 
-export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = true, left, header, workspace, right, rightPanelOpenRequestKey }: AppShellProps) {
+export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = true, left, header, workspace, right, rightPanelCloseRequestKey, rightPanelOpenRequestKey }: AppShellProps) {
   const [isLeftOpen, setLeftOpen] = useState(true);
   const [isRightOpen, setRightOpen] = useState(initialRightOpen);
   const [isLeftPreviewOpen, setLeftPreviewOpen] = useState(false);
@@ -78,10 +80,15 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
   const contentRegionBodyRef = useRef<HTMLDivElement | null>(null);
   const leftPreviewExitTimerRef = useRef<number | null>(null);
   const handledRightPanelOpenRequestKeyRef = useRef<number | undefined>(undefined);
+  const handledRightPanelCloseRequestKeyRef = useRef<number | undefined>(undefined);
   const hasRightPanel = right != null;
+  const isVeryNarrow = collapsePanelsOnNarrow
+    && typeof window !== "undefined"
+    && window.matchMedia("(max-width: 720px)").matches;
+  const isRightPanelFullscreen = isRightFullscreen || (isRightOpen && isVeryNarrow);
   const rightPanelMaxWidth = getResponsiveRightPanelMaxWidth(
     contentRegionWidth,
-    isRightFullscreen,
+    isRightPanelFullscreen,
     collapsePanelsOnNarrow,
   );
   const resolvedRightPanelRatio =
@@ -91,7 +98,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
       ? rightPanelWidthRatioToPixels(resolvedRightPanelRatio, contentRegionWidth)
       : rightWidth;
   const fullscreenRightWidth = getAvailableRightPanelWidth(contentRegionWidth, true);
-  const visibleRightWidth = isRightFullscreen
+  const visibleRightWidth = isRightPanelFullscreen
     ? fullscreenRightWidth
     : Math.min(effectiveRightWidth, rightPanelMaxWidth);
   const rightPanelAnimation = usePanelAnimation(isRightOpen);
@@ -141,12 +148,25 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
   }, [hasRightPanel, rightPanelOpenRequestKey]);
 
   useEffect(() => {
+    if (rightPanelCloseRequestKey == null || handledRightPanelCloseRequestKeyRef.current === rightPanelCloseRequestKey) return;
+    handledRightPanelCloseRequestKeyRef.current = rightPanelCloseRequestKey;
+    moveFocusBeforePanelCollapse("right-panel", '[data-shell-panel-toggle="right"]');
+    setRightOpen(false);
+  }, [rightPanelCloseRequestKey]);
+
+  useEffect(() => {
     if (!collapsePanelsOnNarrow) return;
     const narrowWindow = window.matchMedia("(max-width: 960px)");
     const veryNarrowWindow = window.matchMedia("(max-width: 720px)");
     const syncPanels = () => {
-      if (narrowWindow.matches) setLeftOpen(false);
-      if (veryNarrowWindow.matches) setRightOpen(false);
+      if (narrowWindow.matches) {
+        moveFocusBeforePanelCollapse("left-panel", '[data-shell-panel-toggle="left"]');
+        setLeftOpen(false);
+      }
+      if (veryNarrowWindow.matches) {
+        moveFocusBeforePanelCollapse("right-panel", '[data-shell-panel-toggle="right"]');
+        setRightOpen(false);
+      }
     };
     syncPanels();
     narrowWindow.addEventListener("change", syncPanels);
@@ -226,7 +246,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
         {isRightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
       </button>
     ) : null,
-    rightFullscreen: hasRightPanel ? (
+    rightFullscreen: hasRightPanel && !isVeryNarrow ? (
       <button
         className="shell-panel-toggle shell-panel-toggle-right-fullscreen we-toolbar-icon-button cursor-interaction"
         type="button"
@@ -252,7 +272,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
       data-left-panel-open={isLeftOpen}
       data-left-panel-width={isLeftOpen ? leftWidth : 0}
       data-right-panel-open={hasRightPanel && isRightOpen}
-      data-right-panel-fullscreen={isRightFullscreen}
+      data-right-panel-fullscreen={isRightPanelFullscreen}
       data-right-panel-width={hasRightPanel && isRightOpen ? renderedRightWidth : 0}
       style={
         {
@@ -289,6 +309,8 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
             defaultSize={LEFT_PANEL_DEFAULT_WIDTH}
             edge="right"
             getCurrentSize={() => leftWidth}
+            maxSize={LEFT_PANEL_MAX_WIDTH}
+            minSize={LEFT_PANEL_MIN_WIDTH}
             onResizeEnd={(width) => writeStoredPanelWidth(LEFT_PANEL_WIDTH_KEY, width)}
             onResizingChange={(resizing) => {
               if (resizing) {
@@ -311,7 +333,10 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
           minWidth={LEFT_PANEL_MIN_WIDTH}
           maxWidth={LEFT_PANEL_MAX_WIDTH}
           collapseBelow={LEFT_PANEL_COLLAPSE_WIDTH}
-          onCollapse={() => setLeftOpen(false)}
+          onCollapse={() => {
+            moveFocusBeforePanelCollapse("left-panel", '[data-shell-panel-toggle="left"]');
+            setLeftOpen(false);
+          }}
           onOpen={() => setLeftOpen(true)}
           onResize={setLeftWidth}
           onResizeEnd={(width) => writeStoredPanelWidth(LEFT_PANEL_WIDTH_KEY, width)}
@@ -333,9 +358,12 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
                 minWidth={RIGHT_PANEL_MIN_WIDTH}
                 maxWidth={rightPanelMaxWidth}
                 collapseBelow={RIGHT_PANEL_COLLAPSE_WIDTH}
-                resizable={!isRightFullscreen}
+                resizable={!isRightPanelFullscreen}
                 animationProgress={rightPanelAnimation.progress}
-                onCollapse={() => setRightOpen(false)}
+                onCollapse={() => {
+                  moveFocusBeforePanelCollapse("right-panel", '[data-shell-panel-toggle="right"]');
+                  setRightOpen(false);
+                }}
                 onOpen={() => setRightOpen(true)}
                 onResize={(width) => {
                   setRightWidth(width);
@@ -569,6 +597,8 @@ export function ResizablePanel({
           defaultSize={defaultWidth}
           edge="left"
           getCurrentSize={() => width}
+          maxSize={maxWidth}
+          minSize={minWidth}
           onResizeEnd={handleResizeEnd}
           onResizingChange={setIsResizing}
           setSize={setSize}
@@ -580,6 +610,8 @@ export function ResizablePanel({
           defaultSize={defaultWidth}
           edge="right"
           getCurrentSize={() => width}
+          maxSize={maxWidth}
+          minSize={minWidth}
           onResizeEnd={handleResizeEnd}
           onResizingChange={setIsResizing}
           setSize={setSize}
@@ -691,6 +723,8 @@ function ResizeHandle({
   defaultSize,
   edge,
   getCurrentSize,
+  maxSize,
+  minSize,
   onResizeEnd,
   onResizingChange,
   setSize,
@@ -699,6 +733,8 @@ function ResizeHandle({
   defaultSize: number;
   edge: ResizeEdge;
   getCurrentSize: () => number;
+  maxSize: number;
+  minSize: number;
   onResizeEnd?: (size: number) => void;
   onResizingChange?: (isResizing: boolean) => void;
   setSize: (size: number) => void;
@@ -813,28 +849,62 @@ function ResizeHandle({
     onResizeEnd?.(defaultSize);
   }
 
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const direction = event.key === "ArrowRight" || event.key === "ArrowDown"
+      ? 1
+      : event.key === "ArrowLeft" || event.key === "ArrowUp"
+        ? -1
+        : 0;
+    const matchesAxis = isHorizontal
+      ? event.key === "ArrowLeft" || event.key === "ArrowRight"
+      : event.key === "ArrowUp" || event.key === "ArrowDown";
+    if (disabled || !matchesAxis) return;
+
+    event.preventDefault();
+    const edgeDirection = edge === "left" || edge === "top" ? -1 : 1;
+    const nextSize = clampPanelWidth(
+      getCurrentSize() + direction * edgeDirection * 8,
+      minSize,
+      maxSize,
+    );
+    setSize(nextSize);
+    onResizeEnd?.(nextSize);
+  }
+
   return (
     <ResizeHandleSurface
+      currentSize={getCurrentSize()}
       disabled={disabled}
       edge={edge}
       isResizing={isResizing}
+      maxSize={maxSize}
+      minSize={minSize}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
     />
   );
 }
 
 function ResizeHandleSurface({
+  currentSize,
   disabled,
   edge,
   isResizing,
+  maxSize,
+  minSize,
   onClick,
+  onKeyDown,
   onPointerDown,
 }: {
+  currentSize: number;
   disabled: boolean;
   edge: ResizeEdge;
   isResizing: boolean;
+  maxSize: number;
+  minSize: number;
   onClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
   const isHorizontal = edge === "left" || edge === "right";
@@ -847,13 +917,36 @@ function ResizeHandleSurface({
       role="separator"
       aria-disabled={disabled || undefined}
       aria-orientation={isHorizontal ? "vertical" : "horizontal"}
-      aria-label="Resize panel"
+      aria-label={isHorizontal ? "调整面板宽度" : "调整面板高度"}
+      aria-valuemax={Math.round(maxSize)}
+      aria-valuemin={Math.round(minSize)}
+      aria-valuenow={Math.round(currentSize)}
+      aria-valuetext={`${Math.round(currentSize)} 像素`}
+      tabIndex={disabled ? -1 : 0}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
     >
       <div className="resize-handle-line" />
     </div>
   );
+}
+
+function moveFocusBeforePanelCollapse(area: FocusAreaName, toggleSelector: string) {
+  const panels = document.querySelectorAll<HTMLElement>(`[data-focus-area="${area}"]`);
+  const resizerSelector = area === "left-panel"
+    ? ".left-panel-resizer [role=\"separator\"]"
+    : area === "right-panel"
+      ? ".right-panel-resizer [role=\"separator\"]"
+      : null;
+  const focusIsInsidePanel = [...panels].some((panel) => panel.contains(document.activeElement));
+  const focusIsOnResizer = resizerSelector != null
+    && document.activeElement?.matches(resizerSelector);
+  if (!focusIsInsidePanel && !focusIsOnResizer) return;
+
+  const target = document.querySelector<HTMLElement>(toggleSelector)
+    ?? document.querySelector<HTMLElement>('[data-focus-area="thread-workspace"]');
+  target?.focus();
 }
 
 function isFocusAreaName(area: string | undefined): area is FocusAreaName {
@@ -948,12 +1041,13 @@ function getRightPanelWidthRange(mainContentWidth: number) {
 }
 
 function getAvailableRightPanelWidth(mainContentWidth: number, isFullWidth = false) {
-  return mainContentWidth > 0
-    ? Math.max(
-        RIGHT_PANEL_MIN_WIDTH,
-        isFullWidth ? mainContentWidth : mainContentWidth - RIGHT_PANEL_RESERVED_WIDTH,
-      )
-    : RIGHT_PANEL_DEFAULT_WIDTH;
+  if (mainContentWidth <= 0) return RIGHT_PANEL_DEFAULT_WIDTH;
+
+  const minimumWidth = Math.min(RIGHT_PANEL_MIN_WIDTH, mainContentWidth);
+  const availableWidth = isFullWidth
+    ? mainContentWidth
+    : mainContentWidth - RIGHT_PANEL_RESERVED_WIDTH;
+  return Math.min(mainContentWidth, Math.max(minimumWidth, availableWidth));
 }
 
 function getResponsiveRightPanelMaxWidth(

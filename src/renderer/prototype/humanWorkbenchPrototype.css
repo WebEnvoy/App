@@ -5,13 +5,17 @@ body {
 
 button,
 select,
-input {
+input,
+textarea {
   letter-spacing: 0;
 }
 
 button:focus-visible,
 select:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+details:focus-visible {
   outline: 2px solid var(--we-focus-border);
   outline-offset: 1px;
 }
@@ -57,6 +61,18 @@ input:focus-visible {
 .prototype-right-tab-host { min-width: 0; height: 100%; flex: 1 1 auto; }
 .prototype-right-tab-host .panel-tab-strip { position: static; height: 100%; padding-left: 8px; }
 .app-shell[data-right-panel-open="false"] .prototype-right-tab-host { display: none; }
+
+@media (max-width: 720px) {
+  .app-shell[data-right-panel-open="true"] .prototype-topbar {
+    grid-template-columns: 0 0 minmax(0, 1fr);
+  }
+
+  .app-shell[data-right-panel-open="true"] .prototype-topbar > .topbar-left-slot,
+  .app-shell[data-right-panel-open="true"] .prototype-topbar > .topbar-center-surface {
+    visibility: hidden;
+    overflow: hidden;
+  }
+}
 
 .prototype-sidebar {
   padding-top: 42px;

@@ -33,35 +33,38 @@ import {
   type ActionCategory,
   type ExecutionMode,
   type ExecutionPolicy,
+  type Identity,
   type ProxyProfile,
   type Skill,
 } from "./prototypeData";
 
-const tags = ["全部", "数据采集", "内容发布", "内容下载", "内容浏览"];
+const tags = ["数据采集", "内容发布", "内容下载", "内容浏览"];
 type LibraryMode = "catalog" | "detail" | "create";
 type SettingsSection = "general" | "authorization" | "proxies" | "diagnostics";
 
-export function LibrarySurface({ mode, siteFilter, selectedSkill, skillPolicies, onModeChange, onSelectSkill, onSkillPolicyChange, onUse }: {
+export function LibrarySurface({ disabledSkillIds, mode, siteFilter, selectedSkill, skillPolicies, onModeChange, onSelectSkill, onSkillEnabledChange, onSkillPolicyChange, onUse }: {
+  disabledSkillIds: string[];
   mode: LibraryMode;
   siteFilter: string;
   selectedSkill: Skill;
   skillPolicies: Record<string, ExecutionPolicy>;
   onModeChange: (mode: LibraryMode) => void;
   onSelectSkill: (skillId: string) => void;
+  onSkillEnabledChange: (skillId: string, enabled: boolean) => void;
   onSkillPolicyChange: (skillId: string, policy: ExecutionPolicy) => void;
   onUse: (skillId: string) => void;
 }) {
-  const [tag, setTag] = useState("全部");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const discovery = siteFilter === "全部";
   const filteredSkills = useMemo(() => skills.filter((skill) => {
-    const matchesTag = tag === "全部" || skill.tags.includes(tag);
+    const matchesTag = selectedTags.every((tag) => skill.tags.includes(tag));
     const matchesSite = discovery || skill.site === siteFilter;
     const searchable = `${skill.site}${skill.name}${skill.description}`.toLowerCase();
     return matchesSite && matchesTag && (!discovery || searchable.includes(query.toLowerCase()));
-  }), [discovery, query, siteFilter, tag]);
+  }), [discovery, query, selectedTags, siteFilter]);
 
-  if (mode === "detail") return <SkillDetail policy={skillPolicies[selectedSkill.id]} skill={selectedSkill} onBack={() => onModeChange("catalog")} onPolicyChange={(policy) => onSkillPolicyChange(selectedSkill.id, policy)} onUse={onUse} />;
+  if (mode === "detail") return <SkillDetail enabled={!disabledSkillIds.includes(selectedSkill.id)} policy={skillPolicies[selectedSkill.id]} skill={selectedSkill} onBack={() => onModeChange("catalog")} onPolicyChange={(policy) => onSkillPolicyChange(selectedSkill.id, policy)} onToggleEnabled={() => onSkillEnabledChange(selectedSkill.id, disabledSkillIds.includes(selectedSkill.id))} onUse={onUse} />;
   if (mode === "create") return <CreateSkillSurface onDone={() => onModeChange("catalog")} />;
 
   const sites = Array.from(new Set(filteredSkills.map((skill) => skill.site)));
@@ -74,43 +77,44 @@ export function LibrarySurface({ mode, siteFilter, selectedSkill, skillPolicies,
       )}
       <div className={`library-toolbar ${discovery ? "discovery-toolbar" : "site-toolbar"}`}>
         {discovery ? <label className="prototype-search"><Search size={15} /><input value={query} placeholder="搜索站点或技能" onChange={(event) => setQuery(event.target.value)} /></label> : null}
-        <div className="tag-filter" role="group" aria-label="业务场景筛选">{tags.map((item) => <button className={tag === item ? "selected" : ""} type="button" key={item} onClick={() => setTag(item)}>{item}</button>)}</div>
+        <div className="tag-filter" role="group" aria-label="业务场景筛选"><button className={selectedTags.length === 0 ? "selected" : ""} type="button" aria-pressed={selectedTags.length === 0} onClick={() => setSelectedTags([])}>全部</button>{tags.map((item) => <button className={selectedTags.includes(item) ? "selected" : ""} type="button" aria-pressed={selectedTags.includes(item)} key={item} onClick={() => setSelectedTags((current) => current.includes(item) ? current.filter((tag) => tag !== item) : [...current, item])}>{item}</button>)}</div>
       </div>
-      {sites.length === 0 ? <div className="prototype-empty"><Search size={24} /><h2>没有匹配的站点技能</h2><p>{discovery ? `“${query}” · ${tag}` : `${siteFilter} · ${tag}`}</p><button className="prototype-button" type="button" onClick={() => { setTag("全部"); setQuery(""); }}>清除筛选</button></div> : null}
-      <div className="skill-site-groups">{sites.map((site) => <SkillSiteGroup discovery={discovery} key={site} site={site} siteSkills={filteredSkills.filter((skill) => skill.site === site)} onModeChange={onModeChange} onSelectSkill={onSelectSkill} onUse={onUse} />)}</div>
+      {sites.length === 0 ? <div className="prototype-empty"><Search size={24} /><h2>没有匹配的站点技能</h2><p>{discovery ? `“${query}” · ${selectedTags.join(" + ") || "全部"}` : `${siteFilter} · ${selectedTags.join(" + ") || "全部"}`}</p><button className="prototype-button" type="button" onClick={() => { setSelectedTags([]); setQuery(""); }}>清除筛选</button></div> : null}
+      <div className="skill-site-groups">{sites.map((site) => <SkillSiteGroup disabledSkillIds={disabledSkillIds} discovery={discovery} key={site} site={site} siteSkills={filteredSkills.filter((skill) => skill.site === site)} onModeChange={onModeChange} onSelectSkill={onSelectSkill} onUse={onUse} />)}</div>
     </div>
   );
 }
 
-function SkillSiteGroup({ discovery, site, siteSkills, onModeChange, onSelectSkill, onUse }: { discovery: boolean; site: string; siteSkills: Skill[]; onModeChange: (mode: LibraryMode) => void; onSelectSkill: (skillId: string) => void; onUse: (skillId: string) => void }) {
+function SkillSiteGroup({ disabledSkillIds, discovery, site, siteSkills, onModeChange, onSelectSkill, onUse }: { disabledSkillIds: string[]; discovery: boolean; site: string; siteSkills: Skill[]; onModeChange: (mode: LibraryMode) => void; onSelectSkill: (skillId: string) => void; onUse: (skillId: string) => void }) {
   const types = Array.from(new Set(siteSkills.map((skill) => skill.tags[0] ?? "其他")));
   return (
     <section className="skill-site-group">
       {discovery ? <div className="skill-site-heading"><span className="site-mark"><SiteGlyph site={site} size={16} /></span><h2>{site}</h2></div> : null}
-      {types.map((type) => <div className="skill-type-block" key={type}><h3>{type}</h3><div className="skill-list">{siteSkills.filter((skill) => (skill.tags[0] ?? "其他") === type).map((skill) => <SkillRow key={skill.id} skill={skill} onOpen={() => { onSelectSkill(skill.id); onModeChange("detail"); }} onUse={() => onUse(skill.id)} />)}</div></div>)}
+      {types.map((type) => <div className="skill-type-block" key={type}><h3>{type}</h3><div className="skill-list">{siteSkills.filter((skill) => (skill.tags[0] ?? "其他") === type).map((skill) => <SkillRow enabled={!disabledSkillIds.includes(skill.id)} key={skill.id} skill={skill} onOpen={() => { onSelectSkill(skill.id); onModeChange("detail"); }} onUse={() => onUse(skill.id)} />)}</div></div>)}
     </section>
   );
 }
 
-function SkillRow({ skill, onOpen, onUse }: { skill: Skill; onOpen: () => void; onUse: () => void }) {
+function SkillRow({ enabled, skill, onOpen, onUse }: { enabled: boolean; skill: Skill; onOpen: () => void; onUse: () => void }) {
   return (
     <div className={`skill-row ${skill.availability}`}>
       <button className="skill-row-main" type="button" onClick={onOpen}><span className="skill-icon"><SiteGlyph site={skill.site} size={17} /></span><span><strong>{skill.name}</strong><small>{skill.description}</small><span className="skill-tags">{skill.tags.map((tag) => <em key={tag}>{tag}</em>)}</span></span></button>
-      <div className="skill-row-actions">{skill.availability === "available" ? <><span className="availability"><span />可用</span><button className="prototype-button primary compact" type="button" onClick={onUse}>去使用</button></> : <><span className="availability unavailable"><CircleAlert size={13} />已延期</span><button className="prototype-button compact" type="button" onClick={onOpen}>查看说明</button></>}</div>
+      <div className="skill-row-actions">{skill.availability === "available" ? <><span className={`availability ${enabled ? "" : "unavailable"}`}>{enabled ? <span /> : <CircleAlert size={13} />}{enabled ? "可用" : "已停用"}</span><button className="prototype-button primary compact" type="button" disabled={!enabled} onClick={onUse}>去使用</button></> : <><span className="availability unavailable"><CircleAlert size={13} />已延期</span><button className="prototype-button compact" type="button" onClick={onOpen}>查看说明</button></>}</div>
     </div>
   );
 }
 
-function SkillDetail({ policy, skill, onBack, onPolicyChange, onUse }: { policy?: ExecutionPolicy; skill: Skill; onBack: () => void; onPolicyChange: (policy: ExecutionPolicy) => void; onUse: (skillId: string) => void }) {
+function SkillDetail({ enabled, policy, skill, onBack, onPolicyChange, onToggleEnabled, onUse }: { enabled: boolean; policy?: ExecutionPolicy; skill: Skill; onBack: () => void; onPolicyChange: (policy: ExecutionPolicy) => void; onToggleEnabled: () => void; onUse: (skillId: string) => void }) {
   const userPolicy = policy ?? defaultExecutionPolicy;
+  const [maintenanceStatus, setMaintenanceStatus] = useState("");
   return (
     <div className="prototype-page skill-detail-page">
       <button className="inline-link back-link" type="button" onClick={onBack}>返回站点技能</button>
-      <header className="prototype-page-heading skill-detail-heading"><div className="skill-detail-title"><span className="skill-icon large"><SiteGlyph site={skill.site} size={22} /></span><div><div className="prototype-eyebrow">{skill.site}</div><h1>{skill.name}</h1><div className="skill-tags">{skill.tags.map((tag) => <em key={tag}>{tag}</em>)}</div></div></div>{skill.availability === "available" ? <button className="prototype-button primary" type="button" onClick={() => onUse(skill.id)}>去使用 <ArrowRight size={14} /></button> : <button className="prototype-button" type="button" disabled>当前不可用</button>}</header>
+      <header className="prototype-page-heading skill-detail-heading"><div className="skill-detail-title"><span className="skill-icon large"><SiteGlyph site={skill.site} size={22} /></span><div><div className="prototype-eyebrow">{skill.site}</div><h1>{skill.name}</h1><div className="skill-tags">{skill.tags.map((tag) => <em key={tag}>{tag}</em>)}</div></div></div>{skill.availability === "available" ? <button className="prototype-button primary" type="button" disabled={!enabled} onClick={() => onUse(skill.id)}>{enabled ? "去使用" : "已停用"} <ArrowRight size={14} /></button> : <button className="prototype-button" type="button" disabled>当前不可用</button>}</header>
       {skill.availability === "unavailable" ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>目标站点当前访问受限</strong><p>本技能保留为延期项，当前不会创建生产任务。</p></div></section> : null}
-      <div className="skill-detail-grid"><section className="prototype-section"><h2>这个技能能做什么</h2><p className="lead-copy">{skill.description}</p><dl className="prototype-detail-list"><div><dt>需要提供</dt><dd>{skill.inputLabel}</dd></div><div><dt>返回结果</dt><dd>{skill.output}</dd></div><div><dt>结果视图</dt><dd>{skill.outputView === "product-comparison" ? "商品对比 · 同时保留结构化数据" : "App 标准视图"}</dd></div><div><dt>兼容身份</dt><dd>{skill.site} · {skill.requiresLogin ? "需要已登录账号" : "登录账号或无需登录身份"}</dd></div></dl></section><section className="prototype-section"><h2>创建任务时的输入</h2><div className="sample-contract-field"><label>{skill.inputLabel}</label><div>{skill.inputPlaceholder}</div></div><p className="muted-copy">输入字段、选项与校验由技能合同定义。</p></section></div>
+      <div className="skill-detail-grid"><section className="prototype-section"><h2>这个技能能做什么</h2><p className="lead-copy">{skill.description}</p><dl className="prototype-detail-list"><div><dt>需要提供</dt><dd>{skill.inputFields.map((field) => field.label).join("、")}</dd></div><div><dt>返回结果</dt><dd>{skill.output}</dd></div><div><dt>结果视图</dt><dd>{skill.outputView === "product-comparison" ? "商品对比 · 同时保留结构化数据" : "App 标准视图"}</dd></div><div><dt>兼容身份</dt><dd>{skill.site} · {skill.requiresLogin ? "需要已登录账号" : "登录账号或无需登录身份"}</dd></div></dl></section><section className="prototype-section"><h2>创建任务时的输入</h2>{skill.inputFields.map((field) => <div className="sample-contract-field" key={field.key}><label>{field.label}</label><div>{field.placeholder ?? field.options?.join(" / ")}</div></div>)}<p className="muted-copy">输入字段、选项与校验由技能合同定义。</p></section></div>
       {skill.availability === "available" ? <section className="prototype-section skill-execution-section"><div className="prototype-section-title"><div><h2>我的执行设置</h2><p>修改后作为这个技能的默认设置。</p></div></div><ExecutionPolicyRows categories={skill.actionCategories} policy={userPolicy} onChange={(category, mode) => onPolicyChange({ ...userPolicy, [category]: mode })} /><p className="declared-action-copy">技能声明：{skill.actionCategories.map((category) => actionCategoryLabels[category]).join("、")}；实际目标不匹配或无法分类时停止执行。</p></section> : <section className="prototype-section skill-execution-section"><div className="prototype-section-title"><div><h2>我的执行设置</h2><p>当前技能尚未安装或不可用，不能创建本地设置。</p></div></div></section>}
-      <section className="prototype-disclosure"><button type="button"><ChevronDown size={15} />版本、维护与诊断<span>{skill.availability === "available" ? "当前版本 1.4.2 · 已安装" : "尚未安装 · 当前不可用"}</span></button></section>
+      <details className="prototype-disclosure"><summary><ChevronDown size={15} />版本与维护<span>{skill.availability === "available" ? `当前版本 1.4.2 · ${enabled ? "已启用" : "已停用"}` : "尚未安装 · 当前不可用"}</span></summary><div className="diagnostic-detail"><p>{maintenanceStatus || (skill.availability === "available" ? enabled ? "当前版本与动作声明已通过检查。" : "技能已停用；已有结果仍可查看。" : "目标站点受限，修复前不能创建任务。")}</p><div className="section-actions"><button className="prototype-button" type="button" onClick={() => setMaintenanceStatus(skill.availability === "available" ? "发现 1.5.0：动作声明有变化，安装前需要采用或修订新增动作的推荐方式" : "修复失败：目标站点仍不可访问")}>{skill.availability === "available" ? "检查更新" : "重新检查"}</button><button className="prototype-button" type="button" onClick={() => { if (skill.availability === "available") onToggleEnabled(); setMaintenanceStatus(skill.availability === "available" ? enabled ? "技能已停用；已有结果仍可查看" : "技能已重新启用，可以创建任务" : "仍不可用；已保留诊断信息"); }}>{skill.availability === "available" ? enabled ? "停用技能" : "重新启用" : "保留诊断"}</button></div></div></details>
     </div>
   );
 }
@@ -122,9 +126,9 @@ function CreateSkillSurface({ onDone }: { onDone: () => void }) {
   return <div className="prototype-page create-skill-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">站点技能</div><h1>新增站点技能</h1><p>从本机目录或软件包地址导入站点技能。</p></div></header><form className="prototype-form" onSubmit={(event) => { event.preventDefault(); onDone(); }}><fieldset><legend>技能来源</legend><label>目标站点<select value={site} onChange={(event) => setSite(event.target.value)}><option>小红书</option><option>微信公众号</option><option>抖音</option><option>淘宝</option></select></label><label>本机目录或软件包地址<input required value={source} placeholder="选择目录或输入软件包地址" onChange={(event) => setSource(event.target.value)} /></label></fieldset>{source.trim() !== "" ? <fieldset><legend>安装时的执行方式</legend><p className="muted-copy">已载入技能推荐配置，可直接采用或修订后安装。</p><ExecutionPolicyRows policy={policy} onChange={(category, mode) => setPolicy((current) => ({ ...current, [category]: mode }))} /></fieldset> : null}<div className="form-footer"><span>导入后会检查业务动作、目标范围和输入合同。</span><button className="prototype-button primary" type="submit" disabled={source.trim() === ""}><Plus size={14} />添加技能</button></div></form></div>;
 }
 
-export function SettingsSurface({ globalPolicy, proxies, section, onGlobalPolicyChange, onProxiesChange }: { globalPolicy: ExecutionPolicy; proxies: ProxyProfile[]; section: SettingsSection; onGlobalPolicyChange: (policy: ExecutionPolicy) => void; onProxiesChange: Dispatch<SetStateAction<ProxyProfile[]>> }) {
+export function SettingsSurface({ globalPolicy, identities, proxies, section, onGlobalPolicyChange, onProxiesChange }: { globalPolicy: ExecutionPolicy; identities: Identity[]; proxies: ProxyProfile[]; section: SettingsSection; onGlobalPolicyChange: (policy: ExecutionPolicy) => void; onProxiesChange: Dispatch<SetStateAction<ProxyProfile[]>> }) {
   if (section === "general") return <GeneralSettings />;
-  if (section === "proxies") return <ProxySettings proxies={proxies} onProxiesChange={onProxiesChange} />;
+  if (section === "proxies") return <ProxySettings identities={identities} proxies={proxies} onProxiesChange={onProxiesChange} />;
   if (section === "diagnostics") return <DiagnosticsSettings />;
   return <GlobalExecutionSettings policy={globalPolicy} onPolicyChange={onGlobalPolicyChange} />;
 }
@@ -134,7 +138,7 @@ function GeneralSettings() {
   return <div className="prototype-page settings-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>通用</h1><p>管理 App 的显示语言与本机体验。</p></div></header><section className="settings-main settings-single-column"><div className="settings-section"><div className="settings-section-heading"><Languages size={18} /><div><h2>语言</h2><p>更改 App 导航、按钮和状态文本使用的语言。</p></div></div><label className="settings-control">界面语言<select value={language} onChange={(event) => setLanguage(event.target.value)}><option>简体中文</option><option>English</option></select></label></div></section></div>;
 }
 
-function ProxySettings({ proxies, onProxiesChange }: { proxies: ProxyProfile[]; onProxiesChange: Dispatch<SetStateAction<ProxyProfile[]>> }) {
+function ProxySettings({ identities, proxies, onProxiesChange }: { identities: Identity[]; proxies: ProxyProfile[]; onProxiesChange: Dispatch<SetStateAction<ProxyProfile[]>> }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
 
@@ -145,7 +149,7 @@ function ProxySettings({ proxies, onProxiesChange }: { proxies: ProxyProfile[]; 
     }, 650);
   }
 
-  return <div className="prototype-page settings-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>代理管理</h1><p>集中新增、检测和删除可供账号身份复用的代理。</p></div></header><section className="settings-main settings-single-column"><div className="proxy-list">{proxies.map((proxy) => <div className="proxy-row" key={proxy.id}><span className="service-icon"><Network size={17} /></span><div><strong>{proxy.name}</strong><small>{proxy.address} · {proxy.latency}</small></div><span className={`prototype-state-chip ${proxy.state === "可用" ? "available" : "login"}`}>{proxy.state === "检测中" ? <LoaderCircle size={13} /> : proxy.state === "可用" ? <CircleCheck size={13} /> : <CircleAlert size={13} />}{proxy.state}</span><button className="icon-plain-button" type="button" aria-label={`检测 ${proxy.name}`} title="检测" onClick={() => detectProxy(proxy.id)}><RefreshCw size={14} /></button><button className="icon-plain-button" type="button" aria-label={`删除 ${proxy.name}`} title="删除" onClick={() => onProxiesChange((current) => current.filter((item) => item.id !== proxy.id))}><Trash2 size={14} /></button></div>)}</div><form className="proxy-add-form" onSubmit={(event) => { event.preventDefault(); if (name.trim() === "" || address.trim() === "") return; onProxiesChange((current) => [...current, { id: `proxy-${Date.now()}`, name: name.trim(), address: address.trim(), latency: "尚未检测", state: "未检测" }]); setName(""); setAddress(""); }}><label>代理名称<input value={name} placeholder="例如：美国西海岸线路" onChange={(event) => setName(event.target.value)} /></label><label>地址<input value={address} placeholder="host:port" onChange={(event) => setAddress(event.target.value)} /></label><button className="prototype-button primary" type="submit" disabled={name.trim() === "" || address.trim() === ""}><Plus size={14} />新增代理</button></form></section></div>;
+  return <div className="prototype-page settings-page"><header className="prototype-page-heading"><div><div className="prototype-eyebrow">设置</div><h1>代理管理</h1><p>集中新增、检测和删除可供账号身份复用的代理。</p></div></header><section className="settings-main settings-single-column"><div className="proxy-list">{proxies.map((proxy) => { const inUse = identities.some((identity) => identity.proxy === proxy.name); return <div className="proxy-row" key={proxy.id}><span className="service-icon"><Network size={17} /></span><div><strong>{proxy.name}</strong><small>{proxy.address} · {proxy.latency}{inUse ? " · 正被账号身份使用" : ""}</small></div><span className={`prototype-state-chip ${proxy.state === "可用" ? "available" : "login"}`}>{proxy.state === "检测中" ? <LoaderCircle size={13} /> : proxy.state === "可用" ? <CircleCheck size={13} /> : <CircleAlert size={13} />}{proxy.state}</span><button className="icon-plain-button" type="button" aria-label={`检测 ${proxy.name}`} title="检测" onClick={() => detectProxy(proxy.id)}><RefreshCw size={14} /></button><button className="icon-plain-button" type="button" aria-label={`删除 ${proxy.name}`} title={inUse ? "账号身份正在使用此代理" : "删除"} disabled={inUse} onClick={() => onProxiesChange((current) => current.filter((item) => item.id !== proxy.id))}><Trash2 size={14} /></button></div>; })}</div><form className="proxy-add-form" onSubmit={(event) => { event.preventDefault(); if (name.trim() === "" || address.trim() === "") return; onProxiesChange((current) => [...current, { id: `proxy-${Date.now()}`, name: name.trim(), address: address.trim(), latency: "尚未检测", state: "未检测" }]); setName(""); setAddress(""); }}><label>代理名称<input value={name} placeholder="例如：美国西海岸线路" onChange={(event) => setName(event.target.value)} /></label><label>地址<input value={address} placeholder="host:port" onChange={(event) => setAddress(event.target.value)} /></label><button className="prototype-button primary" type="submit" disabled={name.trim() === "" || address.trim() === ""}><Plus size={14} />新增代理</button></form></section></div>;
 }
 
 function GlobalExecutionSettings({ policy, onPolicyChange }: { policy: ExecutionPolicy; onPolicyChange: (policy: ExecutionPolicy) => void }) {

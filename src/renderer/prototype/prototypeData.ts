@@ -3,7 +3,7 @@ export type ActionCategory = "observe" | "prepare" | "external" | "sensitive";
 export type ExecutionMode = "auto" | "confirm" | "block";
 export type ExecutionPolicy = Record<ActionCategory, ExecutionMode>;
 export type TaskKind = "collection" | "article" | "download" | "write" | "takeover";
-export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
+export type TaskState = "success" | "running" | "partial" | "waiting" | "checking" | "unknown" | "failed" | "cancelled" | "not-submitted";
 export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
 export type SkillOutputView = "product-comparison";
 export type TaskSource = "App" | "CLI" | "MCP" | "API" | "SDK" | "Agent";
@@ -12,10 +12,26 @@ export type PrototypePreviewSelection =
   | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" | "media" | "skill-view" }
   | { kind: "note" | "product"; row: string[]; runId: string };
 
+export type ActionExecutionRecord = {
+  actionCategory: ActionCategory;
+  executionMode: ExecutionMode;
+  executionSource: string;
+  outcome: "running" | "completed" | "cancelled" | "blocked";
+};
+
+export type SubmittedField = {
+  key: string;
+  label: string;
+  value: string;
+};
+
 export type PrototypeRun = {
   id: string;
   label: string;
   input: string;
+  inputs?: Record<string, string>;
+  submittedFields?: SubmittedField[];
+  fieldSchemaVersion?: string;
   state: TaskState;
   stateLabel: string;
   summary: string;
@@ -30,6 +46,9 @@ export type PrototypeRun = {
   outputView?: SkillOutputView;
   executionMode?: ExecutionMode;
   executionSource?: string;
+  actionCategory?: ActionCategory;
+  executionRecords?: ActionExecutionRecord[];
+  recoveryAttempts?: number;
 };
 
 export type ProxyProfile = {
@@ -58,7 +77,29 @@ export type PrototypeTask = {
   artifactState?: "ready" | "pending" | "none";
   artifactTotal?: number;
   artifactCurrent?: number;
+  identityRemoval?: "app-removed" | "environment-deleted";
 };
+
+export function articleResultForRun(run: PrototypeRun) {
+  const source = run.inputs?.url ?? run.input;
+  const issue = source.match(/(?:weekly-|第)(\d+)/)?.[1];
+  return {
+    source,
+    kicker: `产品周报${issue == null ? "" : ` · 第 ${issue} 期`}`,
+    title: issue == null ? "我们如何把重复的网站工作变成可复用任务" : `产品周报第 ${issue} 期：把网站工作变成结构化任务`,
+    author: "WebEnvoy 产品团队",
+    publishedAt: "2026-07-14",
+  };
+}
+
+export function writeResultForRun(run: PrototypeRun, task: PrototypeTask) {
+  return {
+    identity: task.identity,
+    title: run.inputs?.title ?? run.input,
+    body: run.inputs?.body ?? run.input,
+    topics: run.inputs?.topics?.split(/\s+/).filter(Boolean) ?? [],
+  };
+}
 
 export function hasCompatibleOutputView(outputView: SkillOutputView | undefined, artifactSet: ArtifactSet | undefined) {
   return outputView === "product-comparison" && artifactSet === "shop-products";
@@ -94,6 +135,7 @@ export type Identity = {
   controller?: string;
   currentPage?: string;
   lastHealthyAt?: string;
+  importSource?: string;
 };
 
 export const actionCategories: ActionCategory[] = ["observe", "prepare", "external", "sensitive"];
@@ -132,13 +174,32 @@ export type Skill = {
   tags: string[];
   actionCategories: ActionCategory[];
   description: string;
-  inputLabel: string;
-  inputPlaceholder: string;
+  inputSchemaVersion: string;
+  inputFields: SkillInputField[];
   output: string;
   outputView?: SkillOutputView;
   requiresLogin: boolean;
   availability: "available" | "unavailable";
 };
+
+export type SkillInputField = {
+  key: string;
+  label: string;
+  placeholder?: string;
+  control?: "text" | "url" | "number" | "textarea" | "select";
+  options?: string[];
+  min?: number;
+  max?: number;
+  defaultValue?: string;
+};
+
+export function snapshotSubmittedFields(skill: Skill, inputs: Record<string, string>): SubmittedField[] {
+  return skill.inputFields.map((field) => ({
+    key: field.key,
+    label: field.label,
+    value: inputs[field.key] ?? "",
+  }));
+}
 
 export function identityCanUseSkill(identity: Identity, skill: Skill) {
   const loginReady = identity.loginState === "logged-in" || (!skill.requiresLogin && identity.loginState === "not-required");
@@ -148,7 +209,7 @@ export function identityCanUseSkill(identity: Identity, skill: Skill) {
     && loginReady;
 }
 
-export function actionCategoryForTask(kind: TaskKind): ActionCategory {
+export function initialActionCategoryForTask(kind: TaskKind): ActionCategory {
   return kind === "write" ? "prepare" : "observe";
 }
 
@@ -176,8 +237,9 @@ export const tasks: PrototypeTask[] = [
     artifactState: "ready",
     artifactTotal: 12,
     runs: [
-      { id: "run-01", label: "8 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", endedAt: "今天 14:28", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8, executionMode: "auto", executionSource: "我的技能默认" },
-      { id: "run-02", label: "12 条采集", input: "AI 工具", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", endedAt: "今天 14:32", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-01", label: "8 条采集", input: "AI 工具", inputs: { keyword: "AI 工具", quantity: "20", sort: "综合" }, submittedFields: [{ key: "keyword", label: "搜索关键词", value: "AI 工具" }, { key: "quantity", label: "结果数量", value: "20" }, { key: "sort", label: "排序", value: "综合" }], fieldSchemaVersion: "xhs-search/1", state: "success", stateLabel: "已完成 · 8 条", summary: "读取 8 条笔记。", duration: "42 秒", endedAt: "今天 14:28", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 8, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-02", label: "12 条采集", input: "AI 工具", inputs: { keyword: "AI 工具", quantity: "20", sort: "最新" }, submittedFields: [{ key: "keyword", label: "搜索关键词", value: "AI 工具" }, { key: "quantity", label: "结果数量", value: "20" }, { key: "sort", label: "排序", value: "最新" }], fieldSchemaVersion: "xhs-search/1", state: "success", stateLabel: "已完成 · 12 条", summary: "读取 12 条笔记并更新结构化结果。", duration: "1 分 14 秒", endedAt: "今天 14:32", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 12, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-03", label: "空结果", input: "不存在的关键词", inputs: { keyword: "不存在的关键词", quantity: "20", sort: "综合" }, submittedFields: [{ key: "keyword", label: "搜索关键词", value: "不存在的关键词" }, { key: "quantity", label: "结果数量", value: "20" }, { key: "sort", label: "排序", value: "综合" }], fieldSchemaVersion: "xhs-search/1", state: "success", stateLabel: "已完成 · 0 条", summary: "没有找到匹配笔记，可修改关键词后再次提交。", duration: "19 秒", endedAt: "今天 14:36", artifactSet: "xhs-notes", artifactState: "ready", artifactTotal: 0, executionMode: "auto", executionSource: "我的技能默认" },
     ],
   },
   {
@@ -188,14 +250,14 @@ export const tasks: PrototypeTask[] = [
     identity: "品牌内容号",
     identityId: "wechat-brand",
     source: "MCP",
-    state: "success",
-    stateLabel: "已完成",
+    state: "unknown",
+    stateLabel: "状态未知",
     updatedAt: "今天 13:18",
-    summary: "文章正文已读取，可以在 App 内直接阅读并回到来源页面。",
+    summary: "网络中断后暂时无法确认最新回合状态。",
     kind: "article",
-    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", endedAt: "今天 13:18", artifactSet: "article", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "文章读取", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-28", inputs: { url: "https://mp.weixin.qq.com/s/webenvoy-weekly-28" }, submittedFields: [{ key: "url", label: "文章链接", value: "https://mp.weixin.qq.com/s/webenvoy-weekly-28" }], fieldSchemaVersion: "wechat-read/1", state: "success", stateLabel: "已完成", summary: "文章正文和图片已读取。", duration: "18 秒", endedAt: "今天 13:18", artifactSet: "article", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }, { id: "run-02", label: "重连检查", input: "https://mp.weixin.qq.com/s/webenvoy-weekly-29", inputs: { url: "https://mp.weixin.qq.com/s/webenvoy-weekly-29" }, submittedFields: [{ key: "url", label: "文章链接", value: "https://mp.weixin.qq.com/s/webenvoy-weekly-29" }], fieldSchemaVersion: "wechat-read/1", state: "unknown", stateLabel: "状态未知", summary: "正在重新读取运行事实；不会重复提交。", artifactSet: "article", artifactState: "none", executionMode: "auto", executionSource: "我的技能默认" }],
     artifactSet: "article",
-    artifactState: "ready",
+    artifactState: "none",
   },
   {
     id: "douyin-download",
@@ -210,7 +272,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 12:46",
     summary: "3 个文件已保存，1 个文件因来源失效未完成，可单独重试。",
     kind: "download",
-    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", endedAt: "今天 12:46", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3, executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "素材下载", input: "活动视频素材链接 · 4 个", inputs: { urls: "https://www.douyin.com/video/73901\nhttps://www.douyin.com/video/73902\nhttps://www.douyin.com/video/73903\nhttps://www.douyin.com/video/73904" }, submittedFields: [{ key: "urls", label: "视频链接", value: "4 个公开视频链接" }], fieldSchemaVersion: "douyin-download/1", state: "partial", stateLabel: "部分完成 · 3/4", summary: "3 个文件已保存，1 个来源失效。", duration: "2 分 18 秒", endedAt: "今天 12:46", artifactSet: "download-files", artifactState: "ready", artifactTotal: 4, artifactCurrent: 3, executionMode: "auto", executionSource: "我的技能默认" }],
     artifactSet: "download-files",
     artifactState: "ready",
   },
@@ -227,7 +289,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "今天 11:20",
     summary: "标题、正文和 4 个话题已填入页面并校验，尚未点击发布。",
     kind: "write",
-    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", endedAt: "今天 11:20", artifactSet: "write-preview", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "草稿准备", input: "新品体验笔记草稿", inputs: { title: "三个让我每天省下两小时的 AI 工具", body: "最近把日常资料整理、内容归档和选题研究重新做了一遍……" }, submittedFields: [{ key: "title", label: "笔记标题", value: "三个让我每天省下两小时的 AI 工具" }, { key: "body", label: "草稿正文", value: "最近把日常资料整理、内容归档和选题研究重新做了一遍……" }], fieldSchemaVersion: "xhs-publish/1", attachments: ["封面.png", "工作流-1.png", "工作流-2.png", "工具清单.png"], state: "not-submitted", stateLabel: "未提交", summary: "页面内容已填写并校验，尚未发布。", duration: "34 秒", endedAt: "今天 11:20", artifactSet: "write-preview", artifactState: "ready", executionMode: "auto", executionSource: "我的技能默认" }],
     artifactSet: "write-preview",
     artifactState: "ready",
   },
@@ -244,7 +306,7 @@ export const tasks: PrototypeTask[] = [
     updatedAt: "10 分钟前",
     summary: "账号登录状态已过期。任务已暂停，登录完成并校验成功后会继续。",
     kind: "takeover",
-    runs: [{ id: "run-01", label: "收藏夹读取", input: "读取收藏夹：竞品笔记", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none", executionMode: "auto", executionSource: "我的技能默认" }],
+    runs: [{ id: "run-01", label: "收藏夹读取", input: "读取收藏夹：竞品笔记", inputs: { folder: "竞品笔记" }, submittedFields: [{ key: "folder", label: "目标收藏夹", value: "竞品笔记" }], fieldSchemaVersion: "xhs-favorites/1", state: "waiting", stateLabel: "等待人工处理", summary: "登录状态已过期，等待用户恢复。", artifactState: "none", executionMode: "auto", executionSource: "我的技能默认" }],
     artifactState: "none",
   },
   {
@@ -265,8 +327,8 @@ export const tasks: PrototypeTask[] = [
     artifactTotal: 80,
     artifactCurrent: 36,
     runs: [
-      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", endedAt: "昨天 23:58", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, outputView: "product-comparison", executionMode: "auto", executionSource: "我的技能默认" },
-      { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36, outputView: "product-comparison", executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-01", label: "昨日同步", input: "昨日", inputs: { url: "https://shop.example.com/store/webenvoy", period: "全部" }, submittedFields: [{ key: "url", label: "店铺链接", value: "https://shop.example.com/store/webenvoy" }, { key: "period", label: "时间范围", value: "全部" }], fieldSchemaVersion: "taobao-products/1", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", endedAt: "昨天 23:58", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, outputView: "product-comparison", executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-02", label: "今日同步", input: "今日", inputs: { url: "https://shop.example.com/store/webenvoy", period: "今日" }, submittedFields: [{ key: "url", label: "店铺链接", value: "https://shop.example.com/store/webenvoy" }, { key: "period", label: "时间范围", value: "今日" }], fieldSchemaVersion: "taobao-products/1", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36, outputView: "product-comparison", executionMode: "auto", executionSource: "我的技能默认" },
     ],
   },
 ];
@@ -359,8 +421,12 @@ export const skills: Skill[] = [
     tags: ["数据采集", "内容浏览"],
     actionCategories: ["observe"],
     description: "按关键词搜索笔记，读取标题、作者、互动数据和正文。",
-    inputLabel: "搜索关键词",
-    inputPlaceholder: "例如：AI 工具",
+    inputSchemaVersion: "xhs-search/1",
+    inputFields: [
+      { key: "keyword", label: "搜索关键词", placeholder: "例如：AI 工具" },
+      { key: "quantity", label: "结果数量", control: "select", options: ["20", "50", "100"], defaultValue: "20" },
+      { key: "sort", label: "排序", control: "select", options: ["综合", "最新", "最多点赞"], defaultValue: "综合" },
+    ],
     output: "笔记列表、内容详情、作者与互动数据",
     requiresLogin: false,
     availability: "available",
@@ -372,8 +438,11 @@ export const skills: Skill[] = [
     tags: ["内容发布"],
     actionCategories: ["observe", "prepare", "external"],
     description: "填写标题、正文、图片与话题，并按当前执行方式决定是否提交。",
-    inputLabel: "笔记标题",
-    inputPlaceholder: "输入本次发布的标题",
+    inputSchemaVersion: "xhs-publish/1",
+    inputFields: [
+      { key: "title", label: "笔记标题", placeholder: "输入本次发布的标题" },
+      { key: "body", label: "草稿正文", placeholder: "输入要填写到页面的正文", control: "textarea" },
+    ],
     output: "提交状态与页面结果",
     requiresLogin: true,
     availability: "available",
@@ -385,8 +454,8 @@ export const skills: Skill[] = [
     tags: ["内容浏览", "数据采集"],
     actionCategories: ["observe"],
     description: "读取指定收藏夹中的笔记，并保留内容、作者与来源信息。",
-    inputLabel: "目标收藏夹",
-    inputPlaceholder: "输入收藏夹名称或网址",
+    inputSchemaVersion: "xhs-favorites/1",
+    inputFields: [{ key: "folder", label: "目标收藏夹", placeholder: "输入收藏夹名称或网址" }],
     output: "收藏笔记列表、内容详情与来源信息",
     requiresLogin: true,
     availability: "available",
@@ -398,8 +467,8 @@ export const skills: Skill[] = [
     tags: ["内容浏览", "数据采集"],
     actionCategories: ["observe"],
     description: "读取指定公众号文章，保留正文结构、图片与来源信息。",
-    inputLabel: "文章链接",
-    inputPlaceholder: "粘贴 mp.weixin.qq.com 文章链接",
+    inputSchemaVersion: "wechat-read/1",
+    inputFields: [{ key: "url", label: "文章链接", placeholder: "粘贴 mp.weixin.qq.com 文章链接", control: "url" }],
     output: "可阅读文章、作者、发布时间与图片",
     requiresLogin: false,
     availability: "available",
@@ -411,8 +480,8 @@ export const skills: Skill[] = [
     tags: ["内容下载"],
     actionCategories: ["observe"],
     description: "保存指定公开视频及其基础描述，逐个显示文件结果。",
-    inputLabel: "视频链接",
-    inputPlaceholder: "粘贴一个或多个公开视频链接",
+    inputSchemaVersion: "douyin-download/1",
+    inputFields: [{ key: "urls", label: "视频链接", placeholder: "每行粘贴一个公开视频链接", control: "textarea" }],
     output: "视频文件、文件名、大小与保存位置",
     requiresLogin: false,
     availability: "available",
@@ -424,8 +493,11 @@ export const skills: Skill[] = [
     tags: ["数据采集"],
     actionCategories: ["observe"],
     description: "读取店铺商品列表中的标题、价格、库存和详情链接。",
-    inputLabel: "店铺链接",
-    inputPlaceholder: "粘贴目标店铺首页链接",
+    inputSchemaVersion: "taobao-products/1",
+    inputFields: [
+      { key: "url", label: "店铺链接", placeholder: "粘贴目标店铺首页链接", control: "url" },
+      { key: "period", label: "时间范围", control: "select", options: ["今日", "最近 7 天", "全部"], defaultValue: "今日" },
+    ],
     output: "结构化商品列表",
     outputView: "product-comparison",
     requiresLogin: false,
@@ -438,8 +510,8 @@ export const skills: Skill[] = [
     tags: ["数据采集", "内容浏览"],
     actionCategories: ["observe"],
     description: "目标站点当前访问条件不稳定，暂不允许创建生产任务。",
-    inputLabel: "职位关键词",
-    inputPlaceholder: "暂不可用",
+    inputSchemaVersion: "boss-jobs/1",
+    inputFields: [{ key: "keyword", label: "职位关键词", placeholder: "暂不可用" }],
     output: "职位列表与详情",
     requiresLogin: false,
     availability: "unavailable",

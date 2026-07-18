@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   UserRoundPlus,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Identity, PrototypeTask, ProxyProfile } from "./prototypeData";
 
@@ -23,18 +23,20 @@ type BrowserMode = "catalog" | "detail" | "create" | "repair" | "edit" | "depend
 type BrowserSurfaceProps = {
   cloakProviderInstalled: boolean;
   identities: Identity[];
-  identity: Identity;
+  identity?: Identity;
   initialIdentitySite: string;
   mode: BrowserMode;
   proxies: ProxyProfile[];
   tasks: PrototypeTask[];
   onCreate: (identity: Identity) => void;
   onCreateRequested: () => void;
-  onDeleteIdentity: (identityId: string) => void;
+  onDeleteIdentity: (identityId: string, deleteEnvironment: boolean) => void;
+  onLoginCompleted: (identityId: string) => void;
   onManageProxies: () => void;
   onModeChange: (mode: BrowserMode) => void;
   onOpenIdentity: (identityId: string) => void;
   onOpenInstance: (identityId: string) => void;
+  onStopInstance: (identityId: string) => void;
   onProviderRepaired: () => void;
   onUpdateIdentity: (identity: Identity) => void;
   onUseSkill: () => void;
@@ -51,10 +53,12 @@ export function BrowserSurface({
   onCreate,
   onCreateRequested,
   onDeleteIdentity,
+  onLoginCompleted,
   onManageProxies,
   onModeChange,
   onOpenIdentity,
   onOpenInstance,
+  onStopInstance,
   onProviderRepaired,
   onUpdateIdentity,
   onUseSkill,
@@ -64,13 +68,14 @@ export function BrowserSurface({
   if (mode === "repair") {
     return <ProviderRecovery onDone={() => { onProviderRepaired(); onModeChange("dependencies"); }} />;
   }
-  if (mode === "edit") {
-    return <EditIdentity cloakProviderInstalled={cloakProviderInstalled} identity={identity} proxies={proxies} onDelete={onDeleteIdentity} onManageProxies={onManageProxies} onSave={onUpdateIdentity} />;
-  }
   if (mode === "dependencies") {
     return <EnvironmentDependencies cloakProviderInstalled={cloakProviderInstalled} identities={identities} onModeChange={onModeChange} />;
   }
-  return <IdentityDetail identity={identity} onModeChange={onModeChange} onOpenInstance={onOpenInstance} onUseSkill={onUseSkill} />;
+  if (identity == null) return <IdentityCatalog identities={identities} tasks={tasks} onCreate={onCreateRequested} onOpenIdentity={onOpenIdentity} />;
+  if (mode === "edit") {
+    return <EditIdentity cloakProviderInstalled={cloakProviderInstalled} identity={identity} proxies={proxies} onDelete={onDeleteIdentity} onManageProxies={onManageProxies} onSave={onUpdateIdentity} />;
+  }
+  return <IdentityDetail identity={identity} onLoginCompleted={onLoginCompleted} onModeChange={onModeChange} onOpenInstance={onOpenInstance} onStopInstance={onStopInstance} onUseSkill={onUseSkill} />;
 }
 
 type IdentitySort = "recent" | "site";
@@ -78,7 +83,20 @@ type IdentitySort = "recent" | "site";
 function IdentityCatalog({ identities, tasks, onCreate, onOpenIdentity }: { identities: Identity[]; tasks: PrototypeTask[]; onCreate: () => void; onOpenIdentity: (identityId: string) => void }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<IdentitySort>("recent");
-  const orderedIdentities = useMemo(() => sortIdentities(identities, tasks, sort).filter((identity) => `${identity.account}${identity.name}${identity.site}`.toLowerCase().includes(query.trim().toLowerCase())), [identities, query, sort, tasks]);
+  const [site, setSite] = useState("全部站点");
+  const [tag, setTag] = useState("全部标签");
+  const [status, setStatus] = useState("全部状态");
+  const [provider, setProvider] = useState("全部 Provider");
+  const orderedIdentities = useMemo(() => sortIdentities(identities, tasks, sort).filter((identity) => {
+    const searchable = `${identity.account}${identity.name}${identity.site}${identity.tags?.join("") ?? ""}`.toLowerCase();
+    const state = identityStatus(identity).label;
+    return searchable.includes(query.trim().toLowerCase())
+      && (site === "全部站点" || identity.site === site)
+      && (tag === "全部标签" || identity.tags?.includes(tag))
+      && (status === "全部状态" || state === status)
+      && (provider === "全部 Provider" || identity.provider === provider);
+  }), [identities, provider, query, site, sort, status, tag, tasks]);
+  const filtersActive = query !== "" || site !== "全部站点" || tag !== "全部标签" || status !== "全部状态" || provider !== "全部 Provider";
   const groups = sort === "site"
     ? Array.from(new Set(orderedIdentities.map((identity) => identity.site))).map((site) => ({ label: site, identities: orderedIdentities.filter((identity) => identity.site === site) }))
     : [{ label: "最近使用", identities: orderedIdentities }];
@@ -88,9 +106,14 @@ function IdentityCatalog({ identities, tasks, onCreate, onOpenIdentity }: { iden
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>账号身份</h1><p>管理站点账号、登录状态和本机浏览器环境。</p></div><button className="prototype-button primary" type="button" onClick={onCreate}><UserRoundPlus size={14} />创建账号身份</button></header>
       <div className="library-toolbar identity-catalog-toolbar">
         <label className="prototype-search"><Search size={15} /><input aria-label="搜索账号身份" value={query} placeholder="搜索账号、身份名称或站点" onChange={(event) => setQuery(event.target.value)} /></label>
+        <select aria-label="按站点筛选" value={site} onChange={(event) => setSite(event.target.value)}><option>全部站点</option>{Array.from(new Set(identities.map((identity) => identity.site))).map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="按标签筛选" value={tag} onChange={(event) => setTag(event.target.value)}><option>全部标签</option>{Array.from(new Set(identities.flatMap((identity) => identity.tags ?? []))).map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="按状态筛选" value={status} onChange={(event) => setStatus(event.target.value)}><option>全部状态</option>{["运行中", "可用", "需要登录", "需要修复"].map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="按 Provider 筛选" value={provider} onChange={(event) => setProvider(event.target.value)}><option>全部 Provider</option>{Array.from(new Set(identities.map((identity) => identity.provider))).map((value) => <option key={value}>{value}</option>)}</select>
         <div className="tag-filter" role="group" aria-label="账号身份排序方式"><button className={sort === "recent" ? "selected" : ""} type="button" aria-pressed={sort === "recent"} onClick={() => setSort("recent")}>最近使用</button><button className={sort === "site" ? "selected" : ""} type="button" aria-pressed={sort === "site"} onClick={() => setSort("site")}>站点名称</button></div>
+        <span className="identity-result-count">{orderedIdentities.length} 个身份</span>{filtersActive ? <button className="inline-link" type="button" onClick={() => { setQuery(""); setSite("全部站点"); setTag("全部标签"); setStatus("全部状态"); setProvider("全部 Provider"); }}>清除筛选</button> : null}
       </div>
-      {orderedIdentities.length === 0 ? <div className="prototype-empty"><Search size={24} /><h2>没有匹配的账号身份</h2><p>{query}</p><button className="prototype-button" type="button" onClick={() => setQuery("")}>清除搜索</button></div> : null}
+      {orderedIdentities.length === 0 ? <div className="prototype-empty">{identities.length === 0 ? <UserRoundPlus size={24} /> : <Search size={24} />}<h2>{identities.length === 0 ? "尚未创建账号身份" : "没有匹配的账号身份"}</h2><p>{identities.length === 0 ? "创建身份后即可启动浏览器或创建站点任务。" : "调整当前搜索或筛选条件"}</p><button className="prototype-button" type="button" onClick={identities.length === 0 ? onCreate : () => { setQuery(""); setSite("全部站点"); setTag("全部标签"); setStatus("全部状态"); setProvider("全部 Provider"); }}>{identities.length === 0 ? "创建账号身份" : "清除筛选"}</button></div> : null}
       <div className="identity-catalog-groups">{groups.map((group) => group.identities.length > 0 ? <section className="identity-catalog-group" key={group.label}><h2>{group.label}</h2><div className="identity-catalog-list">{group.identities.map((item) => <IdentityCatalogRow identity={item} key={item.id} onOpen={() => onOpenIdentity(item.id)} />)}</div></section> : null)}</div>
     </div>
   );
@@ -136,7 +159,7 @@ function taskRecency(label: string) {
   return 0;
 }
 
-function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: { identity: Identity; onModeChange: (mode: BrowserMode) => void; onOpenInstance: (identityId: string) => void; onUseSkill: () => void }) {
+function IdentityDetail({ identity, onLoginCompleted, onModeChange, onOpenInstance, onStopInstance, onUseSkill }: { identity: Identity; onLoginCompleted: (identityId: string) => void; onModeChange: (mode: BrowserMode) => void; onOpenInstance: (identityId: string) => void; onStopInstance: (identityId: string) => void; onUseSkill: () => void }) {
   const unavailable = identity.state === "repair";
   const running = identity.sessionState === "running";
   const sessionFailed = identity.sessionState === "failed";
@@ -170,7 +193,9 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
           </div>
         </div>
         <div className="section-actions">
+          {identity.loginState === "login-required" && running ? <button className="prototype-button primary" type="button" onClick={() => onLoginCompleted(identity.id)}><Check size={14} />我已完成登录</button> : null}
           <button className="prototype-button primary" type="button" disabled={unavailable} onClick={() => onOpenInstance(identity.id)}><Monitor size={14} />{running ? "聚焦浏览器" : sessionFailed ? "重试启动" : identity.loginState === "login-required" || identity.loginState === "unknown" ? "打开浏览器并登录" : "启动浏览器"}</button>
+          {running ? <button className="prototype-button" type="button" onClick={() => onStopInstance(identity.id)}>停止实例</button> : null}
           <button className="prototype-button" type="button" disabled={!canCreateTask} onClick={onUseSkill}><Play size={14} />创建任务</button>
         </div>
       </section>
@@ -189,7 +214,7 @@ function IdentityDetail({ identity, onModeChange, onOpenInstance, onUseSkill }: 
   );
 }
 
-function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onManageProxies, onSave }: { cloakProviderInstalled: boolean; identity: Identity; proxies: ProxyProfile[]; onDelete: (identityId: string) => void; onManageProxies: () => void; onSave: (identity: Identity) => void }) {
+function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onManageProxies, onSave }: { cloakProviderInstalled: boolean; identity: Identity; proxies: ProxyProfile[]; onDelete: (identityId: string, deleteEnvironment: boolean) => void; onManageProxies: () => void; onSave: (identity: Identity) => void }) {
   const [name, setName] = useState(identity.name);
   const [provider, setProvider] = useState(identity.provider);
   const [profile, setProfile] = useState<ProfilePreset>(() => profileFromIdentity(identity));
@@ -203,6 +228,30 @@ function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onM
   const [fingerprintSeed, setFingerprintSeed] = useState(identity.fingerprintSeed ?? createFingerprintSeed());
   const [randomized, setRandomized] = useState(false);
   const [pathOpened, setPathOpened] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [proxyCheck, setProxyCheck] = useState<"idle" | "checking" | "success" | "conflict">("idle");
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement | null>(null);
+  const proxyCheckRequestRef = useRef(0);
+  const initialFormRenderRef = useRef(true);
+  const running = identity.sessionState === "running";
+
+  useEffect(() => {
+    if (deleteOpen) window.requestAnimationFrame(() => deleteCancelRef.current?.focus());
+  }, [deleteOpen]);
+
+  useEffect(() => {
+    if (initialFormRenderRef.current) {
+      initialFormRenderRef.current = false;
+      return;
+    }
+    proxyCheckRequestRef.current += 1;
+    setProxyCheck((current) => current === "checking" || current === "success" ? "idle" : current);
+  }, [fingerprintSeed, interactionPreset, language, name, profile, provider, proxy, region, startPage, tags, timezone]);
+
+  useEffect(() => () => {
+    proxyCheckRequestRef.current += 1;
+  }, []);
 
   function randomizeProfile() {
     setProfile(randomProfileAlternative(profile));
@@ -211,27 +260,46 @@ function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onM
   }
 
   function saveChanges() {
-    const providerUnavailable = provider === "CloakBrowser" && !cloakProviderInstalled;
-    const providerChanged = provider !== identity.provider;
+    const snapshot = { name, provider, profile, region, language, timezone, proxy, startPage, tags, interactionPreset, fingerprintSeed };
+    if (snapshot.proxy !== "不使用代理") {
+      const requestId = ++proxyCheckRequestRef.current;
+      setProxyCheck("checking");
+      window.setTimeout(() => {
+        if (proxyCheckRequestRef.current !== requestId) return;
+        if (snapshot.proxy === "日本采集线路" && identity.site !== "抖音") {
+          setProxyCheck("conflict");
+          return;
+        }
+        setProxyCheck("success");
+        commitChanges(snapshot);
+      }, 700);
+      return;
+    }
+    commitChanges(snapshot);
+  }
+
+  function commitChanges(snapshot: { name: string; provider: string; profile: ProfilePreset; region: string; language: string; timezone: string; proxy: string; startPage: string; tags: string; interactionPreset: string; fingerprintSeed: string }) {
+    const providerUnavailable = snapshot.provider === "CloakBrowser" && !cloakProviderInstalled;
+    const providerChanged = snapshot.provider !== identity.provider;
     const providerRecovered = identity.state === "repair" && !providerUnavailable;
     const loginConfirmed = (identity.loginState === "logged-in" || identity.loginState === "not-required") && !providerChanged;
     const providerReset = providerChanged || providerRecovered;
     onSave({
       ...identity,
-      name,
-      provider,
-      region,
-      language,
-      timezone,
-      proxy,
-      startPage,
-      platform: profile.platform,
-      screen: profile.screen,
-      hardwareConcurrency: profile.hardwareConcurrency,
-      gpuPreset: profile.gpuPreset,
-      interactionPreset,
-      fingerprintSeed,
-      tags: tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean),
+      name: snapshot.name,
+      provider: snapshot.provider,
+      region: snapshot.region,
+      language: snapshot.language,
+      timezone: snapshot.timezone,
+      proxy: snapshot.proxy,
+      startPage: snapshot.startPage,
+      platform: snapshot.profile.platform,
+      screen: snapshot.profile.screen,
+      hardwareConcurrency: snapshot.profile.hardwareConcurrency,
+      gpuPreset: snapshot.profile.gpuPreset,
+      interactionPreset: snapshot.interactionPreset,
+      fingerprintSeed: snapshot.fingerprintSeed,
+      tags: snapshot.tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean),
       state: providerUnavailable ? "repair" : providerReset ? loginConfirmed ? "available" : "login" : identity.state,
       stateLabel: providerUnavailable ? "需要修复" : providerReset ? loginConfirmed ? "可用" : "需要登录" : identity.stateLabel,
       loginState: providerChanged && identity.loginState !== "not-required" ? "unknown" : identity.loginState,
@@ -250,11 +318,10 @@ function EditIdentity({ cloakProviderInstalled, identity, proxies, onDelete, onM
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>编辑 {identity.account}</h1><p>在一个页面统一管理站点账号信息和持久浏览器环境。</p></div></header>
       <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); saveChanges(); }}>
         <fieldset><legend>{identity.loginState === "not-required" ? "浏览器身份" : "站点账号"}</legend><div className="site-account-profile editable-account-profile"><span className="identity-avatar account-avatar">{identity.accountAvatar ?? identity.account.slice(0, 1)}</span><div><strong>{identity.account}</strong><span>{identity.site} · {identity.loginState === "not-required" ? "无需登录" : identity.platformId ?? "平台 ID 待同步"}</span></div><span className={`prototype-state-chip ${identity.loginState === "logged-in" || identity.loginState === "not-required" ? "available" : "login"}`}>{identity.loginState === "logged-in" ? "已登录" : identity.loginState === "not-required" ? "无需登录" : "待登录"}</span></div><p className="muted-copy">{identity.loginState === "not-required" ? "这个环境不预置站点登录状态；以后仍可在浏览器中人工登录。" : "昵称、头像、平台 ID 和登录状态由登录校验同步，不能在本地修改。"}</p><div className="inline-form-grid"><label>本地身份名称<input required value={name} onChange={(event) => setName(event.target.value)} /></label><label>标签<input value={tags} placeholder="内容运营，品牌号" onChange={(event) => setTags(event.target.value)} /></label></div></fieldset>
-        <fieldset><legend>登录目标</legend><label>目标网站 URL<input type="url" value={startPage} onChange={(event) => setStartPage(event.target.value)} /></label></fieldset>
-        <fieldset><legend>浏览器 Provider</legend><ProviderChoices cloakProviderInstalled={cloakProviderInstalled} provider={provider} onChange={setProvider} /></fieldset>
-        <ProfileEnvironmentFields profile={profile} proxy={proxy} proxies={proxies} region={region} language={language} timezone={timezone} interactionPreset={interactionPreset} fingerprintSeed={fingerprintSeed} randomized={randomized} onManageProxies={onManageProxies} onProfileChange={setProfile} onProxyChange={setProxy} onRegionChange={setRegion} onLanguageChange={setLanguage} onTimezoneChange={setTimezone} onInteractionPresetChange={setInteractionPreset} onFingerprintSeedChange={setFingerprintSeed} onRandomize={randomizeProfile} />
-        <fieldset><legend>本机环境</legend><div className="environment-path-row"><span><strong>数据目录</strong><small>~/Library/Application Support/WebEnvoy/profiles/{identity.id}</small></span><button className="prototype-button" type="button" onClick={() => setPathOpened(true)}>{pathOpened ? "已在访达中显示" : "在访达中显示"}</button></div><p className="muted-copy">删除身份、清理本机环境等操作集中在这里管理。</p></fieldset>
-        <div className="form-footer"><button className="prototype-button danger" type="button" onClick={() => onDelete(identity.id)}>删除账号身份</button><button className="prototype-button primary" type="submit">保存更改</button></div>
+        {running ? <section className="prototype-callout action-needed"><CircleAlert size={18} /><div><strong>实例运行中</strong><p>当前只能修改本地名称和标签；停止实例后才能修改环境或删除身份。</p></div></section> : <><fieldset><legend>登录目标</legend><label>目标网站 URL<input type="url" value={startPage} onChange={(event) => setStartPage(event.target.value)} /></label></fieldset><fieldset><legend>浏览器 Provider</legend><ProviderChoices cloakProviderInstalled={cloakProviderInstalled} provider={provider} onChange={setProvider} /></fieldset><ProfileEnvironmentFields profile={profile} proxy={proxy} proxies={proxies} region={region} language={language} timezone={timezone} interactionPreset={interactionPreset} fingerprintSeed={fingerprintSeed} randomized={randomized} onManageProxies={onManageProxies} onProfileChange={setProfile} onProxyChange={(value) => { setProxy(value); setProxyCheck("idle"); }} onRegionChange={setRegion} onLanguageChange={setLanguage} onTimezoneChange={setTimezone} onInteractionPresetChange={setInteractionPreset} onFingerprintSeedChange={setFingerprintSeed} onRandomize={randomizeProfile} /><fieldset><legend>本机环境</legend><div className="environment-path-row"><span><strong>数据目录</strong><small>~/Library/Application Support/WebEnvoy/profiles/{identity.id}</small></span><button className="prototype-button" type="button" onClick={() => setPathOpened(true)}>{pathOpened ? "已在访达中显示" : "在访达中显示"}</button></div><p className="muted-copy">删除身份、清理本机环境等操作集中在这里管理。</p></fieldset></>}
+        {proxyCheck !== "idle" ? <section className={`prototype-callout ${proxyCheck === "conflict" ? "action-needed" : ""}`} aria-live="polite">{proxyCheck === "checking" ? <LoaderCircle size={18} /> : proxyCheck === "success" ? <Check size={18} /> : <CircleAlert size={18} />}<div><strong>{proxyCheck === "checking" ? `正在检查 ${identity.site} 网络` : proxyCheck === "success" ? "目标站点网络检查通过" : "代理与当前站点配置冲突"}</strong><p>{proxyCheck === "conflict" ? "当前出口地区不适合这个身份。请选择其他代理或不使用代理后重试。" : proxyCheck === "checking" ? "正在检查目标可达性、出口地区和配置冲突。" : "代理对当前目标可达，身份设置已保存。"}</p></div>{proxyCheck === "conflict" ? <button className="prototype-button" type="button" onClick={() => { setProxy("团队推荐线路"); setProxyCheck("idle"); }}>改用推荐线路</button> : null}</section> : null}
+        {deleteOpen && !running ? <section className="prototype-section identity-delete-confirmation" role="group" aria-labelledby="identity-delete-title"><h2 id="identity-delete-title">删除账号身份</h2><p>历史任务会保留账号名称并标记身份已删除。</p><div className="section-actions"><button ref={deleteCancelRef} className="prototype-button" type="button" onClick={() => { setDeleteOpen(false); window.setTimeout(() => deleteTriggerRef.current?.focus(), 0); }}>取消</button><button className="prototype-button danger" type="button" onClick={() => onDelete(identity.id, false)}>仅从 App 移除</button><button className="prototype-button danger" type="button" onClick={() => onDelete(identity.id, true)}>同时删除本机环境</button></div></section> : null}
+        <div className="form-footer"><button ref={deleteTriggerRef} className="prototype-button danger" type="button" disabled={running} title={running ? "请先停止实例" : "删除账号身份"} onClick={() => setDeleteOpen(true)}>删除账号身份</button><button className="prototype-button primary" type="submit" disabled={proxyCheck === "checking"}>保存更改</button></div>
       </form>
     </div>
   );
@@ -298,9 +365,12 @@ function CreateIdentity({ cloakProviderInstalled, initialSite, proxies, onCreate
   const [interactionPreset, setInteractionPreset] = useState("正常速度");
   const [fingerprintSeed, setFingerprintSeed] = useState(createFingerprintSeed);
   const [randomized, setRandomized] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importSource, setImportSource] = useState("Chrome · Profile 2");
   const site = loginRequirement === "required" ? siteFromUrl(loginUrl, initialSite) : initialSite;
   const urlValid = loginRequirement === "not-required" || isHttpUrl(loginUrl);
-  const canCreate = loginRequirement === "required" ? urlValid : name.trim() !== "";
+  const importBlocked = importing && importSource.startsWith("CloakBrowser") && !cloakProviderInstalled;
+  const canCreate = !importBlocked && (loginRequirement === "required" ? urlValid : name.trim() !== "");
 
   function randomizeProfile() {
     setProfile(randomProfileAlternative(profile));
@@ -311,29 +381,32 @@ function CreateIdentity({ cloakProviderInstalled, initialSite, proxies, onCreate
   function submitIdentity() {
     const requiresLogin = loginRequirement === "required";
     const identityName = requiresLogin ? `${site}登录身份` : name.trim();
+    const selectedProvider = importing ? importSource.split(" · ")[0] : provider;
     onCreate({
       id: `identity-${Date.now()}`, name: identityName, site, account: requiresLogin ? "等待登录同步" : identityName,
-      accountAvatar: requiresLogin ? "?" : identityName.slice(0, 1), provider, region, language, timezone, proxy,
+      accountAvatar: requiresLogin ? "?" : identityName.slice(0, 1), provider: selectedProvider, region, language, timezone, proxy,
       startPage: requiresLogin ? loginUrl : defaultStartPage(site), tags: [site], platform: profile.platform,
-      fingerprintSeed, fingerprint: provider === "CloakBrowser" ? `独立种子 · ${profile.gpuPreset}` : "Chrome 默认指纹",
+      fingerprintSeed, fingerprint: selectedProvider === "CloakBrowser" ? `独立种子 · ${profile.gpuPreset}` : "Chrome 默认指纹",
       userAgent: `按 ${profile.platform} 预设生成`, screen: profile.screen, hardwareConcurrency: profile.hardwareConcurrency,
       gpuPreset: profile.gpuPreset, interactionPreset, loginState: requiresLogin ? "login-required" : "not-required",
       sessionState: requiresLogin ? "running" : "idle", controller: requiresLogin ? "用户控制" : "空闲",
       currentPage: requiresLogin ? loginUrl : undefined, lastHealthyAt: "刚刚创建",
       state: requiresLogin ? "running" : "available", stateLabel: requiresLogin ? "等待登录" : "可用",
-      detail: requiresLogin ? "浏览器已打开 · 等待完成登录" : "环境已创建 · 无需预置登录",
+      detail: importing ? `已从 ${importSource} 导入 · 原环境保持不变` : requiresLogin ? "浏览器已打开 · 等待完成登录" : "环境已创建 · 无需预置登录",
+      importSource: importing ? importSource : undefined,
     });
   }
 
   return (
     <div className="prototype-page create-identity-page">
-      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>创建账号身份</h1><p>创建一个独立、持久的浏览器环境；需要时再关联站点账号。</p></div><button className="prototype-button" type="button"><Import size={14} />从已有环境导入</button></header>
+      <header className="prototype-page-heading"><div><div className="prototype-eyebrow">账号身份</div><h1>{importing ? "导入已有环境" : "创建账号身份"}</h1><p>{importing ? "检测本机已有浏览器环境，并以新身份 ID 纳入 App。" : "创建一个独立、持久的浏览器环境；需要时再关联站点账号。"}</p></div><button className="prototype-button" type="button" onClick={() => setImporting((value) => !value)}><Import size={14} />{importing ? "返回创建" : "从已有环境导入"}</button></header>
       <form className="prototype-form identity-form" onSubmit={(event) => { event.preventDefault(); submitIdentity(); }}>
+        {importing ? <fieldset><legend>检测到的环境</legend><label>本机环境<select value={importSource} onChange={(event) => setImportSource(event.target.value)}><option>Chrome · Profile 2</option><option>CloakBrowser · marketing-xhs</option></select></label><p className={importBlocked ? "identity-url-status invalid" : "identity-url-status valid"}>{importBlocked ? "CloakBrowser 尚未安装，先修复 Provider 或选择 Chrome 环境。" : `${importSource} 可导入；将保留来源与兼容性记录。`}</p><p className="muted-copy">导入会生成新的身份 ID；原环境保持不变，不读取账号密码。</p></fieldset> : null}
         <fieldset><legend>使用方式</legend><div className="identity-login-choice"><button className={loginRequirement === "required" ? "selected" : ""} type="button" onClick={() => setLoginRequirement("required")}><KeyRound size={17} /><span><strong>需要账号登录</strong><small>打开目标网址，登录后同步账号信息</small></span></button><button className={loginRequirement === "not-required" ? "selected" : ""} type="button" onClick={() => setLoginRequirement("not-required")}><Monitor size={17} /><span><strong>无需账号登录</strong><small>创建一个不预置登录状态的浏览器身份</small></span></button></div></fieldset>
-        <fieldset><legend>{loginRequirement === "required" ? "登录目标" : "身份名称"}</legend>{loginRequirement === "required" ? <><label>目标网站 URL<input required type="url" value={loginUrl} placeholder="https://www.example.com/login" onChange={(event) => setLoginUrl(event.target.value)} /></label><p className={`identity-url-status ${urlValid ? "valid" : "invalid"}`}>{urlValid ? `已识别为 ${site}；创建后将用新环境打开此网址。` : "请输入以 http:// 或 https:// 开头的完整网址。"}</p></> : <label>身份名称<input required value={name} placeholder={`例如：${initialSite}公开浏览`} onChange={(event) => setName(event.target.value)} /></label>}</fieldset>
+        <fieldset><legend>{loginRequirement === "required" ? "登录目标" : "身份名称"}</legend>{loginRequirement === "required" ? <><label>目标网站 URL<input required type="url" value={loginUrl} placeholder="https://www.example.com/login" onChange={(event) => setLoginUrl(event.target.value)} /></label><p className={`identity-url-status ${urlValid ? "valid" : "invalid"}`}>{urlValid ? `已识别为 ${site}；创建后将用新环境打开此网址。` : "请输入以 http:// 或 https:// 开头的完整网址。"}</p></> : <><label>身份名称<input required value={name} placeholder={`例如：${initialSite}公开浏览`} onChange={(event) => setName(event.target.value)} /></label><p className="muted-copy">适用站点：{initialSite}。该身份只会用于此站点中不要求登录的技能。</p></>}</fieldset>
         <fieldset><legend>浏览器 Provider</legend><ProviderChoices cloakProviderInstalled={cloakProviderInstalled} provider={provider} onChange={setProvider} /></fieldset>
         <ProfileEnvironmentFields profile={profile} proxy={proxy} proxies={proxies} region={region} language={language} timezone={timezone} interactionPreset={interactionPreset} fingerprintSeed={fingerprintSeed} randomized={randomized} onManageProxies={onManageProxies} onProfileChange={setProfile} onProxyChange={setProxy} onRegionChange={setRegion} onLanguageChange={setLanguage} onTimezoneChange={setTimezone} onInteractionPresetChange={setInteractionPreset} onFingerprintSeedChange={setFingerprintSeed} onRandomize={randomizeProfile} />
-        <div className="form-footer"><span>{loginRequirement === "required" ? "创建后将拉起独立浏览器，由你完成登录。" : "创建后可直接用于不要求登录的站点技能。"}</span><button className="prototype-button primary" type="submit" disabled={!canCreate}><UserRoundPlus size={14} />{loginRequirement === "required" ? "创建环境并去登录" : "创建环境"}</button></div>
+        <div className="form-footer"><span>{loginRequirement === "required" ? "创建后将拉起独立浏览器，由你完成登录。" : "创建后可直接用于不要求登录的站点技能。"}</span><button className="prototype-button primary" type="submit" disabled={!canCreate}><UserRoundPlus size={14} />{importing ? "导入环境" : loginRequirement === "required" ? "创建环境并去登录" : "创建环境"}</button></div>
       </form>
     </div>
   );
@@ -416,15 +489,25 @@ function ProfileEnvironmentFields({ profile, proxy, proxies, region, language, t
 
 function ProviderRecovery({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<"ready" | "installing" | "complete">("ready");
+  const recoveryStatusRef = useRef<HTMLElement | null>(null);
+  const doneButtonRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (phase !== "installing") return;
     const timer = window.setTimeout(() => setPhase("complete"), 1400);
     return () => window.clearTimeout(timer);
   }, [phase]);
+  useEffect(() => {
+    if (phase === "ready") return;
+    const frame = window.requestAnimationFrame(() => {
+      if (phase === "complete") doneButtonRef.current?.focus();
+      else recoveryStatusRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [phase]);
   return (
     <div className="prototype-page provider-recovery-page">
       <header className="prototype-page-heading"><div><div className="prototype-eyebrow">环境依赖</div><h1>{phase === "complete" ? "CloakBrowser 已可用" : "安装 CloakBrowser"}</h1><p>App 只获取官方安装器，浏览器二进制由 CloakBrowser 官方服务器提供。</p></div></header>
-      <section className="recovery-focus"><span className={`provider-large-icon ${phase}`}>{phase === "complete" ? <Check size={28} /> : phase === "installing" ? <LoaderCircle size={28} /> : <Download size={28} />}</span><div><h2>{phase === "ready" ? "已找到适用于 macOS 的官方安装器" : phase === "installing" ? "正在从官方渠道下载并安装" : "安装与启动验证通过"}</h2><p>{phase === "ready" ? "浏览器二进制不会打包在 WebEnvoy App 中" : phase === "installing" ? "下载完成后会自动执行完整性检查。" : "浏览器将在独立进程中运行，由 App 启动和管理。"}</p></div>{phase === "ready" ? <button className="prototype-button primary" type="button" onClick={() => setPhase("installing")}><Download size={14} />从官方渠道安装</button> : phase === "complete" ? <button className="prototype-button primary" type="button" onClick={onDone}>返回环境依赖</button> : null}</section>
+      <section ref={recoveryStatusRef} className="recovery-focus" tabIndex={phase === "installing" ? -1 : undefined}><span className={`provider-large-icon ${phase}`}>{phase === "complete" ? <Check size={28} /> : phase === "installing" ? <LoaderCircle size={28} /> : <Download size={28} />}</span><div><h2>{phase === "ready" ? "已找到适用于 macOS 的官方安装器" : phase === "installing" ? "正在从官方渠道下载并安装" : "安装与启动验证通过"}</h2><p>{phase === "ready" ? "浏览器二进制不会打包在 WebEnvoy App 中" : phase === "installing" ? "下载完成后会自动执行完整性检查。" : "浏览器将在独立进程中运行，由 App 启动和管理。"}</p></div>{phase === "ready" ? <button className="prototype-button primary" type="button" onClick={() => setPhase("installing")}><Download size={14} />从官方渠道安装</button> : phase === "complete" ? <button ref={doneButtonRef} className="prototype-button primary" type="button" onClick={onDone}>返回环境依赖</button> : null}</section>
       <div className="recovery-steps"><RecoveryStep done={phase !== "ready"} active={phase === "installing"} label="获取官方安装器" detail="确认来源与版本" /><RecoveryStep done={phase === "complete"} active={phase === "installing"} label="下载浏览器并安装" detail="保留已有账号环境" /><RecoveryStep done={phase === "complete"} active={false} label="启动验证" detail="确认独立进程可启动" /></div>
     </div>
   );
@@ -493,5 +576,5 @@ function gpuPresets(platform: NonNullable<Identity["platform"]>) {
 }
 
 function proxyOptions(proxies: ProxyProfile[]) {
-  return proxies.map((proxy) => <option value={proxy.name} key={proxy.id}>{proxy.name}{proxy.state === "可用" ? "" : `（${proxy.state}）`}</option>);
+  return proxies.map((proxy) => <option value={proxy.name} key={proxy.id} disabled={proxy.state !== "可用"}>{proxy.name}{proxy.state === "可用" ? "" : `（${proxy.state}）`}</option>);
 }

@@ -137,7 +137,7 @@ function SidebarHeading({ taskGrouping, taskSort, onCreate, onTaskGroupingChange
   return (
     <div className="section-heading task-list-heading">
       <span>任务线程</span>
-      <span className="section-heading-actions task-list-heading-actions" ref={menuHostRef} onKeyDown={navigateMenu}>
+      <span className="section-heading-actions task-list-heading-actions" ref={menuHostRef} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setMenuOpen(false); }} onKeyDown={navigateMenu}>
         <button ref={menuButtonRef} type="button" aria-label="整理任务线程" title="整理" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><Ellipsis size={15} /></button>
         <button type="button" aria-label="新建任务" title="新建任务" onClick={onCreate}><Plus size={15} /></button>
         {menuOpen ? <TaskListMenu grouping={taskGrouping} sort={taskSort} onGroupingChange={(grouping) => { onTaskGroupingChange(grouping); closeMenu(); }} onSortChange={(sort) => { onTaskSortChange(sort); closeMenu(); }} /> : null}
@@ -215,7 +215,8 @@ function sortTasks(taskList: PrototypeTask[], sort: TaskSort) {
 }
 
 function taskPriority(state: TaskState) {
-  return ({ waiting: 0, failed: 1, partial: 2, "not-submitted": 3, running: 4, success: 5 })[state];
+  const priority: Record<TaskState, number> = { waiting: 0, unknown: 1, checking: 2, failed: 3, partial: 4, "not-submitted": 5, cancelled: 6, running: 7, success: 8 };
+  return priority[state];
 }
 
 function taskRecency(label: string) {

@@ -72,6 +72,7 @@ function ThreadNavigationRailBody({
     new Set(initialActiveItemId == null ? [] : [initialActiveItemId]),
   );
   const [isPointerInsideRail, setIsPointerInsideRail] = useState(false);
+  const [rovingItemId, setRovingItemId] = useState<string | null>(initialActiveItemId);
   const [scrubbedItemId, setScrubbedItemId] = useState<string | null>(null);
   const [hoverTarget, setHoverTarget] = useState<PointerRailTarget | null>(null);
   const [tooltipOpen, setTooltipOpen] = useState(false);
@@ -215,6 +216,12 @@ function ThreadNavigationRailBody({
   }, [activeItemId, scrubbedItemId]);
 
   useEffect(() => {
+    if (rovingItemId == null || !items.some((item) => item.id === rovingItemId)) {
+      setRovingItemId(activeItemId);
+    }
+  }, [activeItemId, itemIdsSignature, items, rovingItemId]);
+
+  useEffect(() => {
     if (!controlledItemExists || controlledActiveItemId == null) {
       return;
     }
@@ -232,7 +239,11 @@ function ThreadNavigationRailBody({
     }
 
     const targetElement = findContentSearchUnitElement(scrollElement, item.id);
-    targetElement?.scrollIntoView({ behavior: scrollBehavior, block: "start" });
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    targetElement?.scrollIntoView({
+      behavior: reducedMotion ? "instant" : scrollBehavior,
+      block: "start",
+    });
     onActiveItemChange?.(item.id);
     animateNavigationTargetHighlight(targetElement);
   }
@@ -333,7 +344,15 @@ function ThreadNavigationRailBody({
   const tooltipItem = hoverTarget?.item;
 
   return (
-    <nav className="thread-navigation-rail" aria-label={ariaLabel}>
+    <nav
+      className="thread-navigation-rail"
+      aria-label={ariaLabel}
+      onBlur={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setHoverTarget(null);
+        setTooltipOpen(false);
+      }}
+    >
       <div
         className="thread-navigation-rail-list vertical-scroll-fade-mask hide-scrollbar"
         data-scrubbing={scrubbedItemId == null ? undefined : true}
@@ -358,12 +377,13 @@ function ThreadNavigationRailBody({
               className="thread-navigation-row"
               data-thread-user-message-navigation-item-id={item.id}
               data-scrub-target={scrubbedItemId === item.id ? true : undefined}
-              aria-current={visibleItemIds.has(item.id) ? "true" : undefined}
+              aria-current={activeItemId === item.id ? "true" : undefined}
               aria-describedby={
                 tooltipOpen && hoverTarget?.item.id === item.id ? tooltipId : undefined
               }
-              aria-label={`跳转到线程段落 ${index + 1}`}
+              aria-label={`跳转到回合：${item.getLabel().trim() || `回合 ${index + 1}`}`}
               key={item.id}
+              tabIndex={rovingItemId === item.id ? 0 : -1}
               title={item.getLabel()}
               type="button"
               onClick={(event) => {
@@ -377,8 +397,26 @@ function ThreadNavigationRailBody({
                 scrollToNavigationItem(item, "smooth");
               }}
               onFocus={(event) => {
+                setRovingItemId(item.id);
                 setHoverTarget({ button: event.currentTarget, item });
                 setTooltipOpen(true);
+              }}
+              onKeyDown={(event) => {
+                const nextIndex = event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? items.length - 1
+                    : event.key === "ArrowUp"
+                      ? Math.max(0, index - 1)
+                      : event.key === "ArrowDown"
+                        ? Math.min(items.length - 1, index + 1)
+                        : -1;
+                if (nextIndex < 0) return;
+
+                event.preventDefault();
+                const nextItem = items[nextIndex];
+                setRovingItemId(nextItem.id);
+                findRailButtonElement(railListRef.current, nextItem.id)?.focus();
               }}
               onPointerEnter={(event) => {
                 setHoverTarget({ button: event.currentTarget, item });
@@ -491,6 +529,7 @@ function getPointerRailTarget(
 }
 
 function animateNavigationTargetHighlight(targetElement: Element | null | undefined) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   targetElement?.animate?.(
     [
       { backgroundColor: "rgba(9, 105, 255, 0)" },

@@ -56,7 +56,10 @@
 .availability > span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .availability.unavailable { color: var(--we-status-warning); }
 
-.identity-catalog-toolbar { margin-bottom: 20px; }
+.identity-catalog-toolbar { flex-wrap: wrap; margin-bottom: 20px; }
+.identity-catalog-toolbar > select { height: 30px; min-width: 112px; padding: 0 8px; border: 1px solid var(--we-border); border-radius: 6px; color: var(--we-foreground); background: var(--we-surface-primary); font-size: 11px; }
+.identity-result-count { color: var(--we-foreground-muted); font-size: 11px; white-space: nowrap; }
+.identity-delete-confirmation { border-color: color-mix(in srgb, var(--we-status-error) 40%, var(--we-border)); }
 .identity-catalog-groups { display: grid; gap: 26px; }
 .identity-catalog-group { display: grid; gap: 8px; }
 .identity-catalog-group > h2 { padding: 0 4px; font-size: 14px; }
@@ -225,6 +228,11 @@
 .dependency-preferences label { display: flex; align-items: center; gap: 8px; color: var(--we-foreground-muted); font-size: 11px; }
 
 @keyframes prototype-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-large-icon.installing svg,
+  .recovery-step.active svg { animation: none; }
+}
 
 @media (max-width: 1100px) {
   .library-toolbar { align-items: stretch; flex-wrap: wrap; }
