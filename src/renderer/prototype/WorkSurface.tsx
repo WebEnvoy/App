@@ -603,6 +603,8 @@ function CollectionResult({ executionMode, executionSource, run, task, onOpenPre
     setBatchStatus("执行方式已变化，请重新发起批量导出");
   }, [executionMode, executionSource]);
 
+  if (total === 0) return null;
+
   function executeBatch() {
     if (executionMode === "block") {
       setBatchConfirming(false);

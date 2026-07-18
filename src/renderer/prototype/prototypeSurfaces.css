@@ -59,11 +59,11 @@
 .task-turn-timeline { display: grid; }
 .task-turn-detail { display: grid; scroll-margin-top: 56px; }
 .task-turn-detail + .task-turn-detail { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--we-border-subtle); }
-.task-input-card { display: grid; grid-template-columns: minmax(110px, 0.32fr) minmax(0, 1fr); min-width: 0; overflow: hidden; border-radius: 6px; background: var(--we-surface-secondary); }
-.task-input-kind { display: flex; min-width: 0; align-items: center; padding: 11px 13px; }
-.task-input-kind span { overflow-wrap: anywhere; font-size: 12px; font-weight: 700; }
-.task-input-card dl { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
-.task-input-card dl > div { display: grid; min-width: 0; gap: 3px; padding: 9px 12px; }
+.task-input-card { display: grid; grid-template-columns: minmax(128px, 0.26fr) minmax(0, 1fr); min-width: 0; gap: 24px; align-items: start; padding: 2px 0 4px; }
+.task-input-kind { display: flex; min-width: 0; align-items: center; padding: 2px 0; }
+.task-input-kind span { overflow-wrap: anywhere; font-size: 13px; font-weight: 700; line-height: 1.4; }
+.task-input-card dl { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px 20px; margin: 0; }
+.task-input-card dl > div { display: grid; min-width: 0; gap: 2px; padding: 2px 0; }
 .task-input-card dt { color: var(--we-foreground-muted); font-size: 10px; }
 .task-input-card dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
 .task-progress-block { display: grid; gap: 12px; padding: 14px 0 8px; }
@@ -384,8 +384,8 @@
   .prototype-composer-context { max-width: 92px; }
   .composer-execution-menu > summary span { max-width: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .composer-validation { max-width: 110px; }
-  .task-input-card { grid-template-columns: 1fr; }
-  .task-input-kind { padding-bottom: 4px; }
+  .task-input-card { grid-template-columns: 1fr; gap: 8px; }
+  .task-input-kind { padding-bottom: 0; }
   .task-input-card dl { grid-template-columns: 1fr; }
   .prototype-table th:nth-child(3),
   .prototype-table th:nth-child(4),
