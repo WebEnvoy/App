@@ -168,6 +168,27 @@
 .artifact-result-facts dt { color: var(--we-foreground-muted); font-size: 10px; }
 .artifact-result-facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 11px; }
 
+.skill-output-view { display: grid; gap: 20px; padding: 18px; }
+.skill-output-view > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.skill-output-view > header > div { min-width: 0; }
+.skill-output-view > header span { color: var(--we-foreground-muted); font-size: 10px; font-weight: 700; }
+.skill-output-view > header h2 { margin-top: 5px; font-size: 18px; }
+.skill-output-view > header p { margin-top: 5px; color: var(--we-foreground-muted); font-size: 11px; line-height: 1.5; }
+.skill-output-comparison { display: grid; overflow: hidden; border: 1px solid var(--we-border); border-radius: 8px; }
+.skill-output-comparison article { display: grid; min-width: 0; grid-template-columns: 24px minmax(0, 1fr) max-content; gap: 10px; align-items: center; min-height: 58px; padding: 9px 11px; border-bottom: 1px solid var(--we-border-subtle); }
+.skill-output-comparison article:last-child { border-bottom: 0; }
+.skill-output-rank { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; color: var(--we-foreground-muted); background: var(--we-surface-secondary); font-size: 10px; font-weight: 800; }
+.skill-output-comparison article > div { display: grid; min-width: 0; gap: 3px; }
+.skill-output-comparison strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.skill-output-comparison small { color: var(--we-foreground-muted); font-size: 10px; }
+.skill-output-comparison b { font-size: 13px; }
+.skill-output-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-top: 1px solid var(--we-border); border-bottom: 1px solid var(--we-border); }
+.skill-output-facts > div { display: grid; gap: 4px; padding: 10px 6px; border-right: 1px solid var(--we-border-subtle); }
+.skill-output-facts > div:last-child { border-right: 0; }
+.skill-output-facts dt { color: var(--we-foreground-muted); font-size: 9px; }
+.skill-output-facts dd { margin: 0; font-size: 12px; font-weight: 700; }
+.skill-output-view > footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; color: var(--we-foreground-muted); font-size: 9px; }
+
 .article-result {
   max-width: 720px;
   padding: 26px 0 30px;

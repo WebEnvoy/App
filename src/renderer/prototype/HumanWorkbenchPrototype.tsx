@@ -209,6 +209,7 @@ export function HumanWorkbenchPrototype() {
       artifactSet: selectedTask.artifactSet,
       artifactState: "pending",
       artifactTotal: quantity,
+      outputView: skills.find((skill) => skill.site === selectedTask.site && skill.name === selectedTask.skill)?.outputView,
       executionMode: selectedTaskExecutionMode,
       executionSource: executionSource ?? selectedTaskExecutionSource,
     };

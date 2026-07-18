@@ -30,6 +30,7 @@ import {
   actionCategoryForTask,
   actionCategoryLabels,
   executionModeLabels,
+  hasCompatibleOutputView,
   identityCanUseSkill,
   productRows,
   resultRows,
@@ -152,7 +153,7 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
   const progressSummary = run.state === "running" || run.state === "waiting";
   const actions = taskExecutionActions(task, run, { newlyCreated, resumed, waiting });
   const summaryCopy = taskSummaryCopy(run, { newlyCreated, resumed, waiting });
-  const previewTab = run.artifactSet === "article" ? "markdown" : run.artifactSet === "download-files" ? "media" : "json";
+  const previewTab = hasCompatibleOutputView(run.outputView, run.artifactSet ?? task.artifactSet) ? "skill-view" : run.artifactSet === "article" ? "markdown" : run.artifactSet === "download-files" ? "media" : "json";
   const executionState = run.state === "running" ? "running" : run.state === "waiting" ? "waiting" : "complete";
   const executionLabel = executionState === "running" ? "正在执行" : executionState === "waiting" ? "等待处理" : "已处理";
   const hasResult = run.artifactState !== "none";
@@ -528,7 +529,7 @@ function CreateTaskSurface({ globalPolicy, identities, preferredIdentityId, sele
       updatedAt: "刚刚",
       summary: `已使用“${businessInput}”创建任务，结果会在此页面持续更新。`,
       kind: taskKind,
-      runs: [{ id: "run-01", label: "本回合", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${selectedIdentity.account}”执行“${selectedSkill.name}”。`, artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending", executionMode, executionSource: executionRecordSource }],
+      runs: [{ id: "run-01", label: "本回合", input: businessInput, state: "running", stateLabel: "正在运行", summary: `正在使用“${selectedIdentity.account}”执行“${selectedSkill.name}”。`, artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes", artifactState: "pending", outputView: selectedSkill.outputView, executionMode, executionSource: executionRecordSource }],
       artifactSet: taskKind === "article" ? "article" : taskKind === "download" ? "download-files" : taskKind === "write" ? "write-preview" : selectedSkill.site === "淘宝" ? "shop-products" : "xhs-notes",
       artifactState: "pending",
     }, creationExecutionModes);

@@ -30,10 +30,11 @@ Open `http://127.0.0.1:5174/prototype.html`.
    each business input followed by a collapsed `正在执行` action record and a
    terminal summary or live progress summary. Expand the action record to inspect
    atomic page actions; waiting and partial outcomes remain honest.
-4. Result consumption: inspect the structured result in the center, then switch
-   the right file preview between JSON, rendered Markdown, and page image. The
-   right panel starts empty and changes only after an explicit center action;
-   rail navigation must not change it.
+4. Result consumption: inspect the App-owned collection, article, media/file and
+   write-result components in the center. Open the Taobao product result to view
+   the skill-provided `商品对比` surface in the right panel, then switch to the
+   retained structured JSON. The right panel starts empty and changes only after
+   an explicit center action; rail navigation must not change it.
 5. Work creation: choose a Site Skill, use its declared fields, choose a
    compatible Account Identity and create the sample task.
 6. Account Identity: inspect independent login, environment, instance and
@@ -95,6 +96,11 @@ Open `http://127.0.0.1:5174/prototype.html`.
   login, environment, instance, controller and health facts. Raw paths,
   endpoints and full fingerprint fields remain folded into technical detail.
 - Task creation is generated from Site Skill inputs rather than an open prompt.
+- Structured output remains the durable result. App-owned renderers cover common
+  result types and retain a generic fallback; a Site Skill may optionally provide
+  a richer right-panel view. The prototype uses a trusted fixture to demonstrate
+  that composition and does not implement the production sandbox or resource
+  protocol.
 - Authorization is configured at its owner surface: global in Settings, skill
   in Library, task in Work, and one-time at execution.
 - Evidence refs, endpoints, raw runtime facts and owner explanations are not

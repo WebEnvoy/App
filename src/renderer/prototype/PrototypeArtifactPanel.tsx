@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import samplePagePreview from "../../../artifacts/app-208-real-read-task.png";
-import { productRows, resultRows, type ArtifactSet, type PrototypePreviewSelection, type PrototypeRun, type PrototypeTask } from "./prototypeData";
+import { hasCompatibleOutputView, productRows, resultRows, type ArtifactSet, type PrototypePreviewSelection, type PrototypeRun, type PrototypeTask } from "./prototypeData";
 
 const downloadFiles = [
   { name: "新品发布会-主片.mp4", size: "126 MB", state: "已保存" },
@@ -14,7 +14,7 @@ const downloadFiles = [
   { name: "活动素材-源文件.zip", size: null, state: "来源已失效" },
 ];
 
-type FileTabId = "json" | "markdown" | "image" | "media";
+type FileTabId = "json" | "markdown" | "image" | "media" | "skill-view";
 type ResultTabId = `result:${string}`;
 type ArtifactTabId = FileTabId | ResultTabId;
 type RunTabState = { openTabIds: ArtifactTabId[]; activeTabId: ArtifactTabId | null };
@@ -25,6 +25,7 @@ const artifactTabLabels: Record<FileTabId, string> = {
   markdown: "summary.md",
   image: "page.png",
   media: "媒体与文件",
+  "skill-view": "商品对比",
 };
 
 export function PrototypeArtifactPanel({ requestKey, run, selection, tabHost, task }: { requestKey: number; run: PrototypeRun | null; selection: PrototypePreviewSelection | null; tabHost: Element | null; task: PrototypeTask }) {
@@ -43,6 +44,7 @@ export function PrototypeArtifactPanel({ requestKey, run, selection, tabHost, ta
     if (artifact != null) result.push("json", "markdown");
     if (artifact != null && artifactSet === "xhs-notes") result.push("image");
     if (artifact != null && artifactSet === "download-files") result.push("media");
+    if (artifact != null && hasCompatibleOutputView(run.outputView, artifactSet)) result.unshift("skill-view");
     return result;
   }, [artifact, artifactSet, resultTabs, run]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -117,7 +119,7 @@ export function PrototypeArtifactPanel({ requestKey, run, selection, tabHost, ta
           </div>,
           tabHost,
         )}
-        <div ref={panelContentRef} className="panel-tab-content" tabIndex={-1}>{run == null ? <ArtifactIdle /> : tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task)}</div>
+        <div ref={panelContentRef} className="panel-tab-content" tabIndex={-1}>{run == null ? <ArtifactIdle /> : tabState.activeTabId == null ? state === "pending" ? <ArtifactPending /> : availableTabIds.length > 0 ? <ArtifactTabsClosed /> : <ArtifactEmpty /> : renderTab(tabState.activeTabId, artifact, artifactSet, resultTabs, run, state, task, openTab)}</div>
       </Tabs.Root>
     </aside>
   );
@@ -141,13 +143,39 @@ function tabLabel(tabId: ArtifactTabId, resultTabs: Record<ResultTabId, ResultSe
   return result == null ? "结果详情" : `${result.kind === "product" ? "商品" : "笔记"} · ${result.row[0]}`;
 }
 
-function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtifact> | null, artifactSet: ArtifactSet | undefined, resultTabs: Record<ResultTabId, ResultSelection>, run: PrototypeRun, state: "ready" | "pending" | "none", task: PrototypeTask) {
+function renderTab(tabId: ArtifactTabId, artifact: ReturnType<typeof createArtifact> | null, artifactSet: ArtifactSet | undefined, resultTabs: Record<ResultTabId, ResultSelection>, run: PrototypeRun, state: "ready" | "pending" | "none", task: PrototypeTask, openTab: (tabId: ArtifactTabId) => void) {
   if (isResultTabId(tabId)) return resultTabs[tabId] == null ? <ArtifactEmpty /> : <ResultItemPreview result={resultTabs[tabId]} />;
   if (artifact == null) return state === "pending" ? <ArtifactPending /> : <ArtifactEmpty />;
+  if (tabId === "skill-view") return hasCompatibleOutputView(run.outputView, artifactSet) ? <ProductComparisonView artifact={createProductArtifact(run)} onOpenStructuredData={() => openTab("json")} /> : <ArtifactEmpty />;
   if (tabId === "json") return <FilePreview icon={<Braces size={16} />} name="result.json" meta={artifact.jsonMeta}><pre>{JSON.stringify(artifact.payload, null, 2)}</pre></FilePreview>;
   if (tabId === "markdown") return <FilePreview icon={<FileText size={16} />} name="summary.md" meta="Markdown"><ArtifactMarkdown run={run} task={task} set={artifactSet} /></FilePreview>;
   if (tabId === "media") return <FilePreview icon={<Video size={16} />} name="媒体与文件" meta={`${downloadFiles.length} 个文件`}><MediaFilePreview /></FilePreview>;
   return <FilePreview icon={<ImageIcon size={16} />} name="page.png" meta="PNG · 1280 × 800"><img className="artifact-image-preview" src={samplePagePreview} alt="小红书采集任务页面截图样例" /></FilePreview>;
+}
+
+function ProductComparisonView({ artifact, onOpenStructuredData }: { artifact: ReturnType<typeof createProductArtifact>; onOpenStructuredData: () => void }) {
+  const products = artifact.payload.preview.slice(0, 3);
+  const lowestPrice = Math.min(...products.map(({ price }) => Number(price.replace(/[^\d.]/g, ""))));
+  const inStock = products.filter(({ stock }) => stock === "有货").length;
+  return (
+    <section className="skill-output-view" aria-label="商品对比">
+      <header>
+        <div><span>商品列表采集</span><h2>商品对比</h2><p>按价格与库存比较当前结果中的前三项。</p></div>
+        <button className="prototype-button compact" type="button" onClick={onOpenStructuredData}><Braces size={14} />结构化数据</button>
+      </header>
+      <div className="skill-output-comparison">
+        {products.map(({ title, price, stock }, index) => (
+          <article key={title}>
+            <span className="skill-output-rank">{index + 1}</span>
+            <div><strong>{title}</strong><small>{stock}</small></div>
+            <b>{price}</b>
+          </article>
+        ))}
+      </div>
+      <dl className="skill-output-facts"><div><dt>最低价格</dt><dd>¥{lowestPrice}</dd></div><div><dt>当前有货</dt><dd>{inStock} / {products.length}</dd></div><div><dt>结果总数</dt><dd>{artifact.payload.current} 条</dd></div></dl>
+      <footer><span>由“商品列表采集”技能提供此视图</span><span>结构化结果仍由 App 保留</span></footer>
+    </section>
+  );
 }
 
 function MediaFilePreview() {
@@ -207,9 +235,7 @@ function createArtifact(run: PrototypeRun, set: ArtifactSet) {
     return { jsonMeta: `JSON · ${items.length}/${total} 条预览`, payload: { input: run.input, status: run.stateLabel, total, preview: items } };
   }
   if (set === "shop-products") {
-    const items = productRows.map(([title, price, stock, readAt]) => ({ title, price, stock, readAt }));
-    const current = run.artifactCurrent ?? items.length;
-    return { jsonMeta: `JSON · ${items.length}/${current} 条预览`, payload: { input: run.input, status: run.stateLabel, current, expected: run.artifactTotal, preview: items } };
+    return createProductArtifact(run);
   }
   if (set === "article") {
     return { jsonMeta: "JSON · 文章摘要", payload: { input: run.input, title: "我们如何把重复的网站工作变成可复用任务", author: "WebEnvoy 产品团队", publishedAt: "2026-07-14" } };
@@ -218,6 +244,12 @@ function createArtifact(run: PrototypeRun, set: ArtifactSet) {
     return { jsonMeta: `JSON · ${downloadFiles.length} 个文件`, payload: { input: run.input, files: downloadFiles } };
   }
   return { jsonMeta: "JSON · 未提交", payload: { input: run.input, submitted: false, title: "三个让我每天省下两小时的 AI 工具", topics: ["AI工具", "效率提升", "内容创作", "工作流"] } };
+}
+
+function createProductArtifact(run: PrototypeRun) {
+  const items = productRows.map(([title, price, stock, readAt]) => ({ title, price, stock, readAt }));
+  const current = run.artifactCurrent ?? items.length;
+  return { jsonMeta: `JSON · ${items.length}/${current} 条预览`, payload: { input: run.input, status: run.stateLabel, current, expected: run.artifactTotal, preview: items } };
 }
 
 function ArtifactMarkdown({ run, set, task }: { run: PrototypeRun; set: ArtifactSet | undefined; task: PrototypeTask }) {

@@ -5,10 +5,11 @@ export type ExecutionPolicy = Record<ActionCategory, ExecutionMode>;
 export type TaskKind = "collection" | "article" | "download" | "write" | "takeover";
 export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
 export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
+export type SkillOutputView = "product-comparison";
 export type TaskSource = "App" | "CLI" | "MCP" | "API" | "SDK" | "Agent";
 
 export type PrototypePreviewSelection =
-  | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" | "media" }
+  | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" | "media" | "skill-view" }
   | { kind: "note" | "product"; row: string[]; runId: string };
 
 export type PrototypeRun = {
@@ -26,6 +27,7 @@ export type PrototypeRun = {
   artifactState?: "ready" | "pending" | "none";
   artifactTotal?: number;
   artifactCurrent?: number;
+  outputView?: SkillOutputView;
   executionMode?: ExecutionMode;
   executionSource?: string;
 };
@@ -57,6 +59,10 @@ export type PrototypeTask = {
   artifactTotal?: number;
   artifactCurrent?: number;
 };
+
+export function hasCompatibleOutputView(outputView: SkillOutputView | undefined, artifactSet: ArtifactSet | undefined) {
+  return outputView === "product-comparison" && artifactSet === "shop-products";
+}
 
 export type Identity = {
   id: string;
@@ -129,6 +135,7 @@ export type Skill = {
   inputLabel: string;
   inputPlaceholder: string;
   output: string;
+  outputView?: SkillOutputView;
   requiresLogin: boolean;
   availability: "available" | "unavailable";
 };
@@ -258,8 +265,8 @@ export const tasks: PrototypeTask[] = [
     artifactTotal: 80,
     artifactCurrent: 36,
     runs: [
-      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", endedAt: "昨天 23:58", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, executionMode: "auto", executionSource: "我的技能默认" },
-      { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36, executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-01", label: "昨日同步", input: "昨日", state: "success", stateLabel: "已完成 · 64 条", summary: "同步 64 条商品数据。", duration: "3 分 5 秒", endedAt: "昨天 23:58", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 64, artifactCurrent: 64, outputView: "product-comparison", executionMode: "auto", executionSource: "我的技能默认" },
+      { id: "run-02", label: "今日同步", input: "今日", state: "running", stateLabel: "正在读取 · 36/80", summary: "正在读取新增商品。", artifactSet: "shop-products", artifactState: "ready", artifactTotal: 80, artifactCurrent: 36, outputView: "product-comparison", executionMode: "auto", executionSource: "我的技能默认" },
     ],
   },
 ];
@@ -420,6 +427,7 @@ export const skills: Skill[] = [
     inputLabel: "店铺链接",
     inputPlaceholder: "粘贴目标店铺首页链接",
     output: "结构化商品列表",
+    outputView: "product-comparison",
     requiresLogin: false,
     availability: "available",
   },
