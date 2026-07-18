@@ -5,6 +5,7 @@ export type ExecutionPolicy = Record<ActionCategory, ExecutionMode>;
 export type TaskKind = "collection" | "article" | "download" | "write" | "takeover";
 export type TaskState = "success" | "running" | "partial" | "waiting" | "failed" | "not-submitted";
 export type ArtifactSet = "xhs-notes" | "shop-products" | "article" | "download-files" | "write-preview";
+export type TaskSource = "App" | "CLI" | "MCP" | "API" | "SDK" | "Agent";
 
 export type PrototypePreviewSelection =
   | { kind: "file"; runId: string; tab: "json" | "markdown" | "image" | "media" }
@@ -19,6 +20,7 @@ export type PrototypeRun = {
   summary: string;
   duration?: string;
   endedAt?: string;
+  source?: TaskSource;
   attachments?: string[];
   artifactSet?: ArtifactSet;
   artifactState?: "ready" | "pending" | "none";
@@ -43,7 +45,7 @@ export type PrototypeTask = {
   site: string;
   identity: string;
   identityId: string;
-  source: "App" | "CLI" | "MCP" | "API" | "SDK" | "Agent";
+  source: TaskSource;
   state: TaskState;
   stateLabel: string;
   updatedAt: string;

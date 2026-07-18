@@ -204,6 +204,7 @@ export function HumanWorkbenchPrototype() {
       state: "running",
       stateLabel: "正在运行",
       summary: `正在执行“${selectedTask.skill}”。`,
+      source: "App",
       attachments,
       artifactSet: selectedTask.artifactSet,
       artifactState: "pending",

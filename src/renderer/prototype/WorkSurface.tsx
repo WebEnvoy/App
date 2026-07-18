@@ -139,7 +139,6 @@ function TaskDetail({
           <div className="task-turn-timeline">
             {runs.map((run, index) => <TaskTurn key={`${task.id}-${run.id}`} run={run} task={task} latest={index === runs.length - 1} taskResumed={taskResumed} takeoverStep={takeoverStep} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} onTakeoverStepChange={setTakeoverStep} />)}
           </div>
-          <p className="task-thread-origin">由 {task.source} 创建</p>
         </div>
       </div>
     </div>
@@ -157,6 +156,7 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
   const executionState = run.state === "running" ? "running" : run.state === "waiting" ? "waiting" : "complete";
   const executionLabel = executionState === "running" ? "正在执行" : executionState === "waiting" ? "等待处理" : "已处理";
   const hasResult = run.artifactState !== "none";
+  const source = run.source ?? task.source;
 
   return (
     <article className="task-turn-detail" data-content-search-unit-key={`${task.id}-${run.id}`}>
@@ -178,7 +178,7 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
         {!newlyCreated && hasResult && task.kind === "write" ? <WriteResult /> : null}
         {resumed ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "22%" }} /></div><span>已读取 3 / 18</span></div> : null}
       </section>
-      {run.endedAt != null ? <footer className="task-turn-timestamp"><time aria-label={`回合结束于 ${run.endedAt}`}>{run.endedAt}</time></footer> : null}
+      {run.endedAt != null ? <footer className="task-turn-timestamp"><time aria-label={`回合结束于 ${run.endedAt}`}>{run.endedAt}</time>{source !== "App" ? <span>· 由 {source} 创建</span> : null}</footer> : null}
     </article>
   );
 }
