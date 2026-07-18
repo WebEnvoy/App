@@ -58,18 +58,15 @@
 .prototype-task-thread-content > * { width: 100%; min-width: 0; max-width: 100%; }
 .task-turn-timeline { display: grid; }
 .task-turn-detail { display: grid; scroll-margin-top: 56px; }
-.task-turn-detail + .task-turn-detail { margin-top: 30px; padding-top: 30px; border-top: 1px solid var(--we-border); }
-.task-input-card { display: grid; grid-template-columns: minmax(110px, 0.32fr) minmax(0, 1fr); min-width: 0; overflow: hidden; border: 1px solid var(--we-border); border-radius: 8px; background: var(--we-surface-primary); }
-.task-input-kind { display: flex; min-width: 0; align-items: center; padding: 13px 14px; border-right: 1px solid var(--we-border); background: var(--we-surface-secondary); }
+.task-turn-detail + .task-turn-detail { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--we-border-subtle); }
+.task-input-card { display: grid; grid-template-columns: minmax(110px, 0.32fr) minmax(0, 1fr); min-width: 0; overflow: hidden; border-radius: 6px; background: var(--we-surface-secondary); }
+.task-input-kind { display: flex; min-width: 0; align-items: center; padding: 11px 13px; }
 .task-input-kind span { overflow-wrap: anywhere; font-size: 12px; font-weight: 700; }
 .task-input-card dl { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
-.task-input-card dl > div { display: grid; min-width: 0; gap: 3px; padding: 10px 13px; }
-.task-input-card dl > div + div { border-left: 1px solid var(--we-border-subtle); }
+.task-input-card dl > div { display: grid; min-width: 0; gap: 3px; padding: 9px 12px; }
 .task-input-card dt { color: var(--we-foreground-muted); font-size: 10px; }
 .task-input-card dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
-.task-turn-execution-record { display: flex; min-width: 0; align-items: center; gap: 6px; padding: 7px 2px 0; color: var(--we-foreground-muted); font-size: 10px; }
-.task-turn-execution-record svg { flex: 0 0 auto; }
-.task-progress-block { display: grid; gap: 12px; padding: 18px 0; border-bottom: 1px solid var(--we-border); }
+.task-progress-block { display: grid; gap: 12px; padding: 14px 0 8px; }
 .task-execution-disclosure > summary { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 12px; list-style: none; cursor: pointer; }
 .task-execution-disclosure > summary::-webkit-details-marker { display: none; }
 .task-execution-disclosure > summary > span { position: relative; display: flex; min-width: 0; align-items: center; gap: 7px; overflow: hidden; padding: 4px 7px; border-radius: 6px; font-size: 12px; }
@@ -104,7 +101,7 @@
 .task-summary-heading.failed .task-summary-state-icon { color: var(--we-status-error); }
 .task-summary-block > header h2 { max-width: 760px; font-size: 15px; line-height: 1.5; }
 .task-summary-block > .prototype-section { padding-top: 4px; }
-.task-turn-timestamp { display: flex; align-items: center; gap: 5px; padding-top: 16px; color: var(--we-foreground-subtle); font-size: 10px; }
+.task-turn-timestamp { display: flex; align-items: center; gap: 5px; padding-top: 6px; color: var(--we-foreground-subtle); font-size: 10px; }
 .task-preview-button { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border-radius: 6px; color: var(--we-foreground-muted); background: transparent; }
 .task-preview-button:hover { color: var(--we-foreground); background: var(--we-list-hover-background); }
 .task-progress-snapshot { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 12px; align-items: center; padding: 4px 0 8px; }
@@ -139,14 +136,20 @@
 
 .prototype-table tbody tr:last-child td { border-bottom: 0; }
 .prototype-table tbody tr:hover { background: var(--we-list-hover-background); }
-.prototype-table th:nth-child(1) { width: 45%; }
+.prototype-table th:first-child,
+.prototype-table td:first-child { width: 34px; padding-right: 7px; padding-left: 7px; text-align: center; }
+.prototype-table th:nth-child(2) { width: 45%; }
 .prototype-table td:nth-child(3),
 .prototype-table td:nth-child(4) { color: var(--we-foreground-muted); }
+.prototype-table th:last-child,
 .prototype-table td:last-child { width: 34px; padding-right: 7px; padding-left: 7px; }
 .prototype-table td button { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; color: var(--we-foreground-muted); background: transparent; }
 .prototype-table td button:hover { background: var(--we-list-hover-background); }
-.result-table-footer { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 12px; padding-top: 9px; }
-.result-table-footer > span { color: var(--we-foreground-muted); font-size: 11px; }
+.result-table-footer { display: flex; min-height: 28px; align-items: center; gap: 12px; padding-top: 6px; }
+.result-table-footer > span,
+.result-more-button { color: var(--we-foreground-muted); font-size: 11px; }
+.result-more-button { padding: 3px 0; background: transparent; text-align: left; }
+.result-more-button:hover { color: var(--we-foreground); text-decoration: underline; }
 
 @keyframes task-execution-shimmer {
   0% { transform: translateX(0); opacity: 0; }
@@ -372,7 +375,9 @@
   .prototype-table { min-width: 0; table-layout: fixed; }
   .prototype-table th,
   .prototype-table td { padding-right: 8px; padding-left: 8px; overflow-wrap: anywhere; }
-  .prototype-table th:first-child { width: 42%; }
+  .prototype-table th:first-child,
+  .prototype-table td:first-child { width: 34px; padding-right: 6px; padding-left: 6px; }
+  .prototype-table th:nth-child(2) { width: 42%; }
 }
 
 @container (max-width: 440px) {
@@ -380,16 +385,15 @@
   .composer-execution-menu > summary span { max-width: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .composer-validation { max-width: 110px; }
   .task-input-card { grid-template-columns: 1fr; }
-  .task-input-kind { border-right: 0; border-bottom: 1px solid var(--we-border); }
+  .task-input-kind { padding-bottom: 4px; }
   .task-input-card dl { grid-template-columns: 1fr; }
-  .task-input-card dl > div + div { border-top: 1px solid var(--we-border-subtle); border-left: 0; }
-  .prototype-table th:nth-child(2),
   .prototype-table th:nth-child(3),
   .prototype-table th:nth-child(4),
-  .prototype-table td:nth-child(2),
+  .prototype-table th:nth-child(5),
   .prototype-table td:nth-child(3),
-  .prototype-table td:nth-child(4) { display: none; }
-  .prototype-table th:first-child { width: auto; }
+  .prototype-table td:nth-child(4),
+  .prototype-table td:nth-child(5) { display: none; }
+  .prototype-table th:nth-child(2) { width: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

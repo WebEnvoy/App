@@ -246,13 +246,11 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, executionModes
   const terminating = run.state === "checking" && run.stateLabel === "正在终止";
   const executionLabel = terminating ? "正在终止" : run.state === "checking" ? "正在检查" : executionState === "running" ? "正在执行" : executionState === "waiting" ? "等待处理" : executionState === "unknown" ? "状态未知" : executionState === "cancelled" ? "已取消" : "已处理";
   const hasResult = run.artifactState === "ready";
-  const runActionCategory = run.actionCategory ?? initialActionCategoryForTask(task.kind);
   const source = run.source ?? task.source;
 
   return (
     <article className="task-turn-detail" data-content-search-unit-key={`${task.id}-${run.id}`}>
       <TaskInputCard task={task} run={run} />
-      <div className="task-turn-execution-record"><ShieldCheck size={13} /><span>{run.executionRecords?.length ? run.executionRecords.map((record) => `${actionCategoryLabels[record.actionCategory]} · ${executionModeLabels[record.executionMode]} · ${record.executionSource}`).join("；") : run.executionMode != null && run.executionSource != null ? `${actionCategoryLabels[runActionCategory]} · ${executionModeLabels[run.executionMode]} · ${run.executionSource}` : `${actionCategoryLabels[runActionCategory]} · 历史回合未记录执行方式`}</span></div>
       <section className="task-progress-block" aria-label={`${run.label}执行记录`}>
         <details className="task-execution-disclosure">
           <summary><span className={`task-execution-status ${executionState}`}><ChevronDown size={14} /><strong>{executionLabel}</strong><small>{executionState === "complete" ? run.duration ?? "耗时未知" : executionState === "running" ? `${actions.length} 个动作` : executionState === "unknown" ? "等待重新检查" : executionState === "cancelled" ? "已停止" : "需要人工处理"}</small></span></summary>
@@ -639,7 +637,7 @@ function CollectionResult({ executionMode, executionSource, run, task, onOpenPre
         </table>
       </div>
       {availableRows.length === 0 ? <div className="prototype-empty result-empty"><Search size={20} /><h3>没有匹配数据</h3><p>修改业务输入后提交新的回合。</p></div> : null}
-      <footer className="result-table-footer"><span>共 {total} 条数据{availableRows.length < total ? ` · 当前预览 ${availableRows.length} 条` : ""}{selectedRows.length > 0 ? ` · 已选 ${selectedRows.length} 条` : ""}</span>{nextCount > 0 ? <button className="prototype-button compact" type="button" onClick={() => setVisibleCount((count) => count + nextCount)}>再展示 {nextCount} 条</button> : null}</footer>
+      <footer className="result-table-footer">{nextCount > 0 ? <button className="result-more-button" type="button" onClick={() => setVisibleCount((count) => count + nextCount)}>共 {total} 条，点击查看更多</button> : <span>共 {total} 条</span>}{selectedRows.length > 0 ? <span>已选 {selectedRows.length} 条</span> : null}</footer>
       {batchConfirming && executionMode !== "block" ? <section className="prototype-callout action-needed" aria-label="确认批量导出"><CircleAlert size={18} /><div><strong>确认导出所选数据</strong><p>已选 {selectedRecords.length} 条，其中 {applicableRecords.length} 条可处理。此操作只生成导出文件，不修改站点内容。当前方式：{executionModeLabels[executionMode]} · {executionSource}。</p></div><div className="section-actions"><button className="prototype-button" type="button" onClick={() => setBatchConfirming(false)}>取消</button><button className="prototype-button primary" type="button" onClick={executeBatch}>{executionMode === "confirm" ? "允许这一次" : "确认导出"}</button></div></section> : null}
       {batchOutcomes.length > 0 ? <section className="file-result-list" aria-label="批量导出结果" aria-live="polite">{batchOutcomes.map((outcome) => <div className="file-result-row" key={outcome.title}><FileText size={18} /><div><strong>{outcome.title}</strong><span>{outcome.detail}</span></div><span className={outcome.state === "成功" ? "saved" : "failed"}>{outcome.state}</span></div>)}</section> : null}
       {executionMode === "block" && selectedRows.length > 0 ? <p className="composer-validation blocked">读取和下载已设为禁止，不能导出所选数据</p> : batchStatus ? <p className="muted-copy" role="status"><ShieldCheck size={13} />{batchStatus}</p> : null}
