@@ -15,9 +15,11 @@ merge 或 agent 判断不能代替这两次用户确认。
 记录于 `docs/design/human-workbench-information-architecture.md`；该候选只允许进入
 #305 高保真原型，不能代替高保真原型的第二次用户验收。
 
-2026-07-18 根据高保真原型多轮审核修订任务创建入口、结构化 Composer、任务回合、
-执行方式用语、账号身份集合与副本、左栏任务列表和右栏预览生命周期；Story Business
-Confirmation 回到 `revision-requested`，等待用户对本轮语义重新确认。
+2026-07-19 用户明确回复“批准当前用户故事和高保真原型，继续目标”。因此 Story
+Business Confirmation 记录为 `confirmed`，高保真原型人工 Gate 记录为 `approved`。
+本文与 canonical IA 文档冻结 IA 和关键旅程；原型 head
+`ddcd13d6cb556cfbe65a72f466d9f12992d438fc` 冻结视觉基线。该确认不代表生产 UI、
+owner runtime 合同或真实运行证据已经完成。
 
 本 ADR 固化产品方向和下一轮设计约束，不实现生产 UI。它保留 ADR
 0005/0006/0008 的 owner truth、敏感数据和本地缓存边界，但 supersede 以下旧决策：

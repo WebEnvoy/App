@@ -9,6 +9,17 @@ isolated Vite entry and does not change the production renderer entry.
 User approval is the product Gate. Build success, automated checks, a PR or a
 Loom review cannot replace that approval.
 
+## Approved Baseline
+
+- Status: `approved`.
+- Approval source: 2026-07-19 当前 Codex 任务中用户明确回复“批准当前用户故事和高保真原型，继续目标”。
+- Approved prototype: `prototype.html` and `src/renderer/prototype/**` at head
+  `ddcd13d6cb556cfbe65a72f466d9f12992d438fc`.
+- Frozen scope: canonical IA, Story scenarios S1-S34, and the visual and
+  interaction baseline at that head.
+- This approval allows production UI Work Item planning. It does not approve a
+  production implementation or prove live Core, Harbor or Lode runtime behavior.
+
 ## Run
 
 ```bash

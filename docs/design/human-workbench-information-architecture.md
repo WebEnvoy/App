@@ -2,16 +2,15 @@
 
 ## Status and Scope
 
-This document is the canonical information architecture candidate for App #298
-and consumes the user-confirmed GWT Story in `docs/stories/APP-308.md`. It
-covers App #300-#304 and is the product input to the high-fidelity prototype in
-App #305.
+This document is the canonical information architecture baseline for App #298.
+It consumes the confirmed Story in `docs/stories/APP-308.md`, covers App
+#300-#304, and is the frozen IA input for production UI Work Items.
 
-The candidate is not a production UI specification. Page composition, visual
-language, responsive behavior and interaction details remain subject to the
-separate high-fidelity prototype Gate. Prototype approval must come from the
-user; Loom review, automated review, a merged PR or hosted checks cannot replace
-that approval.
+On 2026-07-19, the user explicitly approved the current Story and high-fidelity
+prototype. This freezes the IA and key journeys represented by this document
+and prototype head `ddcd13d6cb556cfbe65a72f466d9f12992d438fc`. It does not
+approve production implementation or runtime contracts; later business-semantic
+or key-journey changes require an explicit revision and confirmation.
 
 ## Product Model
 
