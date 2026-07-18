@@ -178,7 +178,7 @@ function TaskTurn({ run, task, latest, taskResumed, takeoverStep, onOpenBrowser,
         {!newlyCreated && hasResult && task.kind === "write" ? <WriteResult /> : null}
         {resumed ? <div className="task-progress-snapshot"><div className="prototype-progress"><span style={{ width: "22%" }} /></div><span>已读取 3 / 18</span></div> : null}
       </section>
-      {run.endedAt != null ? <footer className="task-turn-timestamp"><time>结束于 {run.endedAt}</time></footer> : null}
+      {run.endedAt != null ? <footer className="task-turn-timestamp"><time aria-label={`回合结束于 ${run.endedAt}`}>{run.endedAt}</time></footer> : null}
     </article>
   );
 }
