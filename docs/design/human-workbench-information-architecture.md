@@ -2,16 +2,15 @@
 
 ## Status and Scope
 
-This document is the canonical information architecture candidate for App #298
-and consumes the user-confirmed GWT Story in `docs/stories/APP-308.md`. It
-covers App #300-#304 and is the product input to the high-fidelity prototype in
-App #305.
+This document is the canonical information architecture baseline for App #298.
+It consumes the confirmed Story in `docs/stories/APP-308.md`, covers App
+#300-#304, and is the frozen IA input for production UI Work Items.
 
-The candidate is not a production UI specification. Page composition, visual
-language, responsive behavior and interaction details remain subject to the
-separate high-fidelity prototype Gate. Prototype approval must come from the
-user; Loom review, automated review, a merged PR or hosted checks cannot replace
-that approval.
+On 2026-07-19, the user explicitly approved the current Story and high-fidelity
+prototype. This freezes the IA and key journeys represented by this document
+and prototype head `ddcd13d6cb556cfbe65a72f466d9f12992d438fc`. It does not
+approve production implementation or runtime contracts; later business-semantic
+or key-journey changes require an explicit revision and confirmation.
 
 ## Product Model
 
@@ -59,18 +58,22 @@ App/CLI/MCP/API/SDK/Agent Task -> Work -> result or recovery
 ## Object Relationships
 
 ```text
-Site Skill + Account Identity + declared business input = Task
-Task -> one or more Runs -> Result -> optional Result Items
+Site Skill + Account Identity = Task Thread
+Task Thread -> one or more Task Turns
+Task Turn + declared business input -> one or more Runs -> Result -> optional Result Items
 
 Account Identity -> one persistent Browser Environment
 Browser Environment -> zero or one active controllable Instance
-Task/Run -> references an Account Identity and may temporarily control its Instance
+Task Turn/Run -> references an Account Identity and may temporarily control its Instance
 ```
 
-- A Task is the stable unit of user intent. A retry with unchanged business
-  input creates another Run under the same Task.
-- Changing material business input creates a new Task, prefilled from the old
-  one when appropriate.
+- A Task Thread is the stable App projection for one Site Skill and one Account
+  Identity. It does not replace Core task or run truth.
+- A Task Turn is one business-input submission from App, CLI, MCP, API, SDK or
+  Agent. Changing material business input creates another Turn in the matching
+  Thread.
+- A retry or resume with unchanged business input creates another Run under the
+  same Turn.
 - A manual Browser instance is not a Task, Run or Result.
 - Reopening an identity with an active instance reuses that instance and offers
   view, takeover or stop. It never silently starts a competing instance against
@@ -85,17 +88,37 @@ Task/Run -> references an Account Identity and may temporarily control its Insta
 
 | Page | Purpose | Primary action | Secondary paths |
 | --- | --- | --- | --- |
-| Task list | Observe tasks from every supported entry point | Open the current business state; create task | Search; filter by state, site or source |
-| Create task | Create a bounded task from a skill contract | Create task | Choose skill; create, login or repair identity |
-| Task detail | Consume results or resolve the current interruption | Open result or perform the recommended recovery | Retry; open browser; view source; expand details |
+| Task thread list | Observe task threads from every supported entry point | Open the current business state; create a task turn | Search; switch grouping; filter by state, site or source |
+| Create task | Create a bounded task turn from a skill contract | Create task turn | Choose skill; create, login or repair identity |
+| Task thread detail | Consume turn results or resolve the current interruption | Open result or perform the recommended recovery | Retry; open browser; view source; expand details |
 | Result item detail | Consume one record, content item, author or media object | Read or open the business object | Open source page; return to result collection |
 
-Task detail owns result, failure, progress and Run history. Result, failure and
-Run do not become peer-level global pages.
+Task Thread detail owns Turn history, result, failure, progress and Run detail.
+Turn, Result, failure and Run do not become peer-level global pages.
 
 The create-task page has no generic chat composer. After selecting a Site Skill,
 it renders only the fields, controls, defaults, options and validation rules
 declared by that skill. It lists only compatible Account Identities.
+
+The Work navigator offers two projections of the same Task Threads:
+
+```text
+By Site Skill: Site Skill -> Account Identity Thread
+By Identity: Account Identity -> Site Skill Thread
+```
+
+A Site Skill already carries its site ownership. The Site Skill projection does
+not add a redundant outer Site level; its heading uses only the site icon and
+skill name. Identity threads use an avatar plus account name without a secondary
+business-input line.
+
+Grouping and sorting are presentation preferences. They live in the task-list
+heading overflow menu instead of occupying persistent sidebar width; the same
+hover/focus action area also exposes new-task creation. Switching either
+preference preserves the selected Thread and Turn, never duplicates task or
+result facts, and remembers the last choice locally. Sorting supports priority
+and recent-update order. New business input from any supported entry point is
+appended as a Turn to the matching Site Skill and Account Identity Thread.
 
 ### Browser
 
@@ -117,10 +140,20 @@ login state, provider and recent use. Each row leads with account name, site,
 availability and one primary action. Proxy, fingerprint, paths and raw provider
 facts stay in detail or diagnostics.
 
-Identity configuration leads with name, site, account label and provider.
-Proxy, region, language, timezone and fingerprint are environment settings.
-Only fields supported by the selected provider are shown. Recommended presets
-are preferred; advanced settings remain available without dominating creation.
+Identity configuration first asks whether the environment needs a maintained
+site login. A login-required identity asks for the target URL, opens that URL in
+the newly created isolated browser and derives account avatar, nickname,
+platform ID and login state only after user login and validation. A no-login
+identity asks only for a local name and is compatible only with skills that do
+not require login.
+
+Provider, platform, proxy, GeoIP, region, language, timezone, screen,
+hardware concurrency, GPU preset and fingerprint seed are browser-environment
+settings. Only fields supported by the selected provider are shown. Recommended
+presets are preferred; one-click randomization changes only a coherent device
+tuple and seed, never proxy, geography or login target. Advanced settings remain
+collapsed by default. Provider paths, internal ports, viewer/CDP endpoints and
+raw credentials are not product configuration fields.
 
 ### Library
 
@@ -193,9 +226,10 @@ Browser identity -> Choose skill
 
 ### Observe an External-Entry Task
 
-Tasks from CLI, MCP, API, SDK or Agent appear in the same Work list and detail
-experience. Source is a label and source-summary fact, not a separate product
-area. A stable link or notification may open Task detail directly.
+Task Turns from CLI, MCP, API, SDK or Agent appear in the matching Site Skill +
+Account Identity Thread and use the same Work detail experience. Source is a
+label and source-summary fact, not a separate product area. A stable link or
+notification may open the matching Thread and Turn directly.
 
 ### Human Takeover and Resume
 
@@ -296,7 +330,7 @@ unknown success.
 | Empty | No result plus the applied business input | Modify input; create new task |
 | Failed | Business impact and recommended recovery | Retry; login; open browser; stop |
 | Outcome unknown | The action may have happened but is not confirmed | Reconcile; open browser; inspect source |
-| Awaiting authorization | Action, target, effect, identity and current policy source | Allow once; allow current scope; reject |
+| Awaiting authorization | Action, target, effect, identity and current policy source | Allow once; reject |
 | Hard refused | Requested action exceeds declaration, target or validity | Modify task; no grant-expansion action |
 | Needs user action | Reason, paused task and live-surface target | Open browser; cannot complete |
 | User controlling | Current controller and required completion | Completed, continue; cannot complete |
@@ -336,18 +370,20 @@ Editing, copying and deleting obey these rules:
 
 ### Task Actions
 
-Effective configuration is selected from the most specific valid level:
+Effective configuration is selected from the most specific valid source:
 
 ```text
-one-time -> current Task -> Site Skill -> global default
+current action decision -> current Task Thread revision -> My Skill Default -> global default
 ```
 
 ### Browser Environment Operations
 
-Environment operations do not pass through the Site Skill level:
+An environment operation associated with a Task follows that Task Thread's
+effective configuration. An operation without a Task Thread uses only the
+applicable global default and a current-action decision:
 
 ```text
-one-time -> current operation or associated Task -> global default
+current action decision -> global default
 ```
 
 Before applying user policy, the App/Core path filters requests against the
@@ -355,17 +391,16 @@ owner-declared action, target and validity. A request outside that boundary is
 hard refused and cannot be expanded from the confirmation UI.
 
 A short confirmation surface shows action, target, external effect, account or
-environment, current policy source and the scope of each choice. Runtime
-confirmation offers only:
+environment and current policy source. Runtime confirmation offers only:
 
 - allow once;
-- allow for the current Task or environment operation;
 - reject.
 
-Skill-level and global changes happen in Library and Settings respectively.
-One-time decisions expire after use and never silently modify longer-lived
-configuration. The App sends intent and reads Core's decision; it does not keep
-effective authorization truth locally.
+Task Thread revisions happen only from its Composer. My Skill Default and global
+changes happen in Library and Settings respectively. One-time decisions expire
+after completion, cancellation, timeout or target change and never silently
+modify longer-lived configuration. The App sends intent and reads Core's
+decision; it does not keep effective authorization truth locally.
 
 ## Diagnostics Boundary
 
@@ -390,6 +425,9 @@ understand a result.
 | Authorization | S9, S14, S20, S29 |
 | Browser identity and instance lifecycle | S1, S10, S12, S21-S30 |
 | Skill lifecycle | S2, S13, S15, S16 |
+| Task Thread grouping and complete timeline | S31, S32 |
+| Interrupted-task reconciliation | S33 |
+| Optional skill result views and fallback | S34 |
 
 All scenarios must appear in the high-fidelity prototype plan. The prototype may
 combine compatible scenarios into a smaller number of coherent flows, but may
