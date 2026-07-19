@@ -330,7 +330,7 @@ unknown success.
 | Empty | No result plus the applied business input | Modify input; create new task |
 | Failed | Business impact and recommended recovery | Retry; login; open browser; stop |
 | Outcome unknown | The action may have happened but is not confirmed | Reconcile; open browser; inspect source |
-| Awaiting authorization | Action, target, effect, identity and current policy source | Allow once; allow current scope; reject |
+| Awaiting authorization | Action, target, effect, identity and current policy source | Allow once; reject |
 | Hard refused | Requested action exceeds declaration, target or validity | Modify task; no grant-expansion action |
 | Needs user action | Reason, paused task and live-surface target | Open browser; cannot complete |
 | User controlling | Current controller and required completion | Completed, continue; cannot complete |
@@ -370,18 +370,20 @@ Editing, copying and deleting obey these rules:
 
 ### Task Actions
 
-Effective configuration is selected from the most specific valid level:
+Effective configuration is selected from the most specific valid source:
 
 ```text
-one-time -> current Task -> Site Skill -> global default
+current action decision -> current Task Thread revision -> My Skill Default -> global default
 ```
 
 ### Browser Environment Operations
 
-Environment operations do not pass through the Site Skill level:
+An environment operation associated with a Task follows that Task Thread's
+effective configuration. An operation without a Task Thread uses only the
+applicable global default and a current-action decision:
 
 ```text
-one-time -> current operation or associated Task -> global default
+current action decision -> global default
 ```
 
 Before applying user policy, the App/Core path filters requests against the
@@ -389,17 +391,16 @@ owner-declared action, target and validity. A request outside that boundary is
 hard refused and cannot be expanded from the confirmation UI.
 
 A short confirmation surface shows action, target, external effect, account or
-environment, current policy source and the scope of each choice. Runtime
-confirmation offers only:
+environment and current policy source. Runtime confirmation offers only:
 
 - allow once;
-- allow for the current Task or environment operation;
 - reject.
 
-Skill-level and global changes happen in Library and Settings respectively.
-One-time decisions expire after use and never silently modify longer-lived
-configuration. The App sends intent and reads Core's decision; it does not keep
-effective authorization truth locally.
+Task Thread revisions happen only from its Composer. My Skill Default and global
+changes happen in Library and Settings respectively. One-time decisions expire
+after completion, cancellation, timeout or target change and never silently
+modify longer-lived configuration. The App sends intent and reads Core's
+decision; it does not keep effective authorization truth locally.
 
 ## Diagnostics Boundary
 
@@ -424,6 +425,9 @@ understand a result.
 | Authorization | S9, S14, S20, S29 |
 | Browser identity and instance lifecycle | S1, S10, S12, S21-S30 |
 | Skill lifecycle | S2, S13, S15, S16 |
+| Task Thread grouping and complete timeline | S31, S32 |
+| Interrupted-task reconciliation | S33 |
+| Optional skill result views and fallback | S34 |
 
 All scenarios must appear in the high-fidelity prototype plan. The prototype may
 combine compatible scenarios into a smaller number of coherent flows, but may
