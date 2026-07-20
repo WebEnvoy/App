@@ -861,6 +861,7 @@ const invalidThreadEnvelopes = [
   { ...validCoreThreadEnvelope, unexpected: true },
   { ...validCoreThreadEnvelope, threads: [{ ...validThread, unexpected: true }] },
   { ...validCoreThreadEnvelope, threads: [{ ...validThread, created_at: "2026-02-31T00:00:00Z" }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, created_at: "2026-07-20T24:00:00Z" }] },
   { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, turn_id: "turn_invalid" }] }] },
   { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, unexpected: true }] }] },
   { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, run_status: "completed" }] }] },
