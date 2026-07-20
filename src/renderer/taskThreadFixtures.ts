@@ -94,6 +94,19 @@ export type RunProjection = {
     boundary: string;
   };
   process: string[];
+  turnStatus?:
+    | "submitting"
+    | "accepted"
+    | "running"
+    | "waiting_for_user"
+    | "completed"
+    | "failed"
+    | "cancelled"
+    | "status_unknown";
+  creationChannel?: "api" | "cli" | "mcp" | "sdk" | "app";
+  createdAt?: string;
+  updatedAt?: string;
+  terminalAt?: string;
 };
 
 export type TaskProjection = {

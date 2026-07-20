@@ -132,6 +132,9 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
           return latest;
         };
         const runtimeSupervisorState = await readRuntimeSupervisorState();
+        const coreThreadReadReady = Boolean(await waitUntil(
+          () => document.body.textContent?.includes("当前没有任务线程。")
+        ));
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
           left: appShell?.getAttribute("data-left-panel-open"),
@@ -242,6 +245,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
           hasRuntimeSupervisorApi: typeof shell?.getRuntimeSupervisorState === "function",
           shellContext: shell?.getShellContext ? await shell.getShellContext() : null,
           runtimeSupervisorState,
+          coreThreadReadReady,
           hasRuntimeGate: Boolean(runtimeGate),
           runtimeGateText: runtimeGate?.textContent ?? "",
           panelControls: panelButtons.length,
@@ -249,29 +253,33 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
           composerFocused,
           panelToggleSmoke:
             initialPanels.left === "true" &&
-            initialPanels.right === "true" &&
-            rightCollapsed.right === "false" &&
-            rightRestored.right === "true" &&
-            rightFullscreen.right === "true" &&
-            rightFullscreen.rightFullscreen === "true" &&
-            rightFullscreen.left === initialPanels.left &&
-            rightFullscreen.leftWidth === initialPanels.leftWidth &&
-            rightFullscreenRestored.rightFullscreen === "false" &&
+            (rightPanelButton
+              ? initialPanels.right === "true" &&
+                rightCollapsed.right === "false" &&
+                rightRestored.right === "true" &&
+                rightFullscreen.right === "true" &&
+                rightFullscreen.rightFullscreen === "true" &&
+                rightFullscreen.left === initialPanels.left &&
+                rightFullscreen.leftWidth === initialPanels.leftWidth &&
+                rightFullscreenRestored.rightFullscreen === "false"
+              : coreThreadReadReady && initialPanels.right === "false" && initialPanels.rightWidth === 0) &&
             leftCollapsed.left === "false" &&
             leftHoverPreviewVisible &&
             leftRestored.left === "true",
           panelDragSmoke:
             leftStayOpenDragStarted &&
             leftDragStarted &&
-            rightStayOpenDragStarted &&
-            rightDragStarted &&
             leftDragStayedOpen.left === "true" &&
             leftDragCollapsed.left === "false" &&
-            rightDragStayedOpen.right === "true" &&
-            rightDragCollapsed.right === "false" &&
             leftAfterDragRestore.left === "true" &&
             dragRestored.left === "true" &&
-            dragRestored.right === "true",
+            (rightHandleAfterLeftRestore
+              ? rightStayOpenDragStarted &&
+                rightDragStarted &&
+                rightDragStayedOpen.right === "true" &&
+                rightDragCollapsed.right === "false" &&
+                dragRestored.right === "true"
+              : coreThreadReadReady && dragRestored.right === "false" && dragRestored.rightWidth === 0),
           panelStateTrace: {
             initialPanels,
             rightCollapsed,
@@ -303,6 +311,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         services?: { id: string; health?: { state?: string }; admission?: { state?: string } }[];
         lodeAssets?: { state?: string; packageCount?: number };
       } | null;
+      coreThreadReadReady: boolean;
       hasRuntimeGate: boolean;
       runtimeGateText: string;
       panelControls: number;
@@ -321,13 +330,18 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       throw new Error("packaged renderer smoke failed: preload was not injected.");
     }
 
-    if (!result.hasRuntimeSupervisorApi || !result.hasRuntimeGate || result.runtimeSupervisorState === null) {
-      throw new Error("packaged renderer smoke failed: runtime supervisor bridge or gate is missing.");
+    if (
+      !result.hasRuntimeSupervisorApi ||
+      result.runtimeSupervisorState === null ||
+      (!result.coreThreadReadReady && !result.hasRuntimeGate)
+    ) {
+      throw new Error("packaged renderer smoke failed: runtime supervisor bridge, thread readback, or fail-closed gate is missing.");
     }
 
     if (
       packagedSmokeRuntimeExpectation === "live_ready" &&
       (!result.runtimeSupervisorState.canUseLiveRuntime ||
+        !result.coreThreadReadReady ||
         result.runtimeSupervisorState.lodeAssets?.state !== "ready" ||
         result.runtimeSupervisorState.services?.some((service) => service.health?.state !== "ready") ||
         result.runtimeSupervisorState.services?.some((service) => service.id === "core" && service.admission?.state !== "ready"))
@@ -344,13 +358,13 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       throw new Error("packaged renderer smoke failed: runtime supervisor fail-closed gate is missing.");
     }
 
-    if (result.panelControls < 2 || !result.panelToggleSmoke) {
+    if (result.panelControls < (result.coreThreadReadReady ? 1 : 2) || !result.panelToggleSmoke) {
       throw new Error(
         `packaged renderer smoke failed: panel controls did not toggle. ${JSON.stringify(result.panelStateTrace)}`,
       );
     }
 
-    if (!result.hasComposer || !result.composerFocused) {
+    if (!result.coreThreadReadReady && (!result.hasComposer || !result.composerFocused)) {
       throw new Error("packaged renderer smoke failed: composer is missing or cannot receive focus.");
     }
 

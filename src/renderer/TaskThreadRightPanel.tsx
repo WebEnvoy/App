@@ -13,7 +13,14 @@ import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
 import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
-import { sourceHealthFixture, type SourceHealth, type SourceHealthStatus } from "./sourceHealthFixture";
+
+type SourceHealth = {
+  id: "core" | "harbor" | "lode";
+  name: string;
+  ownerTruth: string;
+  status: "ready" | "unavailable";
+  summary: string;
+};
 
 type ShellDiagnostics = {
   colorScheme?: string;
@@ -30,15 +37,7 @@ const contextTabs = [
 ];
 
 function statusLabel(status: SourceHealth["status"]) {
-  if (status === "ready") {
-    return "ready";
-  }
-
-  if (status === "unavailable") {
-    return "unavailable";
-  }
-
-  return "fixture";
+  return status === "ready" ? "ready" : "unavailable";
 }
 
 export function TaskThreadRightPanel({
@@ -72,7 +71,7 @@ export function TaskThreadRightPanel({
               <ContextPanel
                 icon={<ShieldCheck size={18} />}
                 title="账号身份"
-                body={`账号身份来自 ${selectedTask.identitySource ?? "Harbor fixture"}；App 不保存 credential、cookie、token 或 profile storage。`}
+                body={`当前线程的身份绑定来自 ${selectedTask.identitySource ?? selectedTask.source}；身份可用性仍以 Harbor 为准。App 不保存 credential、cookie、token 或 profile storage。`}
               />
             ) : tab.id === "skill" ? (
               <SiteSkillTab selectedTask={selectedTask} />
@@ -82,7 +81,11 @@ export function TaskThreadRightPanel({
         }))}
       />
 
-      <SourceHealthSection coreReadState={coreReadState} runtimeSupervisorState={runtimeSupervisorState} />
+      <SourceHealthSection
+        coreReadState={coreReadState}
+        runtimeSupervisorState={runtimeSupervisorState}
+        selectedTask={selectedTask}
+      />
     </aside>
   );
 }
@@ -235,7 +238,7 @@ function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
         <Box size={18} />
         <h3>站点技能</h3>
       </div>
-      <p>Capability package source attribution comes from Lode metadata fixture.</p>
+      <p>当前仅展示 Core 线程绑定的 capability ref；技能名称、版本和安装状态仍以 Lode owner 数据为准。</p>
       <dl className="context-facts">
         {[
           ["Package", selectedTask.packageSource.name],
@@ -265,38 +268,45 @@ function SiteSkillTab({ selectedTask }: { selectedTask: TaskProjection }) {
 function SourceHealthSection({
   coreReadState,
   runtimeSupervisorState,
+  selectedTask,
 }: {
   coreReadState: CoreReadTaskLoadState;
   runtimeSupervisorState: RuntimeSupervisorState;
+  selectedTask: TaskProjection;
 }) {
-  const coreStatus: SourceHealthStatus =
-    runtimeSupervisorState.services.find((service) => service.id === "core")?.health.state === "ready"
-      ? "ready"
-      : "unavailable";
-  const harborStatus: SourceHealthStatus =
+  const coreStatus: SourceHealth["status"] =
+    coreReadState.status === "ready" ? "ready" : "unavailable";
+  const harborStatus: SourceHealth["status"] =
     runtimeSupervisorState.services.find((service) => service.id === "harbor")?.health.state === "ready"
       ? "ready"
       : "unavailable";
-  const sources = sourceHealthFixture.map((source) =>
-    source.id === "core"
-      ? {
-          ...source,
-          status: coreStatus,
-          summary: runtimeSupervisorState.summary,
-          fetchedAt: runtimeSupervisorState.checkedAt,
-        }
-      : source.id === "harbor"
-      ? {
-          ...source,
-          status: harborStatus,
-          summary:
-            harborStatus === "ready"
-              ? "Harbor runtime health is ready."
-              : "Harbor runtime health unavailable；fixture/demo provider 不作为可用。",
-          fetchedAt: runtimeSupervisorState.checkedAt,
-        }
-      : source,
-  );
+  const lodeStatus: SourceHealth["status"] =
+    runtimeSupervisorState.lodeAssets.state === "ready" ? "ready" : "unavailable";
+  const sources: SourceHealth[] = [
+    {
+      id: "core",
+      name: "Core",
+      ownerTruth: "任务线程与回合",
+      status: coreStatus,
+      summary: coreStatus === "ready" ? coreReadState.summary : "Core 线程读取不可用；保留终态时仍阻断活动回合。",
+    },
+    {
+      id: "harbor",
+      name: "Harbor",
+      ownerTruth: "账号身份与执行现场",
+      status: harborStatus,
+      summary: harborStatus === "ready" ? "Harbor runtime 可用。" : "Harbor runtime 不可用；不会使用 fixture/demo 代替。",
+    },
+    {
+      id: "lode",
+      name: "Lode",
+      ownerTruth: "站点技能与能力版本",
+      status: lodeStatus,
+      summary: lodeStatus === "ready"
+        ? `${runtimeSupervisorState.lodeAssets.summary} 当前线程绑定 ${selectedTask.packageSource.capabilityRef}。`
+        : `Lode capability assets 不可用；尚未解析 ${selectedTask.packageSource.capabilityRef} 的 owner metadata。`,
+    },
+  ];
 
   return (
     <section className="source-health" id="source-health">

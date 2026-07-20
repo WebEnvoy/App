@@ -1052,7 +1052,9 @@ function readStoredPanelWidth(
   maxWidth: number,
 ) {
   try {
-    const storedWidth = Number(window.localStorage.getItem(key));
+    const storedValue = window.localStorage.getItem(key);
+    if (storedValue == null) return fallback;
+    const storedWidth = Number(storedValue);
     return Number.isFinite(storedWidth)
       ? Math.min(maxWidth, Math.max(minWidth, storedWidth))
       : fallback;

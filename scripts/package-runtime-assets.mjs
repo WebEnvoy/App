@@ -88,19 +88,30 @@ function coreStartScript() {
   return `import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createApiServer } from "@webenvoy/api-server";
-import { createFileRunRecordStore, createHttpHarborRuntimeClient, createLocalLodePackageResolver } from "@webenvoy/core-runtime";
+import { createFileRunRecordStore, createHttpHarborRuntimeClient, createLocalLodePackageResolver, createLocalTaskTurnInputPolicyResolver } from "@webenvoy/core-runtime";
+import { createFileTaskThreadStore } from "@webenvoy/core-runtime/internal/task-thread-store";
 
 const host = process.env.WEBENVOY_CORE_RUNTIME_HOST ?? "127.0.0.1";
 const port = parsePort(process.env.PORT ?? process.env.WEBENVOY_CORE_RUNTIME_PORT, 8787);
 const runtimeDataDir = process.env.WEBENVOY_RUNTIME_DATA_DIR ?? join(process.cwd(), "data");
 const runRecordDir = process.env.WEBENVOY_RUN_RECORD_DIR ?? join(runtimeDataDir, "core-runs");
 mkdirSync(runRecordDir, { recursive: true });
+const runRecordStore = createFileRunRecordStore({ directory: runRecordDir });
+const lodeRegistryPath = process.env.WEBENVOY_LODE_REGISTRY_PATH;
+const taskThreadStore = createFileTaskThreadStore({
+  directory: process.env.WEBENVOY_TASK_THREAD_DIR ?? join(runRecordDir, "threads"),
+  runRecordStore,
+  ...(lodeRegistryPath ? {
+    resolveInputPolicy: createLocalTaskTurnInputPolicyResolver({ registryPath: lodeRegistryPath })
+  } : {})
+});
 
 const server = createApiServer({
-  runRecordStore: createFileRunRecordStore({ directory: runRecordDir }),
-  ...(process.env.WEBENVOY_LODE_REGISTRY_PATH ? {
+  runRecordStore,
+  taskThreadStore,
+  ...(lodeRegistryPath ? {
     lodePackageResolver: createLocalLodePackageResolver({
-      registryPath: process.env.WEBENVOY_LODE_REGISTRY_PATH,
+      registryPath: lodeRegistryPath,
       ...(process.env.WEBENVOY_LODE_ASSETS_PATH ? { rootDir: process.env.WEBENVOY_LODE_ASSETS_PATH } : {})
     })
   } : {}),

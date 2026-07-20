@@ -9,6 +9,7 @@
     "build": "npm run typecheck && npm run build:main && vite build",
     "build:main": "node -e \"require('fs').rmSync('dist-electron', { recursive: true, force: true })\" && tsc -p tsconfig.electron.json && node scripts/package-lode-assets.mjs && node scripts/package-runtime-assets.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "test:workbench-dom": "electron scripts/workbench-dom-smoke.mjs",
     "smoke": "npm run build && node scripts/smoke.mjs",
     "smoke:packaged": "npm run build && node scripts/smoke-packaged.mjs",
     "smoke:packaged:vertical": "npm run build && node scripts/smoke-packaged-vertical.mjs",

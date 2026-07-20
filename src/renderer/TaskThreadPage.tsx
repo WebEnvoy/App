@@ -208,7 +208,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
           <strong>Task = 站点技能 + 账号身份 + 业务输入</strong>
           <p>App 只组织用户意图；Core、Harbor、Lode 仍拥有各自事实来源。</p>
         </div>
-        <span className="badge">{selectedTask.source === "Core live" ? "Core live projection" : "fallback projection"}</span>
+        <span className="badge">{selectedTask.source}</span>
       </div>
       <dl className="thread-intent-grid">
         <SourceField
@@ -219,7 +219,7 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
         <SourceField
           label="Identity"
           value={selectedTask.accountIdentity}
-          source={selectedTask.identitySource ?? "Harbor fixture"}
+          source={selectedTask.identitySource ?? selectedTask.source}
         />
         <SourceField
           label="Business input"

@@ -19,6 +19,11 @@ import {
   type CoreReadTaskLoadState,
 } from "./coreReadTaskClient";
 import {
+  fetchCoreThreadState,
+  loadingCoreThreadState,
+  retainLastKnownCoreThreads,
+} from "./coreThreadClient";
+import {
   coreTaskSubmitReadiness,
   initialCoreTaskSubmitState,
   promoteSubmittedCoreTask,
@@ -95,17 +100,6 @@ const initialHarborIdentityState: HarborIdentityLoadState = {
   identities: [],
 };
 
-function unavailableCoreThreadState(endpoint: string): CoreReadTaskLoadState {
-  return {
-    status: "offline",
-    endpoint,
-    fetchedAt: "not-read",
-    summary: "暂时无法读取任务和创建所需信息，请检查本机服务后重试。",
-    tasks: [],
-    liveTaskIds: [],
-  };
-}
-
 function coreSubmitStateKey(taskId: string, endpoint: string) {
   return `${endpoint}::${taskId}`;
 }
@@ -114,15 +108,11 @@ function applyLocalTaskContext(
   task: TaskProjection,
   businessInputOverrides: Record<string, string>,
 ): TaskProjection {
-  const isBossSearch = task.id === "task-boss-real-read";
-  const businessInput = businessInputOverrides[task.id] ?? (isBossSearch
-    ? '{"query":"前端工程师","city_code":"101020100","page":1,"limit":15}'
-    : task.businessInput);
-  const searchQuery = businessInputOverrides[task.id] === undefined && !isBossSearch ? task.searchQuery : undefined;
+  const businessInput = businessInputOverrides[task.id] ?? task.businessInput;
+  const searchQuery = businessInputOverrides[task.id] === undefined ? task.searchQuery : undefined;
 
   return {
     ...task,
-    ...(isBossSearch ? { title: "BOSS 职位搜索", siteSkill: "BOSS 职位搜索" } : {}),
     businessInput,
     searchQuery,
   };
@@ -137,7 +127,7 @@ export function App() {
     runtimeSupervisorCheckingState,
   );
   const [coreReadState, setCoreReadState] = useState<CoreReadTaskLoadState>(() =>
-    unavailableCoreThreadState(defaultConnectionConfig.coreEndpoint),
+    loadingCoreThreadState(defaultConnectionConfig.coreEndpoint),
   );
   const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
@@ -335,7 +325,23 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setCoreReadState(unavailableCoreThreadState(connectionConfig.coreEndpoint));
+    let cancelled = false;
+    let refreshTimer: number | undefined;
+    setCoreReadState(loadingCoreThreadState(connectionConfig.coreEndpoint));
+
+    const refreshCoreThreads = async () => {
+      const next = await fetchCoreThreadState(connectionConfig.coreEndpoint);
+      if (!cancelled) {
+        setCoreReadState((current) => retainLastKnownCoreThreads(current, next));
+        refreshTimer = window.setTimeout(refreshCoreThreads, 5000);
+      }
+    };
+    void refreshCoreThreads();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+    };
   }, [connectionConfig.coreEndpoint]);
 
   useEffect(() => {
@@ -409,7 +415,7 @@ export function App() {
     setActiveView("work");
     setWorkMode("detail");
     setSelectedTaskId(task.id);
-    setSelectedRunId(task.runs[0].id);
+    setSelectedRunId(task.runs[0]?.id ?? "");
   }
 
   function openTaskById(taskId: string) {
@@ -655,6 +661,10 @@ export function App() {
               selectedSkill={createTaskSkill}
               onRecover={openSettings}
             />
+          </ThreadWorkspace>
+        ) : selectedTask != null && selectedTask.runs.length === 0 ? (
+          <ThreadWorkspace workspaceKey={`work:${selectedTask.id}`}>
+            <OwnerState title="暂无任务回合" summary="该线程已创建，尚未提交业务输入。" />
           </ThreadWorkspace>
         ) : selectedTask == null || selectedRun == null || selectedSubmitTask == null ? (
           <ThreadWorkspace workspaceKey="work-empty">
