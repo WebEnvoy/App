@@ -4,7 +4,7 @@ import { requestOwnerJson } from "./ownerApiClient";
 
 export type IdentityCompatibilityCandidate = {
   identityEnvironmentRef: string;
-  status: "compatible" | "requires_setup" | "incompatible" | "unknown_until_runtime";
+  status: "compatible" | "requires_setup" | "incompatible" | "unknown_until_runtime" | "awaiting_target";
   reasonCodes: string[];
   recoveryAction:
     | "none"
@@ -95,6 +95,7 @@ export async function fetchSkillIdentityCompatibility(
   skill: LodeCatalogSkill,
   identityEnvironmentRefs: string[],
   signal?: AbortSignal,
+  targetRef?: string,
 ): Promise<SkillIdentityCompatibilityState> {
   const refs = [...new Set(identityEnvironmentRefs.filter((value) => value.length > 0))];
   if (refs.length === 0) {
@@ -102,8 +103,16 @@ export async function fetchSkillIdentityCompatibility(
   }
   const candidates: IdentityCompatibilityCandidate[] = [];
   for (let index = 0; index < refs.length; index += 32) {
-    const request = createSkillIdentityCompatibilityRequest(skill, refs.slice(index, index + 32));
-    if (request == null) return unavailableSkillIdentityCompatibility("技能缺少兼容性预检查所需的版本化声明。");
+    const request = createSkillIdentityCompatibilityRequest(skill, refs.slice(index, index + 32), targetRef);
+    if (request == null) {
+      return unavailableSkillIdentityCompatibility(
+        skillRequiresExactTarget(skill)
+          ? targetRef == null
+            ? "请先填写具体目标，再检查账号身份兼容性。"
+            : "具体目标与技能声明不匹配，已停止创建任务。"
+          : "技能缺少兼容性预检查所需的版本化声明。",
+      );
+    }
     let payload: unknown;
     try {
       payload = await requestOwnerJson(coreEndpoint, "/identity-compatibility-preview", {
@@ -131,10 +140,39 @@ export async function fetchSkillIdentityCompatibility(
 }
 
 export function isCandidateUsable(candidate: IdentityCompatibilityCandidate | undefined) {
-  return candidate?.status === "compatible" || candidate?.status === "unknown_until_runtime";
+  return candidate?.status === "compatible" || candidate?.status === "unknown_until_runtime" || candidate?.status === "awaiting_target";
 }
 
-export function createSkillIdentityCompatibilityRequest(skill: LodeCatalogSkill, refs: string[]): CompatibilityRequest | null {
+export function createAwaitingTargetCompatibility(identityEnvironmentRefs: string[]): SkillIdentityCompatibilityState {
+  const refs = [...new Set(identityEnvironmentRefs.filter((value) => value.length > 0))];
+  return {
+    status: "ready",
+    summary: refs.length > 0 ? "选择账号身份并填写具体目标后检查兼容性。" : "当前站点没有账号身份候选。",
+    candidates: refs.map((identityEnvironmentRef) => ({
+      identityEnvironmentRef,
+      status: "awaiting_target",
+      reasonCodes: ["target_required"],
+      recoveryAction: "fix_target",
+    })),
+  };
+}
+
+export function compatibilityTargetFieldId(skill: LodeCatalogSkill) {
+  if (!skillRequiresExactTarget(skill)) return undefined;
+  const fields = skill.inputFields.filter((field) => field.required && field.format === "uri");
+  return fields.length === 1 ? fields[0]?.id : undefined;
+}
+
+export function skillRequiresExactTarget(skill: LodeCatalogSkill) {
+  const action = skill.actions.length === 1 ? skill.actions[0] : undefined;
+  return action?.targetTypes.some((targetType) => /(^|_)detail(_|$)/i.test(targetType)) === true;
+}
+
+export function createSkillIdentityCompatibilityRequest(
+  skill: LodeCatalogSkill,
+  refs: string[],
+  targetRef?: string,
+): CompatibilityRequest | null {
   const action = skill.actions.length === 1 ? skill.actions[0] : undefined;
   const uniqueRefs = [...new Set(refs.filter((value) => value.length > 0))];
   if (
@@ -143,6 +181,10 @@ export function createSkillIdentityCompatibilityRequest(skill: LodeCatalogSkill,
   ) return null;
   const target = publicOrigin(action.supportedOrigins[0]!);
   if (target == null) return null;
+  const compatibilityTarget = skillRequiresExactTarget(skill)
+    ? publicTargetRef(targetRef, target)
+    : `${target}/`;
+  if (compatibilityTarget == null) return null;
   return {
     schema_version: "webenvoy.identity-compatibility-preview-request.v0",
     package_ref: skill.packageRef,
@@ -150,12 +192,23 @@ export function createSkillIdentityCompatibilityRequest(skill: LodeCatalogSkill,
     version: skill.version,
     operation_id: action.id,
     operation_mode: action.operationMode,
-    target_ref: `${target}/`,
+    target_ref: compatibilityTarget,
     target_origin: target,
     resource_requirement_ref: action.resourceRequirementRef,
     resource_requirement_profile_id: action.resourceRequirementProfileIds[0]!,
     identity_environment_refs: uniqueRefs,
   };
+}
+
+function publicTargetRef(value: string | undefined, expectedOrigin: string) {
+  if (value == null) return null;
+  try {
+    const url = new URL(value);
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.origin !== expectedOrigin || url.hash) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 export function parseSkillIdentityCompatibilityResponse(

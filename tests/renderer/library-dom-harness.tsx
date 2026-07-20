@@ -4,15 +4,20 @@ import { createRoot } from "react-dom/client";
 import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../../src/electron/boundedJsonResponse";
 import { identityEnvironmentFixtures } from "../../src/renderer/identityEnvironmentFixtures";
 import {
+  compatibilityTargetFieldId,
+  createAwaitingTargetCompatibility,
   createSkillIdentityCompatibilityRequest,
   parseSkillIdentityCompatibilityResponse,
 } from "../../src/renderer/coreIdentityCompatibilityClient";
+import { CreateTaskShell, type CreateTaskSelection } from "../../src/renderer/CreateTaskShell";
 import {
   projectLodeCatalogDisplayCache,
   type LodeCatalogLoadState,
   type LodeCatalogSkill,
 } from "../../src/renderer/lodeCatalogClient";
 import { createLatestRequestGate } from "../../src/renderer/latestRequestGate";
+import { projectOwnerHttpStatusError } from "../../src/renderer/ownerApiClient";
+import { createSkillInputDraft, validateSkillInputDraft } from "../../src/renderer/skillInputDraft";
 import type { RuntimeSupervisorState } from "../../src/renderer/runtimeSupervisorState";
 import { SiteSkillLibrary } from "../../src/renderer/SiteSkillPages";
 import "../../src/renderer/uiFoundation.css";
@@ -38,8 +43,9 @@ const xhsSkill: LodeCatalogSkill = {
   availabilityReason: "输入、输出与业务动作声明可用。",
   inputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/input@0.1.0",
   inputFields: [
-    { id: "keyword", label: "关键词", kind: "text", required: true, description: "搜索关键词" },
-    { id: "limit", label: "数量", kind: "number", required: false, description: "结果数量", minimum: 1, maximum: 20 },
+    { id: "url", label: "Entry URL", kind: "text", required: true, description: "Owner-provided entry URL", format: "uri" },
+    { id: "keyword", label: "Keyword", kind: "text", required: true, description: "Owner-provided search keyword", minLength: 1, maxLength: 80 },
+    { id: "limit", label: "Limit", kind: "number", required: false, description: "Owner-provided result limit", minimum: 1, maximum: 20, integer: true },
   ],
   outputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
   outputKind: "xhs_note_search",
@@ -79,6 +85,10 @@ const detailSkill: LodeCatalogSkill = {
   packageRef: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
   name: "Read note detail",
   category: "Content detail",
+  inputFields: [
+    { id: "url", label: "Detail URL", kind: "text", required: true, description: "Exact detail URL", format: "uri" },
+  ],
+  actions: [{ ...xhsSkill.actions[0]!, id: "xhs_read_note_detail", targetTypes: ["note_detail_page"] }],
 };
 const sampleSkill: LodeCatalogSkill = {
   ...xhsSkill,
@@ -97,7 +107,12 @@ const catalog: LodeCatalogLoadState = {
   skills: [xhsSkill, detailSkill, bossSkill, sampleSkill],
 };
 const identity = { ...identityEnvironmentFixtures[0], source: "Harbor live" as const };
-const identityB = { ...identity, id: "identity-xhs-ops-b", accountLabel: "运营号 B" };
+const identityB = {
+  ...identity,
+  id: "identity-xhs-ops-b",
+  accountLabel: "运营号 B",
+  identityEnvironmentRef: "harbor://identity-environment/xhs-ops-b",
+};
 const runtime: RuntimeSupervisorState = {
   mode: "real",
   checkedAt: "2026-07-20T00:00:00Z",
@@ -118,29 +133,62 @@ const runtime: RuntimeSupervisorState = {
 };
 function Harness() {
   const [selection, setSelection] = useState("");
+  const [createSelection, setCreateSelection] = useState<CreateTaskSelection | null>(null);
+  const compatibilityBySkill = Object.fromEntries(catalog.skills.map((skill) => [
+    skill.id,
+    skill === detailSkill
+      ? createAwaitingTargetCompatibility([identity.identityEnvironmentRef, identityB.identityEnvironmentRef])
+      : {
+          status: "ready" as const,
+          summary: "兼容性已检查。",
+          candidates: [identity, identityB].map((item, index) => ({
+            identityEnvironmentRef: item.identityEnvironmentRef,
+            status: index === 0 ? "unknown_until_runtime" as const : "requires_setup" as const,
+            reasonCodes: index === 0 ? ["runtime_facts_require_task_admission"] : ["authentication_required"],
+            recoveryAction: index === 0 ? "retry_at_task_submission" as const : "open_manual_auth" as const,
+          })),
+        },
+  ]));
   return (
     <main style={{ width: "100vw", height: "100vh", overflow: "auto", background: "var(--we-surface-primary)" }}>
-      <SiteSkillLibrary
-        catalog={catalog}
-        compatibilityBySkill={Object.fromEntries(catalog.skills.map((skill) => [
-          skill.id,
-          {
-            status: "ready" as const,
-            summary: "兼容性已检查。",
-            candidates: [identity, identityB].map((item) => ({
-              identityEnvironmentRef: item.identityEnvironmentRef,
-              status: "unknown_until_runtime" as const,
-              reasonCodes: ["runtime_facts_require_task_admission"],
-              recoveryAction: "retry_at_task_submission" as const,
-            })),
-          },
-        ]))}
-        identities={[identity, identityB]}
-        runtimeSupervisorState={runtime}
-        onCreateIdentity={() => setSelection("create-identity")}
-        onNavigation={() => {}}
-        onUse={(skill, identityId) => setSelection(`${skill.packageRef}:${identityId}`)}
-      />
+      {createSelection == null ? (
+        <SiteSkillLibrary
+          catalog={catalog}
+          compatibilityBySkill={compatibilityBySkill}
+          identities={[identity, identityB]}
+          runtimeSupervisorState={runtime}
+          onCreateIdentity={() => setSelection("create-identity")}
+          onNavigation={() => {}}
+          onRecoverCandidate={(_skill, identityId, candidate) => setSelection(`${identityId}:${candidate.recoveryAction}`)}
+          onUse={(skill, identityId) => {
+            setSelection(`${skill.packageRef}:${identityId}`);
+            setCreateSelection({ skill, identityId });
+          }}
+        />
+      ) : (
+        <CreateTaskShell
+          catalog={catalog}
+          compatibilityBySkill={compatibilityBySkill}
+          identities={[identity, identityB]}
+          selection={createSelection}
+          runtimeSupervisorState={runtime}
+          onSelect={() => {}}
+          onCreateIdentity={() => setSelection("create-identity")}
+          onCheckCompatibility={async (skill, identityId) => ({
+            status: "ready",
+            summary: "目标已检查。",
+            candidates: [{
+              identityEnvironmentRef: [identity, identityB].find((item) => item.id === identityId)!.identityEnvironmentRef,
+              status: "compatible",
+              reasonCodes: [],
+              recoveryAction: "none",
+            }],
+          })}
+          onRecover={() => setSelection("check-task-owner")}
+          onRecoverCandidate={(_skill, identityId, candidate) => setSelection(`${identityId}:${candidate.recoveryAction}`)}
+          onTargetChange={() => {}}
+        />
+      )}
       <output data-library-selection="">{selection}</output>
     </main>
   );
@@ -158,13 +206,13 @@ window.__runLibraryDomSmoke = async (mode) => {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const bodyText = document.body.textContent ?? "";
   const xhsRow = Array.from(document.querySelectorAll<HTMLButtonElement>(".production-skill-row-main"))
-    .find((button) => button.textContent?.includes("搜索并读取笔记"));
+    .find((button) => button.textContent?.includes(xhsSkill.name));
   const bossUse = Array.from(document.querySelectorAll<HTMLButtonElement>(".production-skill-row .production-primary-button"))
-    .find((button) => button.closest(".production-skill-row")?.textContent?.includes("搜索职位"));
+    .find((button) => button.closest(".production-skill-row")?.textContent?.includes(bossSkill.name));
   const xhsUse = Array.from(document.querySelectorAll<HTMLButtonElement>(".production-skill-row .production-primary-button"))
-    .find((button) => button.closest(".production-skill-row")?.textContent?.includes("搜索并读取笔记"));
+    .find((button) => button.closest(".production-skill-row")?.textContent?.includes(xhsSkill.name));
   const contentBrowseFilters = Array.from(document.querySelectorAll(".production-library-filters button"))
-    .filter((button) => button.textContent === "内容浏览");
+    .filter((button) => button.textContent === xhsSkill.category);
   const searchHeight = document.querySelector(".production-library-search")?.getBoundingClientRect().height ?? 0;
   const compatibilityRequest = createSkillIdentityCompatibilityRequest(xhsSkill, [identity.identityEnvironmentRef]);
   if (compatibilityRequest == null) throw new Error("Compatibility request was not projected from owner metadata.");
@@ -176,6 +224,20 @@ window.__runLibraryDomSmoke = async (mode) => {
     }, [identity.identityEnvironmentRef]) != null
   ) {
     throw new Error("Ambiguous action or resource profile was accepted for compatibility preview.");
+  }
+  const detailUrl = "https://www.xiaohongshu.com/explore/66aa00000000000001000111?xsec_token=public";
+  const detailRequest = createSkillIdentityCompatibilityRequest(detailSkill, [identity.identityEnvironmentRef], detailUrl);
+  if (
+    createSkillIdentityCompatibilityRequest(detailSkill, [identity.identityEnvironmentRef]) != null ||
+    createSkillIdentityCompatibilityRequest(detailSkill, [identity.identityEnvironmentRef], "https://example.test/detail") != null ||
+    detailRequest?.target_ref !== detailUrl ||
+    compatibilityTargetFieldId(detailSkill) !== "url" ||
+    compatibilityTargetFieldId({
+      ...detailSkill,
+      inputFields: [...detailSkill.inputFields, { ...detailSkill.inputFields[0]!, id: "alternate_url" }],
+    }) !== undefined
+  ) {
+    throw new Error("Detail compatibility did not require and preserve an exact target.");
   }
   const compatibilityResponse = {
     schema_version: "webenvoy.identity-compatibility-preview.v0",
@@ -265,6 +327,27 @@ window.__runLibraryDomSmoke = async (mode) => {
   const latestRequest = requestGate.begin();
   const requestGateSuperseded = supersededRequest.signal.aborted && !supersededRequest.isCurrent() && latestRequest.isCurrent();
   requestGate.invalidate();
+  const safeBrowserError = projectOwnerHttpStatusError("/owner", 409, {
+    error: { category: "owner_contract", code: "identity_not_ready", message: "Bearer raw-secret" },
+    token: "raw-secret",
+  });
+  const unsafeBrowserError = projectOwnerHttpStatusError("/owner", 409, {
+    error: { category: "Bearer raw-secret", code: "token=raw-secret" },
+  });
+  const structuredFieldSkill: LodeCatalogSkill = {
+    ...xhsSkill,
+    inputFields: [
+      { id: "body", label: "Body", kind: "multiline", required: true, description: "Long text", minLength: 2, maxLength: 10 },
+      { id: "attachments", label: "Attachments", kind: "file", required: true, description: "Declared files" },
+      { id: "sections", label: "Sections", kind: "multi-select", required: true, description: "Declared options", options: ["title", "summary"], defaultValue: ["title"] },
+      { id: "guard", label: "Guard", kind: "constant", required: true, description: "Declared constant", defaultValue: "active" },
+    ],
+  };
+  const structuredDraft = createSkillInputDraft(structuredFieldSkill);
+  const initialStructuredErrors = validateSkillInputDraft(structuredFieldSkill, structuredDraft);
+  structuredDraft.values.body = "draft";
+  structuredDraft.files.attachments = [new File(["public"], "public.txt", { type: "text/plain" })];
+  const validStructuredErrors = validateSkillInputDraft(structuredFieldSkill, structuredDraft);
   let oversizedCancelled = false;
   await readBoundedJsonResponse(new Response(new ReadableStream<Uint8Array>({
     start(controller) { controller.enqueue(new Uint8Array(64 * 1024 + 1)); },
@@ -277,7 +360,7 @@ window.__runLibraryDomSmoke = async (mode) => {
     !bodyText.includes("发现站点技能") ||
     bodyText.includes("示例技能") ||
     !xhsRow ||
-    bossUse?.disabled !== (mode === "stale") ||
+    bossUse?.disabled !== true ||
     (mode === "stale" && xhsUse?.disabled !== true) ||
     contentBrowseFilters.length !== 1 ||
     parsedCompatibility?.[0]?.status !== "unknown_until_runtime" ||
@@ -287,6 +370,11 @@ window.__runLibraryDomSmoke = async (mode) => {
     !invalidCrossConstraints ||
     /secret|credential|token/.test(cacheJson) ||
     !requestGateSuperseded || latestRequest.isCurrent() ||
+    safeBrowserError !== "/owner returned 409: owner_contract: identity_not_ready" ||
+    unsafeBrowserError !== "/owner returned 409" ||
+    initialStructuredErrors.body == null || initialStructuredErrors.attachments == null ||
+    Object.keys(validStructuredErrors).length !== 0 ||
+    structuredDraft.values.guard !== "active" ||
     ownerApiResponseMaxBytes("/identity-compatibility-preview") !== 64 * 1024 ||
     ownerApiResponseMaxBytes("/threads") <= 64 * 1024 ||
     ownerApiResponseMaxBytes("/runs/run-id/result") <= ownerApiResponseMaxBytes("/threads") / 2 ||
@@ -309,6 +397,10 @@ window.__runLibraryDomSmoke = async (mode) => {
       cacheJson,
       requestGateSuperseded,
       latestStillCurrent: latestRequest.isCurrent(),
+      safeBrowserError,
+      unsafeBrowserError,
+      initialStructuredErrors,
+      validStructuredErrors,
       oversizedCancelled,
       searchHeight,
     })}`);
@@ -320,7 +412,7 @@ window.__runLibraryDomSmoke = async (mode) => {
   const primaryUse = document.querySelector<HTMLButtonElement>(".skill-detail-heading .production-primary-button");
   const radios = Array.from(document.querySelectorAll<HTMLButtonElement>("[role='radio']"));
   if (
-    !detailText.includes("关键词") ||
+    !detailText.includes("Keyword") ||
     !detailText.includes("读取和下载") ||
     !detailText.includes("App 标准结构化视图") ||
     !detailText.includes("提交时再检查") ||
@@ -334,15 +426,54 @@ window.__runLibraryDomSmoke = async (mode) => {
   radios[0]!.focus();
   radios[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
   await new Promise((resolve) => requestAnimationFrame(resolve));
-  if (radios[1]!.getAttribute("aria-checked") !== "true" || document.activeElement !== radios[1]) {
-    throw new Error("Library identity radio keyboard navigation failed.");
+  if (
+    radios[1]!.getAttribute("aria-checked") !== "true" ||
+    document.activeElement !== radios[1] ||
+    primaryUse?.disabled !== true ||
+    !document.body.textContent?.includes("登录账号")
+  ) {
+    throw new Error(`Library identity recovery state or keyboard navigation failed: ${JSON.stringify({
+      checked: radios[1]!.getAttribute("aria-checked"),
+      focused: document.activeElement === radios[1],
+      primaryDisabled: primaryUse?.disabled,
+      text: document.body.textContent,
+    })}`);
   }
-  primaryUse.click();
+  radios[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
   await new Promise((resolve) => requestAnimationFrame(resolve));
+  primaryUse.click();
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const selection = document.querySelector("[data-library-selection]")?.textContent ?? "";
+  const composer = document.querySelector<HTMLFormElement>(".create-task-composer");
+  const submit = document.querySelector<HTMLButtonElement>(".create-task-submit");
+  const initialInvalid = document.querySelectorAll(".create-task-field [aria-invalid='true']").length;
+  submit?.click();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  const submittedInvalid = document.querySelectorAll(".create-task-field [aria-invalid='true']").length;
+  const urlInput = document.querySelector<HTMLInputElement>("[name='url']");
+  const keywordInput = document.querySelector<HTMLInputElement>("[name='keyword']");
+  setInputValue(urlInput, "https://www.xiaohongshu.com/explore");
+  setInputValue(keywordInput, "AI tools");
+  submit?.click();
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const submitState = document.querySelector(".create-task-submit-state")?.textContent ?? "";
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
-  if (!selection.includes("xiaohongshu/search-notes") || overflow > 1) {
+  if (
+    !selection.includes("xiaohongshu/search-notes") ||
+    composer == null ||
+    initialInvalid !== 0 ||
+    submittedInvalid < 2 ||
+    !submitState.includes("任务提交服务尚未接入") ||
+    keywordInput?.value !== "AI tools" ||
+    overflow > 1
+  ) {
     throw new Error(`Library selection or responsive layout failed: selection=${selection}, overflow=${overflow}, searchHeight=${searchHeight}`);
   }
-  return { mode, selection, overflow, searchHeight };
+  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: keywordInput.value };
 };
+
+function setInputValue(input: HTMLInputElement | null, value: string) {
+  if (input == null) throw new Error("Expected schema-driven input is missing.");
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}

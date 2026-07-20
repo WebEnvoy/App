@@ -56,6 +56,11 @@ export function readLodeJsonObject(filePath: string, budget?: LodeReadBudget): R
   return readLodeJson(filePath, budget).value;
 }
 
+export function readLodeJsonObjectSha256(filePath: string, budget?: LodeReadBudget) {
+  const result = readLodeJson(filePath, budget);
+  return createHash("sha256").update(result.bytes).digest("hex");
+}
+
 export function readLodeAssetSha256(filePath: string, budget?: LodeReadBudget) {
   return createHash("sha256").update(readLodeBytes(filePath, budget)).digest("hex");
 }

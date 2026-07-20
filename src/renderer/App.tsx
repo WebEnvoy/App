@@ -41,12 +41,16 @@ import {
 } from "./lodeCatalogClient";
 import { CreateTaskShell, type CreateTaskSelection } from "./CreateTaskShell";
 import {
+  createAwaitingTargetCompatibility,
   fetchSkillIdentityCompatibility,
   isCandidateUsable,
   loadingSkillIdentityCompatibility,
+  skillRequiresExactTarget,
   unavailableSkillIdentityCompatibility,
+  type IdentityCompatibilityCandidate,
   type SkillIdentityCompatibilityState,
 } from "./coreIdentityCompatibilityClient";
+import { compatibilityRecoveryCopy } from "./skillCompatibilityPresentation";
 import { OwnerState } from "./OwnerState";
 import { createLatestRequestGate } from "./latestRequestGate";
 import { SettingsPage } from "./SettingsPage";
@@ -59,7 +63,10 @@ import {
   runtimeSupervisorUnavailableState,
   type RuntimeSupervisorState,
 } from "./runtimeSupervisorState";
-import { loadLocalIdentityEnvironmentDrafts } from "./localIdentityEnvironmentStore";
+import {
+  loadLocalIdentityEnvironmentDrafts,
+  localIdentitySelectionStorageKey,
+} from "./localIdentityEnvironmentStore";
 import { outcomeLabel } from "./TaskThreadFields";
 import { TaskThreadComposer } from "./TaskThreadComposer";
 import { TaskThreadPage } from "./TaskThreadPage";
@@ -364,13 +371,20 @@ export function App() {
       return () => { cancelled = true; };
     }
     const refs = harborIdentityState.identities.map((identity) => identity.identityEnvironmentRef);
-    setCompatibilityBySkill(Object.fromEntries(skills.map((skill) => [
-      skill.id,
-      skill.availability === "available"
-        ? loadingSkillIdentityCompatibility()
-        : unavailableSkillIdentityCompatibility(skill.availabilityReason),
-    ])));
-    const pending = skills.filter((skill) => skill.availability === "available");
+    setCompatibilityBySkill(Object.fromEntries(skills.map((skill) => {
+      const matchingRefs = harborIdentityState.identities
+        .filter((identity) => identity.siteId === skill.siteSlug)
+        .map((identity) => identity.identityEnvironmentRef);
+      return [
+        skill.id,
+        skill.availability !== "available"
+          ? unavailableSkillIdentityCompatibility(skill.availabilityReason)
+          : skillRequiresExactTarget(skill)
+          ? createAwaitingTargetCompatibility(matchingRefs)
+          : loadingSkillIdentityCompatibility(),
+      ];
+    })));
+    const pending = skills.filter((skill) => skill.availability === "available" && !skillRequiresExactTarget(skill));
     let index = 0;
     const workers = Array.from({ length: Math.min(4, pending.length) }, async () => {
       while (!cancelled && index < pending.length) {
@@ -540,7 +554,7 @@ export function App() {
     setActiveView("work");
   }
 
-  async function useSiteSkill(skill: LodeCatalogSkill, identityId?: string) {
+  async function resolveCreateTaskCompatibility(skill: LodeCatalogSkill, identityId?: string, targetRef?: string) {
     const request = createTaskRequestGateRef.current.begin();
     const coreEndpoint = connectionConfig.coreEndpoint;
     const taskContextKey = createTaskContextRef.current;
@@ -559,12 +573,15 @@ export function App() {
       setLodeCatalogState(refreshedCatalog);
       return;
     }
-    const compatibility = await fetchSkillIdentityCompatibility(
-      coreEndpoint,
-      refreshedSkill,
-      [identity.identityEnvironmentRef],
-      request.signal,
-    );
+    const compatibility = skillRequiresExactTarget(refreshedSkill) && targetRef == null
+      ? createAwaitingTargetCompatibility([identity.identityEnvironmentRef])
+      : await fetchSkillIdentityCompatibility(
+          coreEndpoint,
+          refreshedSkill,
+          [identity.identityEnvironmentRef],
+          request.signal,
+          targetRef,
+        );
     if (!request.isCurrent() || coreEndpointRef.current !== coreEndpoint ||
       createTaskContextRef.current !== taskContextKey) return;
     const currentIdentity = harborIdentityState.identities.find((item) => item.id === identityId);
@@ -574,10 +591,52 @@ export function App() {
     const candidate = compatibility.candidates.find(
       (item) => item.identityEnvironmentRef === identity.identityEnvironmentRef,
     );
-    if (compatibility.status !== "ready" || !isCandidateUsable(candidate)) return;
-    setCreateTaskSelection({ skill: refreshedSkill, identityId });
+    return { skill: refreshedSkill, identity, compatibility, candidate };
+  }
+
+  async function useSiteSkill(skill: LodeCatalogSkill, identityId?: string) {
+    const resolved = await resolveCreateTaskCompatibility(skill, identityId);
+    if (resolved == null || resolved.compatibility.status !== "ready" || !isCandidateUsable(resolved.candidate)) return;
+    setCreateTaskSelection({ skill: resolved.skill, identityId: resolved.identity.id });
     setWorkMode("create");
     setActiveView("work");
+  }
+
+  async function checkCreateTaskCompatibility(skill: LodeCatalogSkill, identityId: string, targetRef?: string) {
+    return (await resolveCreateTaskCompatibility(skill, identityId, targetRef))?.compatibility ?? null;
+  }
+
+  function recoverCreateTaskCandidate(
+    skill: LodeCatalogSkill,
+    identityId: string,
+    candidate: IdentityCompatibilityCandidate,
+  ) {
+    const recovery = compatibilityRecoveryCopy(candidate);
+    if (recovery?.destination === "target") {
+      setCreateTaskSelection({ skill, identityId });
+      setWorkMode("create");
+      setActiveView("work");
+      return;
+    }
+    if (recovery?.destination === "skill" || recovery?.destination === "selection") {
+      setActiveView("library");
+      return;
+    }
+    if (recovery?.destination === "identity") {
+      window.localStorage.setItem(localIdentitySelectionStorageKey, identityId);
+      openView("browser");
+    }
+  }
+
+  function resetCreateTaskTargetCompatibility(skill: LodeCatalogSkill, identityId: string) {
+    createTaskRequestGateRef.current.invalidate();
+    const identity = harborIdentityState.identities.find((item) => item.id === identityId);
+    setCompatibilityBySkill((current) => ({
+      ...current,
+      [skill.id]: createAwaitingTargetCompatibility(
+        identity == null ? [] : [identity.identityEnvironmentRef],
+      ),
+    }));
   }
 
   function updateSelectedTaskBusinessInput(value: string) {
@@ -794,6 +853,7 @@ export function App() {
                 runtimeSupervisorState={runtimeSupervisorState}
                 onCreateIdentity={() => openView("browser")}
                 onNavigation={() => createTaskRequestGateRef.current.invalidate()}
+                onRecoverCandidate={recoverCreateTaskCandidate}
                 onUse={useSiteSkill}
               />
             )}
@@ -824,7 +884,10 @@ export function App() {
               runtimeSupervisorState={runtimeSupervisorState}
               onSelect={useSiteSkill}
               onCreateIdentity={() => openView("browser")}
+              onCheckCompatibility={checkCreateTaskCompatibility}
               onRecover={openSettings}
+              onRecoverCandidate={recoverCreateTaskCandidate}
+              onTargetChange={resetCreateTaskTargetCompatibility}
             />
           </ThreadWorkspace>
         ) : selectedTask != null && selectedTask.runs.length === 0 ? (

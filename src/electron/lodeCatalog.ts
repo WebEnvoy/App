@@ -3,8 +3,8 @@ import path from "node:path";
 import {
   createLodeCatalogReadBudget,
   LodeReadBudgetExceededError,
-  readLodeAssetSha256,
   readLodeJsonObject,
+  readLodeJsonObjectSha256,
   resolveLodeAssetPath,
   type LodeReadBudget,
 } from "./lodeAssetAccess.js";
@@ -17,13 +17,17 @@ import {
 export type LodeCatalogField = {
   id: string;
   label: string;
-  kind: "text" | "number" | "boolean" | "select" | "unknown";
+  kind: "text" | "multiline" | "number" | "boolean" | "select" | "multi-select" | "file" | "constant" | "unknown";
   required: boolean;
   description: string;
   options?: string[];
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
   minimum?: number;
   maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  format?: "uri";
+  integer?: boolean;
 };
 
 export type LodeCatalogAction = {
@@ -98,15 +102,6 @@ type LocalPackageRegistry = {
 const maxCatalogSkills = 200;
 const maxCatalogFields = 100;
 const maxCatalogActions = 50;
-const supportedOutputKinds = new Set([
-  "xhs_note_search",
-  "xhs_note_detail",
-  "xhs_publish_note_precheck",
-  "boss_job_search",
-  "boss_job_detail",
-  "boss_greet_precheck",
-]);
-
 export function readLodeCatalog(bundle = resolveLodeAssetBundle()): LodeCatalogState {
   const fetchedAt = new Date().toISOString();
   if (bundle.state !== "ready" || !bundle.rootPath || !bundle.registryPath) {
@@ -285,7 +280,7 @@ function readCatalogSkill(rootPath: string, entry: Record<string, unknown>, budg
     inputFields.length > 0 &&
     inputFields.every((field) => field.kind !== "unknown") &&
     actions.length > 0 &&
-    projectedOutputKind != null && supportedOutputKinds.has(projectedOutputKind);
+    projectedOutputKind != null;
   const availability = catalogAvailable && lifecycleAvailable && versionCompatible && contractComplete ? "available" : "incompatible";
 
   return {
@@ -314,8 +309,8 @@ function readCatalogSkill(rootPath: string, entry: Record<string, unknown>, budg
       ? "当前技能合同版本与 App 不兼容。"
       : actions.length === 0
       ? "缺少业务动作声明，已停止使用。"
-      : projectedOutputKind == null || !supportedOutputKinds.has(projectedOutputKind)
-      ? "输出类型与 App 不兼容，已停止使用。"
+      : projectedOutputKind == null
+      ? "输出合同缺少结果类型，已停止使用。"
       : "输入或输出合同缺失，已停止使用。",
     inputSchemaId,
     inputFields,
@@ -450,7 +445,7 @@ function readResultViewResource(
   budget: LodeReadBudget,
 ) {
   try {
-    return readLodeAssetSha256(resolveLodeAssetPath(rootPath, resourcePath, packageRoot), budget);
+    return readLodeJsonObjectSha256(resolveLodeAssetPath(rootPath, resourcePath, packageRoot), budget);
   } catch {
     return null;
   }
@@ -474,8 +469,23 @@ function projectInputFields(schema: Record<string, unknown>): LodeCatalogField[]
     }
     const options = value.enum === undefined ? [] : requiredStringArray(value.enum, `${id} enum`);
     const type = optionalString(value.type);
-    const kind = options.length > 0
+    const arrayItems = isRecord(value.items) ? value.items : null;
+    const arrayOptions = arrayItems?.enum === undefined ? [] : requiredStringArray(arrayItems.enum, `${id} items enum`);
+    const contentType = optionalString(value.contentMediaType);
+    const format = optionalString(value.format);
+    const constant = typeof value.const === "string" || typeof value.const === "number" || typeof value.const === "boolean"
+      ? value.const
+      : undefined;
+    const kind = constant !== undefined
+      ? "constant"
+      : type === "array" && arrayOptions.length > 0
+      ? "multi-select"
+      : options.length > 0
       ? "select"
+      : type === "string" && (contentType != null || value.contentEncoding === "base64")
+      ? "file"
+      : type === "string" && (format === "multiline" || format === "textarea")
+      ? "multiline"
       : type === "string"
       ? "text"
       : type === "integer" || type === "number"
@@ -483,19 +493,27 @@ function projectInputFields(schema: Record<string, unknown>): LodeCatalogField[]
       : type === "boolean"
       ? "boolean"
       : "unknown";
-    const defaultValue = typeof value.default === "string" || typeof value.default === "number" || typeof value.default === "boolean"
-      ? value.default
-      : undefined;
+    const defaultValue = constant ?? (
+      typeof value.default === "string" || typeof value.default === "number" || typeof value.default === "boolean"
+        ? value.default
+        : Array.isArray(value.default) && value.default.every((item) => typeof item === "string")
+        ? value.default
+        : undefined
+    );
     return {
       id,
-      label: fieldLabel(id),
+      label: optionalString(value.title) ?? fieldLabel(id),
       kind,
       required: required.has(id),
       description: optionalString(value.description) ?? "由技能合同定义。",
-      options: options.length > 0 ? options : undefined,
+      options: options.length > 0 ? options : arrayOptions.length > 0 ? arrayOptions : undefined,
       defaultValue,
       minimum: typeof value.minimum === "number" ? value.minimum : undefined,
       maximum: typeof value.maximum === "number" ? value.maximum : undefined,
+      minLength: Number.isInteger(value.minLength) && Number(value.minLength) >= 0 ? Number(value.minLength) : undefined,
+      maxLength: Number.isInteger(value.maxLength) && Number(value.maxLength) >= 0 ? Number(value.maxLength) : undefined,
+      format: format === "uri" ? "uri" : undefined,
+      integer: type === "integer" ? true : undefined,
     };
   });
 }
@@ -550,17 +568,7 @@ function outputKind(schema: Record<string, unknown>) {
 }
 
 function fieldLabel(id: string) {
-  const labels: Record<string, string> = {
-    url: "网址",
-    keyword: "关键词",
-    sort: "排序",
-    limit: "数量",
-    include_source_refs: "包含来源",
-    note_id: "笔记 ID",
-    title: "标题",
-    body: "正文",
-  };
-  return labels[id] ?? id.replaceAll("_", " ");
+  return id.replaceAll("_", " ");
 }
 
 function manifestAssetPath(manifest: Record<string, unknown>, role: string, packageRef: string) {

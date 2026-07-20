@@ -48,28 +48,15 @@ export async function fetchLodeCatalog(signal?: AbortSignal): Promise<LodeCatalo
 }
 
 export function catalogSkillSiteId(skill: LodeCatalogSkill) {
-  return skill.siteSlug === "xiaohongshu" || skill.siteSlug === "boss" ? skill.siteSlug : null;
+  return skill.siteSlug;
 }
 
 export function catalogSkillSiteName(skill: LodeCatalogSkill) {
-  return skill.siteSlug === "xiaohongshu"
-    ? "小红书"
-    : skill.siteSlug === "boss"
-    ? "BOSS 直聘"
-    : skill.siteName;
+  return skill.siteName;
 }
 
 export function catalogSkillName(skill: LodeCatalogSkill) {
-  const names: Record<string, string> = {
-    "search-notes": "搜索并读取笔记",
-    "read-note-detail": "读取笔记详情",
-    "publish-note-precheck": "发布笔记写前检查",
-    "job-search": "搜索职位",
-    "read-job-detail": "读取职位详情",
-    "greet-precheck": "打招呼写前检查",
-  };
-  const capabilityId = skill.packageRef.match(/\/([^/@]+)@[^/]+$/)?.[1];
-  return capabilityId == null ? skill.name : names[capabilityId] ?? skill.name;
+  return skill.name;
 }
 
 function cachedOrOffline(summary: string): LodeCatalogLoadState {
@@ -107,7 +94,7 @@ export function projectLodeCatalogDisplayCache(state: LodeCatalogLoadState): Lod
       availability: skill.availability,
       availabilityReason: skill.availabilityReason,
       inputSchemaId: skill.inputSchemaId,
-      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options, defaultValue, minimum, maximum }) => ({
+      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options, defaultValue, minimum, maximum, minLength, maxLength, format, integer }) => ({
         id,
         label,
         kind,
@@ -117,6 +104,10 @@ export function projectLodeCatalogDisplayCache(state: LodeCatalogLoadState): Lod
         ...(defaultValue === undefined ? {} : { defaultValue }),
         ...(minimum === undefined ? {} : { minimum }),
         ...(maximum === undefined ? {} : { maximum }),
+        ...(minLength === undefined ? {} : { minLength }),
+        ...(maxLength === undefined ? {} : { maxLength }),
+        ...(format === undefined ? {} : { format }),
+        ...(integer === undefined ? {} : { integer }),
       })),
       outputSchemaId: skill.outputSchemaId,
       outputKind: skill.outputKind,
@@ -235,16 +226,21 @@ function isCatalogSource(value: unknown): value is WebEnvoyLodeAssetBundleState[
 function isField(value: unknown): value is WebEnvoyLodeCatalogField {
   return isRecord(value) && Object.keys(value).every((key) => [
     "id", "label", "kind", "required", "description", "options", "defaultValue", "minimum", "maximum",
+    "minLength", "maxLength", "format", "integer",
   ].includes(key)) &&
     isString(value.id) &&
     isString(value.label) &&
-    ["text", "number", "boolean", "select", "unknown"].includes(String(value.kind)) &&
+    ["text", "multiline", "number", "boolean", "select", "multi-select", "file", "constant", "unknown"].includes(String(value.kind)) &&
     typeof value.required === "boolean" &&
     isString(value.description) &&
     (value.options === undefined || isStringArray(value.options)) &&
-    (value.defaultValue === undefined || ["string", "number", "boolean"].includes(typeof value.defaultValue)) &&
+    (value.defaultValue === undefined || ["string", "number", "boolean"].includes(typeof value.defaultValue) || isStringArray(value.defaultValue)) &&
     (value.minimum === undefined || typeof value.minimum === "number") &&
-    (value.maximum === undefined || typeof value.maximum === "number");
+    (value.maximum === undefined || typeof value.maximum === "number") &&
+    (value.minLength === undefined || Number.isInteger(value.minLength) && Number(value.minLength) >= 0) &&
+    (value.maxLength === undefined || Number.isInteger(value.maxLength) && Number(value.maxLength) >= 0) &&
+    (value.format === undefined || value.format === "uri") &&
+    (value.integer === undefined || value.integer === true);
 }
 
 function isAction(value: unknown): value is WebEnvoyLodeCatalogAction {

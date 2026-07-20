@@ -1,5 +1,7 @@
 import { isManualAuthenticationCompletionPath } from "./manualAuthenticationCompletion.js";
 
+export { projectOwnerApiError } from "./ownerApiErrorProjection.js";
+
 export type OwnerApiJsonRequest = {
   base?: unknown;
   path?: unknown;
@@ -91,29 +93,9 @@ export function ownerApiTimeoutMs(request: Extract<ParsedOwnerApiRequest, { ok: 
   return 5_000;
 }
 
-export function projectOwnerApiError(value: unknown) {
-  if (!isRecord(value)) return undefined;
-  const source = isRecord(value.error) ? value.error : value;
-  const code = safeErrorToken(source.code);
-  const category = safeErrorToken(source.category);
-  const retryable = typeof source.retryable === "boolean" ? source.retryable : undefined;
-  if (code == null && category == null && retryable == null) return undefined;
-  return {
-    ...(code == null ? {} : { code }),
-    ...(category == null ? {} : { category }),
-    ...(retryable == null ? {} : { retryable }),
-  };
-}
-
 function ownerApiMethod(value: unknown): OwnerApiMethod | null {
   if (value === undefined) return "GET";
   return value === "GET" || value === "POST" || value === "PATCH" || value === "DELETE" ? value : null;
-}
-
-function safeErrorToken(value: unknown) {
-  return typeof value === "string" && value.length > 0 && value.length <= 128 && /^[a-z0-9_.-]+$/i.test(value)
-    ? value
-    : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,4 +1,5 @@
 import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../electron/boundedJsonResponse";
+import { projectOwnerApiError } from "../electron/ownerApiErrorProjection";
 
 export type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -49,7 +50,7 @@ async function requestOwnerJsonWithFetch(
       signal: options.signal == null ? controller.signal : AbortSignal.any([controller.signal, options.signal]),
     });
     const payload = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(path));
-    if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
+    if (!response.ok) return { ok: false, error: projectOwnerHttpStatusError(path, response.status, payload) };
     return payload ?? {};
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -71,12 +72,9 @@ function unwrapOwnerApiResponse(value: unknown, path: string): unknown {
   };
 }
 
-function responseStatusError(path: string, status: number, payload: unknown) {
-  if (!isRecord(payload)) return `${path} returned ${status}`;
-  const error = isRecord(payload.error) ? payload.error : null;
-  const code = typeof error?.code === "string" ? error.code : undefined;
-  const category = typeof error?.category === "string" ? error.category : undefined;
-  return [`${path} returned ${status}`, category, code].filter(Boolean).join(": ");
+export function projectOwnerHttpStatusError(path: string, status: number, payload: unknown) {
+  const error = projectOwnerApiError(payload);
+  return [`${path} returned ${status}`, error?.category, error?.code].filter(Boolean).join(": ");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -566,8 +566,13 @@ if (
   xhsSearchSkill?.availability !== "available" ||
   xhsSearchSkill.resultView?.mode !== "standard" ||
   xhsSearchSkill.resultView?.reason !== "not_declared" ||
+  xhsSearchSkill.siteName !== "Xiaohongshu" ||
+  xhsSearchSkill.name !== "Search Xiaohongshu notes" ||
+  xhsSearchSkill.summary !== "Read Xiaohongshu search result cards from a logged-in browser page and return note refs for detail follow-up." ||
   xhsSearchSkill.actions[0]?.category !== "read" ||
-  !xhsSearchSkill.inputFields.some((field) => field.id === "keyword" && field.required) ||
+  !xhsSearchSkill.inputFields.some((field) =>
+    field.id === "keyword" && field.label === "keyword" && field.required && field.minLength === 1 && field.maxLength === 80
+  ) ||
   bossSearchSkill?.availability !== "incompatible" ||
   !bossSearchSkill.availabilityReason.includes("动作声明")
 ) {
@@ -656,29 +661,30 @@ try {
   await rm(missingDeclarationRoot, { recursive: true, force: true });
 }
 
-const unknownOutputRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-unknown-output-"));
+const futureOutputRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-future-output-"));
 try {
-  await cp(lodeBundle.rootPath, unknownOutputRoot, { recursive: true });
-  const outputPath = path.join(unknownOutputRoot, "sites/xiaohongshu/search-notes/schemas/output.schema.json");
+  await cp(lodeBundle.rootPath, futureOutputRoot, { recursive: true });
+  const outputPath = path.join(futureOutputRoot, "sites/xiaohongshu/search-notes/schemas/output.schema.json");
   const outputSchema = JSON.parse(await readFile(outputPath, "utf8"));
   outputSchema.properties.result_kind.const = "future_result_kind";
   await writeFile(outputPath, JSON.stringify(outputSchema));
-  const unknownOutputCatalog = lodeCatalogModule.readLodeCatalog({
+  const futureOutputCatalog = lodeCatalogModule.readLodeCatalog({
     ...lodeBundle,
-    rootPath: unknownOutputRoot,
-    registryPath: path.join(unknownOutputRoot, "registry/local-packages.json"),
+    rootPath: futureOutputRoot,
+    registryPath: path.join(futureOutputRoot, "registry/local-packages.json"),
   });
-  const unknownOutputSkill = unknownOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
-  const unaffectedSkill = unknownOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/read-note-detail@"));
+  const futureOutputSkill = futureOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  const unaffectedSkill = futureOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/read-note-detail@"));
   if (
-    unknownOutputCatalog.status !== "ready" ||
-    unknownOutputSkill?.availability !== "incompatible" ||
+    futureOutputCatalog.status !== "ready" ||
+    futureOutputSkill?.availability !== "available" ||
+    futureOutputSkill?.outputKind !== "future_result_kind" ||
     unaffectedSkill?.availability !== "available"
   ) {
-    throw new Error(`Unknown output kind was not isolated: ${JSON.stringify(unknownOutputCatalog)}`);
+    throw new Error(`Owner-declared future output kind was overridden by App semantics: ${JSON.stringify(futureOutputCatalog)}`);
   }
 } finally {
-  await rm(unknownOutputRoot, { recursive: true, force: true });
+  await rm(futureOutputRoot, { recursive: true, force: true });
 }
 
 const resultViewRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-result-view-"));
@@ -692,9 +698,9 @@ try {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const packageLock = JSON.parse(await readFile(lockPath, "utf8"));
   const resourceRef = "lode://result-view/xiaohongshu/search-notes/xiaohongshu.search-results@0.1.0";
-  const resourcePath = "views/search-results.html";
+  const resourcePath = "views/search-results.json";
   const resourceFile = path.join(packageRoot, resourcePath);
-  const resourceContents = "<webenvoy-result-view data-component=\"table\"></webenvoy-result-view>";
+  const resourceContents = JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "table" });
   const resourceDigest = createHash("sha256").update(resourceContents).digest("hex");
   await mkdir(path.dirname(resourceFile), { recursive: true });
   await writeFile(resourceFile, resourceContents);
@@ -746,20 +752,26 @@ try {
     throw new Error(`Compatible result-view declaration was not projected: ${JSON.stringify(declaredViewSkill)}`);
   }
 
-  const binaryContents = Buffer.from([0x00, 0xff, 0x57, 0x45, 0x42, 0x00, 0x80]);
-  const binaryDigest = createHash("sha256").update(binaryContents).digest("hex");
-  catalog.result_view.integrity.digest = binaryDigest;
-  packageLock.locked_assets.at(-1).sha256 = binaryDigest;
-  await writeFile(resourceFile, binaryContents);
-  await writeFile(catalogPath, JSON.stringify(catalog));
-  await writeFile(lockPath, JSON.stringify(packageLock));
-  const binaryViewSkill = lodeCatalogModule.readLodeCatalog({
-    ...lodeBundle,
-    rootPath: resultViewRoot,
-    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
-  }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
-  if (binaryViewSkill?.resultView?.mode !== "skill") {
-    throw new Error(`Binary result-view resource was forced through JSON parsing: ${JSON.stringify(binaryViewSkill)}`);
+  for (const [label, invalidContents] of [
+    ["HTML", "<webenvoy-result-view></webenvoy-result-view>"],
+    ["JSON scalar", JSON.stringify("table")],
+    ["JSON array", JSON.stringify([{ component: "table" }])],
+    ["binary", Buffer.from([0x00, 0xff, 0x57, 0x45, 0x42, 0x00, 0x80])],
+  ]) {
+    const invalidDigest = createHash("sha256").update(invalidContents).digest("hex");
+    catalog.result_view.integrity.digest = invalidDigest;
+    packageLock.locked_assets.at(-1).sha256 = invalidDigest;
+    await writeFile(resourceFile, invalidContents);
+    await writeFile(catalogPath, JSON.stringify(catalog));
+    await writeFile(lockPath, JSON.stringify(packageLock));
+    const invalidViewSkill = lodeCatalogModule.readLodeCatalog({
+      ...lodeBundle,
+      rootPath: resultViewRoot,
+      registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+    }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+    if (invalidViewSkill?.resultView?.mode !== "standard") {
+      throw new Error(`${label} result-view resource did not fall back safely: ${JSON.stringify(invalidViewSkill)}`);
+    }
   }
 
   await writeFile(resourceFile, JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "tampered" }));
@@ -780,7 +792,10 @@ try {
   if (unreadableViewSkill?.resultView?.mode !== "standard") {
     throw new Error(`Unreadable result-view resource did not fall back safely: ${JSON.stringify(unreadableViewSkill)}`);
   }
-  await writeFile(resourceFile, binaryContents);
+  catalog.result_view.integrity.digest = resourceDigest;
+  packageLock.locked_assets.at(-1).sha256 = resourceDigest;
+  await writeFile(resourceFile, resourceContents);
+  await writeFile(lockPath, JSON.stringify(packageLock));
 
   catalog.result_view.compatible_outputs.schemas[0].schema_ref =
     "lode://schema/site-capability/xiaohongshu/read-note-detail/output@0.1.0";
@@ -919,10 +934,10 @@ const { outputText: rawOwnerApiClientModuleSource } = ts.transpileModule(ownerAp
   },
 });
 const boundedJsonResponseModuleUrl = pathToFileURL(path.resolve("dist-electron/boundedJsonResponse.js")).href;
-const ownerApiClientModuleSource = rawOwnerApiClientModuleSource.replace(
-  /from "\.\.\/electron\/boundedJsonResponse";/,
-  `from "${boundedJsonResponseModuleUrl}";`,
-);
+const ownerApiErrorProjectionModuleUrl = pathToFileURL(path.resolve("dist-electron/ownerApiErrorProjection.js")).href;
+const ownerApiClientModuleSource = rawOwnerApiClientModuleSource
+  .replace(/from "\.\.\/electron\/boundedJsonResponse";/, `from "${boundedJsonResponseModuleUrl}";`)
+  .replace(/from "\.\.\/electron\/ownerApiErrorProjection";/, `from "${ownerApiErrorProjectionModuleUrl}";`);
 const ownerApiClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerApiClientModuleSource)}`;
 const ownerApiClientModule = await import(ownerApiClientModuleUrl);
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
@@ -1648,6 +1663,34 @@ try {
     throw new Error("Harbor manual authentication smoke failed: encoded generic owner API bypass sent a request.");
   }
   globalThis.window.webenvoyShell = priorShell;
+
+  const previousOwnerFetch = globalThis.fetch;
+  globalThis.window.webenvoyShell = undefined;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: {
+      category: "owner_contract",
+      code: "identity_not_ready",
+      message: "Bearer raw-secret",
+      credential: "raw-secret",
+    },
+    token: "raw-secret",
+  }), { status: 409, headers: { "content-type": "application/json" } });
+  try {
+    const browserOwnerError = await ownerApiClientModule.requestOwnerJson(
+      harborContract.endpoint,
+      "/runtime/identity-environments",
+    );
+    const serializedError = JSON.stringify(browserOwnerError);
+    if (
+      browserOwnerError?.error !== "/runtime/identity-environments returned 409: owner_contract: identity_not_ready" ||
+      /raw-secret|Bearer|credential|token/.test(serializedError)
+    ) {
+      throw new Error(`Browser owner error projection exposed raw owner data: ${serializedError}`);
+    }
+  } finally {
+    globalThis.fetch = previousOwnerFetch;
+    globalThis.window.webenvoyShell = priorShell;
+  }
 
   let localOnlySessionFetchCalled = false;
   const previousFetch = globalThis.fetch;

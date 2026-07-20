@@ -66,13 +66,17 @@ type WebEnvoyManualAuthenticationCompletionIntent = {
 type WebEnvoyLodeCatalogField = {
   id: string;
   label: string;
-  kind: "text" | "number" | "boolean" | "select" | "unknown";
+  kind: "text" | "multiline" | "number" | "boolean" | "select" | "multi-select" | "file" | "constant" | "unknown";
   required: boolean;
   description: string;
   options?: string[];
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
   minimum?: number;
   maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  format?: "uri";
+  integer?: boolean;
 };
 type WebEnvoyLodeCatalogAction = {
   id: string;
