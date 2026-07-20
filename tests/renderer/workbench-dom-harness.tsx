@@ -29,6 +29,7 @@ import "../../src/renderer/workbench.css";
 const coreEndpoint = "http://core.owner";
 const taskAId = "thread_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const taskBId = "thread_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const emptyTaskId = "thread_cccccccccccccccccccccccccccccccc";
 const consumerBoundary = "Core stores bounded field summaries and owner refs only; raw content remains with its owner.";
 const ownerPayload = {
   ok: true,
@@ -105,6 +106,15 @@ const ownerPayload = {
           status: "completed",
         },
       ],
+    },
+    {
+      schema_version: "webenvoy.task-thread.v0",
+      thread_id: emptyTaskId,
+      capability_ref: "lode:capability/custom-owner-skill",
+      identity_environment_ref: "identity-env:empty-owner",
+      created_at: "2026-07-20T06:00:00Z",
+      updated_at: "2026-07-20T06:00:00Z",
+      turns: [],
     },
   ],
 };
@@ -249,14 +259,19 @@ const taskButton = (taskId: string) => Array.from(
   document.querySelectorAll<HTMLButtonElement>(".task-thread-row"),
 ).find((button) => selectedTaskIdFromButton(button) === taskId);
 const selectedTaskIdFromButton = (button: HTMLButtonElement) =>
-  button.textContent?.includes("xhs-ops-a") ? taskAId : taskBId;
+  button.textContent?.includes("xhs-ops-a")
+    ? taskAId
+    : button.textContent?.includes("recruiting-a")
+      ? taskBId
+      : emptyTaskId;
 
 async function runDesktopChecks() {
   await waitFor(() => Boolean(shell() && previewButton()), "Workbench did not render.");
   const appShell = shell();
   assert(appShell, "AppShell is missing.");
-  assert(ownerState.status === "ready" && ownerState.tasks.length === 2, "Owner threads were not projected.");
-  assert(retainedState.status === "offline" && retainedState.tasks.length === 2, "Last owner state was not retained.");
+  assert(ownerState.status === "ready" && ownerState.tasks.length === 3, "Owner threads were not projected.");
+  assert(retainedState.status === "offline" && retainedState.tasks.length === 3, "Last owner state was not retained.");
+  assert(taskButton(emptyTaskId), "Empty owner thread was not rendered safely in the sidebar.");
   const taskA = tasks.find((task) => task.id === taskAId);
   assert(taskA, "Projected owner task A is missing.");
   assert(taskA.runs.some((run) => run.id === "run-owner-a-completed"), "Completed owner turn was not retained.");
@@ -305,6 +320,7 @@ async function runDesktopChecks() {
   );
 
   return {
+    emptyThreadSidebar: true,
     ownerProjection: true,
     nonAppCreationChannel: true,
     runtimeFailClosed: true,

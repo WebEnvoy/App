@@ -658,6 +658,7 @@ const harborIdentityProjectionModuleUrl = `data:text/javascript;charset=utf-8,${
     `from "${identityEnvironmentFixturesModuleUrl}";`,
   ),
 )}`;
+const harborIdentityProjectionModule = await import(harborIdentityProjectionModuleUrl);
 const { outputText: harborIdentityClientModuleSource } = ts.transpileModule(harborIdentityClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -753,7 +754,10 @@ const validCoreThreadEnvelope = {
           creation_channel: "mcp",
           input: {
             schema_version: "webenvoy.task-turn-input.v0",
-            fields: [{ field_id: "query", kind: "scalar", summary: "AI 工具" }],
+            fields: [
+              { field_id: "query", kind: "scalar", summary: "AI 工具" },
+              { field_id: "source_url", kind: "url", summary: "https://example.test/path" },
+            ],
             consumer_boundary: "Core stores bounded field summaries and owner refs only; raw content remains with its owner.",
           },
           created_at: "2026-07-20T08:01:00.000Z",
@@ -806,9 +810,48 @@ globalThis.fetch = async () => new Response(JSON.stringify({
   threads: [{ ...validCoreThreadEnvelope.threads[0], schema_version: "webenvoy.task-thread.v1" }],
 }), { status: 200, headers: { "Content-Type": "application/json" } });
 const invalidCoreThreadState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+const validInputSnapshot = validCoreThreadEnvelope.threads[0].turns[0].input;
+const invalidInputSnapshots = [
+  { ...validInputSnapshot, fields: [{ field_id: "session_token", kind: "scalar", summary: "redacted" }] },
+  { ...validInputSnapshot, fields: Array.from({ length: 65 }, (_, index) => ({ field_id: `field_${index}`, kind: "scalar", summary: "value" })) },
+  { ...validInputSnapshot, fields: [
+    { field_id: "query", kind: "scalar", summary: "first" },
+    { field_id: "query", kind: "scalar", summary: "second" },
+  ] },
+  { ...validInputSnapshot, fields: [{ field_id: "query", kind: "scalar", summary: "value", owner_ref: "owner:value" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "draft", kind: "long_text", summary: "raw text", owner_ref: "draft:value" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "https://user:pass@example.test/path" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "https://example.test/path?query=value" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "https://example.test/path#section" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "ftp://example.test/path" }] },
+  { ...validInputSnapshot, attachment_refs: Array.from({ length: 33 }, (_, index) => `attachment:item/${index}`) },
+  { ...validInputSnapshot, attachment_refs: ["attachment:item/1", "attachment:item/1"] },
+  { ...validInputSnapshot, fields: [{ field_id: "query", kind: "scalar", summary: "value", unexpected: true }] },
+];
+for (const input of invalidInputSnapshots) {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    ...validCoreThreadEnvelope,
+    threads: [{
+      ...validCoreThreadEnvelope.threads[0],
+      turns: [{ ...validCoreThreadEnvelope.threads[0].turns[0], input }],
+    }],
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const invalidInputState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+  if (invalidInputState.status !== "offline") {
+    throw new Error(`Core thread input smoke failed: malformed persisted input was accepted: ${JSON.stringify(input)}`);
+  }
+}
 globalThis.fetch = previousFetchForThreadSmoke;
 globalThis.window = previousWindowForThreadSmoke;
 const projectedOwnerThread = coreThreadState.tasks[0];
+const retainedOfflineThreadState = coreThreadClientModule.retainLastKnownCoreThreads(
+  coreThreadState,
+  coreThreadClientModule.unavailableCoreThreadState("http://core.test", "Core /threads unavailable."),
+);
+const submittedOverrideWhileOffline = coreThreadClientModule.mergeSubmittedCoreTaskOverrides(
+  retainedOfflineThreadState,
+  [{ taskId: projectedOwnerThread.id, task: { ...projectedOwnerThread, title: "must not replace owner state" } }],
+);
 if (
   coreThreadState.status !== "ready" ||
   coreThreadState.tasks.length !== 2 ||
@@ -819,9 +862,13 @@ if (
   projectedOwnerThread.runs[1]?.resultRows.some((row) => row.label === "创建渠道" && row.value === "MCP") !== true ||
   !projectedOwnerThread.businessInput.includes("附件 1 个") ||
   coreThreadState.tasks[1]?.runs.length !== 0 ||
-  invalidCoreThreadState.status !== "offline"
+  invalidCoreThreadState.status !== "offline" ||
+  retainedOfflineThreadState.liveTaskIds.length !== 0 ||
+  submittedOverrideWhileOffline.status !== "offline" ||
+  submittedOverrideWhileOffline.liveTaskIds.length !== 0 ||
+  submittedOverrideWhileOffline.tasks[0]?.title === "must not replace owner state"
 ) {
-  throw new Error("Core thread projection smoke failed: owner thread schema, channel, terminal state, attachments, empty thread, or fail-closed parsing regressed.");
+  throw new Error("Core thread projection smoke failed: owner schema, terminal state, empty thread, input validation, or offline fail-closed behavior regressed.");
 }
 for (const [value, kind] of [
   ["source_wrong_type", "session"],
@@ -907,13 +954,27 @@ const runtimeGateProjection = runtimeSupervisorStateModule.projectRuntimeGatedTa
   runtimeSupervisorStateModule.runtimeSupervisorUnavailableState("offline"),
   ["task-live-history"],
 );
+const readyRuntimeWithOfflineThreads = runtimeSupervisorStateModule.projectRuntimeGatedTasks(
+  runtimeGateProjection.map((task) => ({
+    ...task,
+    runs: [
+      { id: "run-terminal", label: "terminal", lifecycle: "completed", outcome: "success", summary: "done", actionIntent: "none", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+      { id: "run-active", label: "active", lifecycle: "running", outcome: "unknown", summary: "running", actionIntent: "wait", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+    ],
+  })),
+  { ...runtimeSupervisorStateModule.runtimeSupervisorUnavailableState("health ready while /threads is offline"), canUseLiveRuntime: true, failClosed: false },
+  [],
+);
 if (
   runtimeGateProjection[0]?.source !== "Core live" ||
   runtimeGateProjection[0]?.runs.some((run) => run.id === "run-terminal") !== true ||
   runtimeGateProjection[0]?.runs.some((run) => run.id === "run-active") ||
-  runtimeGateProjection[0]?.runs.some((run) => run.id === "runtime-blocked-task-live-history") !== true
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "runtime-blocked-task-live-history") !== true ||
+  readyRuntimeWithOfflineThreads[0]?.runs.some((run) => run.id === "run-terminal") !== true ||
+  readyRuntimeWithOfflineThreads[0]?.runs.some((run) => run.id === "run-active") ||
+  readyRuntimeWithOfflineThreads[0]?.runs.some((run) => run.id === "runtime-blocked-task-live-history") !== true
 ) {
-  throw new Error("Runtime task projection smoke failed: terminal owner truth was overwritten or active work was unlocked.");
+  throw new Error("Runtime task projection smoke failed: terminal owner truth was overwritten or active work was unlocked after /threads went offline.");
 }
 
 function installLocalStorage(entries = {}) {
@@ -1050,6 +1111,14 @@ const safeHarborImport = localIdentityStoreModule.parseImportedIdentityEnvironme
 
 if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
   throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
+}
+const projectedHarborIdentity = harborIdentityProjectionModule.projectHarborIdentity(
+  harborIdentityFacts(),
+  harborProviderCatalog(),
+  "2026-07-20T08:00:00Z",
+);
+if (projectedHarborIdentity.source !== "Harbor live" || projectedHarborIdentity.taskEntries.length !== 0) {
+  throw new Error("Harbor identity projection smoke failed: live identity exposed fixture task entries.");
 }
 
 const harborContract = await startHarborIdentityContractServer();

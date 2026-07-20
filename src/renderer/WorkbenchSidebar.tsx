@@ -117,7 +117,7 @@ export function WorkbenchSidebar({
               >
                 {grouping === "skill" ? <IdentityGlyph label={task.accountIdentity} /> : <SiteGlyph site={task.threadContext!.siteLabel} />}
                 <span>{grouping === "skill" ? task.accountIdentity : task.siteSkill}</span>
-                <RunStatusGlyph compact run={task.runs[0]} />
+                {task.runs[0] ? <RunStatusGlyph compact run={task.runs[0]} /> : null}
               </button>
             ))}
           </section>

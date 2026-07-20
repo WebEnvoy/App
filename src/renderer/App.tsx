@@ -21,6 +21,7 @@ import {
 import {
   fetchCoreThreadState,
   loadingCoreThreadState,
+  mergeSubmittedCoreTaskOverrides,
   retainLastKnownCoreThreads,
 } from "./coreThreadClient";
 import {
@@ -166,25 +167,10 @@ export function App() {
       ),
     [connectionConfig.coreEndpoint, submittedTaskOverrides],
   );
-  const submittedLiveTaskIds = useMemo(
-    () => currentEndpointSubmittedOverrides.map((override) => override.taskId),
-    [currentEndpointSubmittedOverrides],
+  const effectiveCoreReadState = useMemo<CoreReadTaskLoadState>(
+    () => mergeSubmittedCoreTaskOverrides(coreReadState, currentEndpointSubmittedOverrides),
+    [coreReadState, currentEndpointSubmittedOverrides],
   );
-  const effectiveCoreReadState = useMemo<CoreReadTaskLoadState>(() => {
-    const liveTaskIds = Array.from(new Set([...coreReadState.liveTaskIds, ...submittedLiveTaskIds]));
-    const submittedTasksById = new Map(
-      currentEndpointSubmittedOverrides.map((override) => [override.taskId, override.task]),
-    );
-    return {
-      ...coreReadState,
-      status: liveTaskIds.length > coreReadState.liveTaskIds.length ? "ready" : coreReadState.status,
-      summary: submittedLiveTaskIds.length > 0
-        ? `${coreReadState.summary} 已包含 UI 提交产生的 live run。`
-        : coreReadState.summary,
-      tasks: coreReadState.tasks.map((task) => submittedTasksById.get(task.id) ?? task),
-      liveTaskIds,
-    };
-  }, [coreReadState, currentEndpointSubmittedOverrides, submittedLiveTaskIds]);
   const effectiveCoreReadTasks = useMemo(
     () =>
       effectiveCoreReadState.tasks.map((task) =>
@@ -195,7 +181,7 @@ export function App() {
   const taskThreads = useMemo(
     () =>
       projectRuntimeGatedTasks(
-        effectiveCoreReadTasks.filter((task) => effectiveCoreReadState.liveTaskIds.includes(task.id)),
+        effectiveCoreReadTasks,
         runtimeSupervisorState,
         effectiveCoreReadState.liveTaskIds,
       ),

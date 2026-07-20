@@ -51,7 +51,7 @@ function createMainWindow() {
   const window = new BrowserWindow({
     width: 1280,
     height: 860,
-    minWidth: 960,
+    minWidth: 720,
     minHeight: 640,
     title: "WebEnvoy App",
     backgroundColor: getSystemColorScheme() === "dark" ? "#17191d" : "#f7f8fb",
@@ -374,6 +374,23 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       );
     }
 
+    window.setSize(720, 900);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const packagedViewport = (await window.webContents.executeJavaScript(`({
+      innerWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    })`)) as { innerWidth: number; scrollWidth: number };
+    const packagedWindowWidth = window.getSize()[0];
+    if (
+      packagedWindowWidth !== 720 ||
+      packagedViewport.innerWidth > 720 ||
+      packagedViewport.scrollWidth > packagedViewport.innerWidth
+    ) {
+      throw new Error(
+        `packaged renderer smoke failed: 720px production window overflowed. ${JSON.stringify({ packagedWindowWidth, ...packagedViewport })}`,
+      );
+    }
+
     if (packagedSmokeScreenshot) {
       await new Promise((resolve) => setTimeout(resolve, 250));
       await mkdir(path.dirname(packagedSmokeScreenshot), { recursive: true });
@@ -396,7 +413,10 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       await writeFile(packagedSmokeScreenshot, image.toPNG());
     }
 
-    console.log(`WEBSMOKE_RESULT ${JSON.stringify(result)}`);
+    console.log(`WEBSMOKE_RESULT ${JSON.stringify({
+      ...result,
+      packagedViewport: { windowWidth: packagedWindowWidth, ...packagedViewport, horizontalOverflow: false },
+    })}`);
     app.exit(0);
   } catch (error) {
     console.error(error);
