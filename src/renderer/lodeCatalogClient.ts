@@ -8,7 +8,7 @@ export type LodeCatalogLoadState = {
   skills: LodeCatalogSkill[];
 };
 
-const cacheKey = "webenvoy.lodeCatalog.displayCache.v1";
+const cacheKey = "webenvoy.lodeCatalog.displayCache.v2";
 
 export const loadingLodeCatalogState: LodeCatalogLoadState = {
   status: "loading",
@@ -94,12 +94,15 @@ function displayCache(state: LodeCatalogLoadState): LodeCatalogLoadState {
         description,
         options,
       })),
-      actions: skill.actions.map(({ id, category }) => ({
+      actions: skill.actions.map(({ id, category, operationMode, resourceRequirementRef, resourceRequirementProfileIds }) => ({
         id,
         category,
+        operationMode,
         targetTypes: [],
         supportedOrigins: [],
         externalEffects: [],
+        resourceRequirementRef,
+        resourceRequirementProfileIds,
       })),
     })),
   };
@@ -162,8 +165,20 @@ function isSkill(value: unknown): value is LodeCatalogSkill {
     isStringArray(value.facets) &&
     Array.isArray(value.inputFields) &&
     value.inputFields.every(isField) &&
+    isResultView(value.resultView) &&
     Array.isArray(value.actions) &&
     value.actions.every(isAction);
+}
+
+function isResultView(value: unknown): value is WebEnvoyLodeCatalogResultView {
+  if (!isRecord(value) || value.fallback !== "standard_renderer") return false;
+  if (value.mode === "standard") return value.reason === "not_declared" || value.reason === "incompatible";
+  return value.mode === "skill" &&
+    value.declarationVersion === "0.1.0" &&
+    isString(value.viewId) &&
+    isString(value.viewVersion) &&
+    isString(value.resourceRef) &&
+    isString(value.lockRef);
 }
 
 function isCatalogSource(value: unknown): value is WebEnvoyLodeAssetBundleState["source"] {
@@ -187,9 +202,12 @@ function isAction(value: unknown): value is WebEnvoyLodeCatalogAction {
   return isRecord(value) &&
     isString(value.id) &&
     ["read", "prepare", "commit", "destructive"].includes(String(value.category)) &&
+    ["read", "validate_only", "draft", "preview"].includes(String(value.operationMode)) &&
     isStringArray(value.targetTypes) &&
     isStringArray(value.supportedOrigins) &&
-    isStringArray(value.externalEffects);
+    isStringArray(value.externalEffects) &&
+    isString(value.resourceRequirementRef) &&
+    isStringArray(value.resourceRequirementProfileIds) && value.resourceRequirementProfileIds.length > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -11,28 +11,34 @@ import {
 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  isCandidateUsable,
+  loadingSkillIdentityCompatibility,
+  type IdentityCompatibilityCandidate,
+  type SkillIdentityCompatibilityState,
+} from "./coreIdentityCompatibilityClient";
 import type { IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
 import {
   catalogSkillName,
-  catalogSkillSiteId,
   catalogSkillSiteName,
   type LodeCatalogLoadState,
   type LodeCatalogSkill,
 } from "./lodeCatalogClient";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
-import { isDeterministicSkillIdentityCandidate } from "./skillIdentityCandidate";
 import "./SiteSkillPages.css";
 
 type LibraryMode = "catalog" | "detail";
 
 export function SiteSkillLibrary({
   catalog,
+  compatibilityBySkill,
   identities,
   runtimeSupervisorState,
   onCreateIdentity,
   onUse,
 }: {
   catalog: LodeCatalogLoadState;
+  compatibilityBySkill: Record<string, SkillIdentityCompatibilityState>;
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
   onCreateIdentity: () => void;
@@ -50,6 +56,7 @@ export function SiteSkillLibrary({
     return (
       <SiteSkillDetail
         catalogStatus={catalog.status}
+        compatibility={compatibilityBySkill[selectedSkill.id] ?? loadingSkillIdentityCompatibility()}
         identities={identities}
         runtimeSupervisorState={runtimeSupervisorState}
         skill={selectedSkill}
@@ -63,6 +70,7 @@ export function SiteSkillLibrary({
   return (
     <SiteSkillDirectory
       catalog={catalog}
+      compatibilityBySkill={compatibilityBySkill}
       identities={identities}
       runtimeSupervisorState={runtimeSupervisorState}
       onOpen={(skill) => {
@@ -76,12 +84,14 @@ export function SiteSkillLibrary({
 
 function SiteSkillDirectory({
   catalog,
+  compatibilityBySkill,
   identities,
   runtimeSupervisorState,
   onOpen,
   onUse,
 }: {
   catalog: LodeCatalogLoadState;
+  compatibilityBySkill: Record<string, SkillIdentityCompatibilityState>;
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
   onOpen: (skill: LodeCatalogSkill) => void;
@@ -188,6 +198,7 @@ function SiteSkillDirectory({
                 {filteredSkills.filter((skill) => catalogSkillSiteName(skill) === site).map((skill) => (
                   <SiteSkillRow
                     catalogStatus={catalog.status}
+                    compatibility={compatibilityBySkill[skill.id] ?? loadingSkillIdentityCompatibility()}
                     identities={identities}
                     runtimeSupervisorState={runtimeSupervisorState}
                     skill={skill}
@@ -207,6 +218,7 @@ function SiteSkillDirectory({
 
 function SiteSkillRow({
   catalogStatus,
+  compatibility,
   identities,
   runtimeSupervisorState,
   skill,
@@ -214,15 +226,17 @@ function SiteSkillRow({
   onUse,
 }: {
   catalogStatus: LodeCatalogLoadState["status"];
+  compatibility: SkillIdentityCompatibilityState;
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
   skill: LodeCatalogSkill;
   onOpen: () => void;
   onUse: (skill: LodeCatalogSkill, identityId?: string) => void;
 }) {
-  const compatibleIdentities = compatibleIdentityList(skill, identities);
-  const defaultIdentity = compatibleIdentities.find(identityCanLaunch);
-  const launch = skillLaunchState(skill, defaultIdentity, runtimeSupervisorState, catalogStatus);
+  const compatibleIdentities = compatibleIdentityList(identities, compatibility);
+  const defaultIdentity = compatibleIdentities[0];
+  const candidate = compatibilityCandidate(defaultIdentity, compatibility);
+  const launch = skillLaunchState(skill, defaultIdentity, candidate, compatibility, runtimeSupervisorState, catalogStatus);
   return (
     <div className="production-skill-row">
       <button className="production-skill-row-main" type="button" onClick={onOpen}>
@@ -257,6 +271,7 @@ function SiteSkillRow({
 
 function SiteSkillDetail({
   catalogStatus,
+  compatibility,
   identities,
   runtimeSupervisorState,
   skill,
@@ -265,6 +280,7 @@ function SiteSkillDetail({
   onUse,
 }: {
   catalogStatus: LodeCatalogLoadState["status"];
+  compatibility: SkillIdentityCompatibilityState;
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
   skill: LodeCatalogSkill;
@@ -273,14 +289,20 @@ function SiteSkillDetail({
   onUse: (skill: LodeCatalogSkill, identityId?: string) => void;
 }) {
   const backRef = useRef<HTMLButtonElement>(null);
-  const compatibleIdentities = compatibleIdentityList(skill, identities);
+  const compatibleIdentities = compatibleIdentityList(identities, compatibility);
   const [selectedIdentityId, setSelectedIdentityId] = useState(
-    compatibleIdentities.find(identityCanLaunch)?.id ?? compatibleIdentities[0]?.id ?? "",
+    compatibleIdentities[0]?.id ?? "",
   );
   const selectedIdentity = compatibleIdentities.find((identity) => identity.id === selectedIdentityId);
-  const launch = skillLaunchState(skill, selectedIdentity, runtimeSupervisorState, catalogStatus);
+  const candidate = compatibilityCandidate(selectedIdentity, compatibility);
+  const launch = skillLaunchState(skill, selectedIdentity, candidate, compatibility, runtimeSupervisorState, catalogStatus);
 
   useEffect(() => backRef.current?.focus(), []);
+  useEffect(() => {
+    if (!compatibleIdentities.some((identity) => identity.id === selectedIdentityId)) {
+      setSelectedIdentityId(compatibleIdentities[0]?.id ?? "");
+    }
+  }, [compatibleIdentities, selectedIdentityId]);
   return (
     <div className="production-library-page production-skill-detail">
       <button ref={backRef} className="production-back-link" type="button" onClick={onBack}>
@@ -322,7 +344,7 @@ function SiteSkillDetail({
           <dl className="production-skill-facts">
             <div><dt>业务动作</dt><dd>{skill.actions.length > 0 ? skill.actions.map((action) => actionLabel(action.category)).join("、") : "未声明"}</dd></div>
             <div><dt>返回结果</dt><dd>{outputLabel(skill.outputKind)}</dd></div>
-            <div><dt>结果视图</dt><dd>App 标准结构化视图</dd></div>
+            <div><dt>结果视图</dt><dd>{resultViewLabel(skill)}</dd></div>
           </dl>
         </section>
         <section>
@@ -342,8 +364,13 @@ function SiteSkillDetail({
       <section className="compatible-identities-section">
         <div>
           <h2>选择账号身份候选</h2>
-          <p>先按站点和公开状态筛选，最终兼容性由 Core 预检查确认。</p>
+          <p>由 Core 根据技能声明与账号身份公共状态预检查；提交时会再次确认。</p>
         </div>
+        {compatibility.status !== "ready" ? (
+          <div className="library-source-notice warning" role="status">
+            <CircleAlert size={15} /><span>{compatibility.summary}</span>
+          </div>
+        ) : null}
         {compatibleIdentities.length === 0 ? (
           <button className="production-secondary-button" type="button" onClick={onCreateIdentity}>
             <Plus size={14} />创建账号身份
@@ -362,7 +389,10 @@ function SiteSkillDetail({
                 key={identity.id}
               >
                 <span className="compatible-identity-icon"><UserRound size={15} /></span>
-                <span><strong>{identity.accountLabel}</strong><small>{identity.readiness.label}</small></span>
+                <span>
+                  <strong>{identity.accountLabel}</strong>
+                  <small>{compatibilityStatusLabel(compatibilityCandidate(identity, compatibility))}</small>
+                </span>
                 {identity.id === selectedIdentityId ? <CircleCheck size={15} /> : null}
               </button>
             ))}
@@ -379,6 +409,12 @@ function SiteSkillDetail({
           <div><dt>更新时间</dt><dd>{skill.updatedAt}</dd></div>
           <div><dt>输入合同</dt><dd>{skill.inputSchemaId || "缺失"}</dd></div>
           <div><dt>输出合同</dt><dd>{skill.outputSchemaId || "缺失"}</dd></div>
+          {skill.resultView.mode === "skill" ? (
+            <>
+              <div><dt>视图版本</dt><dd>{skill.resultView.viewId} · v{skill.resultView.viewVersion}</dd></div>
+              <div><dt>兼容回退</dt><dd>App 标准结构化视图</dd></div>
+            </>
+          ) : null}
           <div><dt>技能包</dt><dd>{skill.packageRef}</dd></div>
         </dl>
       </details>
@@ -386,27 +422,56 @@ function SiteSkillDetail({
   );
 }
 
-function compatibleIdentityList(skill: LodeCatalogSkill, identities: IdentityEnvironmentProjection[]) {
-  return identities.filter((identity) => isDeterministicSkillIdentityCandidate(skill, identity));
+function resultViewLabel(skill: LodeCatalogSkill) {
+  if (skill.resultView.mode === "skill") return `技能提供 · v${skill.resultView.viewVersion}`;
+  return skill.resultView.reason === "incompatible"
+    ? "App 标准结构化视图（技能视图不兼容）"
+    : "App 标准结构化视图";
+}
+
+function compatibleIdentityList(
+  identities: IdentityEnvironmentProjection[],
+  compatibility: SkillIdentityCompatibilityState,
+) {
+  if (compatibility.status !== "ready") return [];
+  const usableRefs = new Set(compatibility.candidates.filter(isCandidateUsable).map((candidate) => candidate.identityEnvironmentRef));
+  return identities.filter((identity) => usableRefs.has(identity.identityEnvironmentRef));
+}
+
+function compatibilityCandidate(
+  identity: IdentityEnvironmentProjection | undefined,
+  compatibility: SkillIdentityCompatibilityState,
+) {
+  return identity == null
+    ? undefined
+    : compatibility.candidates.find((candidate) => candidate.identityEnvironmentRef === identity.identityEnvironmentRef);
+}
+
+function compatibilityStatusLabel(candidate: IdentityCompatibilityCandidate | undefined) {
+  return candidate?.status === "compatible" ? "兼容" : "提交时再检查";
 }
 
 function skillLaunchState(
   skill: LodeCatalogSkill,
   identity: IdentityEnvironmentProjection | undefined,
+  candidate: IdentityCompatibilityCandidate | undefined,
+  compatibility: SkillIdentityCompatibilityState,
   runtime: RuntimeSupervisorState,
   catalogStatus: LodeCatalogLoadState["status"],
 ) {
   if (catalogStatus !== "ready") return { ok: false, reason: "站点技能目录需要刷新后才能创建任务。" };
   if (skill.availability !== "available") return { ok: false, reason: skill.availabilityReason };
   if (skill.siteSlug === "boss") return { ok: false, reason: "BOSS 生产任务当前已延期。" };
+  if (compatibility.status !== "ready") return { ok: false, reason: compatibility.summary };
   if (identity == null) return { ok: false, reason: "没有可用的账号身份候选。" };
-  if (!identityCanLaunch(identity)) return { ok: false, reason: "当前账号身份需要先恢复到可用状态。" };
+  if (!isCandidateUsable(candidate)) return { ok: false, reason: "Core 未确认当前账号身份可以进入任务创建。" };
   if (!runtime.canUseLiveRuntime) return { ok: false, reason: runtime.summary };
-  return { ok: true, reason: "使用当前技能和账号身份创建任务。" };
-}
-
-function identityCanLaunch(identity: IdentityEnvironmentProjection) {
-  return identity.readiness.state === "ready" || identity.readiness.state === "warning";
+  return {
+    ok: true,
+    reason: candidate?.status === "unknown_until_runtime"
+      ? "可进入任务创建；正式提交时会重新检查运行窗口。"
+      : "使用当前技能和账号身份创建任务。",
+  };
 }
 
 function selectIdentityByKey(

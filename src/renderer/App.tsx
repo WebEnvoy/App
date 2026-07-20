@@ -40,6 +40,13 @@ import {
   type LodeCatalogSkill,
 } from "./lodeCatalogClient";
 import { CreateTaskShell, type CreateTaskSelection } from "./CreateTaskShell";
+import {
+  fetchSkillIdentityCompatibility,
+  isCandidateUsable,
+  loadingSkillIdentityCompatibility,
+  unavailableSkillIdentityCompatibility,
+  type SkillIdentityCompatibilityState,
+} from "./coreIdentityCompatibilityClient";
 import { OwnerState } from "./OwnerState";
 import { SettingsPage } from "./SettingsPage";
 import { SiteSkillLibrary } from "./SiteSkillPages";
@@ -51,7 +58,6 @@ import {
   runtimeSupervisorUnavailableState,
   type RuntimeSupervisorState,
 } from "./runtimeSupervisorState";
-import { isDeterministicSkillIdentityCandidate } from "./skillIdentityCandidate";
 import { loadLocalIdentityEnvironmentDrafts } from "./localIdentityEnvironmentStore";
 import { outcomeLabel } from "./TaskThreadFields";
 import { TaskThreadComposer } from "./TaskThreadComposer";
@@ -143,6 +149,7 @@ export function App() {
   const [taskBusinessInputOverrides, setTaskBusinessInputOverrides] = useState<Record<string, string>>({});
   const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
   const [lodeCatalogState, setLodeCatalogState] = useState<LodeCatalogLoadState>(loadingLodeCatalogState);
+  const [compatibilityBySkill, setCompatibilityBySkill] = useState<Record<string, SkillIdentityCompatibilityState>>({});
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [activeView, setActiveView] = useState<WorkbenchView>("work");
@@ -157,6 +164,7 @@ export function App() {
   const selectedTaskIdRef = useRef(selectedTaskId);
   const coreEndpointRef = useRef(connectionConfig.coreEndpoint);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const useSiteSkillRequestRef = useRef(0);
 
   useEffect(() => {
     selectedTaskIdRef.current = selectedTaskId;
@@ -320,6 +328,39 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const skills = lodeCatalogState.skills.filter((skill) => !skill.facets.includes("sample"));
+    const unavailableReason = lodeCatalogState.status !== "ready"
+      ? "站点技能目录需要刷新后才能检查账号身份。"
+      : !runtimeSupervisorState.canUseLiveRuntime
+      ? runtimeSupervisorState.summary
+      : null;
+    if (unavailableReason != null) {
+      setCompatibilityBySkill(Object.fromEntries(skills.map((skill) => [skill.id, unavailableSkillIdentityCompatibility(unavailableReason)])));
+      return () => { cancelled = true; };
+    }
+    const refs = harborIdentityState.identities.map((identity) => identity.identityEnvironmentRef);
+    setCompatibilityBySkill(Object.fromEntries(skills.map((skill) => [
+      skill.id,
+      skill.availability === "available"
+        ? loadingSkillIdentityCompatibility()
+        : unavailableSkillIdentityCompatibility(skill.availabilityReason),
+    ])));
+    const pending = skills.filter((skill) => skill.availability === "available");
+    let index = 0;
+    const workers = Array.from({ length: Math.min(4, pending.length) }, async () => {
+      while (!cancelled && index < pending.length) {
+        const skill = pending[index++];
+        if (skill == null) continue;
+        const next = await fetchSkillIdentityCompatibility(connectionConfig.coreEndpoint, skill, refs);
+        if (!cancelled) setCompatibilityBySkill((current) => ({ ...current, [skill.id]: next }));
+      }
+    });
+    void Promise.all(workers);
+    return () => { cancelled = true; };
+  }, [connectionConfig.coreEndpoint, harborIdentityState.identities, lodeCatalogState.skills, lodeCatalogState.status, runtimeSupervisorState.canUseLiveRuntime, runtimeSupervisorState.summary]);
+
+  useEffect(() => {
     if (lodeCatalogState.status !== "ready") return;
     setCreateTaskSelection((current) => {
       if (current == null) return current;
@@ -464,7 +505,10 @@ export function App() {
   }
 
   async function useSiteSkill(skill: LodeCatalogSkill, identityId?: string) {
+    const requestId = ++useSiteSkillRequestRef.current;
+    const coreEndpoint = connectionConfig.coreEndpoint;
     const refreshedCatalog = await fetchLodeCatalog();
+    if (requestId !== useSiteSkillRequestRef.current || coreEndpointRef.current !== coreEndpoint) return;
     setLodeCatalogState(refreshedCatalog);
     const refreshedSkill = refreshedCatalog.skills.find((item) => item.packageRef === skill.packageRef);
     const identity = harborIdentityState.identities.find((item) => item.id === identityId);
@@ -472,9 +516,19 @@ export function App() {
       refreshedCatalog.status !== "ready" ||
       refreshedSkill?.availability !== "available" ||
       identity == null ||
-      !isDeterministicSkillIdentityCandidate(refreshedSkill, identity) ||
       !runtimeSupervisorState.canUseLiveRuntime
     ) return;
+    const compatibility = await fetchSkillIdentityCompatibility(
+      coreEndpoint,
+      refreshedSkill,
+      [identity.identityEnvironmentRef],
+    );
+    if (requestId !== useSiteSkillRequestRef.current || coreEndpointRef.current !== coreEndpoint) return;
+    setCompatibilityBySkill((current) => ({ ...current, [refreshedSkill.id]: compatibility }));
+    const candidate = compatibility.candidates.find(
+      (item) => item.identityEnvironmentRef === identity.identityEnvironmentRef,
+    );
+    if (compatibility.status !== "ready" || !isCandidateUsable(candidate)) return;
     setCreateTaskSelection({ skill: refreshedSkill, identityId });
     setWorkMode("create");
     setActiveView("work");
@@ -684,6 +738,7 @@ export function App() {
             ) : (
               <SiteSkillLibrary
                 catalog={lodeCatalogState}
+                compatibilityBySkill={compatibilityBySkill}
                 identities={harborIdentityState.identities}
                 runtimeSupervisorState={runtimeSupervisorState}
                 onCreateIdentity={() => setActiveView("browser")}
@@ -711,6 +766,7 @@ export function App() {
           <ThreadWorkspace workspaceKey="work-create">
             <CreateTaskShell
               catalog={lodeCatalogState}
+              compatibilityBySkill={compatibilityBySkill}
               identities={harborIdentityState.identities}
               selection={createTaskSelection}
               runtimeSupervisorState={runtimeSupervisorState}

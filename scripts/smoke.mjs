@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { access, cp, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -540,6 +541,8 @@ const bossSearchSkill = lodeCatalog.skills.find((skill) => skill.packageRef.incl
 if (
   lodeCatalog.status !== "ready" ||
   xhsSearchSkill?.availability !== "available" ||
+  xhsSearchSkill.resultView?.mode !== "standard" ||
+  xhsSearchSkill.resultView?.reason !== "not_declared" ||
   xhsSearchSkill.actions[0]?.category !== "read" ||
   !xhsSearchSkill.inputFields.some((field) => field.id === "keyword" && field.required) ||
   bossSearchSkill?.availability !== "incompatible" ||
@@ -655,6 +658,102 @@ try {
   await rm(unknownOutputRoot, { recursive: true, force: true });
 }
 
+const resultViewRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-result-view-"));
+try {
+  await cp(lodeBundle.rootPath, resultViewRoot, { recursive: true });
+  const packageRoot = path.join(resultViewRoot, "sites/xiaohongshu/search-notes");
+  const catalogPath = path.join(packageRoot, "catalog-metadata.json");
+  const manifestPath = path.join(packageRoot, "manifest.json");
+  const lockPath = path.join(packageRoot, "package-lock.json");
+  const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const packageLock = JSON.parse(await readFile(lockPath, "utf8"));
+  const resourceRef = "lode://result-view/xiaohongshu/search-notes/xiaohongshu.search-results@0.1.0";
+  const resourcePath = "views/search-results.json";
+  const resourceFile = path.join(packageRoot, resourcePath);
+  const resourceContents = JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "table" });
+  const resourceDigest = createHash("sha256").update(resourceContents).digest("hex");
+  await mkdir(path.dirname(resourceFile), { recursive: true });
+  await writeFile(resourceFile, resourceContents);
+  catalog.result_view = {
+    status: "present",
+    declaration_version: "0.1.0",
+    view_id: "xiaohongshu.search-results",
+    view_version: "0.1.0",
+    resource_ref: resourceRef,
+    resource_path: resourcePath,
+    compatible_outputs: {
+      schemas: [{
+        schema_ref: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
+        schema_version: "0.1.0",
+      }],
+    },
+    integrity: { algorithm: "sha256", digest: resourceDigest },
+    lock_ref: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+    fallback: "standard_renderer",
+  };
+  manifest.asset_refs.push({
+    role: "result_view_resource",
+    path: resourcePath,
+    status: "present",
+    resource_ref: resourceRef,
+    resource_version: "0.1.0",
+  });
+  packageLock.locked_assets.push({
+    role: "result_view_resource",
+    path: resourcePath,
+    ref: resourceRef,
+    version: "0.1.0",
+    sha256: resourceDigest,
+  });
+  await writeFile(catalogPath, JSON.stringify(catalog));
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  await writeFile(lockPath, JSON.stringify(packageLock));
+  const declaredViewCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  });
+  const declaredViewSkill = declaredViewCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (
+    declaredViewSkill?.availability !== "available" ||
+    declaredViewSkill.resultView?.mode !== "skill" ||
+    declaredViewSkill.resultView?.viewVersion !== "0.1.0"
+  ) {
+    throw new Error(`Compatible result-view declaration was not projected: ${JSON.stringify(declaredViewSkill)}`);
+  }
+
+  await writeFile(resourceFile, JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "tampered" }));
+  const driftedViewSkill = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (driftedViewSkill?.resultView?.mode !== "standard") {
+    throw new Error(`Result-view integrity drift did not fall back safely: ${JSON.stringify(driftedViewSkill)}`);
+  }
+  await writeFile(resourceFile, resourceContents);
+
+  catalog.result_view.compatible_outputs.schemas[0].schema_ref =
+    "lode://schema/site-capability/xiaohongshu/read-note-detail/output@0.1.0";
+  await writeFile(catalogPath, JSON.stringify(catalog));
+  const fallbackViewCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  });
+  const fallbackViewSkill = fallbackViewCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (
+    fallbackViewSkill?.availability !== "available" ||
+    fallbackViewSkill.resultView?.mode !== "standard" ||
+    fallbackViewSkill.resultView?.reason !== "incompatible"
+  ) {
+    throw new Error(`Incompatible result-view declaration did not fall back safely: ${JSON.stringify(fallbackViewSkill)}`);
+  }
+} finally {
+  await rm(resultViewRoot, { recursive: true, force: true });
+}
+
 await assertPackagedRuntimeRequiredFailsClosed();
 
 const liveReadiness = runtimeSupervisorModule.summarizeRuntimeReadiness(
@@ -765,12 +864,17 @@ if (ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({
 })) {
   throw new Error("Owner payload guard smoke failed: descriptive provider guidance was rejected as fixture evidence.");
 }
-const { outputText: ownerApiClientModuleSource } = ts.transpileModule(ownerApiClientSource, {
+const { outputText: rawOwnerApiClientModuleSource } = ts.transpileModule(ownerApiClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
     target: ts.ScriptTarget.ES2022,
   },
 });
+const boundedJsonResponseModuleUrl = pathToFileURL(path.resolve("dist-electron/boundedJsonResponse.js")).href;
+const ownerApiClientModuleSource = rawOwnerApiClientModuleSource.replace(
+  /from "\.\.\/electron\/boundedJsonResponse";/,
+  `from "${boundedJsonResponseModuleUrl}";`,
+);
 const ownerApiClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerApiClientModuleSource)}`;
 const ownerApiClientModule = await import(ownerApiClientModuleUrl);
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
@@ -1874,6 +1978,10 @@ const fakeRun = {
 const submitFetchCalls = [];
 let submittedTaskPayload;
 const ownerRequestTimeouts = [];
+const coreJsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "Content-Type": "application/json" },
+});
 const originalWindowSetTimeout = globalThis.window.setTimeout;
 globalThis.window.setTimeout = (callback, timeout) => {
   ownerRequestTimeouts.push(timeout);
@@ -1939,12 +2047,7 @@ globalThis.fetch = async (url, init = {}) => {
         },
       }
     : { ok: false, error: { code: "unexpected_submit_contract_path" } };
-  return {
-    ok: true,
-    status: 200,
-    json: async () => json,
-    text: async () => JSON.stringify(json),
-  };
+  return coreJsonResponse(json);
 };
 const submittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
@@ -1991,12 +2094,7 @@ globalThis.fetch = async (url, init = {}) => {
     : pathname.includes("/runs/run_submit_pending_001")
     ? { ok: false, error: { code: "run_not_queryable_yet" } }
     : { ok: false, error: { code: "unexpected_pending_smoke_path" } };
-  return {
-    ok: true,
-    status: 200,
-    json: async () => json,
-    text: async () => JSON.stringify(json),
-  };
+  return coreJsonResponse(json);
 };
 const pendingRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
@@ -2031,10 +2129,10 @@ globalThis.fetch = async (url, init = {}) => {
     const body = accepted
       ? { ok: true, run_id: "run_submit_boss_001" }
       : { ok: false, error: { code: "public_query_invalid" } };
-    return { ok: accepted, status: accepted ? 202 : 400, json: async () => body, text: async () => JSON.stringify(body) };
+    return coreJsonResponse(body, accepted ? 202 : 400);
   }
   const body = { ok: false, error: { code: "run_not_queryable_yet" } };
-  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
+  return coreJsonResponse(body);
 };
 const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
@@ -2135,10 +2233,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
     : { ok: true, session_refs: { session_refs: { runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00" } } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const coreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2186,10 +2281,7 @@ globalThis.fetch = async (url) => {
     : pathname.includes("/capability-runs")
       ? { ok: true, capability_runs: { runs: [] } }
       : { ok: false, error: { code: "fixture_payload_should_not_be_queried" } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const fixtureCoreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2339,10 +2431,7 @@ globalThis.fetch = async (url) => {
         },
       })
     : { ok: true };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const bossCoreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2397,10 +2486,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/result")
     ? { ok: false, error: { code: "result_query_unavailable" } }
     : { ok: true, evidence: { evidence_refs: [] } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const failedDetailState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2477,10 +2563,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
     : { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref } } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const mixedDetailState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2918,7 +3001,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/session-refs")
     ? { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/write-precheck" } } }
     : { ok: true, capability_runs: { runs: [] } };
-  return { ok: true, json: async () => json };
+  return coreJsonResponse(json);
 };
 const writePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {

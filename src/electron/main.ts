@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { readBoundedJsonResponse } from "./boundedJsonResponse.js";
 import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
 import { readLodeCatalog } from "./lodeCatalog.js";
 import {
@@ -527,8 +528,7 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
       ...(parsed.body === undefined ? {} : { body: JSON.stringify(parsed.body) }),
       signal: controller.signal,
     });
-    const text = await response.text();
-    const json = parseJson(text);
+    const json = await readBoundedJsonResponse(response);
     if (!response.ok) {
       return { ok: false, status: response.status, error: `${parsed.path} returned ${response.status}`, body: json };
     }
@@ -563,13 +563,4 @@ async function requestHarborManualAuthenticationCompletion(event: Electron.IpcMa
 
 function expectedRendererUrl() {
   return rendererDevUrl ?? pathToFileURL(path.join(__dirname, "../dist/renderer/index.html")).toString();
-}
-
-function parseJson(text: string) {
-  if (!text.trim()) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
-  }
 }

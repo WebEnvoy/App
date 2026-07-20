@@ -9,7 +9,10 @@ import {
 } from "./lodeCatalogClient";
 import { OwnerState } from "./OwnerState";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
-import { isDeterministicSkillIdentityCandidate } from "./skillIdentityCandidate";
+import {
+  isCandidateUsable,
+  type SkillIdentityCompatibilityState,
+} from "./coreIdentityCompatibilityClient";
 
 export type CreateTaskSelection = {
   skill: LodeCatalogSkill;
@@ -18,6 +21,7 @@ export type CreateTaskSelection = {
 
 export function CreateTaskShell({
   catalog,
+  compatibilityBySkill,
   identities,
   selection,
   runtimeSupervisorState,
@@ -26,6 +30,7 @@ export function CreateTaskShell({
   onRecover,
 }: {
   catalog: LodeCatalogLoadState;
+  compatibilityBySkill: Record<string, SkillIdentityCompatibilityState>;
   identities: HarborIdentityLoadState["identities"];
   selection: CreateTaskSelection | null;
   runtimeSupervisorState: RuntimeSupervisorState;
@@ -34,14 +39,16 @@ export function CreateTaskShell({
   onRecover: () => void;
 }) {
   const combinations = catalog.skills.flatMap((skill) =>
-    identities
-      .filter((identity) =>
-        skill.availability === "available" &&
-        skill.siteSlug !== "boss" &&
-        isDeterministicSkillIdentityCandidate(skill, identity) &&
-        (identity.readiness.state === "ready" || identity.readiness.state === "warning"),
-      )
-      .map((identity) => ({ skill, identity })),
+    (compatibilityBySkill[skill.id]?.candidates ?? [])
+      .filter(isCandidateUsable)
+      .flatMap((candidate) => {
+        const identity = identities.find((item) => item.identityEnvironmentRef === candidate.identityEnvironmentRef);
+        return identity == null ? [] : [{ skill, identity, candidate }];
+      }),
+  );
+  const compatibilityLoading = catalog.skills.some((skill) =>
+    skill.availability === "available" &&
+    (compatibilityBySkill[skill.id] == null || compatibilityBySkill[skill.id]?.status === "loading"),
   );
 
   return (
@@ -60,12 +67,14 @@ export function CreateTaskShell({
         <OwnerState title="站点技能暂不可用" summary={catalog.summary} onRecover={onRecover} />
       ) : catalog.status === "stale" ? (
         <OwnerState title="站点技能目录需要刷新" summary={catalog.summary} onRecover={onRecover} />
+      ) : selection == null && compatibilityLoading ? (
+        <OwnerState title="正在检查账号身份" summary="Core 正在预检查站点技能与账号身份是否兼容。" />
       ) : selection == null ? (
         combinations.length === 0 ? (
           <OwnerState title="没有可用组合" summary="需要一个同站点候选账号身份，以及合同完整的站点技能。最终兼容性由 Core 预检查确认。" actionLabel="创建账号身份" onRecover={onCreateIdentity} />
         ) : (
           <div className="create-task-recommendations" aria-label="推荐的账号身份与站点技能组合">
-            {combinations.map(({ skill, identity }) => {
+            {combinations.map(({ skill, identity, candidate }) => {
               const unavailable = skill.availability !== "available" || skill.siteSlug === "boss" || !runtimeSupervisorState.canUseLiveRuntime;
               return (
                 <button
@@ -76,7 +85,7 @@ export function CreateTaskShell({
                   key={`${skill.id}:${identity.id}`}
                 >
                   <span className="create-task-recommendation-icon"><CircleUserRound size={16} /></span>
-                  <span><strong>{catalogSkillName(skill)}</strong><small>{identity.accountLabel} · {identity.siteName}</small></span>
+                  <span><strong>{catalogSkillName(skill)}</strong><small>{identity.accountLabel} · {identity.siteName}{candidate.status === "unknown_until_runtime" ? " · 提交时再检查" : ""}</small></span>
                   <ArrowRight size={15} />
                 </button>
               );

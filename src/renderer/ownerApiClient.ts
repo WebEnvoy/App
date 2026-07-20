@@ -1,3 +1,5 @@
+import { readBoundedJsonResponse } from "../electron/boundedJsonResponse";
+
 export type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export type OwnerApiRequestOptions = {
@@ -43,7 +45,7 @@ async function requestOwnerJsonWithFetch(
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
       signal: controller.signal,
     });
-    const payload = await responsePayload(response);
+    const payload = await readBoundedJsonResponse(response);
     if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
     return payload ?? {};
   } catch (error) {
@@ -72,23 +74,6 @@ function responseStatusError(path: string, status: number, payload: unknown) {
   const code = typeof error?.code === "string" ? error.code : undefined;
   const category = typeof error?.category === "string" ? error.category : undefined;
   return [`${path} returned ${status}`, category, code].filter(Boolean).join(": ");
-}
-
-async function responsePayload(response: Response): Promise<unknown> {
-  if (typeof response.text === "function") {
-    return parseJson(await response.text());
-  }
-  const jsonResponse = response as Response & { json?: () => Promise<unknown> };
-  return typeof jsonResponse.json === "function" ? jsonResponse.json() : null;
-}
-
-function parseJson(value: string): unknown {
-  if (!value.trim()) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

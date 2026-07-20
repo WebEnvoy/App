@@ -77,10 +77,28 @@ type WebEnvoyLodeCatalogField = {
 type WebEnvoyLodeCatalogAction = {
   id: string;
   category: "read" | "prepare" | "commit" | "destructive";
+  operationMode: "read" | "validate_only" | "draft" | "preview";
   targetTypes: string[];
   supportedOrigins: string[];
   externalEffects: string[];
+  resourceRequirementRef: string;
+  resourceRequirementProfileIds: string[];
 };
+type WebEnvoyLodeCatalogResultView =
+  | {
+      mode: "standard";
+      fallback: "standard_renderer";
+      reason: "not_declared" | "incompatible";
+    }
+  | {
+      mode: "skill";
+      fallback: "standard_renderer";
+      declarationVersion: "0.1.0";
+      viewId: string;
+      viewVersion: string;
+      resourceRef: string;
+      lockRef: string;
+    };
 type WebEnvoyLodeCatalogSkill = {
   id: string;
   packageRef: string;
@@ -102,6 +120,7 @@ type WebEnvoyLodeCatalogSkill = {
   inputFields: WebEnvoyLodeCatalogField[];
   outputSchemaId: string;
   outputKind: string;
+  resultView: WebEnvoyLodeCatalogResultView;
   actions: WebEnvoyLodeCatalogAction[];
 };
 type WebEnvoyLodeCatalogState = {

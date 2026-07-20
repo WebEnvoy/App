@@ -7,6 +7,7 @@ import {
   readSync,
   realpathSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 const maxLodeJsonFileBytes = 2 * 1024 * 1024;
@@ -52,6 +53,15 @@ export function resolveLodeAssetPath(rootPath: string, value: string, basePath =
 }
 
 export function readLodeJsonObject(filePath: string, budget?: LodeReadBudget): Record<string, unknown> {
+  return readLodeJson(filePath, budget).value;
+}
+
+export function readLodeJsonObjectWithSha256(filePath: string, budget?: LodeReadBudget) {
+  const result = readLodeJson(filePath, budget);
+  return { value: result.value, sha256: createHash("sha256").update(result.bytes).digest("hex") };
+}
+
+function readLodeJson(filePath: string, budget?: LodeReadBudget) {
   if (!lstatSync(filePath).isFile()) throw new Error(`Non-file Lode JSON asset: ${filePath}`);
   const descriptor = openSync(
     filePath,
@@ -71,9 +81,10 @@ export function readLodeJsonObject(filePath: string, budget?: LodeReadBudget): R
       }
       budget.remainingBytes -= bytesRead;
     }
-    const value = JSON.parse(contents.toString("utf8", 0, bytesRead)) as unknown;
+    const bytes = contents.subarray(0, bytesRead);
+    const value = JSON.parse(bytes.toString("utf8")) as unknown;
     if (!isRecord(value)) throw new Error(`Invalid Lode JSON object: ${filePath}`);
-    return value;
+    return { value, bytes };
   } finally {
     closeSync(descriptor);
   }
