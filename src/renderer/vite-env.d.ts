@@ -63,6 +63,54 @@ type WebEnvoyManualAuthenticationCompletionIntent = {
   base: string;
   runtimeSessionRef: string;
 };
+type WebEnvoyLodeCatalogField = {
+  id: string;
+  label: string;
+  kind: "text" | "number" | "boolean" | "select" | "unknown";
+  required: boolean;
+  description: string;
+  options?: string[];
+  defaultValue?: string | number | boolean;
+  minimum?: number;
+  maximum?: number;
+};
+type WebEnvoyLodeCatalogAction = {
+  id: string;
+  category: "read" | "prepare" | "commit" | "destructive";
+  targetTypes: string[];
+  supportedOrigins: string[];
+  externalEffects: string[];
+};
+type WebEnvoyLodeCatalogSkill = {
+  id: string;
+  packageRef: string;
+  lockRef?: string;
+  siteSlug: string;
+  siteName: string;
+  name: string;
+  summary: string;
+  category: string;
+  version: string;
+  latestVersion: string;
+  lifecycle: string;
+  facets: string[];
+  sourceHealth: string;
+  updatedAt: string;
+  availability: "available" | "incompatible";
+  availabilityReason: string;
+  inputSchemaId: string;
+  inputFields: WebEnvoyLodeCatalogField[];
+  outputSchemaId: string;
+  outputKind: string;
+  actions: WebEnvoyLodeCatalogAction[];
+};
+type WebEnvoyLodeCatalogState = {
+  status: "ready" | "unavailable";
+  fetchedAt: string;
+  source: WebEnvoyLodeAssetBundleState["source"];
+  summary: string;
+  skills: WebEnvoyLodeCatalogSkill[];
+};
 
 interface Window {
   webenvoyShell?: {
@@ -70,6 +118,7 @@ interface Window {
     getRuntimeSupervisorState?: (
       config: WebEnvoyRuntimeEndpointConfig,
     ) => Promise<WebEnvoyRuntimeSupervisorState>;
+    getLodeCatalog?: () => Promise<WebEnvoyLodeCatalogState>;
     requestOwnerJson?: (request: WebEnvoyOwnerApiJsonRequest) => Promise<unknown>;
     completeHarborManualAuthentication?: (intent: WebEnvoyManualAuthenticationCompletionIntent) => Promise<unknown>;
     subscribeToSystemThemeVariant?: (

@@ -4,7 +4,6 @@ import {
   BriefcaseBusiness,
   CircleUserRound,
   Library,
-  RefreshCw,
   Settings,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -34,7 +33,16 @@ import {
 import { fetchHarborIdentityState } from "./harborIdentityClient";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import { IdentityEnvironmentsPage } from "./IdentityEnvironmentsPage";
+import {
+  fetchLodeCatalog,
+  loadingLodeCatalogState,
+  type LodeCatalogLoadState,
+  type LodeCatalogSkill,
+} from "./lodeCatalogClient";
+import { CreateTaskShell, type CreateTaskSelection } from "./CreateTaskShell";
+import { OwnerState } from "./OwnerState";
 import { SettingsPage } from "./SettingsPage";
+import { SiteSkillLibrary } from "./SiteSkillPages";
 import type { TaskProjection } from "./taskThreadFixtures";
 import { type ThreadNavigationItem } from "./ThreadNavigationRail";
 import {
@@ -43,6 +51,7 @@ import {
   runtimeSupervisorUnavailableState,
   type RuntimeSupervisorState,
 } from "./runtimeSupervisorState";
+import { isDeterministicSkillIdentityCandidate } from "./skillIdentityCandidate";
 import { loadLocalIdentityEnvironmentDrafts } from "./localIdentityEnvironmentStore";
 import { outcomeLabel } from "./TaskThreadFields";
 import { TaskThreadComposer } from "./TaskThreadComposer";
@@ -76,7 +85,6 @@ type SubmittedTaskOverride = {
   task: TaskProjection;
 };
 type WorkMode = "create" | "detail";
-
 function getBrowserColorScheme(): ShellContext["colorScheme"] {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
@@ -134,11 +142,12 @@ export function App() {
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
   const [taskBusinessInputOverrides, setTaskBusinessInputOverrides] = useState<Record<string, string>>({});
   const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
+  const [lodeCatalogState, setLodeCatalogState] = useState<LodeCatalogLoadState>(loadingLodeCatalogState);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [activeView, setActiveView] = useState<WorkbenchView>("work");
   const [workMode, setWorkMode] = useState<WorkMode>("create");
-  const [createTaskSkill, setCreateTaskSkill] = useState<TaskProjection | null>(null);
+  const [createTaskSelection, setCreateTaskSelection] = useState<CreateTaskSelection | null>(null);
   const [settingsReturnView, setSettingsReturnView] = useState<Exclude<WorkbenchView, "settings">>("work");
   const [taskGrouping, setTaskGrouping] = useState<TaskGrouping>(readTaskGrouping);
   const [taskSort, setTaskSort] = useState<TaskSort>(readTaskSort);
@@ -311,6 +320,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (lodeCatalogState.status !== "ready") return;
+    setCreateTaskSelection((current) => {
+      if (current == null) return current;
+      const refreshedSkill = lodeCatalogState.skills.find(
+        (skill) => skill.packageRef === current.skill.packageRef && skill.availability === "available",
+      );
+      return refreshedSkill == null ? null : { ...current, skill: refreshedSkill };
+    });
+  }, [lodeCatalogState]);
+
+  useEffect(() => {
     let cancelled = false;
     let refreshTimer: number | undefined;
     setCoreReadState(loadingCoreThreadState(connectionConfig.coreEndpoint));
@@ -340,6 +360,23 @@ export function App() {
       cancelled = true;
     };
   }, [connectionConfig.harborEndpoint, runtimeSupervisorState.canUseLiveRuntime]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let refreshTimer: number | undefined;
+    const refreshCatalog = async () => {
+      const state = await fetchLodeCatalog();
+      if (!cancelled) {
+        setLodeCatalogState(state);
+        refreshTimer = window.setTimeout(refreshCatalog, 30_000);
+      }
+    };
+    void refreshCatalog();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -414,13 +451,31 @@ export function App() {
   function openView(view: Exclude<WorkbenchView, "settings">) {
     setActiveView(view);
     if (view === "work") {
-      setCreateTaskSkill(null);
+      setCreateTaskSelection(null);
       setWorkMode("create");
     }
   }
 
-  function createTask(skill?: TaskProjection) {
-    setCreateTaskSkill(skill ?? null);
+  function createTask(task?: TaskProjection) {
+    const skill = task == null ? undefined : findCatalogSkillForTask(task, lodeCatalogState.skills);
+    setCreateTaskSelection(skill == null ? null : { skill });
+    setWorkMode("create");
+    setActiveView("work");
+  }
+
+  async function useSiteSkill(skill: LodeCatalogSkill, identityId?: string) {
+    const refreshedCatalog = await fetchLodeCatalog();
+    setLodeCatalogState(refreshedCatalog);
+    const refreshedSkill = refreshedCatalog.skills.find((item) => item.packageRef === skill.packageRef);
+    const identity = harborIdentityState.identities.find((item) => item.id === identityId);
+    if (
+      refreshedCatalog.status !== "ready" ||
+      refreshedSkill?.availability !== "available" ||
+      identity == null ||
+      !isDeterministicSkillIdentityCandidate(refreshedSkill, identity) ||
+      !runtimeSupervisorState.canUseLiveRuntime
+    ) return;
+    setCreateTaskSelection({ skill: refreshedSkill, identityId });
     setWorkMode("create");
     setActiveView("work");
   }
@@ -618,11 +673,23 @@ export function App() {
           </ThreadWorkspace>
         ) : isLibraryView ? (
           <ThreadWorkspace workspaceKey="library">
-            <OwnerState
-              title="站点技能暂不可用"
-              summary="暂时无法读取已安装的站点技能，请检查连接后重试。"
-              onRecover={openSettings}
-            />
+            {lodeCatalogState.status === "loading" ? (
+              <OwnerState title="正在读取站点技能" summary={lodeCatalogState.summary} />
+            ) : lodeCatalogState.status === "offline" ? (
+              <OwnerState
+                title="站点技能暂不可用"
+                summary={lodeCatalogState.summary}
+                onRecover={openSettings}
+              />
+            ) : (
+              <SiteSkillLibrary
+                catalog={lodeCatalogState}
+                identities={harborIdentityState.identities}
+                runtimeSupervisorState={runtimeSupervisorState}
+                onCreateIdentity={() => setActiveView("browser")}
+                onUse={useSiteSkill}
+              />
+            )}
           </ThreadWorkspace>
         ) : isSettingsView ? (
           <ThreadWorkspace workspaceKey="settings">
@@ -643,8 +710,12 @@ export function App() {
         ) : isWorkView && workMode === "create" ? (
           <ThreadWorkspace workspaceKey="work-create">
             <CreateTaskShell
-              coreState={effectiveCoreReadState}
-              selectedSkill={createTaskSkill}
+              catalog={lodeCatalogState}
+              identities={harborIdentityState.identities}
+              selection={createTaskSelection}
+              runtimeSupervisorState={runtimeSupervisorState}
+              onSelect={useSiteSkill}
+              onCreateIdentity={() => setActiveView("browser")}
               onRecover={openSettings}
             />
           </ThreadWorkspace>
@@ -709,42 +780,11 @@ export function App() {
   );
 }
 
-function CreateTaskShell({
-  coreState,
-  selectedSkill,
-  onRecover,
-}: {
-  coreState: CoreReadTaskLoadState;
-  selectedSkill: TaskProjection | null;
-  onRecover: () => void;
-}) {
-  return (
-    <section className="create-task-shell" aria-labelledby="create-task-heading">
-      <div className="create-task-intro">
-        <h1 id="create-task-heading">这次要让 WebEnvoy 完成什么？</h1>
-        <p>
-          {selectedSkill == null
-            ? "选择账号身份与站点技能后，业务输入将由技能字段定义生成。"
-            : `已选择 ${selectedSkill.siteSkill}；请选择兼容账号身份后填写业务输入。`}
-        </p>
-      </div>
-      <OwnerState
-        title="任务创建暂不可用"
-        summary={coreState.summary}
-        onRecover={onRecover}
-      />
-    </section>
-  );
-}
-
-export function OwnerState({ title, summary, onRecover }: { title: string; summary: string; onRecover?: () => void }) {
-  return (
-    <section className="owner-state" role="status">
-      <RefreshCw size={20} aria-hidden="true" />
-      <div><h1>{title}</h1><p>{summary}</p></div>
-      {onRecover ? <button type="button" onClick={onRecover}>检查连接</button> : null}
-    </section>
-  );
+function findCatalogSkillForTask(task: TaskProjection, skills: LodeCatalogSkill[]) {
+  const capabilityId = task.threadContext?.siteSkillKey.split(/[/:]/).filter(Boolean).at(-1);
+  return capabilityId == null
+    ? undefined
+    : skills.find((skill) => skill.packageRef.includes(`/${capabilityId}@`));
 }
 
 function isTextEditingTarget(target: EventTarget | null) {

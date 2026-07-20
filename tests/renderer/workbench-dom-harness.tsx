@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { initialCoreTaskSubmitState } from "../../src/renderer/coreTaskSubmitClient";
-import { OwnerState } from "../../src/renderer/App";
+import { OwnerState } from "../../src/renderer/OwnerState";
 import {
   fetchCoreThreadState,
   retainLastKnownCoreThreads,

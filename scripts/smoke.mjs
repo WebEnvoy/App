@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, cp, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -32,6 +32,7 @@ const identityEnvironmentFixturesSource = await readFile("src/renderer/identityE
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const createTaskShellSource = await readFile("src/renderer/CreateTaskShell.tsx", "utf8");
 const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
 const taskThreadRightPanelSource = await readFile("src/renderer/TaskThreadRightPanel.tsx", "utf8");
 const shellPrimitivesSource = await readFile("src/renderer/shellPrimitives.tsx", "utf8");
@@ -74,6 +75,10 @@ if (!mainSource.includes("webenvoy:shell-context")) {
 
 if (!mainSource.includes("webenvoy:runtime-supervisor-state")) {
   throw new Error("Electron main smoke failed: runtime supervisor IPC is missing.");
+}
+
+if (!mainSource.includes("webenvoy:lode-catalog")) {
+  throw new Error("Electron main smoke failed: Lode catalog IPC is missing.");
 }
 
 if (!mainSource.includes("webenvoy:owner-api-json")) {
@@ -210,6 +215,10 @@ if (!preloadSource.includes("getRuntimeSupervisorState")) {
   throw new Error("Preload smoke failed: runtime supervisor bridge is missing.");
 }
 
+if (!preloadSource.includes("getLodeCatalog")) {
+  throw new Error("Preload smoke failed: Lode catalog bridge is missing.");
+}
+
 if (!preloadSource.includes("requestOwnerJson")) {
   throw new Error("Preload smoke failed: owner API bridge is missing.");
 }
@@ -274,7 +283,7 @@ if (
 }
 
 if (
-  !appSource.includes("这次要让 WebEnvoy 完成什么？") ||
+  !createTaskShellSource.includes("这次要让 WebEnvoy 完成什么？") ||
   !appSource.includes("fetchCoreThreadState") ||
   !appSource.includes("retainLastKnownCoreThreads") ||
   !appSource.includes('task.runs[0]?.id ?? ""') ||
@@ -467,6 +476,9 @@ for (const expectedText of [
 const lodeAssetBundleModule = await import(
   pathToFileURL(path.resolve("dist-electron/lodeAssetBundle.js")).href
 );
+const lodeCatalogModule = await import(
+  pathToFileURL(path.resolve("dist-electron/lodeCatalog.js")).href
+);
 const harborLaunch = runtimeSupervisorModule.resolveRuntimeServiceLaunchConfig(
   "harbor",
   { WEBENVOY_HARBOR_RUNTIME_CWD: "/tmp/harbor-runtime" },
@@ -520,6 +532,127 @@ const coreLodeEnv = lodeAssetBundleModule.coreLodeAssetEnvironment(lodeBundle);
 
 if (!coreLodeEnv.WEBENVOY_LODE_ASSETS_PATH || !coreLodeEnv.WEBENVOY_LODE_REGISTRY_PATH) {
   throw new Error("Lode asset bundle smoke failed: Core env did not include asset paths.");
+}
+
+const lodeCatalog = lodeCatalogModule.readLodeCatalog(lodeBundle);
+const xhsSearchSkill = lodeCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+const bossSearchSkill = lodeCatalog.skills.find((skill) => skill.packageRef.includes("/boss/job-search@"));
+if (
+  lodeCatalog.status !== "ready" ||
+  xhsSearchSkill?.availability !== "available" ||
+  xhsSearchSkill.actions[0]?.category !== "read" ||
+  !xhsSearchSkill.inputFields.some((field) => field.id === "keyword" && field.required) ||
+  bossSearchSkill?.availability !== "incompatible" ||
+  !bossSearchSkill.availabilityReason.includes("动作声明")
+) {
+  throw new Error(`Lode catalog projection smoke failed: ${JSON.stringify(lodeCatalog)}`);
+}
+
+const invalidBundleCatalog = lodeCatalogModule.readLodeCatalog({
+  ...lodeBundle,
+  state: "invalid",
+  summary: "invalid bundle fixture",
+});
+if (invalidBundleCatalog.status !== "unavailable" || invalidBundleCatalog.skills.length > 0) {
+  throw new Error(`Invalid Lode bundle was exposed as a usable catalog: ${JSON.stringify(invalidBundleCatalog)}`);
+}
+
+const damagedLodeRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-catalog-"));
+try {
+  await cp(lodeBundle.rootPath, damagedLodeRoot, { recursive: true });
+  await rm(path.join(damagedLodeRoot, "sites/xiaohongshu/search-notes/schemas/input.schema.json"));
+  const damagedCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: damagedLodeRoot,
+    registryPath: path.join(damagedLodeRoot, "registry/local-packages.json"),
+  });
+  const damagedSkill = damagedCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  const healthySkill = damagedCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/read-note-detail@"));
+  if (damagedCatalog.status !== "ready" || damagedSkill?.availability !== "incompatible" || healthySkill?.availability !== "available") {
+    throw new Error(`Lode per-skill failure isolation smoke failed: ${JSON.stringify(damagedCatalog)}`);
+  }
+} finally {
+  await rm(damagedLodeRoot, { recursive: true, force: true });
+}
+
+const symlinkedLodeRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-symlink-"));
+try {
+  await cp(lodeBundle.rootPath, symlinkedLodeRoot, { recursive: true });
+  const queryPath = path.join(symlinkedLodeRoot, "registry/local-query.fixture.json");
+  await rm(queryPath);
+  await symlink(path.join(lodeBundle.rootPath, "registry/local-query.fixture.json"), queryPath);
+  const symlinkedCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: symlinkedLodeRoot,
+    registryPath: path.join(symlinkedLodeRoot, "registry/local-packages.json"),
+  });
+  if (symlinkedCatalog.status !== "unavailable") {
+    throw new Error(`Symlinked Lode query was not rejected: ${JSON.stringify(symlinkedCatalog)}`);
+  }
+} finally {
+  await rm(symlinkedLodeRoot, { recursive: true, force: true });
+}
+
+const oversizedLodeRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-oversized-"));
+try {
+  await cp(lodeBundle.rootPath, oversizedLodeRoot, { recursive: true });
+  await writeFile(
+    path.join(oversizedLodeRoot, "registry/local-packages.json"),
+    JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) }),
+  );
+  const oversizedBundle = lodeAssetBundleModule.resolveLodeAssetBundle(
+    { WEBENVOY_LODE_ASSETS_PATH: oversizedLodeRoot },
+    undefined,
+  );
+  if (oversizedBundle.state !== "invalid") {
+    throw new Error(`Oversized Lode registry was not rejected: ${JSON.stringify(oversizedBundle)}`);
+  }
+} finally {
+  await rm(oversizedLodeRoot, { recursive: true, force: true });
+}
+
+const missingDeclarationRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-missing-declaration-"));
+try {
+  await cp(lodeBundle.rootPath, missingDeclarationRoot, { recursive: true });
+  const registryPath = path.join(missingDeclarationRoot, "registry/local-packages.json");
+  const registry = JSON.parse(await readFile(registryPath, "utf8"));
+  const searchEntry = registry.entries.find((entry) => entry.package_ref === "lode://site-capability/xiaohongshu/search-notes@0.1.0");
+  delete searchEntry.manifest_path;
+  await writeFile(registryPath, JSON.stringify(registry));
+  const missingDeclarationBundle = lodeAssetBundleModule.resolveLodeAssetBundle(
+    { WEBENVOY_LODE_ASSETS_PATH: missingDeclarationRoot },
+    undefined,
+  );
+  if (missingDeclarationBundle.state !== "invalid") {
+    throw new Error(`Missing Lode path declaration was not rejected: ${JSON.stringify(missingDeclarationBundle)}`);
+  }
+} finally {
+  await rm(missingDeclarationRoot, { recursive: true, force: true });
+}
+
+const unknownOutputRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-unknown-output-"));
+try {
+  await cp(lodeBundle.rootPath, unknownOutputRoot, { recursive: true });
+  const outputPath = path.join(unknownOutputRoot, "sites/xiaohongshu/search-notes/schemas/output.schema.json");
+  const outputSchema = JSON.parse(await readFile(outputPath, "utf8"));
+  outputSchema.properties.result_kind.const = "future_result_kind";
+  await writeFile(outputPath, JSON.stringify(outputSchema));
+  const unknownOutputCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: unknownOutputRoot,
+    registryPath: path.join(unknownOutputRoot, "registry/local-packages.json"),
+  });
+  const unknownOutputSkill = unknownOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  const unaffectedSkill = unknownOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/read-note-detail@"));
+  if (
+    unknownOutputCatalog.status !== "ready" ||
+    unknownOutputSkill?.availability !== "incompatible" ||
+    unaffectedSkill?.availability !== "available"
+  ) {
+    throw new Error(`Unknown output kind was not isolated: ${JSON.stringify(unknownOutputCatalog)}`);
+  }
+} finally {
+  await rm(unknownOutputRoot, { recursive: true, force: true });
 }
 
 await assertPackagedRuntimeRequiredFailsClosed();

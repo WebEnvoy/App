@@ -26,6 +26,7 @@ const shellApi = {
     ipcRenderer.invoke("webenvoy:shell-context") as Promise<WebEnvoyShellContext>,
   getRuntimeSupervisorState: (config: RuntimeEndpointConfig) =>
     ipcRenderer.invoke("webenvoy:runtime-supervisor-state", config),
+  getLodeCatalog: () => ipcRenderer.invoke("webenvoy:lode-catalog"),
   requestOwnerJson: (request: OwnerApiJsonRequest) =>
     ipcRenderer.invoke("webenvoy:owner-api-json", request),
   completeHarborManualAuthentication: (intent: ManualAuthenticationCompletionIntent) =>

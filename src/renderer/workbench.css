@@ -70,6 +70,26 @@ summary:focus-visible {
   border-top: 1px solid var(--we-border);
 }
 
+.create-task-recommendations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.create-task-recommendations button { display: grid; min-width: 0; grid-template-columns: 32px minmax(0, 1fr) 16px; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--we-border); border-radius: 8px; color: var(--we-foreground); background: var(--we-surface-primary); text-align: left; }
+.create-task-recommendations button:hover:not(:disabled) { background: var(--we-list-hover-background); }
+.create-task-recommendations button:disabled { opacity: 0.45; }
+.create-task-recommendations button > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
+.create-task-recommendations strong,
+.create-task-recommendations small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-task-recommendations strong { font-size: 12px; }
+.create-task-recommendations small { color: var(--we-foreground-muted); font-size: 10px; }
+.create-task-recommendation-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; background: var(--we-surface-tertiary); }
+.create-task-selection { display: grid; gap: 16px; }
+.create-task-context-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.create-task-context-row > span { display: grid; gap: 3px; padding: 9px 10px; border-bottom: 1px solid var(--we-border); }
+.create-task-context-row strong { font-size: 11px; }
+.create-task-context-row small { color: var(--we-foreground-muted); font-size: 10px; }
+.create-task-contract-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }
+.create-task-contract-preview > div { display: grid; gap: 3px; padding: 7px 0; border-bottom: 1px solid var(--we-border-subtle); }
+.create-task-contract-preview strong { font-size: 11px; }
+.create-task-contract-preview small { color: var(--we-foreground-muted); font-size: 10px; line-height: 1.4; }
+
 .task-list-heading,
 .task-list-heading-actions {
   position: relative;
@@ -324,6 +344,10 @@ summary:focus-visible {
     width: calc(100% - 32px);
     padding-top: 32px;
   }
+
+  .create-task-recommendations,
+  .create-task-context-row,
+  .create-task-contract-preview { grid-template-columns: 1fr; }
 
   .owner-state button {
     grid-column: 2;

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
+import { readLodeCatalog } from "./lodeCatalog.js";
 import {
   isExpectedManualAuthenticationRendererUrl,
   parseManualAuthenticationCompletionIntent,
@@ -466,6 +467,7 @@ app.whenReady().then(() => {
   ipcMain.handle("webenvoy:runtime-supervisor-state", (_event, config) =>
     runtimeSupervisor.readState(config),
   );
+  ipcMain.handle("webenvoy:lode-catalog", () => readLodeCatalog());
   ipcMain.handle("webenvoy:owner-api-json", (_event, request) =>
     requestOwnerApiJson(request),
   );

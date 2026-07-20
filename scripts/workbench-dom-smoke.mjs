@@ -98,8 +98,37 @@ async function run() {
     window.webContents.executeJavaScript("window.__runWorkbenchDomSmoke('narrow')", true),
     "Narrow DOM checks",
   );
+  stage("loading Library harness");
+  window.setContentSize(1200, 900);
+  await withTimeout(
+    window.loadURL(`${baseUrl}/tests/renderer/library-dom.html`),
+    "Library harness load",
+  );
+  const libraryDesktop = await withTimeout(
+    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('desktop')", true),
+    "Library desktop DOM checks",
+  );
+  window.setContentSize(720, 900);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await withTimeout(
+    window.loadURL(`${baseUrl}/tests/renderer/library-dom.html`),
+    "Library narrow harness reload",
+  );
+  const libraryNarrow = await withTimeout(
+    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('narrow')", true),
+    "Library narrow DOM checks",
+  );
+  window.setContentSize(1200, 900);
+  await withTimeout(
+    window.loadURL(`${baseUrl}/tests/renderer/library-dom.html?stale=1`),
+    "Library stale harness load",
+  );
+  const libraryStale = await withTimeout(
+    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('stale')", true),
+    "Library stale DOM checks",
+  );
   stage("checks passed");
-  process.stdout.write(`${JSON.stringify({ desktop, narrow }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ desktop, narrow, libraryDesktop, libraryNarrow, libraryStale }, null, 2)}\n`);
 }
 
 async function cleanup(exitCode) {
