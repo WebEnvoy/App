@@ -20,15 +20,23 @@ for (const file of requiredFiles) {
 const mainSource = await readFile("dist-electron/main.js", "utf8");
 const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const runtimeSupervisorSource = await readFile("dist-electron/runtimeSupervisor.js", "utf8");
+const packagedCoreRuntimeSource = await readFile("dist-electron/runtime/core/start-runtime.mjs", "utf8");
 const packagedHarborRuntimeSource = await readFile("dist-electron/runtime/harbor/start-runtime.mjs", "utf8");
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
+const coreThreadClientSource = await readFile("src/renderer/coreThreadClient.ts", "utf8");
+const coreThreadInputContractSource = await readFile("src/renderer/coreThreadInputContract.ts", "utf8");
 const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
+const taskThreadRightPanelSource = await readFile("src/renderer/TaskThreadRightPanel.tsx", "utf8");
+const shellPrimitivesSource = await readFile("src/renderer/shellPrimitives.tsx", "utf8");
+const workbenchPreferencesSource = await readFile("src/renderer/workbenchPreferences.ts", "utf8");
+const workbenchSidebarSource = await readFile("src/renderer/WorkbenchSidebar.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -82,6 +90,13 @@ if (!runtimeSupervisorSource.includes("HARBOR_RUNTIME_SUPERVISOR_TOKEN") || !run
 
 if (!packagedHarborRuntimeSource.includes("manual_authentication_supervisor_token: process.env.HARBOR_MANUAL_AUTH_SUPERVISOR_TOKEN")) {
   throw new Error("Packaged Harbor runtime smoke failed: manual-auth supervisor token was not forwarded to Harbor.");
+}
+
+if (
+  !packagedCoreRuntimeSource.includes("createFileTaskThreadStore") ||
+  !packagedCoreRuntimeSource.includes("taskThreadStore")
+) {
+  throw new Error("Packaged Core runtime smoke failed: task-thread persistence was not configured.");
 }
 
 const sharedSupervisorToken = "smoke-shared-runtime-supervisor-token";
@@ -237,16 +252,91 @@ if (
   throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
 
+if (
+  !workbenchSidebarSource.includes('id: "work"') ||
+  !workbenchSidebarSource.includes('id: "browser"') ||
+  !workbenchSidebarSource.includes('id: "library"') ||
+  !workbenchSidebarSource.includes("任务线程") ||
+  !workbenchSidebarSource.includes("按站点技能") ||
+  !workbenchSidebarSource.includes("按账号身份") ||
+  !workbenchSidebarSource.includes("最近更新") ||
+  !workbenchSidebarSource.includes("优先处理") ||
+  !workbenchSidebarSource.includes("task.updatedAt") ||
+  !workbenchSidebarSource.includes("context.siteSkillKey") ||
+  !workbenchSidebarSource.includes("context.accountIdentityKey") ||
+  !workbenchSidebarSource.includes("threadContext!.siteLabel") ||
+  workbenchSidebarSource.includes("ownerRef.includes") ||
+  !workbenchSidebarSource.includes('event.key === "Escape"') ||
+  !workbenchSidebarSource.includes('"ArrowDown"') ||
+  !workbenchSidebarSource.includes("onCreateTask")
+) {
+  throw new Error("Workbench shell smoke failed: approved domains or task-list organization controls are missing.");
+}
+
+if (
+  !appSource.includes("这次要让 WebEnvoy 完成什么？") ||
+  !appSource.includes("fetchCoreThreadState") ||
+  !appSource.includes("retainLastKnownCoreThreads") ||
+  !appSource.includes('task.runs[0]?.id ?? ""') ||
+  !appSource.includes("该线程已创建，尚未提交业务输入。") ||
+  !coreThreadClientSource.includes('requestOwnerJson(endpoint, "/threads"') ||
+  appSource.includes("fetchCoreReadTaskState(") ||
+  appSource.includes("setInterval(refreshRuntimeSupervisor") ||
+  !appSource.includes("setTimeout(refreshRuntimeSupervisor, 5000)") ||
+  !appSource.includes("rightPanelOpenRequestKey={rightPanelOpenRequestKey}") ||
+  !appSource.includes("onOpenPreview={() => setRightPanelOpenRequestKey") ||
+  !taskThreadPageSource.includes("data-workbench-open-right") ||
+  !taskThreadPageSource.includes("onClick={onOpenPreview}") ||
+  taskThreadPageSource.includes('?? "Harbor fixture"') ||
+  taskThreadRightPanelSource.includes("sourceHealthFixture") ||
+  taskThreadRightPanelSource.includes("Lode metadata fixture")
+) {
+  throw new Error("Workbench truth-boundary smoke failed: create mode, owner-thread, or production right-preview wiring regressed.");
+}
+
+const appSyntax = ts.createSourceFile("App.tsx", appSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const hasRuntimeTaskFixtureImport = appSyntax.statements.some((statement) =>
+  ts.isImportDeclaration(statement) &&
+  statement.moduleSpecifier.text === "./taskThreadFixtures" &&
+  statement.importClause?.isTypeOnly !== true,
+);
+if (
+  hasRuntimeTaskFixtureImport ||
+  !identityEnvironmentsPageSource.includes('identity.source === "Harbor live"') ||
+  !identityEnvironmentsPageSource.includes("mergeIdentityEnvironmentProjections(") ||
+  !identityEnvironmentsPageSource.includes("[],")
+) {
+  throw new Error("Workbench owner isolation smoke failed: production shell still depends on task or identity fixture rows.");
+}
+
+if (
+  !shellPrimitivesSource.includes("writeStoredRightPanelState") ||
+  !shellPrimitivesSource.includes("moveFocusBeforePanelCollapse(") ||
+  !shellPrimitivesSource.includes("[data-workbench-open-right]") ||
+  !shellPrimitivesSource.includes('[data-focus-area="right-panel"][tabindex]')
+) {
+  throw new Error("Workbench panel smoke failed: right-panel persistence or focus restoration is missing.");
+}
+
+if (
+  !workbenchPreferencesSource.includes("window.localStorage") ||
+  !shellPrimitivesSource.includes("RIGHT_PANEL_OPEN_KEY_PREFIX") ||
+  !shellPrimitivesSource.includes("workspaceScrollPositions") ||
+  !shellPrimitivesSource.includes('role="separator"') ||
+  !shellPrimitivesSource.includes('event.key === "ArrowRight"') ||
+  !shellPrimitivesSource.includes("prefers-reduced-motion: reduce") &&
+    !(await readFile("src/renderer/styles.css", "utf8")).includes("prefers-reduced-motion: reduce")
+) {
+  throw new Error("Workbench shell smoke failed: persisted layout, keyboard resize, or reduced-motion behavior is missing.");
+}
+
 if (!coreTaskSubmitClientSource.includes("intent_id: `intent_\${runId}`")) {
   throw new Error("Core task submit smoke failed: intent_id must remain a result-ref-safe opaque identifier.");
 }
 
 for (const expectedText of [
-  "Task Thread",
   "source-health",
   "WebEnvoy App 不作为运行事实真相源。",
-  "Read-only task creation entry",
-  "Missing owner source",
   "Core-owned run navigation",
   "outcome:",
   "success",
@@ -260,46 +350,27 @@ for (const expectedText of [
   "unknown",
   "Owner-supported action intent",
   "Evidence card only links owner viewer refs",
-  "Open evidence viewer link",
   "raw evidence body",
-  "Capability package source attribution",
+  "当前仅展示 Core 线程绑定的 capability ref",
   "Capability attribution",
   "Failure class",
-  "Latest capability test",
-  "post_check_failed",
   "site_changed",
-  "Report broken",
-  "Repair drafts",
-  "local_signal_only",
-  "lode_public_fix_candidate",
   "Status",
   "Freshness",
   "Provenance",
   "evidence_expired",
   "Work failure links back to capability health",
-  "Library",
-  "启动只读任务",
-  "Core source blocked",
+  "站点技能",
   "Source ref",
   "Lock ref",
-  "lode://package/example-commerce-product-detail@0.4.2",
-  "lode://lock/example-commerce-product-detail/2026-07-03",
-  "已锁定",
-  "@lode/example-commerce-product-detail",
-  "lode://capability/example-commerce/product-detail",
   "Runtime session",
   "App 不使用无关本机浏览器现场代替任务现场",
   "direct Identity Runtime Session",
-  "not Core Task/Run/Result",
   "Write-pre preview",
   "真实页面写前验证",
-  "validate_only_preview",
-  "Validate contact form target and prepare a local preview without submitting.",
   "No-submit guard",
   "page_changed",
-  "Open preview evidence viewer link",
   "Risk and approval",
-  "action-request:fixture/preview-contact-form",
   "pending",
   "expired",
   "blocked",
@@ -330,7 +401,6 @@ for (const expectedText of [
   "手动身份浏览是 Browser/Harbor session，不是 Core 任务运行。",
   "推荐主力",
   "受限后备",
-  "缺少 CloakBrowser 会影响身份一致性和真实任务运行。",
   "默认打开首页/发现页",
   "默认打开职位入口",
   "控制者",
@@ -343,7 +413,6 @@ for (const expectedText of [
   "智能体直接浏览",
   "只有 Core task path 才产生任务运行、结果和 evidence。",
   "小红书运营号 A",
-  "BOSS 招聘号",
   "代理",
   "地区 / 语言",
   "时区",
@@ -355,17 +424,10 @@ for (const expectedText of [
   "Harbor 已接受认证完成确认",
   "不展示密码、验证码、Cookie、令牌",
   "小红书搜索和笔记读取",
-  "BOSS 搜索和职位详情读取",
   "小红书发布草稿写前验证",
   "BOSS 打招呼写前验证",
   "小红书发布草稿写前预览",
   "BOSS 打招呼写前预览",
-  "真实页面写前验证 / draft-only",
-  "真实页面写前验证 / message draft",
-  "真实页面写前验证已过期",
-  "真实页面写前验证已取消",
-  "action-request:fixture/xhs-publish-draft-preview-006",
-  "action-request:fixture/boss-greeting-preview-004",
   "审批请求",
   "过期请求",
   "取消记录",
@@ -373,17 +435,21 @@ for (const expectedText of [
   "未发送",
   "页面状态已过期",
   "记录取消意图",
-  "打开小红书写前证据",
-  "打开 BOSS 打招呼写前证据",
   "从身份浏览器会话启动真实只读任务",
   "字段来源",
-  "小红书笔记读取证据入口",
-  "BOSS 职位详情证据入口",
   "未登录",
   "验证码",
   "页面变化",
   "字段缺失",
-  "不打招呼、不投递、不发送消息",
+  "任务",
+  "账号身份",
+  "站点技能",
+  "任务线程",
+  "任务暂不可用",
+  "暂无任务线程",
+  "暂无账号身份",
+  "站点技能暂不可用",
+  "这次要让 WebEnvoy 完成什么？",
   "Runtime supervisor status",
   "生产运行已阻断",
   "fixture/demo 不作为可用结果",
@@ -593,6 +659,7 @@ const harborIdentityProjectionModuleUrl = `data:text/javascript;charset=utf-8,${
     `from "${identityEnvironmentFixturesModuleUrl}";`,
   ),
 )}`;
+const harborIdentityProjectionModule = await import(harborIdentityProjectionModuleUrl);
 const { outputText: harborIdentityClientModuleSource } = ts.transpileModule(harborIdentityClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -650,6 +717,206 @@ const coreReadTaskClientModuleRewritten = coreReadTaskClientModuleSource.replace
 const coreReadTaskClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`
 );
+const { outputText: coreThreadInputContractModuleSource } = ts.transpileModule(coreThreadInputContractSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const coreThreadInputContractModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreThreadInputContractModuleSource)}`;
+const { outputText: coreThreadClientModuleSource } = ts.transpileModule(coreThreadClientSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const coreThreadClientModule = await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(
+    coreThreadClientModuleSource
+      .replace(
+        'from "./coreThreadInputContract";',
+        `from "${coreThreadInputContractModuleUrl}";`,
+      )
+      .replace(
+        'from "./ownerPayloadGuards";',
+        `from "${ownerPayloadGuardsModuleUrl}";`,
+      )
+      .replace(
+        'from "./ownerApiClient";',
+        `from "${ownerApiClientModuleUrl}";`,
+      ),
+  )}`
+);
+const validCoreThreadEnvelope = {
+  ok: true,
+  threads: [
+    {
+      schema_version: "webenvoy.task-thread.v0",
+      thread_id: "thread_11111111111111111111111111111111",
+      capability_ref: "lode:capability/search-notes",
+      identity_environment_ref: "identity-env:xhs/ops-a",
+      created_at: "2026-07-20T08:00:00.000Z",
+      updated_at: "2026-07-20T08:03:00.000Z",
+      turns: [
+        {
+          turn_id: "turn_11111111111111111111111111111111",
+          sequence: 1,
+          idempotency_key: "idem-1",
+          run_id: "run-owner-mcp",
+          creation_channel: "mcp",
+          input: {
+            schema_version: "webenvoy.task-turn-input.v0",
+            fields: [
+              { field_id: "query", kind: "scalar", summary: "AI 工具" },
+              { field_id: "source_url", kind: "url", summary: "https://example.test/path" },
+            ],
+            consumer_boundary: "Core stores bounded field summaries and owner refs only; raw content remains with its owner.",
+          },
+          created_at: "2026-07-20T08:01:00.000Z",
+          updated_at: "2026-07-20T08:02:00.000Z",
+          submission_state: "accepted",
+          status: "completed",
+          run_status: "succeeded",
+          input_gaps: [],
+          terminal_at: "2026-07-20T08:02:00.000Z",
+        },
+        {
+          turn_id: "turn_22222222222222222222222222222222",
+          sequence: 2,
+          idempotency_key: "idem-2",
+          run_id: "run-owner-app-cancelled",
+          creation_channel: "app",
+          input: {
+            schema_version: "webenvoy.task-turn-input.v0",
+            fields: [{ field_id: "draft", kind: "long_text", owner_ref: "draft:owner/2" }],
+            attachment_refs: ["attachment:owner/2"],
+            consumer_boundary: "Core stores bounded field summaries and owner refs only; raw content remains with its owner.",
+          },
+          created_at: "2026-07-20T08:02:30.000Z",
+          updated_at: "2026-07-20T08:03:00.000Z",
+          submission_state: "accepted",
+          status: "cancelled",
+          terminated_at: "2026-07-20T08:03:00.000Z",
+        },
+      ],
+    },
+    {
+      schema_version: "webenvoy.task-thread.v0",
+      thread_id: "thread_33333333333333333333333333333333",
+      capability_ref: "lode:capability/custom-owner-skill",
+      identity_environment_ref: "identity-env:owner/custom",
+      created_at: "2026-07-20T07:00:00.000Z",
+      updated_at: "2026-07-20T07:00:00.000Z",
+      turns: [],
+    },
+  ],
+};
+const previousWindowForThreadSmoke = globalThis.window;
+const previousFetchForThreadSmoke = globalThis.fetch;
+globalThis.window = { clearTimeout: globalThis.clearTimeout, setTimeout: globalThis.setTimeout };
+globalThis.fetch = async () => new Response(JSON.stringify(validCoreThreadEnvelope), {
+  status: 200,
+  headers: { "Content-Type": "application/json" },
+});
+const coreThreadState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+globalThis.fetch = async () => new Response(JSON.stringify({
+  ...validCoreThreadEnvelope,
+  threads: [{ ...validCoreThreadEnvelope.threads[0], schema_version: "webenvoy.task-thread.v1" }],
+}), { status: 200, headers: { "Content-Type": "application/json" } });
+const invalidCoreThreadState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+const validInputSnapshot = validCoreThreadEnvelope.threads[0].turns[0].input;
+const invalidInputSnapshots = [
+  { ...validInputSnapshot, fields: [{ field_id: "session_token", kind: "scalar", summary: "redacted" }] },
+  { ...validInputSnapshot, fields: Array.from({ length: 65 }, (_, index) => ({ field_id: `field_${index}`, kind: "scalar", summary: "value" })) },
+  { ...validInputSnapshot, fields: [
+    { field_id: "query", kind: "scalar", summary: "first" },
+    { field_id: "query", kind: "scalar", summary: "second" },
+  ] },
+  { ...validInputSnapshot, fields: [{ field_id: "query", kind: "scalar", summary: "value", owner_ref: "owner:value" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "draft", kind: "long_text", summary: "raw text", owner_ref: "draft:value" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "https://user:pass@example.test/path" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "https://example.test/path?query=value" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "https://example.test/path#section" }] },
+  { ...validInputSnapshot, fields: [{ field_id: "url", kind: "url", summary: "ftp://example.test/path" }] },
+  { ...validInputSnapshot, attachment_refs: Array.from({ length: 33 }, (_, index) => `attachment:item/${index}`) },
+  { ...validInputSnapshot, attachment_refs: ["attachment:item/1", "attachment:item/1"] },
+  { ...validInputSnapshot, fields: [{ field_id: "query", kind: "scalar", summary: "value", unexpected: true }] },
+];
+for (const input of invalidInputSnapshots) {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    ...validCoreThreadEnvelope,
+    threads: [{
+      ...validCoreThreadEnvelope.threads[0],
+      turns: [{ ...validCoreThreadEnvelope.threads[0].turns[0], input }],
+    }],
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const invalidInputState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+  if (invalidInputState.status !== "offline") {
+    throw new Error(`Core thread input smoke failed: malformed persisted input was accepted: ${JSON.stringify(input)}`);
+  }
+}
+const validThread = validCoreThreadEnvelope.threads[0];
+const validTurn = validThread.turns[0];
+const invalidThreadEnvelopes = [
+  { ...validCoreThreadEnvelope, unexpected: true },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, unexpected: true }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, created_at: "2026-02-31T00:00:00Z" }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, created_at: "2026-07-20T24:00:00Z" }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, turn_id: "turn_invalid" }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, unexpected: true }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, run_status: "completed" }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{
+    ...validTurn,
+    submission_error: { category: "runtime", code: "failure", phase: "submit", recovery_hint: "retry", unexpected: true },
+  }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{
+    ...validTurn,
+    submission_error: { category: "x".repeat(129), code: "failure", phase: "submit", recovery_hint: "retry" },
+  }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{
+    ...validTurn,
+    input_gaps: [{ location: "cookie:0", code: "owner_ref_unavailable", recovery_action: "restore_owner_content" }],
+  }] }] },
+];
+for (const envelope of invalidThreadEnvelopes) {
+  globalThis.fetch = async () => new Response(JSON.stringify(envelope), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+  const invalidOuterState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+  if (invalidOuterState.status !== "offline") {
+    throw new Error(`Core thread v0 smoke failed: malformed outer projection was accepted: ${JSON.stringify(envelope)}`);
+  }
+}
+globalThis.fetch = previousFetchForThreadSmoke;
+globalThis.window = previousWindowForThreadSmoke;
+const projectedOwnerThread = coreThreadState.tasks[0];
+const retainedOfflineThreadState = coreThreadClientModule.retainLastKnownCoreThreads(
+  coreThreadState,
+  coreThreadClientModule.unavailableCoreThreadState("http://core.test", "Core /threads unavailable."),
+);
+const submittedOverrideWhileOffline = coreThreadClientModule.mergeSubmittedCoreTaskOverrides(
+  retainedOfflineThreadState,
+  [{ taskId: projectedOwnerThread.id, task: { ...projectedOwnerThread, title: "must not replace owner state" } }],
+);
+if (
+  coreThreadState.status !== "ready" ||
+  coreThreadState.tasks.length !== 2 ||
+  projectedOwnerThread?.id !== "thread_11111111111111111111111111111111" ||
+  projectedOwnerThread.runs[0]?.turnStatus !== "cancelled" ||
+  projectedOwnerThread.runs[0]?.creationChannel !== "app" ||
+  projectedOwnerThread.runs[0]?.resultRows.some((row) => row.label === "创建渠道") ||
+  projectedOwnerThread.runs[1]?.resultRows.some((row) => row.label === "创建渠道" && row.value === "MCP") !== true ||
+  !projectedOwnerThread.businessInput.includes("附件 1 个") ||
+  coreThreadState.tasks[1]?.runs.length !== 0 ||
+  invalidCoreThreadState.status !== "offline" ||
+  retainedOfflineThreadState.liveTaskIds.length !== 0 ||
+  submittedOverrideWhileOffline.status !== "offline" ||
+  submittedOverrideWhileOffline.liveTaskIds.length !== 0 ||
+  submittedOverrideWhileOffline.tasks[0]?.title === "must not replace owner state"
+) {
+  throw new Error("Core thread projection smoke failed: owner schema, terminal state, empty thread, input validation, or offline fail-closed behavior regressed.");
+}
 for (const [value, kind] of [
   ["source_wrong_type", "session"],
   ["https://example.test/session_live", "session"],
@@ -683,6 +950,7 @@ const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(ru
   },
 });
 const runtimeSupervisorStateModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(runtimeSupervisorStateModuleSource)}`;
+const runtimeSupervisorStateModule = await import(runtimeSupervisorStateModuleUrl);
 const coreReadTaskClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`;
 const { outputText: coreTaskSubmitClientModuleSource } = ts.transpileModule(coreTaskSubmitClientSource, {
   compilerOptions: {
@@ -707,6 +975,54 @@ const coreTaskSubmitClientModule = await import(
       ),
   )}`
 );
+
+const runtimeGateProjection = runtimeSupervisorStateModule.projectRuntimeGatedTasks(
+  [{
+    id: "task-live-history",
+    title: "Live history",
+    accountIdentity: "Harbor identity",
+    siteSkill: "Owner capability",
+    businessInput: "owner input",
+    source: "Core live",
+    packageSource: {
+      name: "owner package",
+      version: "1",
+      capabilityRef: "lode:capability/owner",
+      sourceRef: "lode://site-capability/owner@1",
+      fetchedAt: "now",
+      source: "Core live",
+      boundary: "owner refs only",
+    },
+    runs: [
+      { id: "run-terminal", label: "terminal", lifecycle: "completed", outcome: "success", summary: "done", actionIntent: "none", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+      { id: "run-active", label: "active", lifecycle: "running", outcome: "unknown", summary: "running", actionIntent: "wait", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+    ],
+  }],
+  runtimeSupervisorStateModule.runtimeSupervisorUnavailableState("offline"),
+  ["task-live-history"],
+);
+const readyRuntimeWithOfflineThreads = runtimeSupervisorStateModule.projectRuntimeGatedTasks(
+  runtimeGateProjection.map((task) => ({
+    ...task,
+    runs: [
+      { id: "run-terminal", label: "terminal", lifecycle: "completed", outcome: "success", summary: "done", actionIntent: "none", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+      { id: "run-active", label: "active", lifecycle: "running", outcome: "unknown", summary: "running", actionIntent: "wait", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+    ],
+  })),
+  { ...runtimeSupervisorStateModule.runtimeSupervisorUnavailableState("health ready while /threads is offline"), canUseLiveRuntime: true, failClosed: false },
+  [],
+);
+if (
+  runtimeGateProjection[0]?.source !== "Core live" ||
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "run-terminal") !== true ||
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "run-active") ||
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "runtime-blocked-task-live-history") !== true ||
+  readyRuntimeWithOfflineThreads[0]?.runs.some((run) => run.id === "run-terminal") !== true ||
+  readyRuntimeWithOfflineThreads[0]?.runs.some((run) => run.id === "run-active") ||
+  readyRuntimeWithOfflineThreads[0]?.runs.some((run) => run.id === "runtime-blocked-task-live-history") !== true
+) {
+  throw new Error("Runtime task projection smoke failed: terminal owner truth was overwritten or active work was unlocked after /threads went offline.");
+}
 
 function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
@@ -842,6 +1158,14 @@ const safeHarborImport = localIdentityStoreModule.parseImportedIdentityEnvironme
 
 if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
   throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
+}
+const projectedHarborIdentity = harborIdentityProjectionModule.projectHarborIdentity(
+  harborIdentityFacts(),
+  harborProviderCatalog(),
+  "2026-07-20T08:00:00Z",
+);
+if (projectedHarborIdentity.source !== "Harbor live" || projectedHarborIdentity.taskEntries.length !== 0) {
+  throw new Error("Harbor identity projection smoke failed: live identity exposed fixture task entries.");
 }
 
 const harborContract = await startHarborIdentityContractServer();

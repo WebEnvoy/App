@@ -95,7 +95,7 @@ export function projectHarborIdentity(
       session: emptySession(selected === "官方 Chrome" ? "官方 Chrome" : "CloakBrowser", facts.identity_environment_ref),
       boundary: "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
     },
-    taskEntries: taskEntries(siteId),
+    taskEntries: [],
   };
 }
 

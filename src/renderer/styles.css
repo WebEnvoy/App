@@ -1209,6 +1209,10 @@ h3 {
   margin-bottom: 8px;
 }
 
+.task-preview-button {
+  margin-left: auto;
+}
+
 .process-title {
   margin-top: 14px;
 }

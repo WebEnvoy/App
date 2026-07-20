@@ -29,7 +29,6 @@ import { mergeIdentityEnvironmentProjections, projectHarborIdentity } from "./ha
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import {
   identityEnvironmentBoundaries,
-  identityEnvironmentFixtures,
   type BrowserSessionProjection,
   type BrowserTargetProjection,
 } from "./identityEnvironmentFixtures";
@@ -55,20 +54,22 @@ const initialHarborState: HarborIdentityLoadState = {
 
 export function IdentityEnvironmentsPage({
   harborEndpoint,
+  initialState = initialHarborState,
   runtimeSupervisorState,
   onHarborStateChange,
   onOpenTask,
 }: {
   harborEndpoint: string;
+  initialState?: HarborIdentityLoadState;
   runtimeSupervisorState: RuntimeSupervisorState;
   onHarborStateChange: (state: HarborIdentityLoadState) => void;
   onOpenTask: (taskId: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState(
-    () => window.localStorage.getItem(localIdentitySelectionStorageKey) ?? identityEnvironmentFixtures[0].id,
+    () => window.localStorage.getItem(localIdentitySelectionStorageKey) ?? "",
   );
   const [localDrafts, setLocalDrafts] = useState(loadLocalIdentityEnvironmentDrafts);
-  const [harborState, setHarborState] = useState<HarborIdentityLoadState>(initialHarborState);
+  const [harborState, setHarborState] = useState<HarborIdentityLoadState>(initialState);
   const [managementMode, setManagementMode] = useState<IdentityManagementMode>("closed");
   const [managementMessage, setManagementMessage] = useState("");
   const [importText, setImportText] = useState("");
@@ -78,7 +79,10 @@ export function IdentityEnvironmentsPage({
   const identityEnvironments = useMemo(
     () =>
       projectRuntimeGatedIdentities(
-        mergeIdentityEnvironmentProjections(harborState.identities, identityEnvironmentFixtures),
+        mergeIdentityEnvironmentProjections(
+          harborState.identities.filter((identity) => identity.source === "Harbor live"),
+          [],
+        ),
         runtimeSupervisorState,
       ),
     [harborState.identities, runtimeSupervisorState],
@@ -86,8 +90,7 @@ export function IdentityEnvironmentsPage({
   const selected =
     identityEnvironments.find((identity) => identity.id === selectedId) ??
     identityEnvironments[0] ??
-    identityEnvironmentFixtures[0];
-  const session = sessionOverrides[selected.id] ?? selected.browser.session;
+    initialState.identities.find((identity) => identity.source === "Harbor live");
 
   useEffect(() => {
     void refreshHarborState();
@@ -95,9 +98,15 @@ export function IdentityEnvironmentsPage({
 
   useEffect(() => {
     if (!identityEnvironments.some((identity) => identity.id === selectedId)) {
-      selectIdentity(identityEnvironments[0]?.id ?? identityEnvironmentFixtures[0].id);
+      selectIdentity(identityEnvironments[0]?.id ?? "");
     }
   }, [identityEnvironments, selectedId]);
+
+  if (selected == null) {
+    return <section className="owner-state" role="status">当前没有可显示的账号身份。</section>;
+  }
+
+  const session = sessionOverrides[selected.id] ?? selected.browser.session;
 
   async function refreshHarborState() {
     setHarborState((current) => ({ ...current, status: "loading" }));
@@ -249,7 +258,7 @@ export function IdentityEnvironmentsPage({
     }
     removeLocalIdentityEnvironmentDraft(selected.id);
     setLocalDrafts(loadLocalIdentityEnvironmentDrafts());
-    selectIdentity(identityEnvironmentFixtures[0].id);
+    selectIdentity("");
     setManagementMessage("已删除 App 本地身份环境配置；未触碰 Harbor profile 或凭据材料。");
   }
 

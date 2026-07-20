@@ -35,6 +35,16 @@ try {
   if (core?.admission?.state !== "ready" || harbor?.health?.state !== "ready") {
     throw new Error(`Packaged runtime smoke failed: owner health/admission is not ready. ${JSON.stringify(services)}`);
   }
+  if (!result.coreThreadReadReady) {
+    throw new Error("Packaged runtime smoke failed: renderer did not consume Core /threads.");
+  }
+  if (
+    result.packagedViewport?.windowWidth !== 720 ||
+    result.packagedViewport?.horizontalOverflow !== false ||
+    result.packagedViewport?.scrollWidth > result.packagedViewport?.innerWidth
+  ) {
+    throw new Error(`Packaged runtime smoke failed: production window did not hold the 720px layout boundary. ${JSON.stringify(result.packagedViewport)}`);
+  }
 
   console.log(
     [
@@ -43,6 +53,8 @@ try {
       `Harbor endpoint: http://127.0.0.1:${harborPort}`,
       `Core pid: ${core.pid}`,
       `Harbor pid: ${harbor.pid}`,
+      "Core /threads: ready",
+      "Production viewport: 720px without horizontal overflow",
       `Lode asset source: ${result.runtimeSupervisorState.lodeAssets.source}`,
       `Screenshot: ${screenshotPath}`,
       "Boundary: local packaged Core/Harbor runtime health/admission only; no real account/profile/Cookie/production page and no submit/publish/send.",

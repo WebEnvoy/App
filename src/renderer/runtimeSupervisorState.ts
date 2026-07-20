@@ -163,19 +163,25 @@ export function runtimeService(runtime: RuntimeSupervisorState, id: RuntimeServi
 }
 
 function runtimeBlockedTask(task: TaskProjection, runtime: RuntimeSupervisorState): TaskProjection {
-  const run = runtimeBlockedRun(task, runtime);
+  const gateRun = runtimeBlockedRun(task, runtime);
+  let insertedGate = false;
+  const runs = task.runs.flatMap((run) => {
+    if (!runRequiresLiveRuntime(run)) return [run];
+    if (insertedGate) return [];
+    insertedGate = true;
+    return [gateRun];
+  });
+  if (!insertedGate) return task;
+
   return {
     ...task,
-    source: runtimeSupervisorSource,
-    packageSource: {
-      ...task.packageSource,
-      source: runtimeSupervisorSource,
-      fetchedAt: runtime.checkedAt,
-      boundary: "生产/real mode 需要 Core/Harbor owner runtime；fixture/demo capability projection 已隔离，不能作为可运行证明。",
-    },
     blocker: "生产运行已 fail closed：Core/Harbor runtime health/admission 未通过，App 不展示 fixture 结果、真实成功或可审批写前验证。",
-    runs: [run],
+    runs,
   };
+}
+
+export function runRequiresLiveRuntime(run: RunProjection) {
+  return run.lifecycle === "queued" || run.lifecycle === "running" || run.lifecycle === "needs-action";
 }
 
 function runtimeBlockedRun(task: TaskProjection, runtime: RuntimeSupervisorState): RunProjection {
