@@ -153,6 +153,7 @@ export function App() {
   const [taskSort, setTaskSort] = useState<TaskSort>(readTaskSort);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedRunId, setSelectedRunId] = useState("");
+  const [rightPanelOpenRequestKey, setRightPanelOpenRequestKey] = useState<number>();
   const selectedTaskIdRef = useRef(selectedTaskId);
   const coreEndpointRef = useRef(connectionConfig.coreEndpoint);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -530,6 +531,7 @@ export function App() {
     <AppShell
       collapsePanelsOnNarrow
       initialRightOpen={false}
+      rightPanelOpenRequestKey={rightPanelOpenRequestKey}
       rightPanelStateKey={isWorkView && workMode === "detail" ? selectedTask?.id : undefined}
       left={
         <LeftPanel>
@@ -683,6 +685,7 @@ export function App() {
               selectedRun={selectedRun}
               selectedTask={selectedTask}
               onActiveRunChange={setSelectedRunId}
+              onOpenPreview={() => setRightPanelOpenRequestKey((key) => (key ?? 0) + 1)}
             />
           </ThreadWorkspace>
         )

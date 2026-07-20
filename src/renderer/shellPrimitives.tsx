@@ -84,6 +84,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = fa
   const leftPreviewExitTimerRef = useRef<number | null>(null);
   const handledRightPanelOpenRequestKeyRef = useRef<number | undefined>(undefined);
   const handledRightPanelCloseRequestKeyRef = useRef<number | undefined>(undefined);
+  const rightPanelFocusRequestPendingRef = useRef(false);
   const rightPanelReturnFocusRef = useRef<HTMLElement | null>(null);
   const rightPanelStateKeyRef = useRef(rightPanelStateKey);
   const rightPanelStatesRef = useRef(new Map<string, boolean>());
@@ -181,11 +182,20 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = fa
     rightPanelReturnFocusRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
+    rightPanelFocusRequestPendingRef.current = true;
+    if (isRightOpen) {
+      rightPanelFocusRequestPendingRef.current = false;
+      document.querySelector<HTMLElement>('[data-focus-area="right-panel"][tabindex]')?.focus();
+      return;
+    }
     setRightPanelOpen(true);
-    window.requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('[data-focus-area="right-panel"]')?.focus();
-    });
-  }, [hasRightPanel, rightPanelOpenRequestKey, setRightPanelOpen]);
+  }, [hasRightPanel, isRightOpen, rightPanelOpenRequestKey, setRightPanelOpen]);
+
+  useLayoutEffect(() => {
+    if (!hasRightPanel || !isRightOpen || !rightPanelFocusRequestPendingRef.current) return;
+    rightPanelFocusRequestPendingRef.current = false;
+    document.querySelector<HTMLElement>('[data-focus-area="right-panel"][tabindex]')?.focus();
+  }, [hasRightPanel, isRightOpen]);
 
   useEffect(() => {
     if (rightPanelCloseRequestKey == null || handledRightPanelCloseRequestKeyRef.current === rightPanelCloseRequestKey) return;

@@ -29,6 +29,7 @@ const identityEnvironmentFixturesSource = await readFile("src/renderer/identityE
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
 const shellPrimitivesSource = await readFile("src/renderer/shellPrimitives.tsx", "utf8");
 const workbenchPreferencesSource = await readFile("src/renderer/workbenchPreferences.ts", "utf8");
 const workbenchSidebarSource = await readFile("src/renderer/WorkbenchSidebar.tsx", "utf8");
@@ -265,9 +266,12 @@ if (
   !appSource.includes("这次要让 WebEnvoy 完成什么？") ||
   !appSource.includes("unavailableCoreThreadState") ||
   appSource.includes("fetchCoreReadTaskState(") ||
-  appSource.includes("data-workbench-open-right")
+  !appSource.includes("rightPanelOpenRequestKey={rightPanelOpenRequestKey}") ||
+  !appSource.includes("onOpenPreview={() => setRightPanelOpenRequestKey") ||
+  !taskThreadPageSource.includes("data-workbench-open-right") ||
+  !taskThreadPageSource.includes("onClick={onOpenPreview}")
 ) {
-  throw new Error("Workbench truth-boundary smoke failed: create mode or owner-thread/right-preview boundaries regressed.");
+  throw new Error("Workbench truth-boundary smoke failed: create mode, owner-thread, or production right-preview wiring regressed.");
 }
 
 const appSyntax = ts.createSourceFile("App.tsx", appSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -288,7 +292,8 @@ if (
 if (
   !shellPrimitivesSource.includes("writeStoredRightPanelState") ||
   !shellPrimitivesSource.includes("moveFocusBeforePanelCollapse(") ||
-  !shellPrimitivesSource.includes("[data-workbench-open-right]")
+  !shellPrimitivesSource.includes("[data-workbench-open-right]") ||
+  !shellPrimitivesSource.includes('[data-focus-area="right-panel"][tabindex]')
 ) {
   throw new Error("Workbench panel smoke failed: right-panel persistence or focus restoration is missing.");
 }

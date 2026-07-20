@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Ban, Braces, FileDiff, HardDrive, ShieldAlert, Waypoints } from "lucide-react";
+import { Activity, AlertTriangle, Ban, Braces, FileDiff, HardDrive, PanelRightOpen, ShieldAlert, Waypoints } from "lucide-react";
 import { useState } from "react";
 
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
@@ -17,6 +17,7 @@ export function TaskThreadPage({
   selectedRun,
   selectedTask,
   onActiveRunChange,
+  onOpenPreview,
 }: {
   coreReadState: CoreReadTaskLoadState;
   coreSubmitState: CoreTaskSubmitState;
@@ -25,6 +26,7 @@ export function TaskThreadPage({
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   onActiveRunChange: (runId: string) => void;
+  onOpenPreview: () => void;
 }) {
   return (
     <div className="thread-body">
@@ -62,6 +64,7 @@ export function TaskThreadPage({
               isSelected={run.id === selectedRun.id}
               key={run.id}
               run={run}
+              onOpenPreview={onOpenPreview}
             />
           ))}
         </div>
@@ -232,7 +235,15 @@ function TaskIntentTurn({ selectedTask }: { selectedTask: TaskProjection }) {
   );
 }
 
-function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean }) {
+function RunTurn({
+  run,
+  isSelected,
+  onOpenPreview,
+}: {
+  run: RunProjection;
+  isSelected: boolean;
+  onOpenPreview: () => void;
+}) {
   return (
     <article
       className={isSelected ? "run-turn selected" : "run-turn"}
@@ -297,6 +308,16 @@ function RunTurn({ run, isSelected }: { run: RunProjection; isSelected: boolean 
         <div className="card-title compact-title">
           <Braces size={18} />
           <h3>证据预览</h3>
+          <button
+            className="task-preview-button we-toolbar-icon-button cursor-interaction"
+            type="button"
+            aria-label="在右栏打开结果依据"
+            title="在右栏打开结果依据"
+            data-workbench-open-right
+            onClick={onOpenPreview}
+          >
+            <PanelRightOpen size={16} />
+          </button>
         </div>
         <dl className="result-table">
           {run.evidenceCards.map((row) => (
