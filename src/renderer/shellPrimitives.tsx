@@ -184,17 +184,22 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = fa
       : null;
     rightPanelFocusRequestPendingRef.current = true;
     if (isRightOpen) {
-      rightPanelFocusRequestPendingRef.current = false;
-      document.querySelector<HTMLElement>('[data-focus-area="right-panel"][tabindex]')?.focus();
-      return;
+      const frame = window.requestAnimationFrame(() => {
+        rightPanelFocusRequestPendingRef.current = false;
+        document.querySelector<HTMLElement>('[data-focus-area="right-panel"][tabindex]')?.focus();
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
     setRightPanelOpen(true);
   }, [hasRightPanel, isRightOpen, rightPanelOpenRequestKey, setRightPanelOpen]);
 
   useLayoutEffect(() => {
     if (!hasRightPanel || !isRightOpen || !rightPanelFocusRequestPendingRef.current) return;
-    rightPanelFocusRequestPendingRef.current = false;
-    document.querySelector<HTMLElement>('[data-focus-area="right-panel"][tabindex]')?.focus();
+    const frame = window.requestAnimationFrame(() => {
+      rightPanelFocusRequestPendingRef.current = false;
+      document.querySelector<HTMLElement>('[data-focus-area="right-panel"][tabindex]')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [hasRightPanel, isRightOpen]);
 
   useEffect(() => {
