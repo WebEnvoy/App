@@ -365,27 +365,30 @@ export function App() {
       };
     }
 
-    const refreshRuntimeSupervisor = () => {
-      readSupervisor(connectionConfig)
-        .then((state) => {
-          if (!cancelled) setRuntimeSupervisorState(state);
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            setRuntimeSupervisorState(
-              runtimeSupervisorUnavailableState(
-                error instanceof Error ? error.message : String(error),
-              ),
-            );
-          }
-        });
+    let refreshTimer: number | undefined;
+    const refreshRuntimeSupervisor = async () => {
+      try {
+        const state = await readSupervisor(connectionConfig);
+        if (!cancelled) setRuntimeSupervisorState(state);
+      } catch (error) {
+        if (!cancelled) {
+          setRuntimeSupervisorState(
+            runtimeSupervisorUnavailableState(
+              error instanceof Error ? error.message : String(error),
+            ),
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          refreshTimer = window.setTimeout(refreshRuntimeSupervisor, 5000);
+        }
+      }
     };
-    refreshRuntimeSupervisor();
-    const interval = window.setInterval(refreshRuntimeSupervisor, 5000);
+    void refreshRuntimeSupervisor();
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      window.clearTimeout(refreshTimer);
     };
   }, [connectionConfig]);
 

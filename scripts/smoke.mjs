@@ -266,6 +266,8 @@ if (
   !appSource.includes("这次要让 WebEnvoy 完成什么？") ||
   !appSource.includes("unavailableCoreThreadState") ||
   appSource.includes("fetchCoreReadTaskState(") ||
+  appSource.includes("setInterval(refreshRuntimeSupervisor") ||
+  !appSource.includes("setTimeout(refreshRuntimeSupervisor, 5000)") ||
   !appSource.includes("rightPanelOpenRequestKey={rightPanelOpenRequestKey}") ||
   !appSource.includes("onOpenPreview={() => setRightPanelOpenRequestKey") ||
   !taskThreadPageSource.includes("data-workbench-open-right") ||
