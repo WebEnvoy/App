@@ -1,16 +1,11 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Box,
-  ChevronDown,
-  FolderKanban,
-  HardDrive,
-  Plus,
-  PanelRightOpen,
-  Search,
+  BriefcaseBusiness,
+  CircleUserRound,
+  Library,
+  RefreshCw,
   Settings,
-  SquarePen,
-  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,8 +16,6 @@ import {
   type LocalConnectionConfig,
 } from "./localConnectionConfig";
 import {
-  coreReadTaskStateFromFallback,
-  fetchCoreReadTaskState,
   type CoreReadTaskLoadState,
 } from "./coreReadTaskClient";
 import {
@@ -34,20 +27,10 @@ import {
 } from "./coreTaskSubmitClient";
 import { fetchHarborIdentityState } from "./harborIdentityClient";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
-import {
-  SiteSkillDetailPage,
-  SiteSkillDirectoryPage,
-} from "./SiteSkillPages";
 import { IdentityEnvironmentsPage } from "./IdentityEnvironmentsPage";
 import { SettingsPage } from "./SettingsPage";
-import { siteSkillFixtures, type SiteSkill } from "./siteSkillFixtures";
-import {
-  directSessionFixture,
-  taskThreadFixtures,
-  type TaskProjection,
-} from "./taskThreadFixtures";
+import type { TaskProjection } from "./taskThreadFixtures";
 import { type ThreadNavigationItem } from "./ThreadNavigationRail";
-import { RunStatusGlyph } from "./RunStatusGlyph";
 import {
   projectRuntimeGatedTasks,
   runtimeSupervisorCheckingState,
@@ -65,26 +48,28 @@ import {
   RightPanel,
   ThreadWorkspace,
 } from "./shellPrimitives";
+import { WorkbenchSidebar, type WorkbenchView } from "./WorkbenchSidebar";
+import {
+  readTaskGrouping,
+  readTaskSort,
+  writeTaskGrouping,
+  writeTaskSort,
+  type TaskGrouping,
+  type TaskSort,
+} from "./workbenchPreferences";
+import "./workbench.css";
 
 type ShellContext = {
   platform: string;
   colorScheme: "light" | "dark";
   configScope: "local-ui-only";
 };
-type AppView = "task-thread" | "site-skills" | "identity-environments" | "settings";
 type SubmittedTaskOverride = {
   endpoint: string;
   taskId: string;
   task: TaskProjection;
 };
-type SiteId = "xiaohongshu" | "boss";
-const milestone14TaskIds = new Set([
-  "task-xhs-publish-write-preview",
-  "task-boss-greeting-write-preview",
-  "task-xhs-real-read",
-  "task-boss-real-read",
-]);
-const milestone14TaskThreadFixtures = taskThreadFixtures.filter((task) => milestone14TaskIds.has(task.id));
+type WorkMode = "create" | "detail";
 
 function getBrowserColorScheme(): ShellContext["colorScheme"] {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -103,10 +88,6 @@ function applyDocumentTheme(colorScheme: ShellContext["colorScheme"]) {
   document.documentElement.dataset.weTheme = colorScheme;
 }
 
-const defaultTaskThread =
-  milestone14TaskThreadFixtures.find((task) => task.id === "task-xhs-real-read") ??
-  milestone14TaskThreadFixtures[0] ??
-  taskThreadFixtures[0];
 const initialHarborIdentityState: HarborIdentityLoadState = {
   status: "loading",
   fetchedAt: "pending",
@@ -114,44 +95,37 @@ const initialHarborIdentityState: HarborIdentityLoadState = {
   identities: [],
 };
 
-function coreSubmitStateKey(taskId: string, endpoint: string) {
-  return `${endpoint}::${taskId}`;
+function unavailableCoreThreadState(endpoint: string): CoreReadTaskLoadState {
+  return {
+    status: "offline",
+    endpoint,
+    fetchedAt: "not-read",
+    summary: "暂时无法读取任务和创建所需信息，请检查本机服务后重试。",
+    tasks: [],
+    liveTaskIds: [],
+  };
 }
 
-function siteForTask(task: TaskProjection): SiteId {
-  return task.id.includes("boss") || task.siteSkill.toLowerCase().includes("boss") ? "boss" : "xiaohongshu";
+function coreSubmitStateKey(taskId: string, endpoint: string) {
+  return `${endpoint}::${taskId}`;
 }
 
 function applyLocalTaskContext(
   task: TaskProjection,
   businessInputOverrides: Record<string, string>,
-  harborIdentityState: HarborIdentityLoadState,
 ): TaskProjection {
   const isBossSearch = task.id === "task-boss-real-read";
   const businessInput = businessInputOverrides[task.id] ?? (isBossSearch
     ? '{"query":"前端工程师","city_code":"101020100","page":1,"limit":15}'
     : task.businessInput);
   const searchQuery = businessInputOverrides[task.id] === undefined && !isBossSearch ? task.searchQuery : undefined;
-  const liveIdentity = harborIdentityState.identities.find(
-    (identity) => identity.source === "Harbor live" && identity.siteId === siteForTask(task),
-  );
 
   return {
     ...task,
     ...(isBossSearch ? { title: "BOSS 职位搜索", siteSkill: "BOSS 职位搜索" } : {}),
     businessInput,
     searchQuery,
-    ...(liveIdentity == null
-      ? {}
-      : {
-          accountIdentity: liveIdentity.name,
-          identitySource: liveIdentity.source,
-        }),
   };
-}
-
-function readOnlyTaskId(taskId: string) {
-  return milestone14TaskIds.has(taskId) && !taskId.includes("write-preview");
 }
 
 export function App() {
@@ -163,7 +137,7 @@ export function App() {
     runtimeSupervisorCheckingState,
   );
   const [coreReadState, setCoreReadState] = useState<CoreReadTaskLoadState>(() =>
-    coreReadTaskStateFromFallback(defaultConnectionConfig.coreEndpoint, milestone14TaskThreadFixtures),
+    unavailableCoreThreadState(defaultConnectionConfig.coreEndpoint),
   );
   const [coreSubmitStatesByKey, setCoreSubmitStatesByKey] = useState<Record<string, CoreTaskSubmitState>>({});
   const [submittedTaskOverrides, setSubmittedTaskOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
@@ -171,13 +145,17 @@ export function App() {
   const [harborIdentityState, setHarborIdentityState] = useState<HarborIdentityLoadState>(initialHarborIdentityState);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState("");
-  const [activeView, setActiveView] = useState<AppView>("task-thread");
-  const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskThread.id);
-  const [selectedRunId, setSelectedRunId] = useState(defaultTaskThread.runs[0]?.id ?? "");
-  const [selectedSiteSkillId, setSelectedSiteSkillId] = useState(siteSkillFixtures[0].id);
-  const [isSiteSkillDetailOpen, setSiteSkillDetailOpen] = useState(false);
+  const [activeView, setActiveView] = useState<WorkbenchView>("work");
+  const [workMode, setWorkMode] = useState<WorkMode>("create");
+  const [createTaskSkill, setCreateTaskSkill] = useState<TaskProjection | null>(null);
+  const [settingsReturnView, setSettingsReturnView] = useState<Exclude<WorkbenchView, "settings">>("work");
+  const [taskGrouping, setTaskGrouping] = useState<TaskGrouping>(readTaskGrouping);
+  const [taskSort, setTaskSort] = useState<TaskSort>(readTaskSort);
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedRunId, setSelectedRunId] = useState("");
   const selectedTaskIdRef = useRef(selectedTaskId);
   const coreEndpointRef = useRef(connectionConfig.coreEndpoint);
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     selectedTaskIdRef.current = selectedTaskId;
@@ -186,6 +164,9 @@ export function App() {
   useEffect(() => {
     coreEndpointRef.current = connectionConfig.coreEndpoint;
   }, [connectionConfig.coreEndpoint]);
+
+  useEffect(() => writeTaskGrouping(taskGrouping), [taskGrouping]);
+  useEffect(() => writeTaskSort(taskSort), [taskSort]);
 
   const currentEndpointSubmittedOverrides = useMemo(
     () =>
@@ -216,45 +197,51 @@ export function App() {
   const effectiveCoreReadTasks = useMemo(
     () =>
       effectiveCoreReadState.tasks.map((task) =>
-        applyLocalTaskContext(task, taskBusinessInputOverrides, harborIdentityState),
+        applyLocalTaskContext(task, taskBusinessInputOverrides),
       ),
-    [effectiveCoreReadState.tasks, harborIdentityState, taskBusinessInputOverrides],
+    [effectiveCoreReadState.tasks, taskBusinessInputOverrides],
   );
   const taskThreads = useMemo(
     () =>
       projectRuntimeGatedTasks(
-        effectiveCoreReadTasks,
+        effectiveCoreReadTasks.filter((task) => effectiveCoreReadState.liveTaskIds.includes(task.id)),
         runtimeSupervisorState,
         effectiveCoreReadState.liveTaskIds,
       ),
     [effectiveCoreReadState.liveTaskIds, effectiveCoreReadTasks, runtimeSupervisorState],
   );
-  const selectedTask =
-    taskThreads.find((task) => task.id === selectedTaskId) ?? taskThreads[0] ?? defaultTaskThread;
-  const selectedSubmitTask =
-    effectiveCoreReadTasks.find((task) => task.id === selectedTask.id) ?? selectedTask;
-  const selectedSubmitStateKey = coreSubmitStateKey(selectedSubmitTask.id, connectionConfig.coreEndpoint);
+  const workbenchTaskThreads = useMemo(
+    () => taskThreads.filter((task) => task.threadContext != null),
+    [taskThreads],
+  );
+  const selectedTask = taskThreads.find((task) => task.id === selectedTaskId) ?? taskThreads[0];
+  const selectedSubmitTask = selectedTask == null
+    ? undefined
+    : effectiveCoreReadTasks.find((task) => task.id === selectedTask.id) ?? selectedTask;
+  const selectedSubmitStateKey = selectedSubmitTask == null
+    ? ""
+    : coreSubmitStateKey(selectedSubmitTask.id, connectionConfig.coreEndpoint);
   const coreSubmitState = coreSubmitStatesByKey[selectedSubmitStateKey] ?? initialCoreTaskSubmitState;
-  const selectedRun =
-    selectedTask.runs.find((run) => run.id === selectedRunId) ?? selectedTask.runs[0];
-  const selectedSiteSkill =
-    siteSkillFixtures.find((skill) => skill.id === selectedSiteSkillId) ?? siteSkillFixtures[0];
-  const isSiteSkillView = activeView === "site-skills";
-  const isIdentityEnvironmentsView = activeView === "identity-environments";
+  const selectedRun = selectedTask?.runs.find((run) => run.id === selectedRunId) ?? selectedTask?.runs[0];
+  const isWorkView = activeView === "work";
+  const isLibraryView = activeView === "library";
+  const isIdentityEnvironmentsView = activeView === "browser";
   const isSettingsView = activeView === "settings";
-  const isAppLevelView = isSiteSkillView || isIdentityEnvironmentsView || isSettingsView;
+  const hasLiveIdentity = harborIdentityState.identities.some(
+    (identity) => identity.source === "Harbor live",
+  );
   const pageTitle = isSettingsView
     ? "设置"
     : isIdentityEnvironmentsView
     ? "账号身份"
-    : isSiteSkillView
-    ? isSiteSkillDetailOpen
-      ? selectedSiteSkill.name
-      : "Library"
-    : selectedTask.title;
+    : isLibraryView
+    ? "站点技能"
+    : workMode === "create"
+    ? "创建任务"
+    : selectedTask?.title ?? "任务";
   const threadNavigationItems = useMemo<ThreadNavigationItem[]>(
     () =>
-      selectedTask.runs.map((run) => ({
+      (selectedTask?.runs ?? []).map((run) => ({
         id: run.id,
         getLabel: () => `${run.label} · ${outcomeLabel(run.outcome)}`,
         hasOutput: run.evidenceCards.length > 0,
@@ -272,6 +259,23 @@ export function App() {
       })),
     [selectedTask],
   );
+
+  useEffect(() => {
+    if (!isSettingsView) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>("[data-settings-initial-focus]")?.focus();
+    });
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || isTextEditingTarget(event.target)) return;
+      event.preventDefault();
+      closeSettings();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isSettingsView, settingsReturnView]);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,14 +334,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    setCoreReadState(coreReadTaskStateFromFallback(connectionConfig.coreEndpoint, milestone14TaskThreadFixtures));
-    fetchCoreReadTaskState(connectionConfig.coreEndpoint, milestone14TaskThreadFixtures).then((state) => {
-      if (!cancelled) setCoreReadState(state);
-    });
-    return () => {
-      cancelled = true;
-    };
+    setCoreReadState(unavailableCoreThreadState(connectionConfig.coreEndpoint));
   }, [connectionConfig.coreEndpoint]);
 
   useEffect(() => {
@@ -405,7 +402,8 @@ export function App() {
   }, [selectedRunId, selectedTaskId, taskThreads]);
 
   function selectTask(task: TaskProjection) {
-    setActiveView("task-thread");
+    setActiveView("work");
+    setWorkMode("detail");
     setSelectedTaskId(task.id);
     setSelectedRunId(task.runs[0].id);
   }
@@ -417,37 +415,22 @@ export function App() {
     }
   }
 
-  function openTaskThread() {
-    setActiveView("task-thread");
-  }
-
-  function openSiteSkillDirectory() {
-    setActiveView("site-skills");
-    setSiteSkillDetailOpen(false);
-  }
-
-  function openIdentityEnvironments() {
-    setActiveView("identity-environments");
-  }
-
-  function openSiteSkillDetail(skill: SiteSkill) {
-    setActiveView("site-skills");
-    setSelectedSiteSkillId(skill.id);
-    setSiteSkillDetailOpen(true);
-  }
-
-  function startReadTask(skill: SiteSkill) {
-    const taskId = skill.relatedTaskIds[0];
-    if (
-      taskId != null &&
-      runtimeSupervisorState.canUseLiveRuntime &&
-      (readOnlyTaskId(taskId) || effectiveCoreReadState.liveTaskIds.includes(taskId))
-    ) {
-      openTaskById(taskId);
+  function openView(view: Exclude<WorkbenchView, "settings">) {
+    setActiveView(view);
+    if (view === "work") {
+      setCreateTaskSkill(null);
+      setWorkMode("create");
     }
   }
 
+  function createTask(skill?: TaskProjection) {
+    setCreateTaskSkill(skill ?? null);
+    setWorkMode("create");
+    setActiveView("work");
+  }
+
   function updateSelectedTaskBusinessInput(value: string) {
+    if (selectedSubmitTask == null) return;
     const taskId = selectedSubmitTask.id;
     const submitKey = coreSubmitStateKey(taskId, connectionConfig.coreEndpoint);
     setTaskBusinessInputOverrides((current) => ({
@@ -461,6 +444,7 @@ export function App() {
   }
 
   async function submitSelectedCoreTask() {
+    if (selectedSubmitTask == null) return;
     const submitTask = selectedSubmitTask;
     const submitEndpoint = connectionConfig.coreEndpoint;
     const submitKey = coreSubmitStateKey(submitTask.id, submitEndpoint);
@@ -507,22 +491,18 @@ export function App() {
   }
 
   function openSettings() {
+    if (activeView !== "settings") setSettingsReturnView(activeView);
     setActiveView("settings");
+  }
+
+  function closeSettings() {
+    setActiveView(settingsReturnView);
+    window.requestAnimationFrame(() => settingsTriggerRef.current?.focus());
   }
 
   function goBackFromTopbar() {
     if (isSettingsView) {
-      openTaskThread();
-      return;
-    }
-
-    if (isIdentityEnvironmentsView) {
-      openTaskThread();
-      return;
-    }
-
-    if (isSiteSkillDetailOpen) {
-      openSiteSkillDirectory();
+      closeSettings();
     }
   }
 
@@ -546,147 +526,39 @@ export function App() {
     setSettingsSaved(true);
   }
 
-  if (isSettingsView) {
-    return (
-      <SettingsPage
-        colorScheme={shellContext?.colorScheme}
-        configScope={shellContext?.configScope}
-        connectionConfig={connectionConfig}
-        platform={shellContext?.platform}
-        runtimeSupervisorState={runtimeSupervisorState}
-        settingsError={settingsError}
-        settingsSaved={settingsSaved}
-        onBack={openTaskThread}
-        onEndpointChange={updateEndpoint}
-        onSave={saveSettings}
-      />
-    );
-  }
-
   return (
     <AppShell
+      collapsePanelsOnNarrow
+      initialRightOpen={false}
+      rightPanelStateKey={isWorkView && workMode === "detail" ? selectedTask?.id : undefined}
       left={
         <LeftPanel>
-          <aside className="sidebar" aria-label="Task Thread navigation">
-            <nav className="global-nav" aria-label="Global navigation">
-              <button
-                className={
-                  activeView === "task-thread"
-                    ? "nav-item we-list-row cursor-interaction nav-item-active"
-                    : "nav-item we-list-row cursor-interaction"
-                }
-                type="button"
-                onClick={openTaskThread}
-              >
-                <SquarePen size={16} />
-                任务
-              </button>
-              <button
-                className={
-                  activeView === "site-skills"
-                    ? "nav-item we-list-row cursor-interaction nav-item-active"
-                    : "nav-item we-list-row cursor-interaction"
-                }
-                type="button"
-                onClick={openSiteSkillDirectory}
-              >
-                <Box size={16} />
-                Library
-              </button>
-              <button
-                className={
-                  activeView === "identity-environments"
-                    ? "nav-item we-list-row cursor-interaction nav-item-active"
-                    : "nav-item we-list-row cursor-interaction"
-                }
-                type="button"
-                onClick={openIdentityEnvironments}
-              >
-                <UserRound size={16} />
-                账号身份
-              </button>
-              <button
-                className="nav-item we-list-row cursor-interaction"
-                type="button"
-                disabled
-                title="搜索不属于 APP-239 真实只读结果展示批次。"
-              >
-                <Search size={16} />
-                Search
-              </button>
-            </nav>
-
-            <section className="task-tree codex-scrollbar" aria-label="Tasks grouped by account identity">
-              <div className="section-heading">
-                <span>任务</span>
-                <button
-                  type="button"
-                  aria-label="Read-only task creation entry"
-                  disabled
-                  title="新建任务不属于 APP-244；本批次只展示已有小红书/BOSS 只读任务和写前验证。"
-                >
-                  <Plus size={15} />
-                </button>
-              </div>
-
-              {taskThreads.map((task) => (
-                <div className="tree-account" key={task.id}>
-                  <div className="tree-account-label">
-                    <HardDrive size={14} />
-                    {task.accountIdentity}
-                  </div>
-                  <div className="tree-skill">
-                    <span>{task.siteSkill}</span>
-                    <button
-                      className={
-                        task.id === selectedTask.id
-                          ? "tree-task we-list-row cursor-interaction selected"
-                          : "tree-task we-list-row cursor-interaction"
-                      }
-                      type="button"
-                      onClick={() => selectTask(task)}
-                    >
-                      <span className="tree-task-title">{task.title}</span>
-                      <RunStatusGlyph compact run={task.runs[0]} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <article className="direct-session-card">
-                <strong>{directSessionFixture.title}</strong>
-                <span>{directSessionFixture.accountIdentity} · {directSessionFixture.sessionState}</span>
-                <p>{directSessionFixture.summary}</p>
-              </article>
-            </section>
-
-            <footer className="sidebar-user-footer" aria-label="Current user">
-              <span className="user-avatar" aria-hidden="true">CH</span>
-              <span className="user-copy">
-                <strong>Chen</strong>
-                <span>Pro</span>
-              </span>
-              <button
-                className={isSettingsView ? "selected" : undefined}
-                type="button"
-                aria-label="用户设置"
-                onClick={openSettings}
-              >
-                <Settings size={16} />
-              </button>
-            </footer>
-          </aside>
+          <WorkbenchSidebar
+            activeView={activeView}
+            grouping={taskGrouping}
+            selectedTaskId={isWorkView && workMode === "detail" ? selectedTask?.id ?? null : null}
+            settingsTriggerRef={settingsTriggerRef}
+            sort={taskSort}
+            taskLoadStatus={effectiveCoreReadState.status}
+            tasks={workbenchTaskThreads}
+            onCreateTask={createTask}
+            onGroupingChange={setTaskGrouping}
+            onOpenSettings={openSettings}
+            onOpenTask={selectTask}
+            onOpenView={openView}
+            onSortChange={setTaskSort}
+          />
         </LeftPanel>
       }
       header={(panelControls) => (
-        <header className="shell-topbar" aria-label={isSiteSkillView ? "Site skill toolbar" : "Task Thread toolbar"}>
+        <header className="shell-topbar production-topbar" aria-label="应用工具栏">
           <div className="topbar-left-slot">
             {panelControls.left}
             <button
               className="topbar-icon-button we-toolbar-icon-button cursor-interaction"
               type="button"
               aria-label="后退"
-              disabled={activeView === "task-thread" || (isSiteSkillView && !isSiteSkillDetailOpen)}
+              disabled={!isSettingsView}
               onClick={goBackFromTopbar}
             >
               <ArrowLeft size={15} />
@@ -700,59 +572,96 @@ export function App() {
               {isSettingsView ? (
                 <Settings size={15} />
               ) : isIdentityEnvironmentsView ? (
-                <UserRound size={15} />
-              ) : isSiteSkillView ? (
-                <Box size={15} />
+                <CircleUserRound size={15} />
+              ) : isLibraryView ? (
+                <Library size={15} />
               ) : (
-                <FolderKanban size={15} />
+                <BriefcaseBusiness size={15} />
               )}
             </span>
             <h2 id="thread-title">{pageTitle}</h2>
           </div>
-          {isAppLevelView ? null : (
-            <div className="topbar-right-slot">
-              <button className="topbar-open-button" type="button" disabled title="使用右侧图标显示或隐藏上下文面板。">
-                <PanelRightOpen size={15} />
-                <span>打开</span>
-                <ChevronDown size={14} />
-              </button>
-              {panelControls.rightFullscreen}
-              {panelControls.right}
-            </div>
-          )}
+          <div className="topbar-right-slot production-right-topbar">
+            {isWorkView && workMode === "detail" && selectedTask != null ? (
+              <>
+                <span className="right-panel-topbar-title">预览</span>
+                {panelControls.rightFullscreen}
+                {panelControls.right}
+              </>
+            ) : null}
+          </div>
         </header>
       )}
       workspace={
         isIdentityEnvironmentsView ? (
-          <ThreadWorkspace>
-            <IdentityEnvironmentsPage
-              harborEndpoint={connectionConfig.harborEndpoint}
-              runtimeSupervisorState={runtimeSupervisorState}
-              onHarborStateChange={setHarborIdentityState}
-              onOpenTask={openTaskById}
-            />
-          </ThreadWorkspace>
-        ) : isSiteSkillView ? (
-          <ThreadWorkspace>
-            {isSiteSkillDetailOpen ? (
-              <SiteSkillDetailPage
-                canUseLiveRuntime={runtimeSupervisorState.canUseLiveRuntime}
-                liveTaskIds={effectiveCoreReadState.liveTaskIds}
-                skill={selectedSiteSkill}
-                onBack={openSiteSkillDirectory}
-                onOpenTask={startReadTask}
+          <ThreadWorkspace workspaceKey="browser">
+            {harborIdentityState.status === "loading" ? (
+              <OwnerState title="正在读取账号身份" summary="正在同步账号、登录状态和浏览器环境。" />
+            ) : hasLiveIdentity ? (
+              <IdentityEnvironmentsPage
+                harborEndpoint={connectionConfig.harborEndpoint}
+                initialState={harborIdentityState}
+                runtimeSupervisorState={runtimeSupervisorState}
+                onHarborStateChange={setHarborIdentityState}
+                onOpenTask={openTaskById}
+              />
+            ) : harborIdentityState.status === "ready" ? (
+              <OwnerState
+                title="暂无账号身份"
+                summary="当前没有可用的账号身份。"
+                onRecover={openSettings}
               />
             ) : (
-              <SiteSkillDirectoryPage
-                canUseLiveRuntime={runtimeSupervisorState.canUseLiveRuntime}
-                liveTaskIds={effectiveCoreReadState.liveTaskIds}
-                selectedSkillId={selectedSiteSkill.id}
-                onSelectSkill={openSiteSkillDetail}
+              <OwnerState
+                title="账号身份暂不可用"
+                summary="暂时无法读取账号身份，请检查连接后重试。"
+                onRecover={openSettings}
               />
             )}
           </ThreadWorkspace>
+        ) : isLibraryView ? (
+          <ThreadWorkspace workspaceKey="library">
+            <OwnerState
+              title="站点技能暂不可用"
+              summary="暂时无法读取已安装的站点技能，请检查连接后重试。"
+              onRecover={openSettings}
+            />
+          </ThreadWorkspace>
+        ) : isSettingsView ? (
+          <ThreadWorkspace workspaceKey="settings">
+            <SettingsPage
+              embedded
+              colorScheme={shellContext?.colorScheme}
+              configScope={shellContext?.configScope}
+              connectionConfig={connectionConfig}
+              platform={shellContext?.platform}
+              runtimeSupervisorState={runtimeSupervisorState}
+              settingsError={settingsError}
+              settingsSaved={settingsSaved}
+              onBack={closeSettings}
+              onEndpointChange={updateEndpoint}
+              onSave={saveSettings}
+            />
+          </ThreadWorkspace>
+        ) : isWorkView && workMode === "create" ? (
+          <ThreadWorkspace workspaceKey="work-create">
+            <CreateTaskShell
+              coreState={effectiveCoreReadState}
+              selectedSkill={createTaskSkill}
+              onRecover={openSettings}
+            />
+          </ThreadWorkspace>
+        ) : selectedTask == null || selectedRun == null || selectedSubmitTask == null ? (
+          <ThreadWorkspace workspaceKey="work-empty">
+            <OwnerState
+              title={workEmptyStateTitle(effectiveCoreReadState.status)}
+              summary={workEmptyStateSummary(effectiveCoreReadState)}
+              onRecover={effectiveCoreReadState.status === "loading" ? undefined : openSettings}
+            />
+          </ThreadWorkspace>
         ) : (
           <ThreadWorkspace
+            workspaceKey={`work:${selectedTask.id}`}
             composer={
               <TaskThreadComposer
                 coreSubmitState={coreSubmitState}
@@ -778,7 +687,7 @@ export function App() {
           </ThreadWorkspace>
         )
       }
-      right={isAppLevelView ? null : (
+      right={isWorkView && workMode === "detail" && selectedTask != null && selectedRun != null ? (
         <RightPanel>
           <TaskThreadRightPanel
             coreReadState={effectiveCoreReadState}
@@ -793,7 +702,60 @@ export function App() {
             }}
           />
         </RightPanel>
-      )}
+      ) : null}
     />
   );
+}
+
+function CreateTaskShell({
+  coreState,
+  selectedSkill,
+  onRecover,
+}: {
+  coreState: CoreReadTaskLoadState;
+  selectedSkill: TaskProjection | null;
+  onRecover: () => void;
+}) {
+  return (
+    <section className="create-task-shell" aria-labelledby="create-task-heading">
+      <div className="create-task-intro">
+        <h1 id="create-task-heading">这次要让 WebEnvoy 完成什么？</h1>
+        <p>
+          {selectedSkill == null
+            ? "选择账号身份与站点技能后，业务输入将由技能字段定义生成。"
+            : `已选择 ${selectedSkill.siteSkill}；请选择兼容账号身份后填写业务输入。`}
+        </p>
+      </div>
+      <OwnerState
+        title="任务创建暂不可用"
+        summary={coreState.summary}
+        onRecover={onRecover}
+      />
+    </section>
+  );
+}
+
+function OwnerState({ title, summary, onRecover }: { title: string; summary: string; onRecover?: () => void }) {
+  return (
+    <section className="owner-state" role="status">
+      <RefreshCw size={20} aria-hidden="true" />
+      <div><h1>{title}</h1><p>{summary}</p></div>
+      {onRecover ? <button type="button" onClick={onRecover}>检查连接</button> : null}
+    </section>
+  );
+}
+
+function isTextEditingTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']") != null;
+}
+
+function workEmptyStateTitle(status: CoreReadTaskLoadState["status"]) {
+  if (status === "loading") return "正在读取任务";
+  return status === "ready" ? "暂无任务线程" : "任务暂不可用";
+}
+
+function workEmptyStateSummary(state: CoreReadTaskLoadState) {
+  if (state.status === "loading") return state.summary;
+  if (state.status === "ready") return "当前没有任务线程。";
+  return "暂时无法读取任务线程，请检查连接后重试。";
 }

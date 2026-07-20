@@ -21,6 +21,7 @@ type SettingsSection = {
 };
 
 type SettingsPageProps = {
+  embedded?: boolean;
   colorScheme?: "light" | "dark";
   configScope?: "local-ui-only";
   connectionConfig: LocalConnectionConfig;
@@ -41,6 +42,7 @@ const settingsSections: SettingsSection[] = [
 ];
 
 export function SettingsPage({
+  embedded = false,
   colorScheme,
   configScope,
   connectionConfig,
@@ -57,13 +59,15 @@ export function SettingsPage({
     settingsSections.find((section) => section.id === activeSection)?.label ?? "设置";
 
   return (
-    <div className="app-settings-page">
+    <div className={embedded ? "app-settings-page app-settings-page-embedded" : "app-settings-page"}>
       <aside className="settings-navigation" aria-label="设置分类">
-        <div className="settings-titlebar-spacer" aria-hidden="true" />
-        <button className="settings-back-row" type="button" onClick={onBack}>
-          <ArrowLeft size={15} />
-          WebEnvoy App
-        </button>
+        {embedded ? null : <div className="settings-titlebar-spacer" aria-hidden="true" />}
+        {embedded ? null : (
+          <button className="settings-back-row" type="button" onClick={onBack}>
+            <ArrowLeft size={15} />
+            WebEnvoy App
+          </button>
+        )}
         {["运行来源", "App"].map((group) => (
           <section className="settings-navigation-group" key={group}>
             <h2>{group}</h2>
@@ -79,6 +83,7 @@ export function SettingsPage({
                         : "settings-navigation-row we-list-row cursor-interaction"
                     }
                     type="button"
+                    data-settings-initial-focus={section.id === "connections" ? "" : undefined}
                     aria-current={section.id === activeSection ? "page" : undefined}
                     onClick={() => setActiveSection(section.id)}
                     key={section.id}
@@ -93,7 +98,7 @@ export function SettingsPage({
       </aside>
 
       <main className="settings-content-layout">
-        <div className="settings-content-toolbar" aria-hidden="true" />
+        {embedded ? null : <div className="settings-content-toolbar" aria-hidden="true" />}
         <div className="settings-content-scroll">
           <div className="settings-content-inner">
             <header className="settings-content-header">

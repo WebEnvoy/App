@@ -98,6 +98,12 @@ export type RunProjection = {
 
 export type TaskProjection = {
   id: string;
+  updatedAt?: string;
+  threadContext?: {
+    siteLabel: string;
+    siteSkillKey: string;
+    accountIdentityKey: string;
+  };
   title: string;
   accountIdentity: string;
   identitySource?: OwnerSource;

@@ -14,7 +14,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type FocusAreaName = "left-panel" | "thread-workspace" | "right-panel" | "bottom-panel";
 type ResizeEdge = "top" | "right" | "bottom" | "left";
@@ -35,8 +35,10 @@ const RIGHT_PANEL_RESERVED_WIDTH = 352;
 const RIGHT_PANEL_COLLAPSE_WIDTH = RIGHT_PANEL_MIN_WIDTH * PANEL_COLLAPSE_SCALE;
 const RIGHT_PANEL_WIDTH_KEY = "webenvoy.shell.v3.right-panel-width";
 const RIGHT_PANEL_RATIO_KEY = "webenvoy.shell.v3.right-panel-ratio";
+const RIGHT_PANEL_OPEN_KEY_PREFIX = "webenvoy.shell.v3.right-panel-open:";
 const NARROW_RIGHT_PANEL_MAX_RATIO = 0.42;
 const PANEL_ANIMATION_DURATION_MS = 500;
+const workspaceScrollPositions = new Map<string, number>();
 
 type AppShellProps = {
   collapsePanelsOnNarrow?: boolean;
@@ -47,9 +49,10 @@ type AppShellProps = {
   right: ReactNode | null;
   rightPanelCloseRequestKey?: number;
   rightPanelOpenRequestKey?: number;
+  rightPanelStateKey?: string;
 };
 
-export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = true, left, header, workspace, right, rightPanelCloseRequestKey, rightPanelOpenRequestKey }: AppShellProps) {
+export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = false, left, header, workspace, right, rightPanelCloseRequestKey, rightPanelOpenRequestKey, rightPanelStateKey }: AppShellProps) {
   const [isLeftOpen, setLeftOpen] = useState(true);
   const [isRightOpen, setRightOpen] = useState(initialRightOpen);
   const [isLeftPreviewOpen, setLeftPreviewOpen] = useState(false);
@@ -81,6 +84,9 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
   const leftPreviewExitTimerRef = useRef<number | null>(null);
   const handledRightPanelOpenRequestKeyRef = useRef<number | undefined>(undefined);
   const handledRightPanelCloseRequestKeyRef = useRef<number | undefined>(undefined);
+  const rightPanelReturnFocusRef = useRef<HTMLElement | null>(null);
+  const rightPanelStateKeyRef = useRef(rightPanelStateKey);
+  const rightPanelStatesRef = useRef(new Map<string, boolean>());
   const hasRightPanel = right != null;
   const isVeryNarrow = collapsePanelsOnNarrow
     && typeof window !== "undefined"
@@ -103,6 +109,34 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
     : Math.min(effectiveRightWidth, rightPanelMaxWidth);
   const rightPanelAnimation = usePanelAnimation(isRightOpen);
   const renderedRightWidth = Math.max(0, Math.min(1, rightPanelAnimation.progress)) * visibleRightWidth;
+
+  const setRightPanelOpen = useCallback((open: boolean) => {
+    const stateKey = rightPanelStateKeyRef.current;
+    if (stateKey != null) {
+      rightPanelStatesRef.current.set(stateKey, open);
+      writeStoredRightPanelState(stateKey, open);
+    }
+    setRightOpen(open);
+  }, []);
+
+  const moveFocusBeforeRightPanelCollapse = useCallback(() => {
+    moveFocusBeforePanelCollapse(
+      "right-panel",
+      '[data-workbench-open-right], [data-shell-panel-toggle="right"]',
+      rightPanelReturnFocusRef.current,
+    );
+  }, []);
+
+  useEffect(() => {
+    rightPanelStateKeyRef.current = rightPanelStateKey;
+    rightPanelReturnFocusRef.current = null;
+    setRightOpen(
+      rightPanelStateKey == null
+        ? initialRightOpen
+        : rememberedRightPanelState(rightPanelStatesRef.current, rightPanelStateKey, initialRightOpen),
+    );
+    setRightFullscreen(false);
+  }, [initialRightOpen, rightPanelStateKey]);
 
   useEffect(() => {
     const element = contentRegionBodyRef.current;
@@ -144,15 +178,21 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
   useEffect(() => {
     if (!hasRightPanel || rightPanelOpenRequestKey == null || handledRightPanelOpenRequestKeyRef.current === rightPanelOpenRequestKey) return;
     handledRightPanelOpenRequestKeyRef.current = rightPanelOpenRequestKey;
-    setRightOpen(true);
-  }, [hasRightPanel, rightPanelOpenRequestKey]);
+    rightPanelReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setRightPanelOpen(true);
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-focus-area="right-panel"]')?.focus();
+    });
+  }, [hasRightPanel, rightPanelOpenRequestKey, setRightPanelOpen]);
 
   useEffect(() => {
     if (rightPanelCloseRequestKey == null || handledRightPanelCloseRequestKeyRef.current === rightPanelCloseRequestKey) return;
     handledRightPanelCloseRequestKeyRef.current = rightPanelCloseRequestKey;
-    moveFocusBeforePanelCollapse("right-panel", '[data-shell-panel-toggle="right"]');
-    setRightOpen(false);
-  }, [rightPanelCloseRequestKey]);
+    moveFocusBeforeRightPanelCollapse();
+    setRightPanelOpen(false);
+  }, [moveFocusBeforeRightPanelCollapse, rightPanelCloseRequestKey, setRightPanelOpen]);
 
   useEffect(() => {
     if (!collapsePanelsOnNarrow) return;
@@ -164,8 +204,15 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
         setLeftOpen(false);
       }
       if (veryNarrowWindow.matches) {
-        moveFocusBeforePanelCollapse("right-panel", '[data-shell-panel-toggle="right"]');
+        moveFocusBeforeRightPanelCollapse();
         setRightOpen(false);
+      } else {
+        const stateKey = rightPanelStateKeyRef.current;
+        setRightOpen(
+          stateKey == null
+            ? initialRightOpen
+            : rememberedRightPanelState(rightPanelStatesRef.current, stateKey, initialRightOpen),
+        );
       }
     };
     syncPanels();
@@ -175,7 +222,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
       narrowWindow.removeEventListener("change", syncPanels);
       veryNarrowWindow.removeEventListener("change", syncPanels);
     };
-  }, [collapsePanelsOnNarrow, hasRightPanel]);
+  }, [collapsePanelsOnNarrow, hasRightPanel, initialRightOpen, moveFocusBeforeRightPanelCollapse]);
 
   useEffect(() => {
     return () => {
@@ -238,9 +285,14 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
         data-shell-panel-toggle="right"
         onClick={() => {
           if (isRightOpen) {
+            moveFocusBeforeRightPanelCollapse();
             setRightFullscreen(false);
+          } else {
+            rightPanelReturnFocusRef.current = document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
           }
-          setRightOpen((open) => !open);
+          setRightPanelOpen(!isRightOpen);
         }}
       >
         {isRightOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
@@ -255,7 +307,7 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
         title={isRightFullscreen ? "退出右栏全屏" : "全屏展开右栏"}
         data-shell-panel-fullscreen="right"
         onClick={() => {
-          setRightOpen(true);
+          setRightPanelOpen(true);
           setRightFullscreen((fullscreen) => !fullscreen);
         }}
       >
@@ -361,10 +413,10 @@ export function AppShell({ collapsePanelsOnNarrow = false, initialRightOpen = tr
                 resizable={!isRightPanelFullscreen}
                 animationProgress={rightPanelAnimation.progress}
                 onCollapse={() => {
-                  moveFocusBeforePanelCollapse("right-panel", '[data-shell-panel-toggle="right"]');
-                  setRightOpen(false);
+                  moveFocusBeforeRightPanelCollapse();
+                  setRightPanelOpen(false);
                 }}
-                onOpen={() => setRightOpen(true)}
+                onOpen={() => setRightPanelOpen(true)}
                 onResize={(width) => {
                   setRightWidth(width);
                   if (contentRegionWidth > 0) {
@@ -417,21 +469,33 @@ export function LeftPanel({ children }: { children: ReactNode }) {
 export function ThreadWorkspace({
   children,
   composer,
+  workspaceKey,
 }: {
   children: ReactNode;
   composer?: ReactNode;
+  workspaceKey?: string;
 }) {
   const hasComposer = composer != null;
+  const contentFrameRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (workspaceKey == null || contentFrameRef.current == null) return;
+    contentFrameRef.current.scrollTop = workspaceScrollPositions.get(workspaceKey) ?? 0;
+  }, [workspaceKey]);
 
   return (
     <FocusArea area="thread-workspace" className="thread-workspace">
       <div className="main-content-viewport">
         <div
+          ref={contentFrameRef}
           className={
             hasComposer
               ? "main-content-frame codex-scrollbar"
               : "main-content-frame no-bottom-panel codex-scrollbar"
           }
+          onScroll={workspaceKey == null ? undefined : (event) => {
+            workspaceScrollPositions.set(workspaceKey, event.currentTarget.scrollTop);
+          }}
         >
           {children}
         </div>
@@ -932,7 +996,11 @@ function ResizeHandleSurface({
   );
 }
 
-function moveFocusBeforePanelCollapse(area: FocusAreaName, toggleSelector: string) {
+function moveFocusBeforePanelCollapse(
+  area: FocusAreaName,
+  toggleSelector: string,
+  preferredTarget?: HTMLElement | null,
+) {
   const panels = document.querySelectorAll<HTMLElement>(`[data-focus-area="${area}"]`);
   const resizerSelector = area === "left-panel"
     ? ".left-panel-resizer [role=\"separator\"]"
@@ -942,9 +1010,13 @@ function moveFocusBeforePanelCollapse(area: FocusAreaName, toggleSelector: strin
   const focusIsInsidePanel = [...panels].some((panel) => panel.contains(document.activeElement));
   const focusIsOnResizer = resizerSelector != null
     && document.activeElement?.matches(resizerSelector);
-  if (!focusIsInsidePanel && !focusIsOnResizer) return;
+  const focusIsOnToggle = document.activeElement?.matches(toggleSelector);
+  if (!focusIsInsidePanel && !focusIsOnResizer && !focusIsOnToggle) return;
 
-  const target = document.querySelector<HTMLElement>(toggleSelector)
+  const target = preferredTarget?.isConnected && preferredTarget.getClientRects().length > 0
+    ? preferredTarget
+    : [...document.querySelectorAll<HTMLElement>(toggleSelector)]
+    .find((element) => element !== document.activeElement && element.getClientRects().length > 0)
     ?? document.querySelector<HTMLElement>('[data-focus-area="thread-workspace"]');
   target?.focus();
 }
@@ -1004,6 +1076,35 @@ function writeStoredPanelRatio(key: string, width: number, mainContentWidth: num
     );
   } catch {
     // Layout persistence is a local convenience and must never block the shell.
+  }
+}
+
+function rememberedRightPanelState(states: Map<string, boolean>, stateKey: string, fallback: boolean) {
+  const memoryState = states.get(stateKey);
+  if (memoryState != null) return memoryState;
+  const storedState = readStoredRightPanelState(stateKey);
+  const resolvedState = storedState ?? fallback;
+  states.set(stateKey, resolvedState);
+  return resolvedState;
+}
+
+function readStoredRightPanelState(stateKey: string) {
+  try {
+    const stored = window.localStorage.getItem(`${RIGHT_PANEL_OPEN_KEY_PREFIX}${stateKey}`);
+    return stored === "open" ? true : stored === "closed" ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredRightPanelState(stateKey: string, open: boolean) {
+  try {
+    window.localStorage.setItem(
+      `${RIGHT_PANEL_OPEN_KEY_PREFIX}${stateKey}`,
+      open ? "open" : "closed",
+    );
+  } catch {
+    // Per-thread panel state is a local preference and must never block the shell.
   }
 }
 

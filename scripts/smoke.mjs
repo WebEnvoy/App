@@ -29,6 +29,9 @@ const identityEnvironmentFixturesSource = await readFile("src/renderer/identityE
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const shellPrimitivesSource = await readFile("src/renderer/shellPrimitives.tsx", "utf8");
+const workbenchPreferencesSource = await readFile("src/renderer/workbenchPreferences.ts", "utf8");
+const workbenchSidebarSource = await readFile("src/renderer/WorkbenchSidebar.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
@@ -237,6 +240,71 @@ if (
   throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
 
+if (
+  !workbenchSidebarSource.includes('id: "work"') ||
+  !workbenchSidebarSource.includes('id: "browser"') ||
+  !workbenchSidebarSource.includes('id: "library"') ||
+  !workbenchSidebarSource.includes("任务线程") ||
+  !workbenchSidebarSource.includes("按站点技能") ||
+  !workbenchSidebarSource.includes("按账号身份") ||
+  !workbenchSidebarSource.includes("最近更新") ||
+  !workbenchSidebarSource.includes("优先处理") ||
+  !workbenchSidebarSource.includes("task.updatedAt") ||
+  !workbenchSidebarSource.includes("context.siteSkillKey") ||
+  !workbenchSidebarSource.includes("context.accountIdentityKey") ||
+  !workbenchSidebarSource.includes("threadContext!.siteLabel") ||
+  workbenchSidebarSource.includes("ownerRef.includes") ||
+  !workbenchSidebarSource.includes('event.key === "Escape"') ||
+  !workbenchSidebarSource.includes('"ArrowDown"') ||
+  !workbenchSidebarSource.includes("onCreateTask")
+) {
+  throw new Error("Workbench shell smoke failed: approved domains or task-list organization controls are missing.");
+}
+
+if (
+  !appSource.includes("这次要让 WebEnvoy 完成什么？") ||
+  !appSource.includes("unavailableCoreThreadState") ||
+  appSource.includes("fetchCoreReadTaskState(") ||
+  appSource.includes("data-workbench-open-right")
+) {
+  throw new Error("Workbench truth-boundary smoke failed: create mode or owner-thread/right-preview boundaries regressed.");
+}
+
+const appSyntax = ts.createSourceFile("App.tsx", appSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const hasRuntimeTaskFixtureImport = appSyntax.statements.some((statement) =>
+  ts.isImportDeclaration(statement) &&
+  statement.moduleSpecifier.text === "./taskThreadFixtures" &&
+  statement.importClause?.isTypeOnly !== true,
+);
+if (
+  hasRuntimeTaskFixtureImport ||
+  !identityEnvironmentsPageSource.includes('identity.source === "Harbor live"') ||
+  !identityEnvironmentsPageSource.includes("mergeIdentityEnvironmentProjections(") ||
+  !identityEnvironmentsPageSource.includes("[],")
+) {
+  throw new Error("Workbench owner isolation smoke failed: production shell still depends on task or identity fixture rows.");
+}
+
+if (
+  !shellPrimitivesSource.includes("writeStoredRightPanelState") ||
+  !shellPrimitivesSource.includes("moveFocusBeforePanelCollapse(") ||
+  !shellPrimitivesSource.includes("[data-workbench-open-right]")
+) {
+  throw new Error("Workbench panel smoke failed: right-panel persistence or focus restoration is missing.");
+}
+
+if (
+  !workbenchPreferencesSource.includes("window.localStorage") ||
+  !shellPrimitivesSource.includes("RIGHT_PANEL_OPEN_KEY_PREFIX") ||
+  !shellPrimitivesSource.includes("workspaceScrollPositions") ||
+  !shellPrimitivesSource.includes('role="separator"') ||
+  !shellPrimitivesSource.includes('event.key === "ArrowRight"') ||
+  !shellPrimitivesSource.includes("prefers-reduced-motion: reduce") &&
+    !(await readFile("src/renderer/styles.css", "utf8")).includes("prefers-reduced-motion: reduce")
+) {
+  throw new Error("Workbench shell smoke failed: persisted layout, keyboard resize, or reduced-motion behavior is missing.");
+}
+
 if (!coreTaskSubmitClientSource.includes("intent_id: `intent_\${runId}`")) {
   throw new Error("Core task submit smoke failed: intent_id must remain a result-ref-safe opaque identifier.");
 }
@@ -245,8 +313,6 @@ for (const expectedText of [
   "Task Thread",
   "source-health",
   "WebEnvoy App 不作为运行事实真相源。",
-  "Read-only task creation entry",
-  "Missing owner source",
   "Core-owned run navigation",
   "outcome:",
   "success",
@@ -260,46 +326,27 @@ for (const expectedText of [
   "unknown",
   "Owner-supported action intent",
   "Evidence card only links owner viewer refs",
-  "Open evidence viewer link",
   "raw evidence body",
   "Capability package source attribution",
   "Capability attribution",
   "Failure class",
-  "Latest capability test",
-  "post_check_failed",
   "site_changed",
-  "Report broken",
-  "Repair drafts",
-  "local_signal_only",
-  "lode_public_fix_candidate",
   "Status",
   "Freshness",
   "Provenance",
   "evidence_expired",
   "Work failure links back to capability health",
-  "Library",
-  "启动只读任务",
-  "Core source blocked",
+  "站点技能",
   "Source ref",
   "Lock ref",
-  "lode://package/example-commerce-product-detail@0.4.2",
-  "lode://lock/example-commerce-product-detail/2026-07-03",
-  "已锁定",
-  "@lode/example-commerce-product-detail",
-  "lode://capability/example-commerce/product-detail",
   "Runtime session",
   "App 不使用无关本机浏览器现场代替任务现场",
   "direct Identity Runtime Session",
-  "not Core Task/Run/Result",
   "Write-pre preview",
   "真实页面写前验证",
-  "validate_only_preview",
-  "Validate contact form target and prepare a local preview without submitting.",
   "No-submit guard",
   "page_changed",
-  "Open preview evidence viewer link",
   "Risk and approval",
-  "action-request:fixture/preview-contact-form",
   "pending",
   "expired",
   "blocked",
@@ -330,7 +377,6 @@ for (const expectedText of [
   "手动身份浏览是 Browser/Harbor session，不是 Core 任务运行。",
   "推荐主力",
   "受限后备",
-  "缺少 CloakBrowser 会影响身份一致性和真实任务运行。",
   "默认打开首页/发现页",
   "默认打开职位入口",
   "控制者",
@@ -343,7 +389,6 @@ for (const expectedText of [
   "智能体直接浏览",
   "只有 Core task path 才产生任务运行、结果和 evidence。",
   "小红书运营号 A",
-  "BOSS 招聘号",
   "代理",
   "地区 / 语言",
   "时区",
@@ -355,17 +400,10 @@ for (const expectedText of [
   "Harbor 已接受认证完成确认",
   "不展示密码、验证码、Cookie、令牌",
   "小红书搜索和笔记读取",
-  "BOSS 搜索和职位详情读取",
   "小红书发布草稿写前验证",
   "BOSS 打招呼写前验证",
   "小红书发布草稿写前预览",
   "BOSS 打招呼写前预览",
-  "真实页面写前验证 / draft-only",
-  "真实页面写前验证 / message draft",
-  "真实页面写前验证已过期",
-  "真实页面写前验证已取消",
-  "action-request:fixture/xhs-publish-draft-preview-006",
-  "action-request:fixture/boss-greeting-preview-004",
   "审批请求",
   "过期请求",
   "取消记录",
@@ -373,17 +411,21 @@ for (const expectedText of [
   "未发送",
   "页面状态已过期",
   "记录取消意图",
-  "打开小红书写前证据",
-  "打开 BOSS 打招呼写前证据",
   "从身份浏览器会话启动真实只读任务",
   "字段来源",
-  "小红书笔记读取证据入口",
-  "BOSS 职位详情证据入口",
   "未登录",
   "验证码",
   "页面变化",
   "字段缺失",
-  "不打招呼、不投递、不发送消息",
+  "任务",
+  "账号身份",
+  "站点技能",
+  "任务线程",
+  "任务暂不可用",
+  "暂无任务线程",
+  "暂无账号身份",
+  "站点技能暂不可用",
+  "这次要让 WebEnvoy 完成什么？",
   "Runtime supervisor status",
   "生产运行已阻断",
   "fixture/demo 不作为可用结果",
@@ -683,6 +725,7 @@ const { outputText: runtimeSupervisorStateModuleSource } = ts.transpileModule(ru
   },
 });
 const runtimeSupervisorStateModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(runtimeSupervisorStateModuleSource)}`;
+const runtimeSupervisorStateModule = await import(runtimeSupervisorStateModuleUrl);
 const coreReadTaskClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`;
 const { outputText: coreTaskSubmitClientModuleSource } = ts.transpileModule(coreTaskSubmitClientSource, {
   compilerOptions: {
@@ -707,6 +750,40 @@ const coreTaskSubmitClientModule = await import(
       ),
   )}`
 );
+
+const runtimeGateProjection = runtimeSupervisorStateModule.projectRuntimeGatedTasks(
+  [{
+    id: "task-live-history",
+    title: "Live history",
+    accountIdentity: "Harbor identity",
+    siteSkill: "Owner capability",
+    businessInput: "owner input",
+    source: "Core live",
+    packageSource: {
+      name: "owner package",
+      version: "1",
+      capabilityRef: "lode:capability/owner",
+      sourceRef: "lode://site-capability/owner@1",
+      fetchedAt: "now",
+      source: "Core live",
+      boundary: "owner refs only",
+    },
+    runs: [
+      { id: "run-terminal", label: "terminal", lifecycle: "completed", outcome: "success", summary: "done", actionIntent: "none", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+      { id: "run-active", label: "active", lifecycle: "running", outcome: "unknown", summary: "running", actionIntent: "wait", owner: "Core", source: "Core live", resultRows: [], evidenceCards: [], process: [] },
+    ],
+  }],
+  runtimeSupervisorStateModule.runtimeSupervisorUnavailableState("offline"),
+  ["task-live-history"],
+);
+if (
+  runtimeGateProjection[0]?.source !== "Core live" ||
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "run-terminal") !== true ||
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "run-active") ||
+  runtimeGateProjection[0]?.runs.some((run) => run.id === "runtime-blocked-task-live-history") !== true
+) {
+  throw new Error("Runtime task projection smoke failed: terminal owner truth was overwritten or active work was unlocked.");
+}
 
 function installLocalStorage(entries = {}) {
   const store = new Map(Object.entries(entries));
