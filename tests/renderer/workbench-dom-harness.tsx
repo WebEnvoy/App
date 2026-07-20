@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { initialCoreTaskSubmitState } from "../../src/renderer/coreTaskSubmitClient";
+import { OwnerState } from "../../src/renderer/App";
 import {
   fetchCoreThreadState,
   retainLastKnownCoreThreads,
@@ -164,7 +165,7 @@ function WorkbenchDomHarness() {
     [selectedTask],
   );
 
-  if (!selectedTask || !selectedRun) return null;
+  if (!selectedTask) return null;
 
   return (
     <AppShell
@@ -205,7 +206,7 @@ function WorkbenchDomHarness() {
           </div>
         </header>
       )}
-      workspace={
+      workspace={selectedRun ? (
         <ThreadWorkspace workspaceKey={`work:${selectedTask.id}`}>
           <TaskThreadPage
             coreReadState={retainedState}
@@ -221,8 +222,12 @@ function WorkbenchDomHarness() {
             onOpenPreview={() => setRightPanelOpenRequestKey((key) => (key ?? 0) + 1)}
           />
         </ThreadWorkspace>
-      }
-      right={
+      ) : (
+        <ThreadWorkspace workspaceKey={`work:${selectedTask.id}`}>
+          <OwnerState title="暂无任务回合" summary="该线程已创建，尚未提交业务输入。" />
+        </ThreadWorkspace>
+      )}
+      right={selectedRun ? (
         <RightPanel>
           <TaskThreadRightPanel
             coreReadState={retainedState}
@@ -233,7 +238,7 @@ function WorkbenchDomHarness() {
             shellDiagnostics={{ colorScheme: "light", configScope: "local-ui-only", platform: "darwin" }}
           />
         </RightPanel>
-      }
+      ) : undefined}
     />
   );
 }
@@ -318,9 +323,17 @@ async function runDesktopChecks() {
       && appShell.dataset.rightPanelOpen === "true",
     "Task A did not restore its open right-panel state.",
   );
+  taskButton(emptyTaskId)?.click();
+  await waitFor(
+    () => document.body.textContent?.includes("暂无任务回合") === true &&
+      document.body.textContent?.includes("该线程已创建，尚未提交业务输入。") === true,
+    "Opening the empty owner thread did not render its business empty state.",
+  );
+  taskButton(taskAId)?.click();
+  await waitFor(() => Boolean(previewButton()), "Task A did not restore after the empty thread check.");
 
   return {
-    emptyThreadSidebar: true,
+    emptyThreadOpenState: true,
     ownerProjection: true,
     nonAppCreationChannel: true,
     runtimeFailClosed: true,

@@ -1,23 +1,10 @@
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
+import { parseCoreThreadInputSnapshot, type CoreThreadInputSnapshot } from "./coreThreadInputContract";
 import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 import { requestOwnerJson } from "./ownerApiClient";
 import type { OutcomeKind, RunProjection, TaskProjection } from "./taskThreadFixtures";
 
 type JsonRecord = Record<string, unknown>;
-
-type CoreThreadInputField = {
-  field_id: string;
-  kind: "scalar" | "url" | "long_text" | "file" | "attachment";
-  summary?: string;
-  owner_ref?: string;
-};
-
-type CoreThreadInputSnapshot = {
-  schema_version: "webenvoy.task-turn-input.v0";
-  fields: CoreThreadInputField[];
-  attachment_refs: string[];
-  consumer_boundary: string;
-};
 
 type CoreThreadTurn = {
   turn_id: string;
@@ -38,7 +25,18 @@ type CoreThreadTurn = {
     | "failed"
     | "cancelled"
     | "status_unknown";
-  run_status?: string;
+  run_status?:
+    | "pending"
+    | "admitted"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "blocked"
+    | "requires_user_action"
+    | "manual_recovery_required"
+    | "unknown_outcome"
+    | "cancelled"
+    | "expired";
   failure_code?: string;
   submission_error?: {
     category: string;
@@ -46,8 +44,15 @@ type CoreThreadTurn = {
     phase: string;
     recovery_hint: string;
   };
+  input_gaps?: CoreThreadInputGap[];
   terminal_at?: string;
   terminated_at?: string;
+};
+
+type CoreThreadInputGap = {
+  location: string;
+  code: "owner_ref_unavailable" | "owner_ref_check_unavailable";
+  recovery_action: "restore_owner_content" | "reselect_attachment" | "retry_owner_check";
 };
 
 type CoreThread = {
@@ -289,7 +294,7 @@ function creationChannelLabel(channel: CoreThreadTurn["creation_channel"]) {
 
 function parseCoreThreads(value: unknown): CoreThread[] | null {
   const envelope = asRecord(value);
-  if (envelope?.ok !== true || !Array.isArray(envelope.threads)) return null;
+  if (!envelope || !hasOnlyKeys(envelope, threadEnvelopeKeys) || envelope.ok !== true || !Array.isArray(envelope.threads)) return null;
   const parsed = envelope.threads.map(parseCoreThread);
   return parsed.every((thread): thread is CoreThread => thread != null) ? parsed : null;
 }
@@ -297,6 +302,8 @@ function parseCoreThreads(value: unknown): CoreThread[] | null {
 function parseCoreThread(value: unknown): CoreThread | null {
   const thread = asRecord(value);
   if (
+    !thread ||
+    !hasOnlyKeys(thread, threadKeys) ||
     thread?.schema_version !== "webenvoy.task-thread.v0" ||
     !isThreadId(thread.thread_id) ||
     !isCapabilityRef(thread.capability_ref) ||
@@ -312,10 +319,11 @@ function parseCoreThread(value: unknown): CoreThread | null {
 
 function parseCoreTurn(value: unknown): CoreThreadTurn | null {
   const turn = asRecord(value);
-  const input = parseInputSnapshot(turn?.input);
+  const input = parseCoreThreadInputSnapshot(turn?.input);
   if (
     !turn ||
-    !isString(turn.turn_id) ||
+    !hasOnlyKeys(turn, turnKeys) ||
+    !isTurnId(turn.turn_id) ||
     !Number.isInteger(turn.sequence) || Number(turn.sequence) < 1 ||
     !isString(turn.idempotency_key) ||
     !isString(turn.run_id) ||
@@ -324,135 +332,72 @@ function parseCoreTurn(value: unknown): CoreThreadTurn | null {
     !isDateTime(turn.created_at) ||
     !isDateTime(turn.updated_at) ||
     !isSubmissionState(turn.submission_state) ||
-    !isTurnStatus(turn.status)
+    !isTurnStatus(turn.status) ||
+    !isOptionalRunStatus(turn.run_status)
   ) return null;
   const submissionError = parseSubmissionError(turn.submission_error);
+  const inputGaps = parseInputGaps(turn.input_gaps);
   if (turn.submission_error !== undefined && submissionError == null) return null;
+  if (turn.input_gaps !== undefined && inputGaps == null) return null;
   if (
     !isOptionalString(turn.failure_code) ||
     !isOptionalDateTime(turn.terminal_at) ||
     !isOptionalDateTime(turn.terminated_at)
   ) return null;
-  return { ...turn, input, ...(submissionError ? { submission_error: submissionError } : {}) } as CoreThreadTurn;
-}
-
-function parseInputSnapshot(value: unknown): CoreThreadInputSnapshot | null {
-  const snapshot = asRecord(value);
-  if (
-    !snapshot ||
-    !hasOnlyKeys(snapshot, inputSnapshotKeys) ||
-    findPrivateField(snapshot) != null ||
-    snapshot.schema_version !== "webenvoy.task-turn-input.v0" ||
-    !Array.isArray(snapshot.fields) ||
-    snapshot.fields.length > 64 ||
-    (snapshot.attachment_refs !== undefined && !Array.isArray(snapshot.attachment_refs)) ||
-    (Array.isArray(snapshot.attachment_refs) && !snapshot.attachment_refs.every(isOwnerRef)) ||
-    snapshot.consumer_boundary !== "Core stores bounded field summaries and owner refs only; raw content remains with its owner."
-  ) return null;
-  const attachmentRefs = (snapshot.attachment_refs as string[] | undefined) ?? [];
-  if (attachmentRefs.length > 32 || new Set(attachmentRefs).size !== attachmentRefs.length) return null;
-  const fieldIds = new Set<string>();
-  const fields = snapshot.fields.map((fieldValue) => {
-    const field = asRecord(fieldValue);
-    if (
-      !field ||
-      !hasOnlyKeys(field, inputFieldKeys) ||
-      !isFieldId(field.field_id) ||
-      isPrivateFieldId(field.field_id) ||
-      fieldIds.has(field.field_id) ||
-      !isInputKind(field.kind) ||
-      !isValidInputField(field)
-    ) return null;
-    fieldIds.add(field.field_id);
-    return field as CoreThreadInputField;
-  });
-  return fields.every((field): field is CoreThreadInputField => field != null)
-    ? { ...snapshot, fields, attachment_refs: attachmentRefs } as CoreThreadInputSnapshot
-    : null;
+  return {
+    ...turn,
+    input,
+    ...(submissionError ? { submission_error: submissionError } : {}),
+    ...(inputGaps ? { input_gaps: inputGaps } : {}),
+  } as CoreThreadTurn;
 }
 
 function parseSubmissionError(value: unknown): CoreThreadTurn["submission_error"] | null {
   if (value === undefined) return undefined;
   const error = asRecord(value);
-  if (!error || !isString(error.category) || !isString(error.code) || !isString(error.phase) || !isString(error.recovery_hint)) return null;
+  if (
+    !error ||
+    !hasOnlyKeys(error, submissionErrorKeys) ||
+    !isBoundedText(error.category, 128) ||
+    !isBoundedText(error.code, 256) ||
+    !isBoundedText(error.phase, 128) ||
+    !isBoundedText(error.recovery_hint, 256)
+  ) return null;
   return error as CoreThreadTurn["submission_error"];
 }
 
-function isValidInputField(field: JsonRecord) {
-  const usesOwnerRef = field.kind === "long_text" || field.kind === "file" || field.kind === "attachment";
-  if (usesOwnerRef) return field.summary === undefined && isOwnerRef(field.owner_ref);
-  if (field.owner_ref !== undefined || !isBoundedSummary(field.summary)) return false;
-  return field.kind !== "url" || isPersistedPublicUrlSummary(field.summary);
+function parseInputGaps(value: unknown): CoreThreadInputGap[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+  const gaps = value.map((gapValue) => {
+    const gap = asRecord(gapValue);
+    return gap &&
+      hasOnlyKeys(gap, inputGapKeys) &&
+      typeof gap.location === "string" && /^(field:[A-Za-z0-9][A-Za-z0-9._:-]{0,255}|attachment:[0-9]+)$/.test(gap.location) &&
+      (gap.code === "owner_ref_unavailable" || gap.code === "owner_ref_check_unavailable") &&
+      (gap.recovery_action === "restore_owner_content" || gap.recovery_action === "reselect_attachment" || gap.recovery_action === "retry_owner_check")
+      ? gap as CoreThreadInputGap
+      : null;
+  });
+  return gaps.every((gap): gap is CoreThreadInputGap => gap != null) ? gaps : null;
 }
 
-const inputSnapshotKeys = new Set(["schema_version", "fields", "attachment_refs", "consumer_boundary"]);
-const inputFieldKeys = new Set(["field_id", "kind", "summary", "owner_ref"]);
-const privateFieldNames = new Set([
-  "cookie", "cookies", "token", "tokens", "password", "profile", "profile_path",
-  "storage", "storage_value", "dom", "har", "video", "raw_payload", "network_body",
-  "secret", "credential", "authorization", "auth", "api_key", "access_key",
-  "verification_code", "otp", "one_time_password", "passcode", "session_token",
+const threadEnvelopeKeys = new Set(["ok", "threads"]);
+const threadKeys = new Set([
+  "schema_version", "thread_id", "capability_ref", "identity_environment_ref", "created_at", "updated_at", "turns",
 ]);
-const privateFieldIdFragments = [
-  "cookie", "token", "password", "secret", "credential", "authorization",
-  "apikey", "accesskey", "profilepath", "storagevalue", "rawpayload", "networkbody",
-  "verificationcode", "onetimepassword", "passcode", "sessiontoken",
-];
-
+const turnKeys = new Set([
+  "turn_id", "sequence", "idempotency_key", "run_id", "creation_channel", "input", "created_at", "updated_at",
+  "submission_state", "failure_code", "submission_error", "terminated_at", "terminal_at", "status", "run_status", "input_gaps",
+]);
+const submissionErrorKeys = new Set(["category", "code", "phase", "recovery_hint"]);
+const inputGapKeys = new Set(["location", "code", "recovery_action"]);
 function hasOnlyKeys(value: JsonRecord, allowed: ReadonlySet<string>) {
   return Object.keys(value).every((key) => allowed.has(key));
 }
 
-function findPrivateField(value: unknown): string | undefined {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findPrivateField(item);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  const record = asRecord(value);
-  if (!record) return undefined;
-  for (const [key, child] of Object.entries(record)) {
-    if (privateFieldNames.has(key.toLowerCase())) return key;
-    const found = findPrivateField(child);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-function isPrivateFieldId(fieldId: string) {
-  const segments = fieldId.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  const normalized = fieldId.toLowerCase().replaceAll(/[^a-z0-9]/g, "");
-  return privateFieldNames.has(fieldId.toLowerCase()) ||
-    segments.some((segment) => segment === "auth" || segment === "otp") ||
-    privateFieldIdFragments.some((name) => normalized.includes(name));
-}
-
-function isBoundedSummary(value: unknown): value is string {
-  return typeof value === "string" && value.length >= 1 && value.length <= 512;
-}
-
-function isPersistedPublicUrlSummary(value: string) {
-  try {
-    const url = new URL(value);
-    return (url.protocol === "http:" || url.protocol === "https:") &&
-      !url.username && !url.password && !url.search && !url.hash;
-  } catch {
-    return false;
-  }
-}
-
-function isInputKind(value: unknown): value is CoreThreadInputField["kind"] {
-  return value === "scalar" || value === "url" || value === "long_text" || value === "file" || value === "attachment";
-}
-
-function isFieldId(value: unknown): value is string {
-  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value);
-}
-
-function isOwnerRef(value: unknown): value is string {
-  return typeof value === "string" && /^(attachment|draft|owner):[A-Za-z0-9][A-Za-z0-9._~:/%-]{0,2047}$/.test(value);
+function isBoundedText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= maximum;
 }
 
 function isOptionalString(value: unknown): value is string | undefined {
@@ -461,6 +406,10 @@ function isOptionalString(value: unknown): value is string | undefined {
 
 function isThreadId(value: unknown): value is string {
   return typeof value === "string" && /^thread_[a-f0-9]{32}$/.test(value);
+}
+
+function isTurnId(value: unknown): value is string {
+  return typeof value === "string" && /^turn_[a-f0-9]{32}$/.test(value);
 }
 
 function isCapabilityRef(value: unknown): value is string {
@@ -472,7 +421,15 @@ function isIdentityEnvironmentRef(value: unknown): value is string {
 }
 
 function isDateTime(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && Number.isFinite(Date.parse(value));
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1];
 }
 
 function isOptionalDateTime(value: unknown): value is string | undefined {
@@ -497,4 +454,8 @@ function isSubmissionState(value: unknown): value is CoreThreadTurn["submission_
 
 function isTurnStatus(value: unknown): value is CoreThreadTurn["status"] {
   return value === "submitting" || value === "accepted" || value === "running" || value === "waiting_for_user" || value === "completed" || value === "failed" || value === "cancelled" || value === "status_unknown";
+}
+
+function isOptionalRunStatus(value: unknown): value is CoreThreadTurn["run_status"] {
+  return value === undefined || value === "pending" || value === "admitted" || value === "running" || value === "succeeded" || value === "failed" || value === "blocked" || value === "requires_user_action" || value === "manual_recovery_required" || value === "unknown_outcome" || value === "cancelled" || value === "expired";
 }

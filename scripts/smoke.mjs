@@ -26,6 +26,7 @@ const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
 const coreThreadClientSource = await readFile("src/renderer/coreThreadClient.ts", "utf8");
+const coreThreadInputContractSource = await readFile("src/renderer/coreThreadInputContract.ts", "utf8");
 const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
@@ -716,6 +717,13 @@ const coreReadTaskClientModuleRewritten = coreReadTaskClientModuleSource.replace
 const coreReadTaskClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(coreReadTaskClientModuleRewritten)}`
 );
+const { outputText: coreThreadInputContractModuleSource } = ts.transpileModule(coreThreadInputContractSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const coreThreadInputContractModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(coreThreadInputContractModuleSource)}`;
 const { outputText: coreThreadClientModuleSource } = ts.transpileModule(coreThreadClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -725,6 +733,10 @@ const { outputText: coreThreadClientModuleSource } = ts.transpileModule(coreThre
 const coreThreadClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(
     coreThreadClientModuleSource
+      .replace(
+        'from "./coreThreadInputContract";',
+        `from "${coreThreadInputContractModuleUrl}";`,
+      )
       .replace(
         'from "./ownerPayloadGuards";',
         `from "${ownerPayloadGuardsModuleUrl}";`,
@@ -764,6 +776,8 @@ const validCoreThreadEnvelope = {
           updated_at: "2026-07-20T08:02:00.000Z",
           submission_state: "accepted",
           status: "completed",
+          run_status: "succeeded",
+          input_gaps: [],
           terminal_at: "2026-07-20T08:02:00.000Z",
         },
         {
@@ -839,6 +853,38 @@ for (const input of invalidInputSnapshots) {
   const invalidInputState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
   if (invalidInputState.status !== "offline") {
     throw new Error(`Core thread input smoke failed: malformed persisted input was accepted: ${JSON.stringify(input)}`);
+  }
+}
+const validThread = validCoreThreadEnvelope.threads[0];
+const validTurn = validThread.turns[0];
+const invalidThreadEnvelopes = [
+  { ...validCoreThreadEnvelope, unexpected: true },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, unexpected: true }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, created_at: "2026-02-31T00:00:00Z" }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, turn_id: "turn_invalid" }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, unexpected: true }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{ ...validTurn, run_status: "completed" }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{
+    ...validTurn,
+    submission_error: { category: "runtime", code: "failure", phase: "submit", recovery_hint: "retry", unexpected: true },
+  }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{
+    ...validTurn,
+    submission_error: { category: "x".repeat(129), code: "failure", phase: "submit", recovery_hint: "retry" },
+  }] }] },
+  { ...validCoreThreadEnvelope, threads: [{ ...validThread, turns: [{
+    ...validTurn,
+    input_gaps: [{ location: "cookie:0", code: "owner_ref_unavailable", recovery_action: "restore_owner_content" }],
+  }] }] },
+];
+for (const envelope of invalidThreadEnvelopes) {
+  globalThis.fetch = async () => new Response(JSON.stringify(envelope), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+  const invalidOuterState = await coreThreadClientModule.fetchCoreThreadState("http://core.test");
+  if (invalidOuterState.status !== "offline") {
+    throw new Error(`Core thread v0 smoke failed: malformed outer projection was accepted: ${JSON.stringify(envelope)}`);
   }
 }
 globalThis.fetch = previousFetchForThreadSmoke;

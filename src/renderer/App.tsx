@@ -737,7 +737,7 @@ function CreateTaskShell({
   );
 }
 
-function OwnerState({ title, summary, onRecover }: { title: string; summary: string; onRecover?: () => void }) {
+export function OwnerState({ title, summary, onRecover }: { title: string; summary: string; onRecover?: () => void }) {
   return (
     <section className="owner-state" role="status">
       <RefreshCw size={20} aria-hidden="true" />
