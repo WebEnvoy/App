@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { readBoundedJsonResponse } from "../../src/electron/boundedJsonResponse";
+import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../../src/electron/boundedJsonResponse";
 import { identityEnvironmentFixtures } from "../../src/renderer/identityEnvironmentFixtures";
 import {
   createSkillIdentityCompatibilityRequest,
   parseSkillIdentityCompatibilityResponse,
 } from "../../src/renderer/coreIdentityCompatibilityClient";
-import type { LodeCatalogLoadState, LodeCatalogSkill } from "../../src/renderer/lodeCatalogClient";
+import {
+  projectLodeCatalogDisplayCache,
+  type LodeCatalogLoadState,
+  type LodeCatalogSkill,
+} from "../../src/renderer/lodeCatalogClient";
+import { createLatestRequestGate } from "../../src/renderer/latestRequestGate";
 import type { RuntimeSupervisorState } from "../../src/renderer/runtimeSupervisorState";
 import { SiteSkillLibrary } from "../../src/renderer/SiteSkillPages";
 import "../../src/renderer/uiFoundation.css";
@@ -54,12 +59,19 @@ const bossSkill: LodeCatalogSkill = {
   ...xhsSkill,
   id: "lode://site-capability/boss/job-search@0.1.0",
   packageRef: "lode://site-capability/boss/job-search@0.1.0",
+  lockRef: "lode://lock/site-capability/boss/job-search@0.1.0",
   siteSlug: "boss",
   siteName: "BOSS",
   name: "Search jobs",
-  availability: "incompatible",
-  availabilityReason: "缺少业务动作声明，已停止使用。",
-  actions: [],
+  availability: "available",
+  availabilityReason: "输入、输出与业务动作声明可用。",
+  actions: [{
+    ...xhsSkill.actions[0]!,
+    id: "boss_job_search",
+    supportedOrigins: ["https://www.zhipin.com"],
+    resourceRequirementRef: "boss.job-search.resources",
+    resourceRequirementProfileIds: ["job-search-logged-in-ready-page"],
+  }],
 };
 const detailSkill: LodeCatalogSkill = {
   ...xhsSkill,
@@ -126,6 +138,7 @@ function Harness() {
         identities={[identity, identityB]}
         runtimeSupervisorState={runtime}
         onCreateIdentity={() => setSelection("create-identity")}
+        onNavigation={() => {}}
         onUse={(skill, identityId) => setSelection(`${skill.packageRef}:${identityId}`)}
       />
       <output data-library-selection="">{selection}</output>
@@ -181,7 +194,11 @@ window.__runLibraryDomSmoke = async (mode) => {
       status: "unknown_until_runtime",
       reason_codes: ["runtime_facts_require_task_admission"],
       missing_requirement_categories: ["runtime_facts"],
-      fact_freshness: [],
+      fact_freshness: [{
+        fact_key: "runtime.execution_surface.available",
+        required_freshness: "current_execution_window",
+        state: "unknown_until_runtime",
+      }],
       owner_status: { lode: "available", harbor: "available" },
       freshness: { state: "fresh", observed_at: "2026-07-20T00:00:00.000Z", age_ms: 0 },
       recovery_action: "retry_at_task_submission",
@@ -190,6 +207,10 @@ window.__runLibraryDomSmoke = async (mode) => {
   };
   const compatibilityNow = Date.parse("2026-07-20T00:00:30.000Z");
   const parsedCompatibility = parseSkillIdentityCompatibilityResponse(compatibilityResponse, compatibilityRequest, compatibilityNow);
+  const rejectsCandidate = (candidate: Record<string, unknown>) => parseSkillIdentityCompatibilityResponse({
+    ...compatibilityResponse,
+    candidates: [{ ...compatibilityResponse.candidates[0], ...candidate }],
+  }, compatibilityRequest, compatibilityNow) === null;
   const malformedCompatibility = parseSkillIdentityCompatibilityResponse({
     ...compatibilityResponse,
     candidates: [{ ...compatibilityResponse.candidates[0], credential: "forbidden" }],
@@ -206,11 +227,49 @@ window.__runLibraryDomSmoke = async (mode) => {
     ...compatibilityResponse,
     generated_at: "2026-07-19T00:00:00.000Z",
   }, compatibilityRequest, compatibilityNow);
+  const invalidCrossConstraints = [
+    rejectsCandidate({ status: "compatible", missing_requirement_categories: ["runtime_facts"], recovery_action: "none" }),
+    rejectsCandidate({ status: "compatible", fact_freshness: [{
+      fact_key: "runtime.execution_surface.available",
+      required_freshness: "current_execution_window",
+      state: "missing",
+    }], missing_requirement_categories: [], recovery_action: "none" }),
+    rejectsCandidate({ status: "compatible", missing_requirement_categories: [], fact_freshness: [], recovery_action: "retry_at_task_submission" }),
+    rejectsCandidate({ status: "unknown_until_runtime", fact_freshness: [] }),
+    rejectsCandidate({ status: "unknown_until_runtime", recovery_action: "none" }),
+    rejectsCandidate({
+      status: "incompatible",
+      reason_codes: ["harbor_owner_unavailable"],
+      missing_requirement_categories: ["owner_contract"],
+      fact_freshness: [],
+      owner_status: { lode: "available", harbor: "unavailable" },
+      freshness: { state: "unavailable", observed_at: "2026-07-20T00:00:00.000Z", age_ms: 0 },
+      recovery_action: "connect_identity_environment",
+    }),
+    rejectsCandidate({ freshness: { state: "fresh", observed_at: "2026-07-20T00:00:00.000Z", age_ms: 60_000 } }),
+  ].every(Boolean);
+  const cacheProjection = projectLodeCatalogDisplayCache({
+    ...catalog,
+    credential: "top-secret",
+    skills: [{
+      ...xhsSkill,
+      token: "skill-secret",
+      inputFields: [{ ...xhsSkill.inputFields[0]!, token: "field-secret" }],
+      resultView: { ...xhsSkill.resultView, token: "view-secret" },
+      actions: [{ ...xhsSkill.actions[0]!, token: "action-secret" }],
+    }],
+  } as LodeCatalogLoadState);
+  const cacheJson = JSON.stringify(cacheProjection);
+  const requestGate = createLatestRequestGate();
+  const supersededRequest = requestGate.begin();
+  const latestRequest = requestGate.begin();
+  const requestGateSuperseded = supersededRequest.signal.aborted && !supersededRequest.isCurrent() && latestRequest.isCurrent();
+  requestGate.invalidate();
   let oversizedCancelled = false;
   await readBoundedJsonResponse(new Response(new ReadableStream<Uint8Array>({
     start(controller) { controller.enqueue(new Uint8Array(64 * 1024 + 1)); },
     cancel() { oversizedCancelled = true; },
-  }), { headers: { "content-type": "application/json" } })).then(
+  }), { headers: { "content-type": "application/json" } }), ownerApiResponseMaxBytes("/identity-compatibility-preview")).then(
     () => { throw new Error("Oversized owner response was accepted."); },
     () => undefined,
   );
@@ -218,17 +277,41 @@ window.__runLibraryDomSmoke = async (mode) => {
     !bodyText.includes("发现站点技能") ||
     bodyText.includes("示例技能") ||
     !xhsRow ||
-    bossUse?.disabled !== true ||
+    bossUse?.disabled !== (mode === "stale") ||
     (mode === "stale" && xhsUse?.disabled !== true) ||
     contentBrowseFilters.length !== 1 ||
     parsedCompatibility?.[0]?.status !== "unknown_until_runtime" ||
     malformedCompatibility !== null ||
     staleOwnerCompatibility !== null ||
     expiredCompatibility !== null ||
+    !invalidCrossConstraints ||
+    /secret|credential|token/.test(cacheJson) ||
+    !requestGateSuperseded || latestRequest.isCurrent() ||
+    ownerApiResponseMaxBytes("/identity-compatibility-preview") !== 64 * 1024 ||
+    ownerApiResponseMaxBytes("/threads") <= 64 * 1024 ||
+    ownerApiResponseMaxBytes("/runs/run-id/result") <= ownerApiResponseMaxBytes("/threads") / 2 ||
+    ownerApiResponseMaxBytes("/runtime/identity-environments") <= 64 * 1024 ||
     !oversizedCancelled ||
     (mode === "narrow" && searchHeight > 50)
   ) {
-    throw new Error("Library directory did not render owner skills or fail closed for the incompatible skill.");
+    throw new Error(`Library directory did not render owner skills or fail closed: ${JSON.stringify({
+      hasExpectedCopy: bodyText.includes("发现站点技能"),
+      hasSample: bodyText.includes("示例技能"),
+      hasXhsRow: Boolean(xhsRow),
+      bossDisabled: bossUse?.disabled,
+      xhsDisabled: xhsUse?.disabled,
+      contentBrowseFilterCount: contentBrowseFilters.length,
+      parsedStatus: parsedCompatibility?.[0]?.status,
+      malformedAccepted: malformedCompatibility !== null,
+      staleAccepted: staleOwnerCompatibility !== null,
+      expiredAccepted: expiredCompatibility !== null,
+      invalidCrossConstraints,
+      cacheJson,
+      requestGateSuperseded,
+      latestStillCurrent: latestRequest.isCurrent(),
+      oversizedCancelled,
+      searchHeight,
+    })}`);
   }
   if (mode === "stale") return { mode, staleCreateDisabled: true };
   xhsRow.click();

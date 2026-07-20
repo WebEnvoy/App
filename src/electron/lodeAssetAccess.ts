@@ -10,7 +10,7 @@ import {
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-const maxLodeJsonFileBytes = 2 * 1024 * 1024;
+const maxLodeAssetFileBytes = 2 * 1024 * 1024;
 const maxLodeCatalogBytes = 16 * 1024 * 1024;
 
 export type LodeReadBudget = { remainingBytes: number };
@@ -56,35 +56,38 @@ export function readLodeJsonObject(filePath: string, budget?: LodeReadBudget): R
   return readLodeJson(filePath, budget).value;
 }
 
-export function readLodeJsonObjectWithSha256(filePath: string, budget?: LodeReadBudget) {
-  const result = readLodeJson(filePath, budget);
-  return { value: result.value, sha256: createHash("sha256").update(result.bytes).digest("hex") };
+export function readLodeAssetSha256(filePath: string, budget?: LodeReadBudget) {
+  return createHash("sha256").update(readLodeBytes(filePath, budget)).digest("hex");
 }
 
 function readLodeJson(filePath: string, budget?: LodeReadBudget) {
-  if (!lstatSync(filePath).isFile()) throw new Error(`Non-file Lode JSON asset: ${filePath}`);
+  const bytes = readLodeBytes(filePath, budget);
+  const value = JSON.parse(bytes.toString("utf8")) as unknown;
+  if (!isRecord(value)) throw new Error(`Invalid Lode JSON object: ${filePath}`);
+  return { value, bytes };
+}
+
+function readLodeBytes(filePath: string, budget?: LodeReadBudget) {
+  if (!lstatSync(filePath).isFile()) throw new Error(`Non-file Lode asset: ${filePath}`);
   const descriptor = openSync(
     filePath,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
   );
   try {
     const stats = fstatSync(descriptor);
-    if (!stats.isFile()) throw new Error(`Non-file Lode JSON asset: ${filePath}`);
+    if (!stats.isFile()) throw new Error(`Non-file Lode asset: ${filePath}`);
     const size = stats.size;
-    if (size > maxLodeJsonFileBytes) throw new Error(`Oversized Lode JSON file: ${filePath}`);
-    const contents = Buffer.allocUnsafe(maxLodeJsonFileBytes + 1);
+    if (size > maxLodeAssetFileBytes) throw new Error(`Oversized Lode asset: ${filePath}`);
+    const contents = Buffer.allocUnsafe(maxLodeAssetFileBytes + 1);
     const bytesRead = readSync(descriptor, contents, 0, contents.length, 0);
-    if (bytesRead > maxLodeJsonFileBytes) throw new Error(`Oversized Lode JSON file: ${filePath}`);
+    if (bytesRead > maxLodeAssetFileBytes) throw new Error(`Oversized Lode asset: ${filePath}`);
     if (budget != null) {
       if (bytesRead > budget.remainingBytes) {
         throw new LodeReadBudgetExceededError("Lode catalog exceeds the supported read budget.");
       }
       budget.remainingBytes -= bytesRead;
     }
-    const bytes = contents.subarray(0, bytesRead);
-    const value = JSON.parse(bytes.toString("utf8")) as unknown;
-    if (!isRecord(value)) throw new Error(`Invalid Lode JSON object: ${filePath}`);
-    return { value, bytes };
+    return contents.subarray(0, bytesRead);
   } finally {
     closeSync(descriptor);
   }

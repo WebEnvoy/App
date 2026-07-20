@@ -18,12 +18,14 @@ export const loadingLodeCatalogState: LodeCatalogLoadState = {
   skills: [],
 };
 
-export async function fetchLodeCatalog(): Promise<LodeCatalogLoadState> {
+export async function fetchLodeCatalog(signal?: AbortSignal): Promise<LodeCatalogLoadState> {
   const readCatalog = window.webenvoyShell?.getLodeCatalog;
   if (readCatalog == null) return cachedOrOffline("站点技能目录接口暂不可用。");
 
   try {
+    signal?.throwIfAborted();
     const state = await readCatalog();
+    signal?.throwIfAborted();
     if (!isCatalogState(state)) return cachedOrOffline("站点技能目录返回了不兼容的数据。");
     if (state.status !== "ready") return cachedOrOffline(state.summary);
 
@@ -35,7 +37,7 @@ export async function fetchLodeCatalog(): Promise<LodeCatalogLoadState> {
       skills: state.skills,
     };
     try {
-      window.localStorage.setItem(cacheKey, JSON.stringify(displayCache(readyState)));
+      window.localStorage.setItem(cacheKey, JSON.stringify(projectLodeCatalogDisplayCache(readyState)));
     } catch {
       // A display cache failure must not hide the live owner response.
     }
@@ -81,28 +83,63 @@ function cachedOrOffline(summary: string): LodeCatalogLoadState {
       };
 }
 
-function displayCache(state: LodeCatalogLoadState): LodeCatalogLoadState {
+export function projectLodeCatalogDisplayCache(state: LodeCatalogLoadState): LodeCatalogLoadState {
   return {
-    ...state,
+    status: state.status,
+    fetchedAt: state.fetchedAt,
+    source: state.source,
+    summary: state.summary,
     skills: state.skills.map((skill) => ({
-      ...skill,
-      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options }) => ({
+      id: skill.id,
+      packageRef: skill.packageRef,
+      ...(skill.lockRef === undefined ? {} : { lockRef: skill.lockRef }),
+      siteSlug: skill.siteSlug,
+      siteName: skill.siteName,
+      name: skill.name,
+      summary: skill.summary,
+      category: skill.category,
+      version: skill.version,
+      latestVersion: skill.latestVersion,
+      lifecycle: skill.lifecycle,
+      facets: [...skill.facets],
+      sourceHealth: skill.sourceHealth,
+      updatedAt: skill.updatedAt,
+      availability: skill.availability,
+      availabilityReason: skill.availabilityReason,
+      inputSchemaId: skill.inputSchemaId,
+      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options, defaultValue, minimum, maximum }) => ({
         id,
         label,
         kind,
         required,
         description,
-        options,
+        ...(options === undefined ? {} : { options: [...options] }),
+        ...(defaultValue === undefined ? {} : { defaultValue }),
+        ...(minimum === undefined ? {} : { minimum }),
+        ...(maximum === undefined ? {} : { maximum }),
       })),
-      actions: skill.actions.map(({ id, category, operationMode, resourceRequirementRef, resourceRequirementProfileIds }) => ({
+      outputSchemaId: skill.outputSchemaId,
+      outputKind: skill.outputKind,
+      resultView: skill.resultView.mode === "standard"
+        ? { mode: "standard", fallback: "standard_renderer", reason: skill.resultView.reason }
+        : {
+            mode: "skill",
+            fallback: "standard_renderer",
+            declarationVersion: skill.resultView.declarationVersion,
+            viewId: skill.resultView.viewId,
+            viewVersion: skill.resultView.viewVersion,
+            resourceRef: skill.resultView.resourceRef,
+            lockRef: skill.resultView.lockRef,
+          },
+      actions: skill.actions.map(({ id, category, operationMode, targetTypes, supportedOrigins, externalEffects, resourceRequirementRef, resourceRequirementProfileIds }) => ({
         id,
         category,
         operationMode,
-        targetTypes: [],
-        supportedOrigins: [],
-        externalEffects: [],
+        targetTypes: [...targetTypes],
+        supportedOrigins: [...supportedOrigins],
+        externalEffects: [...externalEffects],
         resourceRequirementRef,
-        resourceRequirementProfileIds,
+        resourceRequirementProfileIds: [...resourceRequirementProfileIds],
       })),
     })),
   };
@@ -119,7 +156,7 @@ function readCache(): LodeCatalogLoadState | null {
 }
 
 function isCatalogState(value: unknown): value is WebEnvoyLodeCatalogState {
-  return isRecord(value) &&
+  return isRecord(value) && hasOnlyKeys(value, ["status", "fetchedAt", "source", "summary", "skills"]) &&
     (value.status === "ready" || value.status === "unavailable") &&
     isString(value.fetchedAt) &&
     isCatalogSource(value.source) &&
@@ -129,7 +166,7 @@ function isCatalogState(value: unknown): value is WebEnvoyLodeCatalogState {
 }
 
 function isLoadState(value: unknown): value is LodeCatalogLoadState {
-  return isRecord(value) &&
+  return isRecord(value) && hasOnlyKeys(value, ["status", "fetchedAt", "source", "summary", "skills"]) &&
     ["loading", "ready", "stale", "offline"].includes(String(value.status)) &&
     isString(value.fetchedAt) &&
     isCatalogSource(value.source) &&
@@ -140,6 +177,13 @@ function isLoadState(value: unknown): value is LodeCatalogLoadState {
 
 function isSkill(value: unknown): value is LodeCatalogSkill {
   if (!isRecord(value)) return false;
+  const requiredKeys = [
+    "id", "packageRef", "siteSlug", "siteName", "name", "summary", "category", "version", "latestVersion",
+    "lifecycle", "facets", "sourceHealth", "updatedAt", "availability", "availabilityReason", "inputSchemaId",
+    "inputFields", "outputSchemaId", "outputKind", "resultView", "actions",
+  ];
+  if (!Object.keys(value).every((key) => key === "lockRef" || requiredKeys.includes(key)) ||
+    !requiredKeys.every((key) => Object.hasOwn(value, key))) return false;
   const stringsValid = [
     "id",
     "packageRef",
@@ -172,8 +216,11 @@ function isSkill(value: unknown): value is LodeCatalogSkill {
 
 function isResultView(value: unknown): value is WebEnvoyLodeCatalogResultView {
   if (!isRecord(value) || value.fallback !== "standard_renderer") return false;
-  if (value.mode === "standard") return value.reason === "not_declared" || value.reason === "incompatible";
-  return value.mode === "skill" &&
+  if (value.mode === "standard") return hasOnlyKeys(value, ["mode", "fallback", "reason"]) &&
+    (value.reason === "not_declared" || value.reason === "incompatible");
+  return value.mode === "skill" && hasOnlyKeys(value, [
+    "mode", "fallback", "declarationVersion", "viewId", "viewVersion", "resourceRef", "lockRef",
+  ]) &&
     value.declarationVersion === "0.1.0" &&
     isString(value.viewId) &&
     isString(value.viewVersion) &&
@@ -186,7 +233,9 @@ function isCatalogSource(value: unknown): value is WebEnvoyLodeAssetBundleState[
 }
 
 function isField(value: unknown): value is WebEnvoyLodeCatalogField {
-  return isRecord(value) &&
+  return isRecord(value) && Object.keys(value).every((key) => [
+    "id", "label", "kind", "required", "description", "options", "defaultValue", "minimum", "maximum",
+  ].includes(key)) &&
     isString(value.id) &&
     isString(value.label) &&
     ["text", "number", "boolean", "select", "unknown"].includes(String(value.kind)) &&
@@ -199,7 +248,10 @@ function isField(value: unknown): value is WebEnvoyLodeCatalogField {
 }
 
 function isAction(value: unknown): value is WebEnvoyLodeCatalogAction {
-  return isRecord(value) &&
+  return isRecord(value) && hasOnlyKeys(value, [
+    "id", "category", "operationMode", "targetTypes", "supportedOrigins", "externalEffects",
+    "resourceRequirementRef", "resourceRequirementProfileIds",
+  ]) &&
     isString(value.id) &&
     ["read", "prepare", "commit", "destructive"].includes(String(value.category)) &&
     ["read", "validate_only", "draft", "preview"].includes(String(value.operationMode)) &&
@@ -224,4 +276,8 @@ function isText(value: unknown): value is string {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }

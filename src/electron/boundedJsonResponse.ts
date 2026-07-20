@@ -1,6 +1,17 @@
-const defaultMaxBytes = 64 * 1024;
+const kibibyte = 1024;
 
-export async function readBoundedJsonResponse(response: Response, maxBytes = defaultMaxBytes): Promise<unknown> {
+export function ownerApiResponseMaxBytes(path: string) {
+  const pathname = path.split("?", 1)[0] ?? path;
+  if (pathname === "/identity-compatibility-preview") return 64 * kibibyte;
+  if (pathname === "/threads") return 2 * 1024 * kibibyte;
+  if (/^\/runs\/[^/]+\/result$/.test(pathname)) return 2 * 1024 * kibibyte;
+  if (/^\/runs\/[^/]+(?:\/[^/]+)?$/.test(pathname)) return 512 * kibibyte;
+  if (pathname.includes("identity-environment") || pathname.includes("browser-provider")) return 1024 * kibibyte;
+  if (pathname === "/tasks") return 256 * kibibyte;
+  return 256 * kibibyte;
+}
+
+export async function readBoundedJsonResponse(response: Response, maxBytes: number): Promise<unknown> {
   const mediaType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
   if (mediaType !== "application/json") {
     await cancel(response);

@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { readBoundedJsonResponse } from "./boundedJsonResponse.js";
+import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "./boundedJsonResponse.js";
 import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
 import { readLodeCatalog } from "./lodeCatalog.js";
 import {
@@ -16,6 +16,7 @@ import {
   isHarborSupervisorProtectedRequest,
   ownerApiTimeoutMs,
   parseOwnerApiRequest,
+  projectOwnerApiError,
   type OwnerApiJsonRequest,
 } from "./ownerApiRequest.js";
 
@@ -528,9 +529,15 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
       ...(parsed.body === undefined ? {} : { body: JSON.stringify(parsed.body) }),
       signal: controller.signal,
     });
-    const json = await readBoundedJsonResponse(response);
+    const json = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(parsed.path));
     if (!response.ok) {
-      return { ok: false, status: response.status, error: `${parsed.path} returned ${response.status}`, body: json };
+      const projectedError = projectOwnerApiError(json);
+      return {
+        ok: false,
+        status: response.status,
+        error: `${parsed.path} returned ${response.status}`,
+        ...(projectedError == null ? {} : { body: { error: projectedError } }),
+      };
     }
     return { ok: true, status: response.status, body: json ?? {} };
   } catch (error) {

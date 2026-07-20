@@ -75,7 +75,7 @@ export function CreateTaskShell({
         ) : (
           <div className="create-task-recommendations" aria-label="推荐的账号身份与站点技能组合">
             {combinations.map(({ skill, identity, candidate }) => {
-              const unavailable = skill.availability !== "available" || skill.siteSlug === "boss" || !runtimeSupervisorState.canUseLiveRuntime;
+              const unavailable = skill.availability !== "available" || !runtimeSupervisorState.canUseLiveRuntime;
               return (
                 <button
                   type="button"

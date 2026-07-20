@@ -94,6 +94,7 @@ export async function fetchSkillIdentityCompatibility(
   coreEndpoint: string,
   skill: LodeCatalogSkill,
   identityEnvironmentRefs: string[],
+  signal?: AbortSignal,
 ): Promise<SkillIdentityCompatibilityState> {
   const refs = [...new Set(identityEnvironmentRefs.filter((value) => value.length > 0))];
   if (refs.length === 0) {
@@ -109,6 +110,7 @@ export async function fetchSkillIdentityCompatibility(
         method: "POST",
         body: request,
         timeoutMs: 2500,
+        signal,
       });
     } catch {
       return unavailableSkillIdentityCompatibility("Core 暂时无法检查账号身份兼容性。");
@@ -172,7 +174,8 @@ export function parseSkillIdentityCompatibilityResponse(
     value.consumer_boundary !== consumerBoundary || !isFreshTimestamp(value.generated_at, now) || !Array.isArray(value.candidates) ||
     value.candidates.length !== request.identity_environment_refs.length
   ) return null;
-  const candidates = value.candidates.flatMap(parseCandidate);
+  const generatedAt = Date.parse(value.generated_at as string);
+  const candidates = value.candidates.flatMap((candidate) => parseCandidate(candidate, generatedAt, now));
   if (candidates.length !== value.candidates.length) return null;
   const expectedRefs = new Set(request.identity_environment_refs);
   if (new Set(candidates.map((candidate) => candidate.identityEnvironmentRef)).size !== candidates.length) return null;
@@ -180,18 +183,21 @@ export function parseSkillIdentityCompatibilityResponse(
   return candidates;
 }
 
-function parseCandidate(value: unknown): IdentityCompatibilityCandidate[] {
+function parseCandidate(value: unknown, generatedAt: number, now: number): IdentityCompatibilityCandidate[] {
   if (!isRecord(value) || !hasOnlyKeys(value, candidateFields)) return [];
   const identityEnvironmentRef = boundedString(value.identity_environment_ref, 256);
   const status = boundedString(value.status, 64);
   const reasonCodes = stringArray(value.reason_codes, 4, 128);
   const missingCategories = stringArray(value.missing_requirement_categories, 4, 64);
   const recoveryAction = boundedString(value.recovery_action, 128);
+  const factFreshness = parseFactFreshness(value.fact_freshness);
+  const ownerStatus = parseOwnerStatus(value.owner_status);
+  const freshness = parseFreshness(value.freshness, generatedAt, now);
   if (
     identityEnvironmentRef == null || status == null || !compatibilityStatuses.has(status) || reasonCodes == null ||
     missingCategories == null || recoveryAction == null || !recoveryActions.has(recoveryAction) ||
-    !validFactFreshness(value.fact_freshness) || !validOwnerStatus(value.owner_status) || !validFreshness(value.freshness) ||
-    (isCandidateStatusUsable(status) && !hasUsableOwnerFacts(value.owner_status, value.freshness))
+    factFreshness == null || ownerStatus == null || freshness == null ||
+    !validCandidateSemantics(status, reasonCodes, missingCategories, factFreshness, ownerStatus, freshness, recoveryAction)
   ) return [];
   return [{
     identityEnvironmentRef,
@@ -201,33 +207,71 @@ function parseCandidate(value: unknown): IdentityCompatibilityCandidate[] {
   }];
 }
 
-function isCandidateStatusUsable(status: string) {
-  return status === "compatible" || status === "unknown_until_runtime";
+type FactFreshness = { state: "satisfied" | "missing" | "unknown_until_runtime" };
+type OwnerStatus = { lode: string; harbor: string };
+type CandidateFreshness = { state: "fresh" | "stale" | "unavailable"; ageMs?: number };
+
+function parseFactFreshness(value: unknown): FactFreshness[] | null {
+  if (!Array.isArray(value) || value.length > 32) return null;
+  const parsed = value.flatMap((item): FactFreshness[] => {
+    if (!isRecord(item) || !hasOnlyKeys(item, ["fact_key", "required_freshness", "state"]) ||
+      boundedString(item.fact_key, 128) == null || boundedString(item.required_freshness, 64) == null ||
+      !["satisfied", "missing", "unknown_until_runtime"].includes(String(item.state))) return [];
+    return [{ state: item.state as FactFreshness["state"] }];
+  });
+  return parsed.length === value.length ? parsed : null;
 }
 
-function hasUsableOwnerFacts(ownerStatus: unknown, freshness: unknown) {
-  return isRecord(ownerStatus) && ownerStatus.lode === "available" && ownerStatus.harbor === "available" &&
-    isRecord(freshness) && freshness.state === "fresh";
-}
-
-function validFactFreshness(value: unknown) {
-  return Array.isArray(value) && value.length <= 32 && value.every((item) => isRecord(item) &&
-    hasOnlyKeys(item, ["fact_key", "required_freshness", "state"]) &&
-    boundedString(item.fact_key, 128) != null && boundedString(item.required_freshness, 64) != null &&
-    ["satisfied", "missing", "unknown_until_runtime"].includes(String(item.state)));
-}
-
-function validOwnerStatus(value: unknown) {
+function parseOwnerStatus(value: unknown): OwnerStatus | null {
   const allowed = ["available", "unavailable", "malformed", "stale", "not_checked"];
   return isRecord(value) && hasOnlyKeys(value, ["lode", "harbor"]) &&
-    allowed.includes(String(value.lode)) && allowed.includes(String(value.harbor));
+    allowed.includes(String(value.lode)) && allowed.includes(String(value.harbor))
+    ? { lode: String(value.lode), harbor: String(value.harbor) }
+    : null;
 }
 
-function validFreshness(value: unknown) {
-  if (!isRecord(value) || !["fresh", "stale", "unavailable"].includes(String(value.state))) return false;
-  if (!Object.keys(value).every((key) => ["state", "observed_at", "age_ms"].includes(key))) return false;
-  return (value.observed_at === undefined || isRfc3339(value.observed_at)) &&
-    (value.age_ms === undefined || (Number.isInteger(value.age_ms) && Number(value.age_ms) >= 0));
+function parseFreshness(value: unknown, generatedAt: number, now: number): CandidateFreshness | null {
+  if (!isRecord(value) || !["fresh", "stale", "unavailable"].includes(String(value.state))) return null;
+  if (value.state === "unavailable") {
+    return hasOnlyKeys(value, ["state"]) ? { state: "unavailable" } : null;
+  }
+  if (!hasOnlyKeys(value, ["state", "observed_at", "age_ms"]) || !isRfc3339(value.observed_at) ||
+    !Number.isInteger(value.age_ms) || Number(value.age_ms) < 0 || Number(value.age_ms) > 30 * 24 * 60 * 60_000) return null;
+  const observedAt = Date.parse(value.observed_at as string);
+  const ageMs = Number(value.age_ms);
+  const expectedAge = Math.max(0, generatedAt - observedAt);
+  if (observedAt > generatedAt + 60_000 || Math.abs(expectedAge - ageMs) > 1000 || generatedAt > now + 60_000) return null;
+  if ((value.state === "fresh" && ageMs > 5 * 60_000) || (value.state === "stale" && ageMs <= 5 * 60_000)) return null;
+  return { state: value.state as "fresh" | "stale", ageMs };
+}
+
+function validCandidateSemantics(
+  status: string,
+  reasonCodes: string[],
+  missingCategories: string[],
+  facts: FactFreshness[],
+  owner: OwnerStatus,
+  freshness: CandidateFreshness,
+  recovery: string,
+) {
+  const ownersAvailable = owner.lode === "available" && owner.harbor === "available";
+  if (status === "compatible") {
+    return ownersAvailable && freshness.state === "fresh" && missingCategories.length === 0 &&
+      facts.every((fact) => fact.state === "satisfied") && recovery === "none";
+  }
+  if (status === "unknown_until_runtime") {
+    return ownersAvailable && freshness.state === "fresh" &&
+      reasonCodes.length === 1 && reasonCodes[0] === "runtime_facts_require_task_admission" &&
+      missingCategories.length === 1 && missingCategories[0] === "runtime_facts" && facts.length > 0 &&
+      facts.some((fact) => fact.state !== "satisfied") && recovery === "retry_at_task_submission";
+  }
+  if (reasonCodes.length === 0 || missingCategories.length === 0 || facts.length > 0 || recovery === "none" || recovery === "retry_at_task_submission") return false;
+  if (freshness.state === "stale") {
+    return status === "incompatible" && owner.lode === "available" && owner.harbor === "stale" &&
+      missingCategories.length === 1 && missingCategories[0] === "owner_contract" && recovery === "refresh_owner_facts";
+  }
+  if (freshness.state === "unavailable") return status === "incompatible" && !ownersAvailable;
+  return ownersAvailable && (status === "requires_setup" || status === "incompatible");
 }
 
 function publicOrigin(value: string) {

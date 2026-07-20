@@ -35,6 +35,7 @@ export function SiteSkillLibrary({
   identities,
   runtimeSupervisorState,
   onCreateIdentity,
+  onNavigation,
   onUse,
 }: {
   catalog: LodeCatalogLoadState;
@@ -42,6 +43,7 @@ export function SiteSkillLibrary({
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
   onCreateIdentity: () => void;
+  onNavigation: () => void;
   onUse: (skill: LodeCatalogSkill, identityId?: string) => void;
 }) {
   const [mode, setMode] = useState<LibraryMode>("catalog");
@@ -60,7 +62,11 @@ export function SiteSkillLibrary({
         identities={identities}
         runtimeSupervisorState={runtimeSupervisorState}
         skill={selectedSkill}
-        onBack={() => setMode("catalog")}
+        onBack={() => {
+          onNavigation();
+          setMode("catalog");
+        }}
+        onContextChange={onNavigation}
         onCreateIdentity={onCreateIdentity}
         onUse={onUse}
       />
@@ -74,6 +80,7 @@ export function SiteSkillLibrary({
       identities={identities}
       runtimeSupervisorState={runtimeSupervisorState}
       onOpen={(skill) => {
+        onNavigation();
         setSelectedSkillId(skill.id);
         setMode("detail");
       }}
@@ -276,6 +283,7 @@ function SiteSkillDetail({
   runtimeSupervisorState,
   skill,
   onBack,
+  onContextChange,
   onCreateIdentity,
   onUse,
 }: {
@@ -285,6 +293,7 @@ function SiteSkillDetail({
   runtimeSupervisorState: RuntimeSupervisorState;
   skill: LodeCatalogSkill;
   onBack: () => void;
+  onContextChange: () => void;
   onCreateIdentity: () => void;
   onUse: (skill: LodeCatalogSkill, identityId?: string) => void;
 }) {
@@ -384,7 +393,10 @@ function SiteSkillDetail({
                 role="radio"
                 aria-checked={identity.id === selectedIdentityId}
                 tabIndex={identity.id === selectedIdentityId ? 0 : -1}
-                onClick={() => setSelectedIdentityId(identity.id)}
+                onClick={() => {
+                  onContextChange();
+                  setSelectedIdentityId(identity.id);
+                }}
                 onKeyDown={(event) => selectIdentityByKey(event, compatibleIdentities, identity.id, setSelectedIdentityId)}
                 key={identity.id}
               >
@@ -461,7 +473,6 @@ function skillLaunchState(
 ) {
   if (catalogStatus !== "ready") return { ok: false, reason: "站点技能目录需要刷新后才能创建任务。" };
   if (skill.availability !== "available") return { ok: false, reason: skill.availabilityReason };
-  if (skill.siteSlug === "boss") return { ok: false, reason: "BOSS 生产任务当前已延期。" };
   if (compatibility.status !== "ready") return { ok: false, reason: compatibility.summary };
   if (identity == null) return { ok: false, reason: "没有可用的账号身份候选。" };
   if (!isCandidateUsable(candidate)) return { ok: false, reason: "Core 未确认当前账号身份可以进入任务创建。" };

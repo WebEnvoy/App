@@ -3,8 +3,8 @@ import path from "node:path";
 import {
   createLodeCatalogReadBudget,
   LodeReadBudgetExceededError,
+  readLodeAssetSha256,
   readLodeJsonObject,
-  readLodeJsonObjectWithSha256,
   resolveLodeAssetPath,
   type LodeReadBudget,
 } from "./lodeAssetAccess.js";
@@ -412,7 +412,7 @@ function projectResultView(
     (schemas === undefined || schemaCompatible) && (resultKinds === undefined || kindCompatible) &&
     integrity != null && hasOnlyKeys(integrity, ["algorithm", "digest"]) &&
     integrity?.algorithm === "sha256" &&
-    resource?.sha256 === declaredDigest &&
+    resource === declaredDigest &&
     outputAsset?.schema_id === outputSchemaId;
   return valid
     ? {
@@ -450,7 +450,7 @@ function readResultViewResource(
   budget: LodeReadBudget,
 ) {
   try {
-    return readLodeJsonObjectWithSha256(resolveLodeAssetPath(rootPath, resourcePath, packageRoot), budget);
+    return readLodeAssetSha256(resolveLodeAssetPath(rootPath, resourcePath, packageRoot), budget);
   } catch {
     return null;
   }

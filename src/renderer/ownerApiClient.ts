@@ -1,4 +1,4 @@
-import { readBoundedJsonResponse } from "../electron/boundedJsonResponse";
+import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../electron/boundedJsonResponse";
 
 export type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -6,6 +6,7 @@ export type OwnerApiRequestOptions = {
   method?: OwnerApiMethod;
   body?: unknown;
   timeoutMs?: number;
+  signal?: AbortSignal;
 };
 
 export async function requestOwnerJson(
@@ -15,12 +16,14 @@ export async function requestOwnerJson(
 ): Promise<unknown> {
   const shellRequest = window.webenvoyShell?.requestOwnerJson;
   if (shellRequest) {
+    options.signal?.throwIfAborted();
     const result = await shellRequest({
       base,
       path,
       method: options.method ?? "GET",
       ...(options.body === undefined ? {} : { body: options.body }),
     });
+    options.signal?.throwIfAborted();
     return unwrapOwnerApiResponse(result, path);
   }
 
@@ -43,9 +46,9 @@ async function requestOwnerJsonWithFetch(
         ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-      signal: controller.signal,
+      signal: options.signal == null ? controller.signal : AbortSignal.any([controller.signal, options.signal]),
     });
-    const payload = await readBoundedJsonResponse(response);
+    const payload = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(path));
     if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
     return payload ?? {};
   } catch (error) {

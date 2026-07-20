@@ -189,6 +189,27 @@ for (const [request, expectedTimeout] of [
   }
 }
 
+const projectedOwnerError = ownerApiRequestModule.projectOwnerApiError({
+  error: {
+    code: "identity_not_found",
+    category: "owner_contract",
+    retryable: false,
+    message: "Bearer raw-secret",
+    credential: "raw-secret",
+  },
+  token: "raw-secret",
+});
+if (
+  JSON.stringify(projectedOwnerError) !== JSON.stringify({
+    code: "identity_not_found",
+    category: "owner_contract",
+    retryable: false,
+  }) ||
+  ownerApiRequestModule.projectOwnerApiError({ error: { code: "Bearer raw-secret" } }) !== undefined
+) {
+  throw new Error("Electron owner API error projection exposed non-allowlisted or credential-bearing fields.");
+}
+
 const splitOutputToken = "smoke-split-supervisor-token";
 const splitOutputRedactor = runtimeSupervisorModule.createRuntimeOutputRedactor(splitOutputToken);
 const splitOutputParts = [
@@ -257,7 +278,9 @@ if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !i
 
 if (
   !identityEnvironmentsPageSource.includes("onHarborStateChange(nextState)") ||
-  !appSource.includes("onHarborStateChange={setHarborIdentityState}")
+  !appSource.includes("onHarborStateChange={(state) =>") ||
+  !appSource.includes("createTaskRequestGateRef.current.invalidate();") ||
+  !appSource.includes("setHarborIdentityState(state);")
 ) {
   throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
@@ -669,9 +692,9 @@ try {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const packageLock = JSON.parse(await readFile(lockPath, "utf8"));
   const resourceRef = "lode://result-view/xiaohongshu/search-notes/xiaohongshu.search-results@0.1.0";
-  const resourcePath = "views/search-results.json";
+  const resourcePath = "views/search-results.html";
   const resourceFile = path.join(packageRoot, resourcePath);
-  const resourceContents = JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "table" });
+  const resourceContents = "<webenvoy-result-view data-component=\"table\"></webenvoy-result-view>";
   const resourceDigest = createHash("sha256").update(resourceContents).digest("hex");
   await mkdir(path.dirname(resourceFile), { recursive: true });
   await writeFile(resourceFile, resourceContents);
@@ -723,6 +746,22 @@ try {
     throw new Error(`Compatible result-view declaration was not projected: ${JSON.stringify(declaredViewSkill)}`);
   }
 
+  const binaryContents = Buffer.from([0x00, 0xff, 0x57, 0x45, 0x42, 0x00, 0x80]);
+  const binaryDigest = createHash("sha256").update(binaryContents).digest("hex");
+  catalog.result_view.integrity.digest = binaryDigest;
+  packageLock.locked_assets.at(-1).sha256 = binaryDigest;
+  await writeFile(resourceFile, binaryContents);
+  await writeFile(catalogPath, JSON.stringify(catalog));
+  await writeFile(lockPath, JSON.stringify(packageLock));
+  const binaryViewSkill = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (binaryViewSkill?.resultView?.mode !== "skill") {
+    throw new Error(`Binary result-view resource was forced through JSON parsing: ${JSON.stringify(binaryViewSkill)}`);
+  }
+
   await writeFile(resourceFile, JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "tampered" }));
   const driftedViewSkill = lodeCatalogModule.readLodeCatalog({
     ...lodeBundle,
@@ -732,7 +771,16 @@ try {
   if (driftedViewSkill?.resultView?.mode !== "standard") {
     throw new Error(`Result-view integrity drift did not fall back safely: ${JSON.stringify(driftedViewSkill)}`);
   }
-  await writeFile(resourceFile, resourceContents);
+  await rm(resourceFile, { force: true });
+  const unreadableViewSkill = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (unreadableViewSkill?.resultView?.mode !== "standard") {
+    throw new Error(`Unreadable result-view resource did not fall back safely: ${JSON.stringify(unreadableViewSkill)}`);
+  }
+  await writeFile(resourceFile, binaryContents);
 
   catalog.result_view.compatible_outputs.schemas[0].schema_ref =
     "lode://schema/site-capability/xiaohongshu/read-note-detail/output@0.1.0";

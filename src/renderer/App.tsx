@@ -48,6 +48,7 @@ import {
   type SkillIdentityCompatibilityState,
 } from "./coreIdentityCompatibilityClient";
 import { OwnerState } from "./OwnerState";
+import { createLatestRequestGate } from "./latestRequestGate";
 import { SettingsPage } from "./SettingsPage";
 import { SiteSkillLibrary } from "./SiteSkillPages";
 import type { TaskProjection } from "./taskThreadFixtures";
@@ -164,7 +165,9 @@ export function App() {
   const selectedTaskIdRef = useRef(selectedTaskId);
   const coreEndpointRef = useRef(connectionConfig.coreEndpoint);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const useSiteSkillRequestRef = useRef(0);
+  const createTaskRequestGateRef = useRef(createLatestRequestGate());
+  const createTaskContextRef = useRef("");
+  const runtimeCanUseRef = useRef(runtimeSupervisorState.canUseLiveRuntime);
 
   useEffect(() => {
     selectedTaskIdRef.current = selectedTaskId;
@@ -173,6 +176,27 @@ export function App() {
   useEffect(() => {
     coreEndpointRef.current = connectionConfig.coreEndpoint;
   }, [connectionConfig.coreEndpoint]);
+
+  const createTaskContextKey = [
+    connectionConfig.coreEndpoint,
+    runtimeSupervisorState.canUseLiveRuntime,
+    ...harborIdentityState.identities.map((identity) => [
+      identity.id,
+      identity.identityEnvironmentRef,
+      identity.source,
+      identity.readiness.state,
+      identity.login.state,
+      identity.login.recoveryRequired,
+    ].join(":")).sort(),
+    ...lodeCatalogState.skills.map(skillVersionKey).sort(),
+  ].join("|");
+  createTaskContextRef.current = createTaskContextKey;
+  runtimeCanUseRef.current = runtimeSupervisorState.canUseLiveRuntime;
+
+  useEffect(() => {
+    createTaskRequestGateRef.current.invalidate();
+    return () => createTaskRequestGateRef.current.invalidate();
+  }, [createTaskContextKey]);
 
   useEffect(() => writeTaskGrouping(taskGrouping), [taskGrouping]);
   useEffect(() => writeTaskSort(taskSort), [taskSort]);
@@ -395,7 +419,10 @@ export function App() {
     let cancelled = false;
     setHarborIdentityState(initialHarborIdentityState);
     fetchHarborIdentityState(connectionConfig.harborEndpoint, loadLocalIdentityEnvironmentDrafts()).then((state) => {
-      if (!cancelled) setHarborIdentityState(state);
+      if (!cancelled) {
+        createTaskRequestGateRef.current.invalidate();
+        setHarborIdentityState(state);
+      }
     });
     return () => {
       cancelled = true;
@@ -408,6 +435,7 @@ export function App() {
     const refreshCatalog = async () => {
       const state = await fetchLodeCatalog();
       if (!cancelled) {
+        createTaskRequestGateRef.current.invalidate();
         setLodeCatalogState(state);
         refreshTimer = window.setTimeout(refreshCatalog, 30_000);
       }
@@ -425,6 +453,7 @@ export function App() {
 
     const readSupervisor = window.webenvoyShell?.getRuntimeSupervisorState;
     if (readSupervisor == null) {
+      if (runtimeCanUseRef.current) createTaskRequestGateRef.current.invalidate();
       setRuntimeSupervisorState(
         runtimeSupervisorUnavailableState(
           "Electron runtime supervisor unavailable；生产任务保持 fail closed，fixture/demo 不作为可用结果。",
@@ -439,9 +468,13 @@ export function App() {
     const refreshRuntimeSupervisor = async () => {
       try {
         const state = await readSupervisor(connectionConfig);
-        if (!cancelled) setRuntimeSupervisorState(state);
+        if (!cancelled) {
+          if (runtimeCanUseRef.current !== state.canUseLiveRuntime) createTaskRequestGateRef.current.invalidate();
+          setRuntimeSupervisorState(state);
+        }
       } catch (error) {
         if (!cancelled) {
+          if (runtimeCanUseRef.current) createTaskRequestGateRef.current.invalidate();
           setRuntimeSupervisorState(
             runtimeSupervisorUnavailableState(
               error instanceof Error ? error.message : String(error),
@@ -476,6 +509,7 @@ export function App() {
   }, [selectedRunId, selectedTaskId, taskThreads]);
 
   function selectTask(task: TaskProjection) {
+    createTaskRequestGateRef.current.invalidate();
     setActiveView("work");
     setWorkMode("detail");
     setSelectedTaskId(task.id);
@@ -490,6 +524,7 @@ export function App() {
   }
 
   function openView(view: Exclude<WorkbenchView, "settings">) {
+    createTaskRequestGateRef.current.invalidate();
     setActiveView(view);
     if (view === "work") {
       setCreateTaskSelection(null);
@@ -498,6 +533,7 @@ export function App() {
   }
 
   function createTask(task?: TaskProjection) {
+    createTaskRequestGateRef.current.invalidate();
     const skill = task == null ? undefined : findCatalogSkillForTask(task, lodeCatalogState.skills);
     setCreateTaskSelection(skill == null ? null : { skill });
     setWorkMode("create");
@@ -505,25 +541,35 @@ export function App() {
   }
 
   async function useSiteSkill(skill: LodeCatalogSkill, identityId?: string) {
-    const requestId = ++useSiteSkillRequestRef.current;
+    const request = createTaskRequestGateRef.current.begin();
     const coreEndpoint = connectionConfig.coreEndpoint;
-    const refreshedCatalog = await fetchLodeCatalog();
-    if (requestId !== useSiteSkillRequestRef.current || coreEndpointRef.current !== coreEndpoint) return;
-    setLodeCatalogState(refreshedCatalog);
+    const taskContextKey = createTaskContextRef.current;
+    const refreshedCatalog = await fetchLodeCatalog(request.signal);
+    if (!request.isCurrent() || coreEndpointRef.current !== coreEndpoint ||
+      createTaskContextRef.current !== taskContextKey) return;
     const refreshedSkill = refreshedCatalog.skills.find((item) => item.packageRef === skill.packageRef);
     const identity = harborIdentityState.identities.find((item) => item.id === identityId);
     if (
       refreshedCatalog.status !== "ready" ||
       refreshedSkill?.availability !== "available" ||
+      skillVersionKey(refreshedSkill) !== skillVersionKey(skill) ||
       identity == null ||
       !runtimeSupervisorState.canUseLiveRuntime
-    ) return;
+    ) {
+      setLodeCatalogState(refreshedCatalog);
+      return;
+    }
     const compatibility = await fetchSkillIdentityCompatibility(
       coreEndpoint,
       refreshedSkill,
       [identity.identityEnvironmentRef],
+      request.signal,
     );
-    if (requestId !== useSiteSkillRequestRef.current || coreEndpointRef.current !== coreEndpoint) return;
+    if (!request.isCurrent() || coreEndpointRef.current !== coreEndpoint ||
+      createTaskContextRef.current !== taskContextKey) return;
+    const currentIdentity = harborIdentityState.identities.find((item) => item.id === identityId);
+    if (currentIdentity?.identityEnvironmentRef !== identity.identityEnvironmentRef) return;
+    setLodeCatalogState(refreshedCatalog);
     setCompatibilityBySkill((current) => ({ ...current, [refreshedSkill.id]: compatibility }));
     const candidate = compatibility.candidates.find(
       (item) => item.identityEnvironmentRef === identity.identityEnvironmentRef,
@@ -596,6 +642,7 @@ export function App() {
   }
 
   function openSettings() {
+    createTaskRequestGateRef.current.invalidate();
     if (activeView !== "settings") setSettingsReturnView(activeView);
     setActiveView("settings");
   }
@@ -612,6 +659,7 @@ export function App() {
   }
 
   function updateEndpoint(field: keyof LocalConnectionConfig, value: string) {
+    createTaskRequestGateRef.current.invalidate();
     setSettingsSaved(false);
     setSettingsError("");
     setConnectionConfig((currentConfig) => ({ ...currentConfig, [field]: value }));
@@ -708,7 +756,10 @@ export function App() {
                 harborEndpoint={connectionConfig.harborEndpoint}
                 initialState={harborIdentityState}
                 runtimeSupervisorState={runtimeSupervisorState}
-                onHarborStateChange={setHarborIdentityState}
+                onHarborStateChange={(state) => {
+                  createTaskRequestGateRef.current.invalidate();
+                  setHarborIdentityState(state);
+                }}
                 onOpenTask={openTaskById}
               />
             ) : harborIdentityState.status === "ready" ? (
@@ -741,7 +792,8 @@ export function App() {
                 compatibilityBySkill={compatibilityBySkill}
                 identities={harborIdentityState.identities}
                 runtimeSupervisorState={runtimeSupervisorState}
-                onCreateIdentity={() => setActiveView("browser")}
+                onCreateIdentity={() => openView("browser")}
+                onNavigation={() => createTaskRequestGateRef.current.invalidate()}
                 onUse={useSiteSkill}
               />
             )}
@@ -771,7 +823,7 @@ export function App() {
               selection={createTaskSelection}
               runtimeSupervisorState={runtimeSupervisorState}
               onSelect={useSiteSkill}
-              onCreateIdentity={() => setActiveView("browser")}
+              onCreateIdentity={() => openView("browser")}
               onRecover={openSettings}
             />
           </ThreadWorkspace>
@@ -841,6 +893,16 @@ function findCatalogSkillForTask(task: TaskProjection, skills: LodeCatalogSkill[
   return capabilityId == null
     ? undefined
     : skills.find((skill) => skill.packageRef.includes(`/${capabilityId}@`));
+}
+
+function skillVersionKey(skill: LodeCatalogSkill) {
+  return [
+    skill.packageRef,
+    skill.lockRef ?? "",
+    skill.version,
+    skill.availability,
+    ...skill.actions.map((action) => `${action.id}:${action.operationMode}:${action.resourceRequirementRef}:${action.resourceRequirementProfileIds.join(",")}`),
+  ].join(":");
 }
 
 function isTextEditingTarget(target: EventTarget | null) {
