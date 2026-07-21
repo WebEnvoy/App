@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -32,6 +33,11 @@ const identityEnvironmentFixturesSource = await readFile("src/renderer/identityE
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const appControllerSource = await readFile("src/renderer/useAppController.ts", "utf8");
+const appShellViewSource = await readFile("src/renderer/AppShellView.tsx", "utf8");
+const appSourcesSource = await readFile("src/renderer/useAppSources.ts", "utf8");
+const appTasksSource = await readFile("src/renderer/useAppTasks.ts", "utf8");
+const createTaskShellSource = await readFile("src/renderer/CreateTaskShell.tsx", "utf8");
 const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
 const taskThreadRightPanelSource = await readFile("src/renderer/TaskThreadRightPanel.tsx", "utf8");
 const shellPrimitivesSource = await readFile("src/renderer/shellPrimitives.tsx", "utf8");
@@ -74,6 +80,10 @@ if (!mainSource.includes("webenvoy:shell-context")) {
 
 if (!mainSource.includes("webenvoy:runtime-supervisor-state")) {
   throw new Error("Electron main smoke failed: runtime supervisor IPC is missing.");
+}
+
+if (!mainSource.includes("webenvoy:lode-catalog")) {
+  throw new Error("Electron main smoke failed: Lode catalog IPC is missing.");
 }
 
 if (!mainSource.includes("webenvoy:owner-api-json")) {
@@ -183,6 +193,27 @@ for (const [request, expectedTimeout] of [
   }
 }
 
+const projectedOwnerError = ownerApiRequestModule.projectOwnerApiError({
+  error: {
+    code: "identity_not_found",
+    category: "owner_contract",
+    retryable: false,
+    message: "Bearer raw-secret",
+    credential: "raw-secret",
+  },
+  token: "raw-secret",
+});
+if (
+  JSON.stringify(projectedOwnerError) !== JSON.stringify({
+    code: "identity_not_found",
+    category: "owner_contract",
+    retryable: false,
+  }) ||
+  ownerApiRequestModule.projectOwnerApiError({ error: { code: "Bearer raw-secret" } }) !== undefined
+) {
+  throw new Error("Electron owner API error projection exposed non-allowlisted or credential-bearing fields.");
+}
+
 const splitOutputToken = "smoke-split-supervisor-token";
 const splitOutputRedactor = runtimeSupervisorModule.createRuntimeOutputRedactor(splitOutputToken);
 const splitOutputParts = [
@@ -208,6 +239,10 @@ if (!preloadSource.includes("webenvoyShell")) {
 
 if (!preloadSource.includes("getRuntimeSupervisorState")) {
   throw new Error("Preload smoke failed: runtime supervisor bridge is missing.");
+}
+
+if (!preloadSource.includes("getLodeCatalog")) {
+  throw new Error("Preload smoke failed: Lode catalog bridge is missing.");
 }
 
 if (!preloadSource.includes("requestOwnerJson")) {
@@ -247,7 +282,9 @@ if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !i
 
 if (
   !identityEnvironmentsPageSource.includes("onHarborStateChange(nextState)") ||
-  !appSource.includes("onHarborStateChange={setHarborIdentityState}")
+  !appShellViewSource.includes("onHarborStateChange={actions.onHarborStateChange}") ||
+  !appControllerSource.includes("skillWorkbench.invalidateRequests();") ||
+  !appControllerSource.includes("sources.setHarborIdentityState(state);")
 ) {
   throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
@@ -274,17 +311,18 @@ if (
 }
 
 if (
-  !appSource.includes("这次要让 WebEnvoy 完成什么？") ||
-  !appSource.includes("fetchCoreThreadState") ||
-  !appSource.includes("retainLastKnownCoreThreads") ||
-  !appSource.includes('task.runs[0]?.id ?? ""') ||
-  !appSource.includes("该线程已创建，尚未提交业务输入。") ||
+  !createTaskShellSource.includes("这次要让 WebEnvoy 完成什么？") ||
+  createTaskShellSource.includes("opaqueTargetRef") ||
+  !appSourcesSource.includes("fetchCoreThreadState") ||
+  !appSourcesSource.includes("retainLastKnownCoreThreads") ||
+  !appTasksSource.includes('task.runs[0]?.id ?? ""') ||
+  !appShellViewSource.includes("该线程已创建，尚未提交业务输入。") ||
   !coreThreadClientSource.includes('requestOwnerJson(endpoint, "/threads"') ||
-  appSource.includes("fetchCoreReadTaskState(") ||
-  appSource.includes("setInterval(refreshRuntimeSupervisor") ||
-  !appSource.includes("setTimeout(refreshRuntimeSupervisor, 5000)") ||
-  !appSource.includes("rightPanelOpenRequestKey={rightPanelOpenRequestKey}") ||
-  !appSource.includes("onOpenPreview={() => setRightPanelOpenRequestKey") ||
+  appSourcesSource.includes("fetchCoreReadTaskState(") ||
+  appSourcesSource.includes("setInterval(refreshRuntimeSupervisor") ||
+  !appSourcesSource.includes("setTimeout(refresh, 5000)") ||
+  !appShellViewSource.includes("rightPanelOpenRequestKey={controller.tasks.rightPanelOpenRequestKey}") ||
+  !appShellViewSource.includes("onOpenPreview={tasks.requestRightPanel}") ||
   !taskThreadPageSource.includes("data-workbench-open-right") ||
   !taskThreadPageSource.includes("onClick={onOpenPreview}") ||
   taskThreadPageSource.includes('?? "Harbor fixture"') ||
@@ -467,6 +505,9 @@ for (const expectedText of [
 const lodeAssetBundleModule = await import(
   pathToFileURL(path.resolve("dist-electron/lodeAssetBundle.js")).href
 );
+const lodeCatalogModule = await import(
+  pathToFileURL(path.resolve("dist-electron/lodeCatalog.js")).href
+);
 const harborLaunch = runtimeSupervisorModule.resolveRuntimeServiceLaunchConfig(
   "harbor",
   { WEBENVOY_HARBOR_RUNTIME_CWD: "/tmp/harbor-runtime" },
@@ -520,6 +561,400 @@ const coreLodeEnv = lodeAssetBundleModule.coreLodeAssetEnvironment(lodeBundle);
 
 if (!coreLodeEnv.WEBENVOY_LODE_ASSETS_PATH || !coreLodeEnv.WEBENVOY_LODE_REGISTRY_PATH) {
   throw new Error("Lode asset bundle smoke failed: Core env did not include asset paths.");
+}
+
+const lodeCatalog = lodeCatalogModule.readLodeCatalog(lodeBundle);
+const xhsSearchSkill = lodeCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+const bossSearchSkill = lodeCatalog.skills.find((skill) => skill.packageRef.includes("/boss/job-search@"));
+if (
+  lodeCatalog.status !== "ready" ||
+  xhsSearchSkill?.availability !== "available" ||
+  xhsSearchSkill.resultView?.mode !== "standard" ||
+  xhsSearchSkill.resultView?.reason !== "not_declared" ||
+  xhsSearchSkill.siteName !== "Xiaohongshu" ||
+  xhsSearchSkill.name !== "Search Xiaohongshu notes" ||
+  xhsSearchSkill.summary !== "Read Xiaohongshu search result cards from a logged-in browser page and return note refs for detail follow-up." ||
+  xhsSearchSkill.actions[0]?.category !== "read" ||
+  !xhsSearchSkill.inputFields.some((field) =>
+    field.id === "keyword" && field.label === "keyword" && field.required && field.minLength === 1 && field.maxLength === 80
+  ) ||
+  bossSearchSkill?.availability !== "incompatible" ||
+  !bossSearchSkill.availabilityReason.includes("动作声明")
+) {
+  throw new Error(`Lode catalog projection smoke failed: ${JSON.stringify(lodeCatalog)}`);
+}
+
+const invalidBundleCatalog = lodeCatalogModule.readLodeCatalog({
+  ...lodeBundle,
+  state: "invalid",
+  summary: "invalid bundle fixture",
+});
+if (invalidBundleCatalog.status !== "unavailable" || invalidBundleCatalog.skills.length > 0) {
+  throw new Error(`Invalid Lode bundle was exposed as a usable catalog: ${JSON.stringify(invalidBundleCatalog)}`);
+}
+
+const damagedLodeRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-catalog-"));
+try {
+  await cp(lodeBundle.rootPath, damagedLodeRoot, { recursive: true });
+  await rm(path.join(damagedLodeRoot, "sites/xiaohongshu/search-notes/schemas/input.schema.json"));
+  const damagedCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: damagedLodeRoot,
+    registryPath: path.join(damagedLodeRoot, "registry/local-packages.json"),
+  });
+  const damagedSkill = damagedCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  const healthySkill = damagedCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/read-note-detail@"));
+  if (damagedCatalog.status !== "ready" || damagedSkill?.availability !== "incompatible" || healthySkill?.availability !== "available") {
+    throw new Error(`Lode per-skill failure isolation smoke failed: ${JSON.stringify(damagedCatalog)}`);
+  }
+} finally {
+  await rm(damagedLodeRoot, { recursive: true, force: true });
+}
+
+const symlinkedLodeRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-symlink-"));
+try {
+  await cp(lodeBundle.rootPath, symlinkedLodeRoot, { recursive: true });
+  const queryPath = path.join(symlinkedLodeRoot, "registry/local-query.fixture.json");
+  await rm(queryPath);
+  await symlink(path.join(lodeBundle.rootPath, "registry/local-query.fixture.json"), queryPath);
+  const symlinkedCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: symlinkedLodeRoot,
+    registryPath: path.join(symlinkedLodeRoot, "registry/local-packages.json"),
+  });
+  if (symlinkedCatalog.status !== "unavailable") {
+    throw new Error(`Symlinked Lode query was not rejected: ${JSON.stringify(symlinkedCatalog)}`);
+  }
+} finally {
+  await rm(symlinkedLodeRoot, { recursive: true, force: true });
+}
+
+const oversizedLodeRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-oversized-"));
+try {
+  await cp(lodeBundle.rootPath, oversizedLodeRoot, { recursive: true });
+  await writeFile(
+    path.join(oversizedLodeRoot, "registry/local-packages.json"),
+    JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) }),
+  );
+  const oversizedBundle = lodeAssetBundleModule.resolveLodeAssetBundle(
+    { WEBENVOY_LODE_ASSETS_PATH: oversizedLodeRoot },
+    undefined,
+  );
+  if (oversizedBundle.state !== "invalid") {
+    throw new Error(`Oversized Lode registry was not rejected: ${JSON.stringify(oversizedBundle)}`);
+  }
+} finally {
+  await rm(oversizedLodeRoot, { recursive: true, force: true });
+}
+
+const missingDeclarationRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-missing-declaration-"));
+try {
+  await cp(lodeBundle.rootPath, missingDeclarationRoot, { recursive: true });
+  const registryPath = path.join(missingDeclarationRoot, "registry/local-packages.json");
+  const registry = JSON.parse(await readFile(registryPath, "utf8"));
+  const searchEntry = registry.entries.find((entry) => entry.package_ref === "lode://site-capability/xiaohongshu/search-notes@0.1.0");
+  delete searchEntry.manifest_path;
+  await writeFile(registryPath, JSON.stringify(registry));
+  const missingDeclarationBundle = lodeAssetBundleModule.resolveLodeAssetBundle(
+    { WEBENVOY_LODE_ASSETS_PATH: missingDeclarationRoot },
+    undefined,
+  );
+  if (missingDeclarationBundle.state !== "invalid") {
+    throw new Error(`Missing Lode path declaration was not rejected: ${JSON.stringify(missingDeclarationBundle)}`);
+  }
+} finally {
+  await rm(missingDeclarationRoot, { recursive: true, force: true });
+}
+
+const futureOutputRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-future-output-"));
+try {
+  await cp(lodeBundle.rootPath, futureOutputRoot, { recursive: true });
+  const outputPath = path.join(futureOutputRoot, "sites/xiaohongshu/search-notes/schemas/output.schema.json");
+  const outputSchema = JSON.parse(await readFile(outputPath, "utf8"));
+  outputSchema.properties.result_kind.const = "future_result_kind";
+  await writeFile(outputPath, JSON.stringify(outputSchema));
+  const futureOutputCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: futureOutputRoot,
+    registryPath: path.join(futureOutputRoot, "registry/local-packages.json"),
+  });
+  const futureOutputSkill = futureOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  const unaffectedSkill = futureOutputCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/read-note-detail@"));
+  if (
+    futureOutputCatalog.status !== "ready" ||
+    futureOutputSkill?.availability !== "available" ||
+    futureOutputSkill?.outputKind !== "future_result_kind" ||
+    unaffectedSkill?.availability !== "available"
+  ) {
+    throw new Error(`Owner-declared future output kind was overridden by App semantics: ${JSON.stringify(futureOutputCatalog)}`);
+  }
+} finally {
+  await rm(futureOutputRoot, { recursive: true, force: true });
+}
+
+const contractBindingRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-contract-binding-"));
+try {
+  await cp(lodeBundle.rootPath, contractBindingRoot, { recursive: true });
+  const packageRef = "lode://site-capability/xiaohongshu/search-notes@0.1.0";
+  const packageRoot = path.join(contractBindingRoot, "sites/xiaohongshu/search-notes");
+  const manifestPath = path.join(packageRoot, "manifest.json");
+  const lockPath = path.join(packageRoot, "package-lock.json");
+  const catalogPath = path.join(packageRoot, "catalog-metadata.json");
+  const requirementsPath = path.join(packageRoot, "resource-requirements.json");
+  const inputPath = path.join(packageRoot, "schemas/input.schema.json");
+  const outputPath = path.join(packageRoot, "schemas/output.schema.json");
+  const queryPath = path.join(contractBindingRoot, "registry/local-query.fixture.json");
+  const originals = new Map(await Promise.all([manifestPath, lockPath, catalogPath, requirementsPath, inputPath, outputPath, queryPath]
+    .map(async (file) => [file, await readFile(file, "utf8")])));
+  const readSkill = () => lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: contractBindingRoot,
+    registryPath: path.join(contractBindingRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef === packageRef);
+  const expectIncompatible = (label) => {
+    if (readSkill()?.availability !== "incompatible") throw new Error(`Lode ${label} drift remained usable.`);
+  };
+  const restore = async (file) => writeFile(file, originals.get(file));
+
+  const manifest = JSON.parse(originals.get(manifestPath));
+  manifest.action_declaration.actions[0].target_scope.target_types = ["wrong_target"];
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  expectIncompatible("action target");
+  await restore(manifestPath);
+
+  for (const mutate of [
+    (value) => { value.manifest_version = "lode.site-capability.manifest.v999"; },
+    (value) => { value.package_type = "future-capability"; },
+    (value) => { value.capability.lifecycle = "active"; },
+  ]) {
+    const versionedManifest = JSON.parse(originals.get(manifestPath));
+    mutate(versionedManifest);
+    await writeFile(manifestPath, JSON.stringify(versionedManifest));
+    expectIncompatible("manifest contract version");
+    await restore(manifestPath);
+  }
+
+  const requirements = JSON.parse(originals.get(requirementsPath));
+  requirements.operation_ref = "lode://operation/wrong_operation";
+  await writeFile(requirementsPath, JSON.stringify(requirements));
+  expectIncompatible("resource requirement operation");
+  await restore(requirementsPath);
+
+  const schemaRequirements = JSON.parse(originals.get(requirementsPath));
+  schemaRequirements.resource_requirement_profiles[0].input_binding.input_schema = "lode://schema/wrong";
+  await writeFile(requirementsPath, JSON.stringify(schemaRequirements));
+  expectIncompatible("resource requirement schema binding");
+  await restore(requirementsPath);
+
+  const boundaryRequirements = JSON.parse(originals.get(requirementsPath));
+  boundaryRequirements.resource_requirement_profiles[0].operation_boundary = "validate_only";
+  await writeFile(requirementsPath, JSON.stringify(boundaryRequirements));
+  expectIncompatible("resource requirement operation boundary");
+  await restore(requirementsPath);
+
+  for (const requiredFields of [["url"], ["url", "missing_field"], ["url", "limit"]]) {
+    const fieldRequirements = JSON.parse(originals.get(requirementsPath));
+    fieldRequirements.resource_requirement_profiles[0].input_binding.required_input_fields = requiredFields;
+    await writeFile(requirementsPath, JSON.stringify(fieldRequirements));
+    expectIncompatible("resource requirement input fields");
+    await restore(requirementsPath);
+  }
+
+  const catalogMetadata = JSON.parse(originals.get(catalogPath));
+  catalogMetadata.operation_id = "wrong_operation";
+  await writeFile(catalogPath, JSON.stringify(catalogMetadata));
+  expectIncompatible("catalog operation");
+  await restore(catalogPath);
+
+  const catalogVersion = JSON.parse(originals.get(catalogPath));
+  catalogVersion.schema_version = "lode.catalog-metadata.v999";
+  await writeFile(catalogPath, JSON.stringify(catalogVersion));
+  expectIncompatible("catalog schema version");
+  await restore(catalogPath);
+
+  const query = JSON.parse(originals.get(queryPath));
+  for (const group of query.queries) {
+    for (const result of group.results ?? []) if (result.package_ref === packageRef) result.operation_id = "wrong_operation";
+  }
+  await writeFile(queryPath, JSON.stringify(query));
+  expectIncompatible("query operation");
+  await restore(queryPath);
+
+  for (const mutate of [
+    (schema) => { schema.$schema = "https://json-schema.org/draft/2099-01/schema"; },
+    (schema) => { schema["x-lode"].operation_ref = "lode://operation/wrong"; },
+    (schema) => { schema["x-lode"].operation_mode = "validate_only"; },
+  ]) {
+    const input = JSON.parse(originals.get(inputPath));
+    mutate(input);
+    await writeFile(inputPath, JSON.stringify(input));
+    expectIncompatible("input schema action binding");
+    await restore(inputPath);
+  }
+
+  for (const mutate of [
+    (lock) => { lock.schema_version = "lode.package-lock.v999"; },
+    (lock) => { lock.locked_assets.find((asset) => asset.role === "input_schema").path = "schemas/wrong.json"; },
+    (lock) => { lock.locked_assets.find((asset) => asset.role === "input_schema").ref = "lode://schema/wrong"; },
+    (lock) => { lock.locked_assets.find((asset) => asset.role === "input_schema").version = "9.9.9"; },
+    (lock) => { lock.locked_assets.push({ ...lock.locked_assets.find((asset) => asset.role === "input_schema") }); },
+  ]) {
+    const packageLock = JSON.parse(originals.get(lockPath));
+    mutate(packageLock);
+    await writeFile(lockPath, JSON.stringify(packageLock));
+    expectIncompatible("package lock asset binding");
+    await restore(lockPath);
+  }
+
+  for (const mutate of [
+    (schema) => { schema.additionalProperties = true; },
+    (schema) => { schema.required = schema.required.filter((field) => field !== "result_kind"); },
+    (schema) => { schema["x-lode"].schema_version = "9.9.9"; },
+    (schema) => { delete schema.properties.result_kind; },
+    (schema) => { schema.properties.notes = { type: 42, required: "not-an-array", additionalProperties: "yes" }; },
+    (schema) => { schema.properties.notes = { unknownKeyword: true }; },
+    (schema) => { schema.properties.notes = { $ref: "https://example.test/remote-schema" }; },
+    (schema) => { schema.properties.notes = { $ref: "#/$defs/missing" }; },
+    (schema) => { schema.properties.notes = { type: "string", pattern: "^[a-z]*[a-y]*z$" }; },
+  ]) {
+    const output = JSON.parse(originals.get(outputPath));
+    mutate(output);
+    await writeFile(outputPath, JSON.stringify(output));
+    expectIncompatible("output schema");
+  }
+  await restore(outputPath);
+} finally {
+  await rm(contractBindingRoot, { recursive: true, force: true });
+}
+
+const resultViewRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-result-view-"));
+try {
+  await cp(lodeBundle.rootPath, resultViewRoot, { recursive: true });
+  const packageRoot = path.join(resultViewRoot, "sites/xiaohongshu/search-notes");
+  const catalogPath = path.join(packageRoot, "catalog-metadata.json");
+  const manifestPath = path.join(packageRoot, "manifest.json");
+  const lockPath = path.join(packageRoot, "package-lock.json");
+  const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const packageLock = JSON.parse(await readFile(lockPath, "utf8"));
+  const resourceRef = "lode://result-view/xiaohongshu/search-notes/xiaohongshu.search-results@0.1.0";
+  const resourcePath = "views/search-results.json";
+  const resourceFile = path.join(packageRoot, resourcePath);
+  const resourceContents = JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "table" });
+  const resourceDigest = createHash("sha256").update(resourceContents).digest("hex");
+  await mkdir(path.dirname(resourceFile), { recursive: true });
+  await writeFile(resourceFile, resourceContents);
+  catalog.result_view = {
+    status: "present",
+    declaration_version: "0.1.0",
+    view_id: "xiaohongshu.search-results",
+    view_version: "0.1.0",
+    resource_ref: resourceRef,
+    resource_path: resourcePath,
+    compatible_outputs: {
+      schemas: [{
+        schema_ref: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
+        schema_version: "0.1.0",
+      }],
+    },
+    integrity: { algorithm: "sha256", digest: resourceDigest },
+    lock_ref: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+    fallback: "standard_renderer",
+  };
+  manifest.asset_refs.push({
+    role: "result_view_resource",
+    path: resourcePath,
+    status: "present",
+    resource_ref: resourceRef,
+    resource_version: "0.1.0",
+  });
+  packageLock.locked_assets.push({
+    role: "result_view_resource",
+    path: resourcePath,
+    ref: resourceRef,
+    version: "0.1.0",
+    sha256: resourceDigest,
+  });
+  await writeFile(catalogPath, JSON.stringify(catalog));
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  await writeFile(lockPath, JSON.stringify(packageLock));
+  const declaredViewCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  });
+  const declaredViewSkill = declaredViewCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (
+    declaredViewSkill?.availability !== "available" ||
+    declaredViewSkill.resultView?.mode !== "skill" ||
+    declaredViewSkill.resultView?.viewVersion !== "0.1.0"
+  ) {
+    throw new Error(`Compatible result-view declaration was not projected: ${JSON.stringify(declaredViewSkill)}`);
+  }
+
+  for (const [label, invalidContents] of [
+    ["HTML", "<webenvoy-result-view></webenvoy-result-view>"],
+    ["JSON scalar", JSON.stringify("table")],
+    ["JSON array", JSON.stringify([{ component: "table" }])],
+    ["binary", Buffer.from([0x00, 0xff, 0x57, 0x45, 0x42, 0x00, 0x80])],
+  ]) {
+    const invalidDigest = createHash("sha256").update(invalidContents).digest("hex");
+    catalog.result_view.integrity.digest = invalidDigest;
+    packageLock.locked_assets.at(-1).sha256 = invalidDigest;
+    await writeFile(resourceFile, invalidContents);
+    await writeFile(catalogPath, JSON.stringify(catalog));
+    await writeFile(lockPath, JSON.stringify(packageLock));
+    const invalidViewSkill = lodeCatalogModule.readLodeCatalog({
+      ...lodeBundle,
+      rootPath: resultViewRoot,
+      registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+    }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+    if (invalidViewSkill?.resultView?.mode !== "standard") {
+      throw new Error(`${label} result-view resource did not fall back safely: ${JSON.stringify(invalidViewSkill)}`);
+    }
+  }
+
+  await writeFile(resourceFile, JSON.stringify({ schema_version: "webenvoy.result-view-resource.v0", component: "tampered" }));
+  const driftedViewSkill = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (driftedViewSkill?.resultView?.mode !== "standard") {
+    throw new Error(`Result-view integrity drift did not fall back safely: ${JSON.stringify(driftedViewSkill)}`);
+  }
+  await rm(resourceFile, { force: true });
+  const unreadableViewSkill = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (unreadableViewSkill?.resultView?.mode !== "standard") {
+    throw new Error(`Unreadable result-view resource did not fall back safely: ${JSON.stringify(unreadableViewSkill)}`);
+  }
+  catalog.result_view.integrity.digest = resourceDigest;
+  packageLock.locked_assets.at(-1).sha256 = resourceDigest;
+  await writeFile(resourceFile, resourceContents);
+  await writeFile(lockPath, JSON.stringify(packageLock));
+
+  catalog.result_view.compatible_outputs.schemas[0].schema_ref =
+    "lode://schema/site-capability/xiaohongshu/read-note-detail/output@0.1.0";
+  await writeFile(catalogPath, JSON.stringify(catalog));
+  const fallbackViewCatalog = lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: resultViewRoot,
+    registryPath: path.join(resultViewRoot, "registry/local-packages.json"),
+  });
+  const fallbackViewSkill = fallbackViewCatalog.skills.find((skill) => skill.packageRef.includes("/xiaohongshu/search-notes@"));
+  if (
+    fallbackViewSkill?.availability !== "available" ||
+    fallbackViewSkill.resultView?.mode !== "standard" ||
+    fallbackViewSkill.resultView?.reason !== "incompatible"
+  ) {
+    throw new Error(`Incompatible result-view declaration did not fall back safely: ${JSON.stringify(fallbackViewSkill)}`);
+  }
+} finally {
+  await rm(resultViewRoot, { recursive: true, force: true });
 }
 
 await assertPackagedRuntimeRequiredFailsClosed();
@@ -632,12 +1067,17 @@ if (ownerPayloadGuardsModule.fixtureOrDemoPayloadReason({
 })) {
   throw new Error("Owner payload guard smoke failed: descriptive provider guidance was rejected as fixture evidence.");
 }
-const { outputText: ownerApiClientModuleSource } = ts.transpileModule(ownerApiClientSource, {
+const { outputText: rawOwnerApiClientModuleSource } = ts.transpileModule(ownerApiClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
     target: ts.ScriptTarget.ES2022,
   },
 });
+const boundedJsonResponseModuleUrl = pathToFileURL(path.resolve("dist-electron/boundedJsonResponse.js")).href;
+const ownerApiErrorProjectionModuleUrl = pathToFileURL(path.resolve("dist-electron/ownerApiErrorProjection.js")).href;
+const ownerApiClientModuleSource = rawOwnerApiClientModuleSource
+  .replace(/from "\.\.\/electron\/boundedJsonResponse";/, `from "${boundedJsonResponseModuleUrl}";`)
+  .replace(/from "\.\.\/electron\/ownerApiErrorProjection";/, `from "${ownerApiErrorProjectionModuleUrl}";`);
 const ownerApiClientModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(ownerApiClientModuleSource)}`;
 const ownerApiClientModule = await import(ownerApiClientModuleUrl);
 const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModule(identityEnvironmentFixturesSource, {
@@ -1364,6 +1804,34 @@ try {
   }
   globalThis.window.webenvoyShell = priorShell;
 
+  const previousOwnerFetch = globalThis.fetch;
+  globalThis.window.webenvoyShell = undefined;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: {
+      category: "owner_contract",
+      code: "identity_not_ready",
+      message: "Bearer raw-secret",
+      credential: "raw-secret",
+    },
+    token: "raw-secret",
+  }), { status: 409, headers: { "content-type": "application/json" } });
+  try {
+    const browserOwnerError = await ownerApiClientModule.requestOwnerJson(
+      harborContract.endpoint,
+      "/runtime/identity-environments",
+    );
+    const serializedError = JSON.stringify(browserOwnerError);
+    if (
+      browserOwnerError?.error !== "/runtime/identity-environments returned 409: owner_contract: identity_not_ready" ||
+      /raw-secret|Bearer|credential|token/.test(serializedError)
+    ) {
+      throw new Error(`Browser owner error projection exposed raw owner data: ${serializedError}`);
+    }
+  } finally {
+    globalThis.fetch = previousOwnerFetch;
+    globalThis.window.webenvoyShell = priorShell;
+  }
+
   let localOnlySessionFetchCalled = false;
   const previousFetch = globalThis.fetch;
   globalThis.fetch = async () => {
@@ -1741,6 +2209,10 @@ const fakeRun = {
 const submitFetchCalls = [];
 let submittedTaskPayload;
 const ownerRequestTimeouts = [];
+const coreJsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "Content-Type": "application/json" },
+});
 const originalWindowSetTimeout = globalThis.window.setTimeout;
 globalThis.window.setTimeout = (callback, timeout) => {
   ownerRequestTimeouts.push(timeout);
@@ -1806,12 +2278,7 @@ globalThis.fetch = async (url, init = {}) => {
         },
       }
     : { ok: false, error: { code: "unexpected_submit_contract_path" } };
-  return {
-    ok: true,
-    status: 200,
-    json: async () => json,
-    text: async () => JSON.stringify(json),
-  };
+  return coreJsonResponse(json);
 };
 const submittedRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
@@ -1858,12 +2325,7 @@ globalThis.fetch = async (url, init = {}) => {
     : pathname.includes("/runs/run_submit_pending_001")
     ? { ok: false, error: { code: "run_not_queryable_yet" } }
     : { ok: false, error: { code: "unexpected_pending_smoke_path" } };
-  return {
-    ok: true,
-    status: 200,
-    json: async () => json,
-    text: async () => JSON.stringify(json),
-  };
+  return coreJsonResponse(json);
 };
 const pendingRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
@@ -1898,10 +2360,10 @@ globalThis.fetch = async (url, init = {}) => {
     const body = accepted
       ? { ok: true, run_id: "run_submit_boss_001" }
       : { ok: false, error: { code: "public_query_invalid" } };
-    return { ok: accepted, status: accepted ? 202 : 400, json: async () => body, text: async () => JSON.stringify(body) };
+    return coreJsonResponse(body, accepted ? 202 : 400);
   }
   const body = { ok: false, error: { code: "run_not_queryable_yet" } };
-  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
+  return coreJsonResponse(body);
 };
 const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
@@ -2002,10 +2464,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
     : { ok: true, session_refs: { session_refs: { runtime_session_ref: "session_f76393db-e74f-4bec-88be-63754f7a5d00" } } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const coreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2053,10 +2512,7 @@ globalThis.fetch = async (url) => {
     : pathname.includes("/capability-runs")
       ? { ok: true, capability_runs: { runs: [] } }
       : { ok: false, error: { code: "fixture_payload_should_not_be_queried" } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const fixtureCoreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2206,10 +2662,7 @@ globalThis.fetch = async (url) => {
         },
       })
     : { ok: true };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const bossCoreReadState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2264,10 +2717,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/result")
     ? { ok: false, error: { code: "result_query_unavailable" } }
     : { ok: true, evidence: { evidence_refs: [] } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const failedDetailState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2344,10 +2794,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/failure")
     ? { ok: true, failure_reason: { reason_class: "none", app_action: "none", retryable: false } }
     : { ok: true, session_refs: { session_refs: { runtime_session_ref: harborRuntimeSession.runtime_session_ref } } };
-  return {
-    ok: true,
-    json: async () => json,
-  };
+  return coreJsonResponse(json);
 };
 const mixedDetailState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {
@@ -2785,7 +3232,7 @@ globalThis.fetch = async (url) => {
     : pathname.endsWith("/session-refs")
     ? { ok: true, session_refs: { session_refs: { runtime_session_ref: "harbor:runtime-session/xiaohongshu/write-precheck" } } }
     : { ok: true, capability_runs: { runs: [] } };
-  return { ok: true, json: async () => json };
+  return coreJsonResponse(json);
 };
 const writePreviewState = await coreReadTaskClientModule.fetchCoreReadTaskState("http://core.test", [
   {

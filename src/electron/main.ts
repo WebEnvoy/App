@@ -3,7 +3,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "./boundedJsonResponse.js";
 import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
+import { readLodeCatalog } from "./lodeCatalog.js";
 import {
   isExpectedManualAuthenticationRendererUrl,
   parseManualAuthenticationCompletionIntent,
@@ -14,8 +16,11 @@ import {
   isHarborSupervisorProtectedRequest,
   ownerApiTimeoutMs,
   parseOwnerApiRequest,
+  projectOwnerApiError,
   type OwnerApiJsonRequest,
 } from "./ownerApiRequest.js";
+import { registerWorkbenchIpc } from "./workbenchIpc.js";
+import { secureRendererNavigation } from "./rendererNavigationGuard.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
@@ -64,6 +69,7 @@ function createMainWindow() {
     },
   });
   mainWindows.add(window);
+  secureRendererNavigation(window.webContents, expectedRendererUrl());
   window.on("closed", () => {
     mainWindows.delete(window);
   });
@@ -456,7 +462,7 @@ function reloadWindow(window: BrowserWindow) {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   runtimeSupervisor = createRuntimeSupervisor({ dataDir: path.join(app.getPath("userData"), "runtime") });
   ipcMain.handle("webenvoy:shell-context", () => ({
     platform: process.platform,
@@ -466,12 +472,14 @@ app.whenReady().then(() => {
   ipcMain.handle("webenvoy:runtime-supervisor-state", (_event, config) =>
     runtimeSupervisor.readState(config),
   );
+  ipcMain.handle("webenvoy:lode-catalog", () => readLodeCatalog());
   ipcMain.handle("webenvoy:owner-api-json", (_event, request) =>
     requestOwnerApiJson(request),
   );
   ipcMain.handle("webenvoy:harbor-manual-authentication-completed", (event, intent) =>
     requestHarborManualAuthenticationCompletion(event, intent),
   );
+  await registerWorkbenchIpc(mainWindows, expectedRendererUrl());
 
   nativeTheme.on("updated", () => {
     const colorScheme = getSystemColorScheme();
@@ -525,10 +533,15 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
       ...(parsed.body === undefined ? {} : { body: JSON.stringify(parsed.body) }),
       signal: controller.signal,
     });
-    const text = await response.text();
-    const json = parseJson(text);
+    const json = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(parsed.path));
     if (!response.ok) {
-      return { ok: false, status: response.status, error: `${parsed.path} returned ${response.status}`, body: json };
+      const projectedError = projectOwnerApiError(json);
+      return {
+        ok: false,
+        status: response.status,
+        error: `${parsed.path} returned ${response.status}`,
+        ...(projectedError == null ? {} : { body: { error: projectedError } }),
+      };
     }
     return { ok: true, status: response.status, body: json ?? {} };
   } catch (error) {
@@ -561,13 +574,4 @@ async function requestHarborManualAuthenticationCompletion(event: Electron.IpcMa
 
 function expectedRendererUrl() {
   return rendererDevUrl ?? pathToFileURL(path.join(__dirname, "../dist/renderer/index.html")).toString();
-}
-
-function parseJson(text: string) {
-  if (!text.trim()) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
-  }
 }

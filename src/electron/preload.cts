@@ -26,10 +26,17 @@ const shellApi = {
     ipcRenderer.invoke("webenvoy:shell-context") as Promise<WebEnvoyShellContext>,
   getRuntimeSupervisorState: (config: RuntimeEndpointConfig) =>
     ipcRenderer.invoke("webenvoy:runtime-supervisor-state", config),
+  getLodeCatalog: () => ipcRenderer.invoke("webenvoy:lode-catalog"),
   requestOwnerJson: (request: OwnerApiJsonRequest) =>
     ipcRenderer.invoke("webenvoy:owner-api-json", request),
   completeHarborManualAuthentication: (intent: ManualAuthenticationCompletionIntent) =>
     ipcRenderer.invoke("webenvoy:harbor-manual-authentication-completed", intent),
+  selectLocalFiles: () => ipcRenderer.invoke("webenvoy:select-local-files"),
+  checkLocalFiles: (localRefs: string[]) => ipcRenderer.invoke("webenvoy:check-local-files", localRefs),
+  releaseLocalFiles: (localRefs: string[]) => ipcRenderer.invoke("webenvoy:release-local-files", localRefs),
+  loadProtectedDraft: (context: unknown) => ipcRenderer.invoke("webenvoy:load-protected-draft", context),
+  saveProtectedDraft: (draft: unknown) => ipcRenderer.invoke("webenvoy:save-protected-draft", draft),
+  deleteProtectedDraft: (context: unknown) => ipcRenderer.invoke("webenvoy:delete-protected-draft", context),
   subscribeToSystemThemeVariant: (listener: (colorScheme: WebEnvoyColorScheme) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, colorScheme: WebEnvoyColorScheme) => {
       listener(colorScheme);

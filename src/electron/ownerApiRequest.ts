@@ -1,5 +1,7 @@
 import { isManualAuthenticationCompletionPath } from "./manualAuthenticationCompletion.js";
 
+export { projectOwnerApiError } from "./ownerApiErrorProjection.js";
+
 export type OwnerApiJsonRequest = {
   base?: unknown;
   path?: unknown;
@@ -94,4 +96,8 @@ export function ownerApiTimeoutMs(request: Extract<ParsedOwnerApiRequest, { ok: 
 function ownerApiMethod(value: unknown): OwnerApiMethod | null {
   if (value === undefined) return "GET";
   return value === "GET" || value === "POST" || value === "PATCH" || value === "DELETE" ? value : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

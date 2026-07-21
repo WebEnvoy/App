@@ -1,9 +1,13 @@
+import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../electron/boundedJsonResponse";
+import { projectOwnerApiError } from "../electron/ownerApiErrorProjection";
+
 export type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export type OwnerApiRequestOptions = {
   method?: OwnerApiMethod;
   body?: unknown;
   timeoutMs?: number;
+  signal?: AbortSignal;
 };
 
 export async function requestOwnerJson(
@@ -13,12 +17,14 @@ export async function requestOwnerJson(
 ): Promise<unknown> {
   const shellRequest = window.webenvoyShell?.requestOwnerJson;
   if (shellRequest) {
+    options.signal?.throwIfAborted();
     const result = await shellRequest({
       base,
       path,
       method: options.method ?? "GET",
       ...(options.body === undefined ? {} : { body: options.body }),
     });
+    options.signal?.throwIfAborted();
     return unwrapOwnerApiResponse(result, path);
   }
 
@@ -41,10 +47,10 @@ async function requestOwnerJsonWithFetch(
         ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-      signal: controller.signal,
+      signal: options.signal == null ? controller.signal : AbortSignal.any([controller.signal, options.signal]),
     });
-    const payload = await responsePayload(response);
-    if (!response.ok) return { ok: false, error: responseStatusError(path, response.status, payload) };
+    const payload = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(path));
+    if (!response.ok) return { ok: false, error: projectOwnerHttpStatusError(path, response.status, payload) };
     return payload ?? {};
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -66,29 +72,9 @@ function unwrapOwnerApiResponse(value: unknown, path: string): unknown {
   };
 }
 
-function responseStatusError(path: string, status: number, payload: unknown) {
-  if (!isRecord(payload)) return `${path} returned ${status}`;
-  const error = isRecord(payload.error) ? payload.error : null;
-  const code = typeof error?.code === "string" ? error.code : undefined;
-  const category = typeof error?.category === "string" ? error.category : undefined;
-  return [`${path} returned ${status}`, category, code].filter(Boolean).join(": ");
-}
-
-async function responsePayload(response: Response): Promise<unknown> {
-  if (typeof response.text === "function") {
-    return parseJson(await response.text());
-  }
-  const jsonResponse = response as Response & { json?: () => Promise<unknown> };
-  return typeof jsonResponse.json === "function" ? jsonResponse.json() : null;
-}
-
-function parseJson(value: string): unknown {
-  if (!value.trim()) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
+export function projectOwnerHttpStatusError(path: string, status: number, payload: unknown) {
+  const error = projectOwnerApiError(payload);
+  return [`${path} returned ${status}`, error?.category, error?.code].filter(Boolean).join(": ");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

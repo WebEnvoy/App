@@ -63,6 +63,101 @@ type WebEnvoyManualAuthenticationCompletionIntent = {
   base: string;
   runtimeSessionRef: string;
 };
+type WebEnvoyLocalFileReference = {
+  localRef: string;
+  name: string;
+  size: number;
+  lastModified: number;
+  type: string;
+};
+type WebEnvoyLocalFileReadability = {
+  localRef: string;
+  readable: boolean;
+  reason: "readable" | "unreadable" | "not_regular_file" | "invalid_reference";
+};
+type WebEnvoyProtectedDraftResult = {
+  status: "ready" | "unavailable" | "rejected";
+  draft?: unknown;
+};
+type WebEnvoyLodeCatalogField = {
+  id: string;
+  label: string;
+  kind: "text" | "multiline" | "number" | "boolean" | "select" | "multi-select" | "file" | "constant" | "unknown";
+  required: boolean;
+  description: string;
+  options?: string[];
+  defaultValue?: string | number | boolean | string[];
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  pattern?: string;
+  patternSafety?: "linear";
+  format?: "uri";
+  integer?: boolean;
+};
+type WebEnvoyLodeCatalogAction = {
+  id: string;
+  category: "read" | "prepare" | "commit" | "destructive";
+  operationMode: "read" | "validate_only" | "draft" | "preview";
+  targetTypes: string[];
+  supportedOrigins: string[];
+  externalEffects: string[];
+  resourceRequirementRef: string;
+  resourceRequirementProfileIds: string[];
+};
+type WebEnvoyLodeCatalogResultView =
+  | {
+      mode: "standard";
+      fallback: "standard_renderer";
+      reason: "not_declared" | "incompatible";
+    }
+  | {
+      mode: "skill";
+      fallback: "standard_renderer";
+      declarationVersion: "0.1.0";
+      viewId: string;
+      viewVersion: string;
+      resourceRef: string;
+      lockRef: string;
+    };
+type WebEnvoyLodeCatalogSkill = {
+  id: string;
+  packageRef: string;
+  lockRef?: string;
+  siteSlug: string;
+  siteName: string;
+  name: string;
+  summary: string;
+  category: string;
+  version: string;
+  latestVersion: string;
+  lifecycle: string;
+  facets: string[];
+  sourceHealth: string;
+  updatedAt: string;
+  availability: "available" | "incompatible";
+  availabilityReason: string;
+  inputSchemaId: string;
+  inputFields: WebEnvoyLodeCatalogField[];
+  outputSchemaId: string;
+  outputKind: string;
+  resultView: WebEnvoyLodeCatalogResultView;
+  actions: WebEnvoyLodeCatalogAction[];
+};
+type WebEnvoyLodeCatalogState = {
+  status: "ready" | "unavailable";
+  fetchedAt: string;
+  source: WebEnvoyLodeAssetBundleState["source"];
+  summary: string;
+  skills: WebEnvoyLodeCatalogSkill[];
+};
+type WebEnvoyLocalFileSelectionResult =
+  | { status: "ready"; files: WebEnvoyLocalFileReference[] }
+  | { status: "unavailable" | "rejected"; files: [] };
 
 interface Window {
   webenvoyShell?: {
@@ -70,8 +165,15 @@ interface Window {
     getRuntimeSupervisorState?: (
       config: WebEnvoyRuntimeEndpointConfig,
     ) => Promise<WebEnvoyRuntimeSupervisorState>;
+    getLodeCatalog?: () => Promise<WebEnvoyLodeCatalogState>;
     requestOwnerJson?: (request: WebEnvoyOwnerApiJsonRequest) => Promise<unknown>;
     completeHarborManualAuthentication?: (intent: WebEnvoyManualAuthenticationCompletionIntent) => Promise<unknown>;
+    selectLocalFiles?: () => Promise<WebEnvoyLocalFileSelectionResult>;
+    checkLocalFiles?: (localRefs: string[]) => Promise<WebEnvoyLocalFileReadability[]>;
+    releaseLocalFiles?: (localRefs: string[]) => Promise<WebEnvoyProtectedDraftResult>;
+    loadProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
+    saveProtectedDraft?: (draft: unknown) => Promise<WebEnvoyProtectedDraftResult>;
+    deleteProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
     subscribeToSystemThemeVariant?: (
       listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
     ) => () => void;

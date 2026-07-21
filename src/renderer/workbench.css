@@ -70,6 +70,61 @@ summary:focus-visible {
   border-top: 1px solid var(--we-border);
 }
 
+.create-task-recommendations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.create-task-recommendations button { display: grid; min-width: 0; grid-template-columns: 32px minmax(0, 1fr) 16px; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--we-border); border-radius: 8px; color: var(--we-foreground); background: var(--we-surface-primary); text-align: left; }
+.create-task-recommendations button:hover:not(:disabled) { background: var(--we-list-hover-background); }
+.create-task-recommendations button:disabled { opacity: 0.45; }
+.create-task-recommendations button > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
+.create-task-recommendations strong,
+.create-task-recommendations small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-task-recommendations strong { font-size: 12px; }
+.create-task-recommendations small { color: var(--we-foreground-muted); font-size: 10px; }
+.create-task-recommendation-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; background: var(--we-surface-tertiary); }
+.create-task-composer { height: auto; min-height: 124px; gap: 10px; border-radius: 12px; }
+.create-task-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.create-task-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.create-task-field { display: grid; min-width: 0; gap: 5px; }
+.create-task-field.wide { grid-column: 1 / -1; }
+.create-task-field > label,
+.create-task-field-label { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.create-task-field strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.create-task-field em { color: var(--we-status-warning); font-size: 9px; font-style: normal; font-weight: 700; }
+.create-task-field > input:not([type="checkbox"]),
+.create-task-field > select,
+.create-task-field > textarea { width: 100%; min-width: 0; height: 34px; min-height: 34px; padding: 6px 8px; border: 1px solid var(--we-border); border-radius: 7px; outline: none; color: var(--we-foreground); background: var(--we-surface-primary); font: inherit; font-size: 12px; }
+.create-task-field > textarea { height: 82px; resize: vertical; line-height: 1.45; }
+.create-task-field > input[aria-invalid="true"],
+.create-task-field > select[aria-invalid="true"],
+.create-task-field > textarea[aria-invalid="true"] { border-color: var(--we-status-error); }
+.create-task-field > small { min-width: 0; color: var(--we-foreground-muted); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.create-task-field:has([aria-invalid="true"]) > small { color: var(--we-status-error); }
+.create-task-multi-select { display: flex; min-height: 34px; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 5px 8px; border: 1px solid var(--we-border); border-radius: 7px; }
+.create-task-multi-select[aria-invalid="true"],
+.create-task-file-field[aria-invalid="true"] .create-task-file-control { border-color: var(--we-status-error); }
+.create-task-multi-select label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
+.create-task-file-field { display: grid; min-width: 0; gap: 5px; outline: none; }
+.create-task-file-control { display: flex; min-height: 34px; align-items: center; gap: 7px; padding: 5px 8px; border: 1px dashed var(--we-border); border-radius: 7px; color: var(--we-foreground-muted); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.create-task-file-list { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 5px; }
+.create-task-file-list > span { display: inline-flex; max-width: 100%; align-items: center; gap: 4px; padding: 3px 5px; border-radius: 5px; background: var(--we-surface-secondary); font-size: 10px; }
+.create-task-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-task-file-list > span > button { flex: 0 0 auto; }
+.create-task-file-list > span.invalid { color: var(--we-status-error); }
+.create-task-file-list button { display: inline-flex; align-items: center; justify-content: center; border: 0; color: inherit; background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
+.create-task-draft-state { color: var(--we-foreground-muted); font-size: 10px; }
+.create-task-composer-toolbar { display: flex; min-width: 0; align-items: center; gap: 10px; padding-top: 2px; border-top: 1px solid var(--we-border-subtle); }
+.create-task-context { display: grid; min-width: 0; flex: 1 1 auto; gap: 2px; }
+.create-task-context strong,
+.create-task-context small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-task-context strong { font-size: 11px; }
+.create-task-context small { color: var(--we-foreground-muted); font-size: 10px; }
+.thread-composer .create-task-submit { min-width: 90px; color: var(--we-inverted-foreground); background: var(--we-foreground); }
+.create-task-submit-state { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid var(--we-border-subtle); color: var(--we-status-warning); }
+.create-task-submit-state > span { display: grid; min-width: 0; gap: 2px; }
+.create-task-submit-state strong { color: var(--we-foreground); font-size: 11px; }
+.create-task-submit-state small { color: var(--we-foreground-muted); font-size: 10px; }
+.create-task-submit-state button { min-width: auto; color: var(--we-foreground); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+
 .task-list-heading,
 .task-list-heading-actions {
   position: relative;
@@ -324,6 +379,12 @@ summary:focus-visible {
     width: calc(100% - 32px);
     padding-top: 32px;
   }
+
+  .create-task-recommendations,
+  .create-task-fields { grid-template-columns: 1fr; }
+  .create-task-field.wide { grid-column: auto; }
+  .create-task-submit-state { grid-template-columns: 18px minmax(0, 1fr); }
+  .create-task-submit-state button { grid-column: 2; justify-self: start; }
 
   .owner-state button {
     grid-column: 2;
