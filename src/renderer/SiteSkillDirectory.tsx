@@ -22,12 +22,14 @@ export type SiteSkillDirectoryProps = {
   compatibilityBySkill: Record<string, SkillIdentityCompatibilityState>;
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
+  initialFocusSkillId?: string;
   onOpen: (skill: LodeCatalogSkill) => void;
   onUse: (skill: LodeCatalogSkill, identityId?: string) => void;
 };
 
 export function SiteSkillDirectory(props: SiteSkillDirectoryProps) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const restoredSkillRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
   const [installNoticeOpen, setInstallNoticeOpen] = useState(false);
@@ -43,7 +45,9 @@ export function SiteSkillDirectory(props: SiteSkillDirectoryProps) {
     () => filterSkills(visibleSkills, category, query),
     [visibleSkills, category, query],
   );
-  useEffect(() => searchRef.current?.focus(), []);
+  useEffect(() => {
+    (props.initialFocusSkillId ? restoredSkillRef.current : searchRef.current)?.focus();
+  }, [props.initialFocusSkillId]);
 
   return (
     <div className="production-library-page">
@@ -62,6 +66,7 @@ export function SiteSkillDirectory(props: SiteSkillDirectoryProps) {
       />
       <DirectoryResults
         {...props}
+        restoredSkillRef={restoredSkillRef}
         skills={filteredSkills}
         onClear={() => { setQuery(""); setCategory("全部"); }}
       />
@@ -126,7 +131,11 @@ function DirectoryToolbar({
   );
 }
 
-function DirectoryResults({ skills, onClear, ...props }: SiteSkillDirectoryProps & { skills: LodeCatalogSkill[]; onClear: () => void }) {
+function DirectoryResults({ skills, onClear, restoredSkillRef, ...props }: SiteSkillDirectoryProps & {
+  skills: LodeCatalogSkill[];
+  onClear: () => void;
+  restoredSkillRef: React.RefObject<HTMLButtonElement | null>;
+}) {
   const sites = Array.from(new Set(skills.map(catalogSkillSiteName)));
   if (sites.length === 0) {
     return (
@@ -144,7 +153,13 @@ function DirectoryResults({ skills, onClear, ...props }: SiteSkillDirectoryProps
           </div>
           <div className="production-skill-list">
             {skills.filter((skill) => catalogSkillSiteName(skill) === site).map((skill) => (
-              <SiteSkillRow {...props} skill={skill} onOpen={() => props.onOpen(skill)} key={skill.id} />
+              <SiteSkillRow
+                {...props}
+                mainButtonRef={skill.id === props.initialFocusSkillId ? restoredSkillRef : undefined}
+                skill={skill}
+                onOpen={() => props.onOpen(skill)}
+                key={skill.id}
+              />
             ))}
           </div>
         </section>
@@ -159,9 +174,14 @@ function SiteSkillRow({
   identities,
   runtimeSupervisorState,
   skill,
+  mainButtonRef,
   onOpen,
   onUse,
-}: Omit<SiteSkillDirectoryProps, "onOpen"> & { skill: LodeCatalogSkill; onOpen: () => void }) {
+}: Omit<SiteSkillDirectoryProps, "onOpen"> & {
+  mainButtonRef?: React.RefObject<HTMLButtonElement | null>;
+  skill: LodeCatalogSkill;
+  onOpen: () => void;
+}) {
   const compatibility = compatibilityBySkill[skill.id] ?? loadingSkillIdentityCompatibility();
   const candidates = candidateIdentityList(skill, identities);
   const defaultIdentity = candidates.find((identity) => isCandidateUsable(compatibilityCandidate(identity, compatibility))) ?? candidates[0];
@@ -169,7 +189,7 @@ function SiteSkillRow({
   const launch = skillLaunchState(skill, defaultIdentity, candidate, compatibility, runtimeSupervisorState, catalog.status);
   return (
     <div className="production-skill-row">
-      <button className="production-skill-row-main" type="button" onClick={onOpen}>
+      <button ref={mainButtonRef} className="production-skill-row-main" type="button" onClick={onOpen}>
         <span className="production-skill-icon"><Globe2 size={17} /></span>
         <span>
           <strong>{catalogSkillName(skill)}</strong><small>{displaySummary(skill)}</small>

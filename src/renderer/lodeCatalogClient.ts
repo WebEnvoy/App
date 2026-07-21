@@ -94,7 +94,7 @@ export function projectLodeCatalogDisplayCache(state: LodeCatalogLoadState): Lod
       availability: skill.availability,
       availabilityReason: skill.availabilityReason,
       inputSchemaId: skill.inputSchemaId,
-      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options, defaultValue, minimum, maximum, minLength, maxLength, format, integer }) => ({
+      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options, defaultValue, minimum, maximum, minLength, maxLength, minItems, maxItems, uniqueItems, format, integer }) => ({
         id,
         label,
         kind,
@@ -106,6 +106,9 @@ export function projectLodeCatalogDisplayCache(state: LodeCatalogLoadState): Lod
         ...(maximum === undefined ? {} : { maximum }),
         ...(minLength === undefined ? {} : { minLength }),
         ...(maxLength === undefined ? {} : { maxLength }),
+        ...(minItems === undefined ? {} : { minItems }),
+        ...(maxItems === undefined ? {} : { maxItems }),
+        ...(uniqueItems === undefined ? {} : { uniqueItems }),
         ...(format === undefined ? {} : { format }),
         ...(integer === undefined ? {} : { integer }),
       })),
@@ -226,7 +229,7 @@ function isCatalogSource(value: unknown): value is WebEnvoyLodeAssetBundleState[
 function isField(value: unknown): value is WebEnvoyLodeCatalogField {
   return isRecord(value) && Object.keys(value).every((key) => [
     "id", "label", "kind", "required", "description", "options", "defaultValue", "minimum", "maximum",
-    "minLength", "maxLength", "format", "integer",
+    "minLength", "maxLength", "minItems", "maxItems", "uniqueItems", "pattern", "patternSafety", "format", "integer",
   ].includes(key)) &&
     isString(value.id) &&
     isString(value.label) &&
@@ -239,8 +242,57 @@ function isField(value: unknown): value is WebEnvoyLodeCatalogField {
     (value.maximum === undefined || typeof value.maximum === "number") &&
     (value.minLength === undefined || Number.isInteger(value.minLength) && Number(value.minLength) >= 0) &&
     (value.maxLength === undefined || Number.isInteger(value.maxLength) && Number(value.maxLength) >= 0) &&
+    (value.minItems === undefined || Number.isInteger(value.minItems) && Number(value.minItems) >= 0) &&
+    (value.maxItems === undefined || Number.isInteger(value.maxItems) && Number(value.maxItems) >= 0) &&
+    (value.uniqueItems === undefined || typeof value.uniqueItems === "boolean") &&
+    (value.pattern === undefined && value.patternSafety === undefined || isString(value.pattern) && value.patternSafety === "linear") &&
     (value.format === undefined || value.format === "uri") &&
-    (value.integer === undefined || value.integer === true);
+    (value.integer === undefined || value.integer === true) &&
+    validFieldConstraints(value);
+}
+
+function validFieldConstraints(value: Record<string, unknown>) {
+  if (typeof value.minimum === "number" && typeof value.maximum === "number" && value.minimum > value.maximum) return false;
+  if (typeof value.minLength === "number" && typeof value.maxLength === "number" && value.minLength > value.maxLength) return false;
+  if (typeof value.minItems === "number" && typeof value.maxItems === "number" && value.minItems > value.maxItems) return false;
+  if (value.pattern !== undefined && value.patternSafety !== "linear") return false;
+  if (value.kind === "multi-select") {
+    if (!isStringArray(value.options) || value.options.length === 0) return false;
+  } else if (value.minItems !== undefined || value.maxItems !== undefined || value.uniqueItems !== undefined) return false;
+  if (value.kind !== "number" && (value.minimum !== undefined || value.maximum !== undefined || value.integer !== undefined)) return false;
+  if (!["text", "multiline", "select"].includes(String(value.kind)) &&
+    (value.minLength !== undefined || value.maxLength !== undefined || value.pattern !== undefined || value.format !== undefined)) return false;
+  if (value.kind === "select" && (!isStringArray(value.options) || value.options.length === 0 ||
+    value.options.some((option) => !validCachedString(value, option)))) return false;
+  return validFieldDefault(value);
+}
+
+function validFieldDefault(field: Record<string, unknown>) {
+  const value = field.defaultValue;
+  if (value === undefined) return true;
+  if (field.kind === "multi-select") {
+    if (!isStringArray(value) || !(value as string[]).every((item) => (field.options as string[]).includes(item))) return false;
+    return (field.minItems == null || value.length >= Number(field.minItems)) &&
+      (field.maxItems == null || value.length <= Number(field.maxItems));
+  }
+  if (field.kind === "select") return typeof value === "string" && (field.options as string[] | undefined)?.includes(value) === true;
+  if (field.kind === "boolean") return typeof value === "boolean";
+  if (field.kind === "number") return typeof value === "number" && Number.isFinite(value) &&
+    (field.integer !== true || Number.isInteger(value)) &&
+    (field.minimum == null || value >= Number(field.minimum)) && (field.maximum == null || value <= Number(field.maximum));
+  return typeof value === "string" ? validCachedString(field, value) : field.kind === "constant";
+}
+
+function validCachedString(field: Record<string, unknown>, value: string) {
+  if (field.minLength != null && value.length < Number(field.minLength) || field.maxLength != null && value.length > Number(field.maxLength)) return false;
+  if (field.pattern != null && !new RegExp(String(field.pattern)).test(value)) return false;
+  if (field.format === "uri") {
+    try {
+      const url = new URL(value);
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return false;
+    } catch { return false; }
+  }
+  return true;
 }
 
 function isAction(value: unknown): value is WebEnvoyLodeCatalogAction {
@@ -271,7 +323,8 @@ function isText(value: unknown): value is string {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return Array.isArray(value) && value.length <= 100 && value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 1000) &&
+    new Set(value).size === value.length;
 }
 
 function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {

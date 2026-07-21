@@ -13,12 +13,14 @@ import {
   skillLaunchState,
 } from "./skillCompatibilityPresentation";
 import { actionLabel, categoryLabel, displaySummary, outputLabel, resultViewLabel, skillStatusLabel } from "./siteSkillPresentation";
+import type { SiteSkillRecoveryRequest } from "./siteSkillRecovery";
 
 export type SiteSkillDetailProps = {
   catalogStatus: LodeCatalogLoadState["status"];
   compatibility: SkillIdentityCompatibilityState;
   identities: IdentityEnvironmentProjection[];
   runtimeSupervisorState: RuntimeSupervisorState;
+  recoveryRequest?: SiteSkillRecoveryRequest;
   skill: LodeCatalogSkill;
   onBack: () => void;
   onContextChange: () => void;
@@ -45,12 +47,26 @@ export function SiteSkillDetail(props: SiteSkillDetailProps) {
       setSelectedIdentityId(compatibleIdentities[0]?.id ?? "");
     }
   }, [compatibleIdentities, selectedIdentityId]);
+  useEffect(() => {
+    if (props.recoveryRequest?.destination === "skill_repair") {
+      if (maintenanceRef.current != null) maintenanceRef.current.open = true;
+      maintenanceRef.current?.querySelector<HTMLElement>("summary")?.focus();
+    } else if (props.recoveryRequest?.destination === "identity_selection") {
+      const originalId = CSS.escape(props.recoveryRequest.identityId);
+      const candidate = identityListRef.current?.querySelector<HTMLElement>(`[role='radio']:not([data-identity-id='${originalId}'])`) ??
+        document.querySelector<HTMLElement>(".compatible-identities-section .production-secondary-button");
+      candidate?.focus();
+    }
+  }, [props.recoveryRequest]);
 
   function recover() {
     if (recovery == null || selectedIdentity == null || candidate == null) return;
     if (recovery.destination === "target") props.onUse(skill, selectedIdentity.id);
-    else if (recovery.destination === "selection") identityListRef.current?.querySelector<HTMLButtonElement>("[role='radio']:not([aria-checked='true'])")?.focus();
-    else if (recovery.destination === "skill") {
+    else if (recovery.destination === "identity_selection") {
+      const alternate = identityListRef.current?.querySelector<HTMLButtonElement>("[role='radio']:not([aria-checked='true'])");
+      if (alternate != null) alternate.focus();
+      else props.onCreateIdentity();
+    } else if (recovery.destination === "skill_repair") {
       if (maintenanceRef.current != null) maintenanceRef.current.open = true;
       maintenanceRef.current?.querySelector<HTMLElement>("summary")?.focus();
     } else props.onRecoverCandidate(skill, selectedIdentity.id, candidate);
@@ -198,6 +214,7 @@ function IdentityCandidateList({
           className={identity.id === selectedIdentityId ? "selected" : ""}
           type="button" role="radio" aria-checked={identity.id === selectedIdentityId}
           tabIndex={identity.id === selectedIdentityId ? 0 : -1}
+          data-identity-id={identity.id}
           onClick={() => onSelect(identity.id)}
           onKeyDown={(event) => selectIdentityByKey(event, candidates, identity.id, onSelect)}
           key={identity.id}

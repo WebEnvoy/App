@@ -28,11 +28,11 @@ export function compatibilityRecoveryCopy(candidate: IdentityCompatibilityCandid
     case "select_supported_package_version":
     case "repair_package_contract":
     case "select_matching_resource_requirements":
-      return { label: "修复站点技能", destination: "skill" as const };
+      return { label: "更新或修复站点技能", destination: "skill_repair" as const };
     case "fix_target":
       return { label: "填写具体目标", destination: "target" as const };
     case "select_matching_identity":
-      return { label: "选择其他账号身份", destination: "selection" as const };
+      return { label: "选择其他账号身份", destination: "identity_selection" as const };
     default:
       return null;
   }

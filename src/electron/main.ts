@@ -19,6 +19,8 @@ import {
   projectOwnerApiError,
   type OwnerApiJsonRequest,
 } from "./ownerApiRequest.js";
+import { registerWorkbenchIpc } from "./workbenchIpc.js";
+import { secureRendererNavigation } from "./rendererNavigationGuard.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
@@ -67,6 +69,7 @@ function createMainWindow() {
     },
   });
   mainWindows.add(window);
+  secureRendererNavigation(window.webContents, expectedRendererUrl());
   window.on("closed", () => {
     mainWindows.delete(window);
   });
@@ -459,7 +462,7 @@ function reloadWindow(window: BrowserWindow) {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   runtimeSupervisor = createRuntimeSupervisor({ dataDir: path.join(app.getPath("userData"), "runtime") });
   ipcMain.handle("webenvoy:shell-context", () => ({
     platform: process.platform,
@@ -476,6 +479,7 @@ app.whenReady().then(() => {
   ipcMain.handle("webenvoy:harbor-manual-authentication-completed", (event, intent) =>
     requestHarborManualAuthenticationCompletion(event, intent),
   );
+  await registerWorkbenchIpc(mainWindows, expectedRendererUrl());
 
   nativeTheme.on("updated", () => {
     const colorScheme = getSystemColorScheme();

@@ -61,10 +61,6 @@ export function readLodeJsonObjectSha256(filePath: string, budget?: LodeReadBudg
   return createHash("sha256").update(result.bytes).digest("hex");
 }
 
-export function readLodeAssetSha256(filePath: string, budget?: LodeReadBudget) {
-  return createHash("sha256").update(readLodeBytes(filePath, budget)).digest("hex");
-}
-
 function readLodeJson(filePath: string, budget?: LodeReadBudget) {
   const bytes = readLodeBytes(filePath, budget);
   const value = JSON.parse(bytes.toString("utf8")) as unknown;

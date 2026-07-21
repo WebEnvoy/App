@@ -33,6 +33,10 @@ const identityEnvironmentFixturesSource = await readFile("src/renderer/identityE
 const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
+const appControllerSource = await readFile("src/renderer/useAppController.ts", "utf8");
+const appShellViewSource = await readFile("src/renderer/AppShellView.tsx", "utf8");
+const appSourcesSource = await readFile("src/renderer/useAppSources.ts", "utf8");
+const appTasksSource = await readFile("src/renderer/useAppTasks.ts", "utf8");
 const createTaskShellSource = await readFile("src/renderer/CreateTaskShell.tsx", "utf8");
 const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
 const taskThreadRightPanelSource = await readFile("src/renderer/TaskThreadRightPanel.tsx", "utf8");
@@ -278,9 +282,9 @@ if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !i
 
 if (
   !identityEnvironmentsPageSource.includes("onHarborStateChange(nextState)") ||
-  !appSource.includes("onHarborStateChange={(state) =>") ||
-  !appSource.includes("createTaskRequestGateRef.current.invalidate();") ||
-  !appSource.includes("setHarborIdentityState(state);")
+  !appShellViewSource.includes("onHarborStateChange={actions.onHarborStateChange}") ||
+  !appControllerSource.includes("skillWorkbench.invalidateRequests();") ||
+  !appControllerSource.includes("sources.setHarborIdentityState(state);")
 ) {
   throw new Error("Harbor identity refresh smoke failed: refreshed live identity state is not synchronized to App submit admission.");
 }
@@ -308,16 +312,17 @@ if (
 
 if (
   !createTaskShellSource.includes("这次要让 WebEnvoy 完成什么？") ||
-  !appSource.includes("fetchCoreThreadState") ||
-  !appSource.includes("retainLastKnownCoreThreads") ||
-  !appSource.includes('task.runs[0]?.id ?? ""') ||
-  !appSource.includes("该线程已创建，尚未提交业务输入。") ||
+  createTaskShellSource.includes("opaqueTargetRef") ||
+  !appSourcesSource.includes("fetchCoreThreadState") ||
+  !appSourcesSource.includes("retainLastKnownCoreThreads") ||
+  !appTasksSource.includes('task.runs[0]?.id ?? ""') ||
+  !appShellViewSource.includes("该线程已创建，尚未提交业务输入。") ||
   !coreThreadClientSource.includes('requestOwnerJson(endpoint, "/threads"') ||
-  appSource.includes("fetchCoreReadTaskState(") ||
-  appSource.includes("setInterval(refreshRuntimeSupervisor") ||
-  !appSource.includes("setTimeout(refreshRuntimeSupervisor, 5000)") ||
-  !appSource.includes("rightPanelOpenRequestKey={rightPanelOpenRequestKey}") ||
-  !appSource.includes("onOpenPreview={() => setRightPanelOpenRequestKey") ||
+  appSourcesSource.includes("fetchCoreReadTaskState(") ||
+  appSourcesSource.includes("setInterval(refreshRuntimeSupervisor") ||
+  !appSourcesSource.includes("setTimeout(refresh, 5000)") ||
+  !appShellViewSource.includes("rightPanelOpenRequestKey={controller.tasks.rightPanelOpenRequestKey}") ||
+  !appShellViewSource.includes("onOpenPreview={tasks.requestRightPanel}") ||
   !taskThreadPageSource.includes("data-workbench-open-right") ||
   !taskThreadPageSource.includes("onClick={onOpenPreview}") ||
   taskThreadPageSource.includes('?? "Harbor fixture"') ||
@@ -685,6 +690,141 @@ try {
   }
 } finally {
   await rm(futureOutputRoot, { recursive: true, force: true });
+}
+
+const contractBindingRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-contract-binding-"));
+try {
+  await cp(lodeBundle.rootPath, contractBindingRoot, { recursive: true });
+  const packageRef = "lode://site-capability/xiaohongshu/search-notes@0.1.0";
+  const packageRoot = path.join(contractBindingRoot, "sites/xiaohongshu/search-notes");
+  const manifestPath = path.join(packageRoot, "manifest.json");
+  const lockPath = path.join(packageRoot, "package-lock.json");
+  const catalogPath = path.join(packageRoot, "catalog-metadata.json");
+  const requirementsPath = path.join(packageRoot, "resource-requirements.json");
+  const inputPath = path.join(packageRoot, "schemas/input.schema.json");
+  const outputPath = path.join(packageRoot, "schemas/output.schema.json");
+  const queryPath = path.join(contractBindingRoot, "registry/local-query.fixture.json");
+  const originals = new Map(await Promise.all([manifestPath, lockPath, catalogPath, requirementsPath, inputPath, outputPath, queryPath]
+    .map(async (file) => [file, await readFile(file, "utf8")])));
+  const readSkill = () => lodeCatalogModule.readLodeCatalog({
+    ...lodeBundle,
+    rootPath: contractBindingRoot,
+    registryPath: path.join(contractBindingRoot, "registry/local-packages.json"),
+  }).skills.find((skill) => skill.packageRef === packageRef);
+  const expectIncompatible = (label) => {
+    if (readSkill()?.availability !== "incompatible") throw new Error(`Lode ${label} drift remained usable.`);
+  };
+  const restore = async (file) => writeFile(file, originals.get(file));
+
+  const manifest = JSON.parse(originals.get(manifestPath));
+  manifest.action_declaration.actions[0].target_scope.target_types = ["wrong_target"];
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  expectIncompatible("action target");
+  await restore(manifestPath);
+
+  for (const mutate of [
+    (value) => { value.manifest_version = "lode.site-capability.manifest.v999"; },
+    (value) => { value.package_type = "future-capability"; },
+    (value) => { value.capability.lifecycle = "active"; },
+  ]) {
+    const versionedManifest = JSON.parse(originals.get(manifestPath));
+    mutate(versionedManifest);
+    await writeFile(manifestPath, JSON.stringify(versionedManifest));
+    expectIncompatible("manifest contract version");
+    await restore(manifestPath);
+  }
+
+  const requirements = JSON.parse(originals.get(requirementsPath));
+  requirements.operation_ref = "lode://operation/wrong_operation";
+  await writeFile(requirementsPath, JSON.stringify(requirements));
+  expectIncompatible("resource requirement operation");
+  await restore(requirementsPath);
+
+  const schemaRequirements = JSON.parse(originals.get(requirementsPath));
+  schemaRequirements.resource_requirement_profiles[0].input_binding.input_schema = "lode://schema/wrong";
+  await writeFile(requirementsPath, JSON.stringify(schemaRequirements));
+  expectIncompatible("resource requirement schema binding");
+  await restore(requirementsPath);
+
+  const boundaryRequirements = JSON.parse(originals.get(requirementsPath));
+  boundaryRequirements.resource_requirement_profiles[0].operation_boundary = "validate_only";
+  await writeFile(requirementsPath, JSON.stringify(boundaryRequirements));
+  expectIncompatible("resource requirement operation boundary");
+  await restore(requirementsPath);
+
+  for (const requiredFields of [["url"], ["url", "missing_field"], ["url", "limit"]]) {
+    const fieldRequirements = JSON.parse(originals.get(requirementsPath));
+    fieldRequirements.resource_requirement_profiles[0].input_binding.required_input_fields = requiredFields;
+    await writeFile(requirementsPath, JSON.stringify(fieldRequirements));
+    expectIncompatible("resource requirement input fields");
+    await restore(requirementsPath);
+  }
+
+  const catalogMetadata = JSON.parse(originals.get(catalogPath));
+  catalogMetadata.operation_id = "wrong_operation";
+  await writeFile(catalogPath, JSON.stringify(catalogMetadata));
+  expectIncompatible("catalog operation");
+  await restore(catalogPath);
+
+  const catalogVersion = JSON.parse(originals.get(catalogPath));
+  catalogVersion.schema_version = "lode.catalog-metadata.v999";
+  await writeFile(catalogPath, JSON.stringify(catalogVersion));
+  expectIncompatible("catalog schema version");
+  await restore(catalogPath);
+
+  const query = JSON.parse(originals.get(queryPath));
+  for (const group of query.queries) {
+    for (const result of group.results ?? []) if (result.package_ref === packageRef) result.operation_id = "wrong_operation";
+  }
+  await writeFile(queryPath, JSON.stringify(query));
+  expectIncompatible("query operation");
+  await restore(queryPath);
+
+  for (const mutate of [
+    (schema) => { schema.$schema = "https://json-schema.org/draft/2099-01/schema"; },
+    (schema) => { schema["x-lode"].operation_ref = "lode://operation/wrong"; },
+    (schema) => { schema["x-lode"].operation_mode = "validate_only"; },
+  ]) {
+    const input = JSON.parse(originals.get(inputPath));
+    mutate(input);
+    await writeFile(inputPath, JSON.stringify(input));
+    expectIncompatible("input schema action binding");
+    await restore(inputPath);
+  }
+
+  for (const mutate of [
+    (lock) => { lock.schema_version = "lode.package-lock.v999"; },
+    (lock) => { lock.locked_assets.find((asset) => asset.role === "input_schema").path = "schemas/wrong.json"; },
+    (lock) => { lock.locked_assets.find((asset) => asset.role === "input_schema").ref = "lode://schema/wrong"; },
+    (lock) => { lock.locked_assets.find((asset) => asset.role === "input_schema").version = "9.9.9"; },
+    (lock) => { lock.locked_assets.push({ ...lock.locked_assets.find((asset) => asset.role === "input_schema") }); },
+  ]) {
+    const packageLock = JSON.parse(originals.get(lockPath));
+    mutate(packageLock);
+    await writeFile(lockPath, JSON.stringify(packageLock));
+    expectIncompatible("package lock asset binding");
+    await restore(lockPath);
+  }
+
+  for (const mutate of [
+    (schema) => { schema.additionalProperties = true; },
+    (schema) => { schema.required = schema.required.filter((field) => field !== "result_kind"); },
+    (schema) => { schema["x-lode"].schema_version = "9.9.9"; },
+    (schema) => { delete schema.properties.result_kind; },
+    (schema) => { schema.properties.notes = { type: 42, required: "not-an-array", additionalProperties: "yes" }; },
+    (schema) => { schema.properties.notes = { unknownKeyword: true }; },
+    (schema) => { schema.properties.notes = { $ref: "https://example.test/remote-schema" }; },
+    (schema) => { schema.properties.notes = { $ref: "#/$defs/missing" }; },
+    (schema) => { schema.properties.notes = { type: "string", pattern: "^[a-z]*[a-y]*z$" }; },
+  ]) {
+    const output = JSON.parse(originals.get(outputPath));
+    mutate(output);
+    await writeFile(outputPath, JSON.stringify(output));
+    expectIncompatible("output schema");
+  }
+  await restore(outputPath);
+} finally {
+  await rm(contractBindingRoot, { recursive: true, force: true });
 }
 
 const resultViewRoot = await mkdtemp(path.join(tmpdir(), "webenvoy-lode-result-view-"));

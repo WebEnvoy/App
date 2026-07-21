@@ -63,6 +63,22 @@ type WebEnvoyManualAuthenticationCompletionIntent = {
   base: string;
   runtimeSessionRef: string;
 };
+type WebEnvoyLocalFileReference = {
+  localRef: string;
+  name: string;
+  size: number;
+  lastModified: number;
+  type: string;
+};
+type WebEnvoyLocalFileReadability = {
+  localRef: string;
+  readable: boolean;
+  reason: "readable" | "unreadable" | "not_regular_file" | "invalid_reference";
+};
+type WebEnvoyProtectedDraftResult = {
+  status: "ready" | "unavailable" | "rejected";
+  draft?: unknown;
+};
 type WebEnvoyLodeCatalogField = {
   id: string;
   label: string;
@@ -75,6 +91,11 @@ type WebEnvoyLodeCatalogField = {
   maximum?: number;
   minLength?: number;
   maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  pattern?: string;
+  patternSafety?: "linear";
   format?: "uri";
   integer?: boolean;
 };
@@ -134,6 +155,9 @@ type WebEnvoyLodeCatalogState = {
   summary: string;
   skills: WebEnvoyLodeCatalogSkill[];
 };
+type WebEnvoyLocalFileSelectionResult =
+  | { status: "ready"; files: WebEnvoyLocalFileReference[] }
+  | { status: "unavailable" | "rejected"; files: [] };
 
 interface Window {
   webenvoyShell?: {
@@ -144,6 +168,12 @@ interface Window {
     getLodeCatalog?: () => Promise<WebEnvoyLodeCatalogState>;
     requestOwnerJson?: (request: WebEnvoyOwnerApiJsonRequest) => Promise<unknown>;
     completeHarborManualAuthentication?: (intent: WebEnvoyManualAuthenticationCompletionIntent) => Promise<unknown>;
+    selectLocalFiles?: () => Promise<WebEnvoyLocalFileSelectionResult>;
+    checkLocalFiles?: (localRefs: string[]) => Promise<WebEnvoyLocalFileReadability[]>;
+    releaseLocalFiles?: (localRefs: string[]) => Promise<WebEnvoyProtectedDraftResult>;
+    loadProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
+    saveProtectedDraft?: (draft: unknown) => Promise<WebEnvoyProtectedDraftResult>;
+    deleteProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
     subscribeToSystemThemeVariant?: (
       listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
     ) => () => void;

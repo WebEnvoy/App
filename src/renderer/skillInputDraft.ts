@@ -2,9 +2,20 @@ import type { LodeCatalogSkill } from "./lodeCatalogClient";
 
 export type SkillInputValue = string | boolean | string[];
 
+export type SkillInputAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+  localRef?: string;
+  state: "ready" | "reselect" | "unreadable";
+  file?: File;
+};
+
 export type SkillInputDraft = {
   values: Record<string, SkillInputValue>;
-  files: Record<string, File[]>;
+  files: Record<string, SkillInputAttachment[]>;
 };
 
 export type SkillInputErrors = Record<string, string>;
@@ -39,15 +50,20 @@ function initialValue(field: WebEnvoyLodeCatalogField): SkillInputValue {
 }
 
 function validateField(field: WebEnvoyLodeCatalogField, draft: SkillInputDraft) {
-  if (field.kind === "constant") return null;
+  if (field.kind === "constant") return sameValue(draft.values[field.id], initialValue(field)) ? null : "固定字段与技能合同不一致";
   if (field.kind === "file") {
-    return field.required && (draft.files[field.id]?.length ?? 0) === 0 ? "请选择文件" : null;
+    const attachments = draft.files[field.id] ?? [];
+    if (attachments.some((attachment) => attachment.state !== "ready")) return "附件不可读，请重新选择或移除";
+    return field.required && attachments.length === 0 ? "请选择文件" : null;
   }
   const value = draft.values[field.id];
   if (field.kind === "multi-select") {
     const selections = Array.isArray(value) ? value : [];
-    if (field.required && selections.length === 0) return "请至少选择一项";
-    return selections.some((item) => !field.options?.includes(item)) ? "包含合同未声明的选项" : null;
+    if (!field.required && selections.length === 0) return null;
+    return (selections.some((item) => !field.options?.includes(item)) ? "包含合同未声明的选项" : null)
+      ?? (field.minItems != null && selections.length < field.minItems ? `请至少选择 ${field.minItems} 项` : null)
+      ?? (field.maxItems != null && selections.length > field.maxItems ? `最多选择 ${field.maxItems} 项` : null)
+      ?? (field.uniqueItems && new Set(selections).size !== selections.length ? "选项不能重复" : null);
   }
   if (field.kind === "boolean") return typeof value === "boolean" ? null : "请选择是否启用";
   const text = typeof value === "string" ? value : "";
@@ -64,7 +80,14 @@ function validateField(field: WebEnvoyLodeCatalogField, draft: SkillInputDraft) 
   if (field.minLength != null && text.length < field.minLength) return `至少输入 ${field.minLength} 个字符`;
   if (field.maxLength != null && text.length > field.maxLength) return `最多输入 ${field.maxLength} 个字符`;
   if (field.format === "uri" && !isValidUrl(text)) return "请输入有效网址";
+  if (field.pattern != null && (field.patternSafety !== "linear" || !new RegExp(field.pattern).test(text))) return "输入内容不符合技能要求";
   return null;
+}
+
+function sameValue(left: SkillInputValue | undefined, right: SkillInputValue) {
+  return Array.isArray(left) && Array.isArray(right)
+    ? left.length === right.length && left.every((item, index) => item === right[index])
+    : left === right;
 }
 
 function isValidUrl(value: string) {

@@ -21,7 +21,7 @@ export type IdentityCompatibilityCandidate = {
 };
 
 export type SkillIdentityCompatibilityState = {
-  status: "loading" | "ready" | "unavailable";
+  status: "loading" | "ready" | "direct_url_unavailable" | "unavailable";
   summary: string;
   candidates: IdentityCompatibilityCandidate[];
 };
@@ -81,6 +81,7 @@ const recoveryActions = new Set([
 ]);
 const consumerBoundary =
   "Core returns bounded compatibility reasons and public freshness only; no task, thread, run, session, browser action, credential, cookie, token, profile storage, evidence body, or raw owner response is created or exposed.";
+const opaqueDetailRefPattern = /^detail_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function loadingSkillIdentityCompatibility(): SkillIdentityCompatibilityState {
   return { status: "loading", summary: "正在检查账号身份兼容性。", candidates: [] };
@@ -101,16 +102,22 @@ export async function fetchSkillIdentityCompatibility(
   if (refs.length === 0) {
     return unavailableSkillIdentityCompatibility("没有账号身份可供兼容性检查。");
   }
+  const target = projectCompatibilityTarget(skill, targetRef);
+  if (target.status === "awaiting_input") return createAwaitingTargetCompatibility(refs);
+  if (target.status === "direct_url_unavailable") {
+    return {
+      status: "direct_url_unavailable",
+      summary: "当前不能从网址直接创建详情任务。请先运行同站点搜索技能，再从搜索结果打开详情。",
+      candidates: [],
+    };
+  }
+  if (target.status === "invalid") return unavailableSkillIdentityCompatibility(target.summary);
   const candidates: IdentityCompatibilityCandidate[] = [];
   for (let index = 0; index < refs.length; index += 32) {
-    const request = createSkillIdentityCompatibilityRequest(skill, refs.slice(index, index + 32), targetRef);
+    const request = createSkillIdentityCompatibilityRequest(skill, refs.slice(index, index + 32), target.targetRef);
     if (request == null) {
       return unavailableSkillIdentityCompatibility(
-        skillRequiresExactTarget(skill)
-          ? targetRef == null
-            ? "请先填写具体目标，再检查账号身份兼容性。"
-            : "具体目标与技能声明不匹配，已停止创建任务。"
-          : "技能缺少兼容性预检查所需的版本化声明。",
+        "技能缺少兼容性预检查所需的版本化声明。",
       );
     }
     let payload: unknown;
@@ -182,7 +189,7 @@ export function createSkillIdentityCompatibilityRequest(
   const target = publicOrigin(action.supportedOrigins[0]!);
   if (target == null) return null;
   const compatibilityTarget = skillRequiresExactTarget(skill)
-    ? publicTargetRef(targetRef, target)
+    ? opaqueDetailRefPattern.test(targetRef ?? "") ? targetRef! : null
     : `${target}/`;
   if (compatibilityTarget == null) return null;
   return {
@@ -200,14 +207,34 @@ export function createSkillIdentityCompatibilityRequest(
   };
 }
 
-function publicTargetRef(value: string | undefined, expectedOrigin: string) {
-  if (value == null) return null;
+export function projectCompatibilityTarget(skill: LodeCatalogSkill, value?: string):
+  | { status: "ready"; targetRef: string }
+  | { status: "awaiting_input" }
+  | { status: "direct_url_unavailable" }
+  | { status: "invalid"; summary: string } {
+  if (!skillRequiresExactTarget(skill)) {
+    const action = skill.actions.length === 1 ? skill.actions[0] : undefined;
+    const origin = action?.supportedOrigins.length === 1 ? publicOrigin(action.supportedOrigins[0]!) : null;
+    return origin == null ? { status: "invalid", summary: "技能缺少可验证的目标来源。" } : { status: "ready", targetRef: `${origin}/` };
+  }
+  if (value == null || value.trim().length === 0) return { status: "awaiting_input" };
+  if (opaqueDetailRefPattern.test(value)) return { status: "ready", targetRef: value };
   try {
     const url = new URL(value);
-    if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.origin !== expectedOrigin || url.hash) return null;
-    return url.toString();
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.hash) {
+      return { status: "invalid", summary: "具体目标不是可由 owner 解析的安全网址。" };
+    }
+    const action = skill.actions.length === 1 ? skill.actions[0] : undefined;
+    const field = compatibilityTargetFieldId(skill) == null
+      ? undefined
+      : skill.inputFields.find((item) => item.id === compatibilityTargetFieldId(skill));
+    if (action?.supportedOrigins.length !== 1 || publicOrigin(action.supportedOrigins[0]!) !== url.origin ||
+      field?.pattern == null || field.patternSafety !== "linear" || !new RegExp(field.pattern).test(value)) {
+      return { status: "invalid", summary: "具体目标不符合技能声明的站点与路径。" };
+    }
+    return { status: "direct_url_unavailable" };
   } catch {
-    return null;
+    return { status: "invalid", summary: "具体目标既不是合法网址，也不是 Core 拥有的不透明详情引用。" };
   }
 }
 
