@@ -139,7 +139,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         };
         const runtimeSupervisorState = await readRuntimeSupervisorState();
         const coreThreadReadReady = Boolean(await waitUntil(
-          () => document.body.textContent?.includes("当前没有任务线程。")
+          () => document.querySelector(".task-list-empty")?.textContent?.trim() === "暂无任务线程"
         ));
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({

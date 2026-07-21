@@ -54,7 +54,11 @@ function validateField(field: WebEnvoyLodeCatalogField, draft: SkillInputDraft) 
   if (field.kind === "file") {
     const attachments = draft.files[field.id] ?? [];
     if (attachments.some((attachment) => attachment.state !== "ready")) return "附件不可读，请重新选择或移除";
-    return field.required && attachments.length === 0 ? "请选择文件" : null;
+    if (field.required && attachments.length === 0) return "请选择文件";
+    if (field.minItems != null && attachments.length < field.minItems) return `请至少选择 ${field.minItems} 个文件`;
+    const maximum = Math.min(field.maxItems ?? 32, 32);
+    if (attachments.length > maximum) return `最多选择 ${maximum} 个文件`;
+    return new Set(attachments.map((attachment) => attachment.id)).size !== attachments.length ? "附件不能重复" : null;
   }
   const value = draft.values[field.id];
   if (field.kind === "multi-select") {

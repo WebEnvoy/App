@@ -36,9 +36,14 @@ export function useAppTasks(
     setSubmitStates, setSubmittedOverrides,
   });
   const threadNavigationItems = useThreadNavigation(selection.selectedTask);
+  function acceptTaskThreadProjection(task: TaskProjection) {
+    const key = coreSubmitStateKey(task.id, endpoint);
+    setSubmittedOverrides((current) => ({ ...current, [key]: { endpoint, taskId: task.id, task } }));
+    selection.selectTask(task);
+  }
   return {
     ...selection, ...submission, coreSubmitState, effectiveCoreReadState, selectedSubmitTask,
-    taskThreads, threadNavigationItems, workbenchTaskThreads,
+    taskThreads, threadNavigationItems, workbenchTaskThreads, acceptTaskThreadProjection,
   };
 }
 
@@ -48,20 +53,20 @@ function useTaskSelection(tasks: TaskProjection[]) {
   const [rightPanelOpenRequestKey, setRightPanelOpenRequestKey] = useState<number>();
   const selectedTaskIdRef = useRef(selectedTaskId);
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
-  const selectedRun = selectedTask?.runs.find((run) => run.id === selectedRunId) ?? selectedTask?.runs[0];
+  const selectedRun = selectedTask?.runs.find((run) => run.id === selectedRunId) ?? selectedTask?.runs.at(-1);
   useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
   useEffect(() => {
     const task = tasks.find((item) => item.id === selectedTaskId) ?? tasks[0];
     if (task == null) return;
     if (task.id !== selectedTaskId) {
       setSelectedTaskId(task.id);
-      setSelectedRunId(task.runs[0]?.id ?? "");
-    } else if (!task.runs.some((run) => run.id === selectedRunId)) setSelectedRunId(task.runs[0]?.id ?? "");
+      setSelectedRunId(task.runs.at(-1)?.id ?? "");
+    } else if (!task.runs.some((run) => run.id === selectedRunId)) setSelectedRunId(task.runs.at(-1)?.id ?? "");
   }, [selectedRunId, selectedTaskId, tasks]);
 
   function selectTask(task: TaskProjection) {
     setSelectedTaskId(task.id);
-    setSelectedRunId(task.runs[0]?.id ?? "");
+    setSelectedRunId(task.runs.at(-1)?.id ?? "");
   }
 
   return {

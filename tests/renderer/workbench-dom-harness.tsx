@@ -2,6 +2,7 @@ import { BriefcaseBusiness } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import { fetchPendingAuthorizationDecision } from "../../src/renderer/authorizationDecisionClient";
 import { initialCoreTaskSubmitState } from "../../src/renderer/coreTaskSubmitClient";
 import { OwnerState } from "../../src/renderer/OwnerState";
 import {
@@ -19,7 +20,7 @@ import {
   RightPanel,
   ThreadWorkspace,
 } from "../../src/renderer/shellPrimitives";
-import { TaskThreadPage } from "../../src/renderer/TaskThreadPage";
+import { SingleActionConfirmation, TaskThreadPage } from "../../src/renderer/TaskThreadPage";
 import { TaskThreadRightPanel } from "../../src/renderer/TaskThreadRightPanel";
 import type { ThreadNavigationItem } from "../../src/renderer/ThreadNavigationRail";
 import { WorkbenchSidebar } from "../../src/renderer/WorkbenchSidebar";
@@ -32,6 +33,8 @@ const taskAId = "thread_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const taskBId = "thread_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const emptyTaskId = "thread_cccccccccccccccccccccccccccccccc";
 const consumerBoundary = "Core stores bounded field summaries and owner refs only; raw content remains with its owner.";
+const authorizationDecisionRef = "authorization-decision:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const authorizationRequests: WebEnvoyOwnerApiJsonRequest[] = [];
 const ownerPayload = {
   ok: true,
   threads: [
@@ -130,10 +133,57 @@ window.webenvoyShell = {
     colorScheme: "light",
     configScope: "local-ui-only",
   }),
-  requestOwnerJson: async () => ({ ok: true, body: ownerPayload }),
+  requestOwnerJson: async (request) => {
+    authorizationRequests.push(request);
+    if (request.path === `/authorization-decisions/${encodeURIComponent(authorizationDecisionRef)}`) {
+      return { ok: true, body: { ok: true, authorization_decision: {
+        schema_version: "webenvoy.authorization-decision.v0",
+        decision_ref: authorizationDecisionRef,
+        business_action: {
+          action_instance_ref: "action-instance:xhs-search",
+          action_id: "xhs_search_notes",
+          category: "read",
+          target: { target_ref: "target:xhs-search-results", target_type: "search_results_page", site_slug: "xiaohongshu", origin: "https://www.xiaohongshu.com" },
+        },
+        owner_declaration: {
+          matcher: "lode_action_declaration",
+          declaration_ref: "lode:action/xhs_search_notes",
+          declaration_version: "0.1.0",
+          resource_match_ref: "lode:resource/xhs_search_notes",
+          resource_match_version: "0.1.0",
+        },
+        effective_policy: { mode: "confirm", source: "installed_skill_user_version", source_version: "1" },
+        applicability: { scope: "task", run_id: "run-owner-a-confirming", thread_id: taskAId, turn_id: "turn_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3", config_refs: ["execution-policy:skill/xhs"] },
+        outcome: "confirm",
+        risk_marker: null,
+        decided_at: "2026-07-20T08:00:00Z",
+        expires_at: "2099-07-20T08:05:00Z",
+        state: "active",
+        invalidated_at: null,
+        invalidation_reason: null,
+        consumer_boundary: "Business policy decision summary only; technical trace and private browser, evidence, and content material are excluded.",
+      } } };
+    }
+    if (request.path === `/authorization-decisions/${encodeURIComponent(authorizationDecisionRef)}/single-action`) {
+      return { ok: true, body: { ok: true, single_action_decision: {
+        schema_version: "webenvoy.single-action-decision.v0",
+        confirmation_decision_ref: authorizationDecisionRef,
+        mode: "deny",
+      } } };
+    }
+    return { ok: true, body: ownerPayload };
+  },
 };
 
 const ownerState = await fetchCoreThreadState(coreEndpoint);
+const authorizationBinding = {
+  decisionRef: authorizationDecisionRef,
+  runId: "run-owner-a-confirming",
+  threadId: taskAId,
+  turnId: "turn_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3",
+};
+const authorizationProbe = await fetchPendingAuthorizationDecision(coreEndpoint, authorizationBinding);
+if (!authorizationProbe.ok) throw new Error(`Authorization decision fixture was rejected: ${authorizationProbe.reason}`);
 const retainedState = retainLastKnownCoreThreads(
   ownerState,
   unavailableCoreThreadState(coreEndpoint, "Core runtime disconnected."),
@@ -155,6 +205,15 @@ function WorkbenchDomHarness() {
   const selectedRun = selectedTask?.runs.find(
     (run) => run.id === selectedRunId,
   ) ?? selectedTask?.runs.find((run) => run.lifecycle === "completed") ?? selectedTask?.runs[0];
+  const displayedTask = selectedTask;
+  const displayedRun = displayedTask?.runs.find((run) => run.id === selectedRun?.id);
+  const confirmationRun = selectedTask.id === taskAId && displayedRun != null ? {
+    ...displayedRun,
+    id: authorizationBinding.runId,
+    turnId: authorizationBinding.turnId,
+    turnStatus: "waiting_for_user" as const,
+    authorizationDecisionRefs: [authorizationDecisionRef],
+  } : null;
   const navigationItems = useMemo<ThreadNavigationItem[]>(
     () => selectedTask?.runs.map((run) => ({
       id: run.id,
@@ -206,35 +265,45 @@ function WorkbenchDomHarness() {
           </div>
         </header>
       )}
-      workspace={selectedRun ? (
+      workspace={displayedRun ? (
         <ThreadWorkspace workspaceKey={`work:${selectedTask.id}`}>
           <TaskThreadPage
+            coreEndpoint={coreEndpoint}
             coreReadState={retainedState}
             coreSubmitState={initialCoreTaskSubmitState}
             navigationItems={navigationItems}
             runtimeSupervisorState={runtimeState}
-            selectedRun={selectedRun}
-            selectedTask={selectedTask}
+            skill={undefined}
+            selectedRun={displayedRun}
+            selectedTask={displayedTask}
             onActiveRunChange={(runId) => setSelectedRunIds((current) => ({
               ...current,
               [selectedTask.id]: runId,
             }))}
             onOpenPreview={() => setRightPanelOpenRequestKey((key) => (key ?? 0) + 1)}
           />
+          {confirmationRun == null ? null : (
+            <SingleActionConfirmation
+              endpoint={coreEndpoint}
+              identityLabel={selectedTask.accountIdentity}
+              run={confirmationRun}
+              threadRef={selectedTask.id}
+            />
+          )}
         </ThreadWorkspace>
       ) : (
         <ThreadWorkspace workspaceKey={`work:${selectedTask.id}`}>
           <OwnerState title="暂无任务回合" summary="该线程已创建，尚未提交业务输入。" />
         </ThreadWorkspace>
       )}
-      right={selectedRun ? (
+      right={displayedRun ? (
         <RightPanel>
           <TaskThreadRightPanel
             coreReadState={retainedState}
             coreSubmitState={initialCoreTaskSubmitState}
             runtimeSupervisorState={runtimeState}
-            selectedRun={selectedRun}
-            selectedTask={selectedTask}
+            selectedRun={displayedRun}
+            selectedTask={displayedTask}
             shellDiagnostics={{ colorScheme: "light", configScope: "local-ui-only", platform: "darwin" }}
           />
         </RightPanel>
@@ -289,6 +358,17 @@ async function runDesktopChecks() {
   assert(matchMedia("(prefers-reduced-motion: reduce)").matches, "Reduced motion was not emulated.");
   const menuActions = document.querySelector<HTMLElement>(".task-list-heading-actions");
   assert(menuActions && getComputedStyle(menuActions).transitionDuration === "0s", "Reduced-motion CSS did not disable transitions.");
+  await waitFor(() => document.body.textContent?.includes("允许这一次") === true && document.body.textContent?.includes("拒绝这一次") === true,
+    "Active Core confirmation did not render both single-action choices.");
+  const denyOnce = Array.from(document.querySelectorAll<HTMLButtonElement>(".single-action-actions button"))
+    .find((button) => button.textContent?.includes("拒绝这一次"));
+  assert(denyOnce, "Single-action deny button is missing.");
+  denyOnce.click();
+  await waitFor(() => document.body.textContent?.includes("已拒绝这一次。") === true, "Single-action deny did not settle in the UI.");
+  const decisionRequest = authorizationRequests.find((request) => request.path.endsWith("/single-action"));
+  assert(decisionRequest?.method === "POST" && (decisionRequest.body as { choice?: string })?.choice === "deny_once",
+    "Single-action choice was not sent to the Core owner endpoint.");
+  assert(!authorizationRequests.some((request) => request.method === "PUT"), "Single-action confirmation mutated a persistent execution policy.");
 
   const opener = previewButton();
   assert(opener, "Preview opener is missing.");
@@ -340,6 +420,7 @@ async function runDesktopChecks() {
     rightPanelFocusAndRestore: true,
     corruptPreferenceFallback: true,
     reducedMotion: true,
+    singleActionDecision: true,
   };
 }
 

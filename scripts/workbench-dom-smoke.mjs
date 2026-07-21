@@ -57,6 +57,15 @@ async function waitForVite(url, stderr) {
   throw new Error(`Timed out waiting for ${url}.\n${stderr()}`);
 }
 
+async function runRendererCheck(expression, label) {
+  const result = await window.webContents.executeJavaScript(`Promise.resolve().then(() => ${expression}).then(
+    (value) => ({ ok: true, value }),
+    (error) => ({ ok: false, message: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined })
+  )`, true);
+  if (!result.ok) throw new Error(`${label} failed: ${result.stack ?? result.message}`);
+  return result.value;
+}
+
 async function run() {
   if (process.env.WEBENVOY_WORKBENCH_DOM_FORCE_FAILURE === "1") {
     throw new Error("Forced workbench DOM smoke failure.");
@@ -89,6 +98,12 @@ async function run() {
       sandbox: false,
     },
   });
+  window.webContents.on("console-message", (details) => {
+    if (details.level === "error") stage(`renderer error: ${details.message}`);
+  });
+  window.webContents.on("render-process-gone", (_event, details) => {
+    stage(`renderer process gone: ${details.reason}`);
+  });
   stage("BrowserWindow created");
   const navigationModule = await import(pathToFileURL(path.join(root, "dist-electron/rendererNavigationGuard.js")).href);
   const workbenchIpcModule = await import(pathToFileURL(path.join(root, "dist-electron/workbenchIpc.js")).href);
@@ -108,14 +123,14 @@ async function run() {
 
   stage("running desktop checks");
   const desktop = await withTimeout(
-    window.webContents.executeJavaScript("window.__runWorkbenchDomSmoke('desktop')", true),
+    runRendererCheck("window.__runWorkbenchDomSmoke('desktop')", "Desktop DOM checks"),
     "Desktop DOM checks",
   );
   stage("resizing to 720x900");
   window.setContentSize(720, 900);
   await new Promise((resolve) => setTimeout(resolve, 100));
   const narrow = await withTimeout(
-    window.webContents.executeJavaScript("window.__runWorkbenchDomSmoke('narrow')", true),
+    runRendererCheck("window.__runWorkbenchDomSmoke('narrow')", "Narrow DOM checks"),
     "Narrow DOM checks",
   );
   stage("loading Library harness");
@@ -125,7 +140,7 @@ async function run() {
     "Library harness load",
   );
   const libraryDesktop = await withTimeout(
-    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('desktop')", true),
+    runRendererCheck("window.__runLibraryDomSmoke('desktop')", "Library desktop DOM checks"),
     "Library desktop DOM checks",
   );
   window.setContentSize(1200, 900);
@@ -136,7 +151,7 @@ async function run() {
     "Library narrow harness reload",
   );
   const libraryNarrow = await withTimeout(
-    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('narrow')", true),
+    runRendererCheck("window.__runLibraryDomSmoke('narrow')", "Library narrow DOM checks"),
     "Library narrow DOM checks",
   );
   if (window.webContents.getZoomFactor() !== 2) throw new Error("Library narrow checks did not run at 200% zoom.");
@@ -147,7 +162,7 @@ async function run() {
     "Library stale harness load",
   );
   const libraryStale = await withTimeout(
-    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('stale')", true),
+    runRendererCheck("window.__runLibraryDomSmoke('stale')", "Library stale DOM checks"),
     "Library stale DOM checks",
   );
   stage("loading production shell harness");
@@ -157,7 +172,7 @@ async function run() {
     "Production shell harness load",
   );
   const productionShell = await withTimeout(
-    window.webContents.executeJavaScript("window.__runLibraryDomSmoke('production')", true),
+    runRendererCheck("window.__runLibraryDomSmoke('production')", "Production shell DOM checks"),
     "Production shell DOM checks",
   );
   if (window.webContents.getZoomFactor() !== 2) throw new Error("Production shell checks did not run at 200% zoom.");

@@ -1,10 +1,14 @@
 import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../../src/electron/boundedJsonResponse";
+import { checkRejectedAuthorizationDecisions } from "./authorization-decision-contract-smoke";
 import {
   compatibilityTargetFieldId,
   createSkillIdentityCompatibilityRequest,
   parseSkillIdentityCompatibilityResponse,
   projectCompatibilityTarget,
 } from "../../src/renderer/coreIdentityCompatibilityClient";
+import { buildCoreThreadInputSnapshot } from "../../src/renderer/coreTaskThreadSubmitClient";
+import { projectCoreThreadResponse } from "../../src/renderer/coreThreadClient";
+import { parseCoreThreadInputSnapshot } from "../../src/renderer/coreThreadInputContract";
 import { projectLodeCatalogDisplayCache, type LodeCatalogLoadState, type LodeCatalogSkill } from "../../src/renderer/lodeCatalogClient";
 import { createLatestRequestGate } from "../../src/renderer/latestRequestGate";
 import { browserAttachments, refreshLocalAttachments, selectLocalAttachments } from "../../src/renderer/localFileClient";
@@ -27,8 +31,59 @@ const consumerBoundary =
 export async function runLibraryContractSmoke(input: SmokeInput) {
   const request = checkRequestProjection(input);
   checkResponseProjection(request);
+  checkTurnInputProjection(input.xhsSkill);
   await checkDraftProjection(input);
   await checkOwnerBoundaries(input.catalog);
+  await checkRejectedAuthorizationDecisions();
+}
+
+function checkTurnInputProjection(xhsSkill: LodeCatalogSkill) {
+  const thread = {
+    schema_version: "webenvoy.task-thread.v0",
+    thread_id: "thread_22222222222222222222222222222222",
+    capability_ref: "lode:capability/search-notes",
+    identity_environment_ref: "identity-env_aaaaaaaaaaaaaaaaaaaaaaaa",
+    created_at: "2026-07-20T00:00:00.000Z",
+    updated_at: "2026-07-20T00:00:00.000Z",
+    turns: [],
+  };
+  if (projectCoreThreadResponse({ ok: true, thread }) == null ||
+    projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "identity-env:legacy-safe" } }) == null ||
+    projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "harbor://identity-environment/unsafe" } }) != null) {
+    throw new Error("Core thread projection did not distinguish canonical, safe legacy, and unsupported identity refs.");
+  }
+  const skill: LodeCatalogSkill = {
+    ...xhsSkill,
+    inputFields: [
+      ...xhsSkill.inputFields,
+      { id: "body", label: "Body", kind: "multiline", required: true, description: "Declared long text", inputProjection: "owner_ref" },
+      { id: "attachments", label: "Attachments", kind: "file", required: false, description: "Declared files", inputProjection: "owner_ref" },
+    ],
+  };
+  const draft = createSkillInputDraft(skill);
+  draft.values.url = "https://www.xiaohongshu.com/explore?query=url-private-sentinel#fragment-private-sentinel";
+  draft.values.keyword = "AI tools";
+  draft.values.limit = "8";
+  draft.values.body = "long-text-private-sentinel";
+  draft.files.attachments = browserAttachments([new File(["file-private-sentinel"], "private-name.txt", { type: "text/plain" })]);
+  const ownerRef = "draft:app-protected/00000000-0000-4000-8000-000000000020";
+  const result = buildCoreThreadInputSnapshot(skill, draft, {
+    ownerRef,
+    fieldOwnerRefs: Object.fromEntries(skill.inputFields.map((field) => [field.id, `${ownerRef}/${field.id}`])),
+    attachmentRefs: { attachments: ["attachment:app-protected/00000000-0000-4000-8000-000000000020/attachments/0"] },
+  });
+  if (!result.ok) throw new Error(`Valid Core input snapshot was rejected: ${result.reason}`);
+  const parsed = parseCoreThreadInputSnapshot(result.value);
+  const serialized = JSON.stringify(result.value);
+  const fields = Object.fromEntries((parsed?.fields ?? []).map((field) => [field.field_id, field]));
+  if (fields.url?.kind !== "long_text" || fields.url.owner_ref !== `${ownerRef}/url` ||
+    fields.keyword?.kind !== "long_text" || fields.keyword.owner_ref !== `${ownerRef}/keyword` ||
+    fields.limit?.kind !== "scalar" || fields.limit.summary !== "8" ||
+    fields.body?.kind !== "long_text" || fields.body.owner_ref !== `${ownerRef}/body` ||
+    fields.attachments?.kind !== "file" || result.value.attachment_refs.length !== 1 ||
+    /url-private-sentinel|fragment-private-sentinel|long-text-private-sentinel|private-name|file-private-sentinel/.test(serialized)) {
+    throw new Error("Core input snapshot mixed scalar, URL, long-text, or file ownership boundaries.");
+  }
 }
 
 function checkRequestProjection({ detailSkill, identityEnvironmentRef, xhsSkill }: SmokeInput) {
@@ -115,18 +170,18 @@ async function checkDraftProjection({ protectedDrafts, xhsSkill }: SmokeInput) {
   const skill: LodeCatalogSkill = {
     ...xhsSkill,
     inputFields: [
-      { id: "body", label: "Body", kind: "multiline", required: true, description: "Long text", minLength: 2, maxLength: 10 },
-      { id: "attachments", label: "Attachments", kind: "file", required: true, description: "Declared files" },
-      { id: "sections", label: "Sections", kind: "multi-select", required: true, description: "Declared options", options: ["title", "summary", "links"], defaultValue: ["title"], minItems: 1, maxItems: 2, uniqueItems: true },
-      { id: "guard", label: "Guard", kind: "constant", required: true, description: "Declared constant", defaultValue: "active" },
-      { id: "accessToken", label: "Access token", kind: "text", required: false, description: "Credential" },
-      { id: "detailUrl", label: "Detail URL", kind: "text", required: false, description: "Public URL" },
-      { id: "downloadUrl", label: "Download URL", kind: "text", required: false, description: "Public URL" },
-      { id: "awsUrl", label: "AWS URL", kind: "text", required: false, description: "Public URL" },
-      { id: "gcsUrl", label: "GCS URL", kind: "text", required: false, description: "Public URL" },
-      { id: "oauthUrl", label: "OAuth URL", kind: "text", required: false, description: "Public URL" },
-      { id: "fragmentSasUrl", label: "Fragment SAS URL", kind: "text", required: false, description: "Public URL" },
-      { id: "securityId", label: "Security ID", kind: "text", required: false, description: "Credential" },
+      { id: "body", label: "Body", kind: "multiline", required: true, description: "Long text", inputProjection: "owner_ref", minLength: 2, maxLength: 10 },
+      { id: "attachments", label: "Attachments", kind: "file", required: true, description: "Declared files", inputProjection: "owner_ref" },
+      { id: "sections", label: "Sections", kind: "multi-select", required: true, description: "Declared options", inputProjection: "safe_summary", options: ["title", "summary", "links"], defaultValue: ["title"], minItems: 1, maxItems: 2, uniqueItems: true },
+      { id: "guard", label: "Guard", kind: "constant", required: true, description: "Declared constant", inputProjection: "safe_summary", defaultValue: "active" },
+      { id: "accessToken", label: "Access token", kind: "text", required: false, description: "Credential", inputProjection: "owner_ref" },
+      { id: "detailUrl", label: "Detail URL", kind: "text", required: false, description: "Public URL", inputProjection: "owner_ref" },
+      { id: "downloadUrl", label: "Download URL", kind: "text", required: false, description: "Public URL", inputProjection: "owner_ref" },
+      { id: "awsUrl", label: "AWS URL", kind: "text", required: false, description: "Public URL", inputProjection: "owner_ref" },
+      { id: "gcsUrl", label: "GCS URL", kind: "text", required: false, description: "Public URL", inputProjection: "owner_ref" },
+      { id: "oauthUrl", label: "OAuth URL", kind: "text", required: false, description: "Public URL", inputProjection: "owner_ref" },
+      { id: "fragmentSasUrl", label: "Fragment SAS URL", kind: "text", required: false, description: "Public URL", inputProjection: "owner_ref" },
+      { id: "securityId", label: "Security ID", kind: "text", required: false, description: "Credential", inputProjection: "owner_ref" },
     ],
   };
   const draft = createSkillInputDraft(skill);
@@ -134,6 +189,11 @@ async function checkDraftProjection({ protectedDrafts, xhsSkill }: SmokeInput) {
   draft.values.body = "draft";
   draft.files.attachments = browserAttachments([new File(["public"], "public.txt", { type: "text/plain" })]);
   if (Object.keys(validateSkillInputDraft(skill, draft)).length !== 0) throw new Error("Valid structured draft was rejected.");
+  draft.files.attachments = Array.from({ length: 33 }, (_, index) => ({
+    ...draft.files.attachments[0]!, id: `attachment-${index}`, name: `file-${index}.txt`,
+  }));
+  const excessiveFiles = validateSkillInputDraft(skill, draft).attachments;
+  draft.files.attachments = browserAttachments([new File(["public"], "public.txt", { type: "text/plain" })]);
   draft.values.sections = ["title", "summary", "links"];
   const excessive = validateSkillInputDraft(skill, draft).sections;
   draft.values.sections = ["title", "title"];
@@ -200,7 +260,7 @@ async function checkDraftProjection({ protectedDrafts, xhsSkill }: SmokeInput) {
   const persisted = [...protectedDrafts.values()].find((value) => JSON.stringify(value).includes("restart-safe-identity"));
   const refreshed = await refreshLocalAttachments([{ id: "missing", localRef: "local_file_ref_00000000-0000-4000-8000-000000000002", name: "missing.txt", size: 1, type: "text/plain", lastModified: 1, state: "reselect" }]);
   const persistedText = JSON.stringify(persisted);
-  if (initialErrors.body == null || initialErrors.attachments == null || excessive == null || duplicate == null || constant == null ||
+  if (initialErrors.body == null || initialErrors.attachments == null || excessiveFiles == null || excessive == null || duplicate == null || constant == null ||
     !JSON.stringify(persisted).includes("draft") || !JSON.stringify(persisted).includes("public.txt") ||
     /secret-token|xsec_token|synthetic-secret|secret-id/.test(persistedText) || !persistedText.includes("accessToken") ||
     !persistedText.includes("detailUrl") || !persistedText.includes("downloadUrl") || !persistedText.includes("awsUrl") ||

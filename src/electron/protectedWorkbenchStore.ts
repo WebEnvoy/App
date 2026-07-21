@@ -34,18 +34,27 @@ export type ProtectedDraft = {
 
 type StoredFile = Omit<ProtectedDraftAttachment, "localRef"> & { localRef: string; path: string; touchedAt: number };
 type StoredDraft = ProtectedDraft & { updatedAt: number };
+type SealedInput = ProtectedDraft & { createdAt: number; ownerRef: string };
 type ProtectedState = {
-  schemaVersion: "webenvoy.protected-workbench.v1";
+  schemaVersion: "webenvoy.protected-workbench.v2";
   files: Record<string, StoredFile>;
   drafts: Record<string, StoredDraft>;
+  sealedInputs: Record<string, SealedInput>;
 };
 
-const emptyState = (): ProtectedState => ({ schemaVersion: "webenvoy.protected-workbench.v1", files: {}, drafts: {} });
+export type SealedInputRefs = {
+  ownerRef: string;
+  fieldOwnerRefs: Record<string, string>;
+  attachmentRefs: Record<string, string[]>;
+};
+
+const emptyState = (): ProtectedState => ({ schemaVersion: "webenvoy.protected-workbench.v2", files: {}, drafts: {}, sealedInputs: {} });
 const maxEncryptedBytes = 1024 * 1024;
 const maxPlaintextBytes = 512 * 1024;
 const maxDraftBytes = 64 * 1024;
 const maxFiles = 256;
 const maxDrafts = 64;
+const maxSealedInputs = 32;
 const localRefPattern = /^local_file_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ProtectedWorkbenchStore {
@@ -139,6 +148,32 @@ export class ProtectedWorkbenchStore {
     });
   }
 
+  async sealInput(value: unknown): Promise<SealedInputRefs | null> {
+    const draft = parseDraft(value);
+    if (!this.available || draft == null || draft.omittedFieldIds.length > 0 ||
+      Buffer.byteLength(JSON.stringify(draft)) > maxDraftBytes) return null;
+    const ownerRef = `draft:app-protected/${randomUUID()}`;
+    let refs: SealedInputRefs | null = null;
+    const saved = await this.update((state) => {
+      if (Object.keys(state.sealedInputs).length >= maxSealedInputs) return;
+      const attachmentFieldIds = Object.keys(draft.attachments);
+      const attachmentLocalRefs = Object.values(draft.attachments).flatMap((attachments) =>
+        attachments.map((attachment) => attachment.localRef),
+      );
+      if (attachmentLocalRefs.some((localRef) => localRef == null || state.files[localRef] == null)) return;
+      const fieldOwnerRefs = Object.fromEntries(
+        [...new Set([...Object.keys(draft.values), ...attachmentFieldIds])].map((fieldId) => [fieldId, `${ownerRef}/${fieldId}`]),
+      );
+      const attachmentRefs = Object.fromEntries(Object.entries(draft.attachments).map(([fieldId, attachments]) => [
+        fieldId,
+        attachments.map((_, index) => `attachment:app-protected/${ownerRef.slice("draft:app-protected/".length)}/${fieldId}/${index}`),
+      ]));
+      state.sealedInputs[ownerRef] = { ...draft, createdAt: Date.now(), ownerRef };
+      refs = { ownerRef, fieldOwnerRefs, attachmentRefs };
+    });
+    return saved ? refs : null;
+  }
+
   private async restore() {
     if (this.codec == null) return;
     try {
@@ -149,7 +184,10 @@ export class ProtectedWorkbenchStore {
       const state = parseState(JSON.parse(plaintext) as unknown);
       if (state == null) throw new Error("Protected workbench store is malformed.");
       this.state = state;
-      removeUnusedFiles(this.state, new Set(Object.values(this.state.drafts).flatMap((draft) => [...draftLocalRefs(draft)])), true);
+      removeUnusedFiles(this.state, new Set([
+        ...Object.values(this.state.drafts).flatMap((draft) => [...draftLocalRefs(draft)]),
+        ...Object.values(this.state.sealedInputs).flatMap((input) => [...sealedInputLocalRefs(input)]),
+      ]), true);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
       await unlink(this.filePath).catch(() => undefined);
@@ -189,8 +227,11 @@ async function atomicWrite(filePath: string, value: Buffer) {
 }
 
 function parseState(value: unknown): ProtectedState | null {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["schemaVersion", "files", "drafts"]) ||
-    value.schemaVersion !== "webenvoy.protected-workbench.v1" || !isRecord(value.files) || !isRecord(value.drafts) ||
+  if (!isRecord(value) || !["webenvoy.protected-workbench.v1", "webenvoy.protected-workbench.v2"].includes(String(value.schemaVersion)) ||
+    !hasOnlyKeys(value, value.schemaVersion === "webenvoy.protected-workbench.v1"
+      ? ["schemaVersion", "files", "drafts"]
+      : ["schemaVersion", "files", "drafts", "sealedInputs"]) ||
+    !isRecord(value.files) || !isRecord(value.drafts) || (value.sealedInputs !== undefined && !isRecord(value.sealedInputs)) ||
     Object.keys(value.files).length > maxFiles || Object.keys(value.drafts).length > maxDrafts) return null;
   const files = Object.fromEntries(Object.entries(value.files).flatMap(([key, file]) => {
     const parsed = parseStoredFile(file);
@@ -200,8 +241,15 @@ function parseState(value: unknown): ProtectedState | null {
     const parsed = parseStoredDraft(draft);
     return parsed != null && key === draftKey(parsed.context) ? [[key, parsed]] : [];
   }));
-  return Object.keys(files).length === Object.keys(value.files).length && Object.keys(drafts).length === Object.keys(value.drafts).length
-    ? { schemaVersion: "webenvoy.protected-workbench.v1", files, drafts }
+  const rawSealedInputs = isRecord(value.sealedInputs) ? value.sealedInputs : {};
+  if (Object.keys(rawSealedInputs).length > maxSealedInputs) return null;
+  const sealedInputs = Object.fromEntries(Object.entries(rawSealedInputs).flatMap(([key, input]) => {
+    const parsed = parseSealedInput(input);
+    return parsed != null && key === parsed.ownerRef ? [[key, parsed]] : [];
+  }));
+  return Object.keys(files).length === Object.keys(value.files).length && Object.keys(drafts).length === Object.keys(value.drafts).length &&
+    Object.keys(sealedInputs).length === Object.keys(rawSealedInputs).length
+    ? { schemaVersion: "webenvoy.protected-workbench.v2", files, drafts, sealedInputs }
     : null;
 }
 
@@ -218,6 +266,13 @@ function parseStoredDraft(value: unknown): StoredDraft | null {
   if (!isRecord(value) || !hasOnlyKeys(value, ["context", "values", "attachments", "omittedFieldIds", "updatedAt"]) || !validTime(value.updatedAt)) return null;
   const draft = parseDraft({ context: value.context, values: value.values, attachments: value.attachments, omittedFieldIds: value.omittedFieldIds });
   return draft == null ? null : { ...draft, updatedAt: Number(value.updatedAt) };
+}
+
+function parseSealedInput(value: unknown): SealedInput | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["context", "values", "attachments", "omittedFieldIds", "createdAt", "ownerRef"]) ||
+    !validTime(value.createdAt) || typeof value.ownerRef !== "string" || !/^draft:app-protected\/[0-9a-f-]{36}$/i.test(value.ownerRef)) return null;
+  const draft = parseDraft({ context: value.context, values: value.values, attachments: value.attachments, omittedFieldIds: value.omittedFieldIds });
+  return draft == null || draft.omittedFieldIds.length > 0 ? null : { ...draft, createdAt: Number(value.createdAt), ownerRef: value.ownerRef };
 }
 
 function parseContext(value: unknown): ProtectedDraftContext | null {
@@ -276,15 +331,25 @@ function draftLocalRefs(draft: ProtectedDraft) {
   return new Set(Object.values(draft.attachments).flatMap((items) => items.flatMap((item) => item.localRef == null ? [] : [item.localRef])));
 }
 
+function sealedInputLocalRefs(input: SealedInput) {
+  return draftLocalRefs(input);
+}
+
 function removeUnusedFiles(state: ProtectedState, candidates: Set<string>, removeOthers = false) {
-  const used = new Set(Object.values(state.drafts).flatMap((draft) => [...draftLocalRefs(draft)]));
+  const used = new Set([
+    ...Object.values(state.drafts).flatMap((draft) => [...draftLocalRefs(draft)]),
+    ...Object.values(state.sealedInputs).flatMap((input) => [...sealedInputLocalRefs(input)]),
+  ]);
   for (const ref of Object.keys(state.files)) {
     if ((removeOthers || candidates.has(ref)) && !used.has(ref)) delete state.files[ref];
   }
 }
 
 function trimOldestUnusedFiles(state: ProtectedState, targetCount: number) {
-  const used = new Set(Object.values(state.drafts).flatMap((draft) => [...draftLocalRefs(draft)]));
+  const used = new Set([
+    ...Object.values(state.drafts).flatMap((draft) => [...draftLocalRefs(draft)]),
+    ...Object.values(state.sealedInputs).flatMap((input) => [...sealedInputLocalRefs(input)]),
+  ]);
   const removable = Object.values(state.files).filter((file) => !used.has(file.localRef))
     .sort((left, right) => left.touchedAt - right.touchedAt);
   while (Object.keys(state.files).length > targetCount && removable.length > 0) {

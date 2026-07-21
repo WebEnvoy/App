@@ -94,12 +94,13 @@ export function projectLodeCatalogDisplayCache(state: LodeCatalogLoadState): Lod
       availability: skill.availability,
       availabilityReason: skill.availabilityReason,
       inputSchemaId: skill.inputSchemaId,
-      inputFields: skill.inputFields.map(({ id, label, kind, required, description, options, defaultValue, minimum, maximum, minLength, maxLength, minItems, maxItems, uniqueItems, format, integer }) => ({
+      inputFields: skill.inputFields.map(({ id, label, kind, required, description, inputProjection, options, defaultValue, minimum, maximum, minLength, maxLength, minItems, maxItems, uniqueItems, format, integer }) => ({
         id,
         label,
         kind,
         required,
         description,
+        inputProjection,
         ...(options === undefined ? {} : { options: [...options] }),
         ...(defaultValue === undefined ? {} : { defaultValue }),
         ...(minimum === undefined ? {} : { minimum }),
@@ -230,12 +231,14 @@ function isField(value: unknown): value is WebEnvoyLodeCatalogField {
   return isRecord(value) && Object.keys(value).every((key) => [
     "id", "label", "kind", "required", "description", "options", "defaultValue", "minimum", "maximum",
     "minLength", "maxLength", "minItems", "maxItems", "uniqueItems", "pattern", "patternSafety", "format", "integer",
+    "inputProjection",
   ].includes(key)) &&
     isString(value.id) &&
     isString(value.label) &&
     ["text", "multiline", "number", "boolean", "select", "multi-select", "file", "constant", "unknown"].includes(String(value.kind)) &&
     typeof value.required === "boolean" &&
     isString(value.description) &&
+    ["safe_summary", "sanitized_url", "owner_ref"].includes(String(value.inputProjection)) &&
     (value.options === undefined || isStringArray(value.options)) &&
     (value.defaultValue === undefined || ["string", "number", "boolean"].includes(typeof value.defaultValue) || isStringArray(value.defaultValue)) &&
     (value.minimum === undefined || typeof value.minimum === "number") &&

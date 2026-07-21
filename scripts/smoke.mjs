@@ -10,6 +10,7 @@ import ts from "typescript";
 const requiredFiles = [
   "dist-electron/main.js",
   "dist-electron/preload.cjs",
+  "dist-electron/runtime/harbor/node_modules/tar/package.json",
   "dist/renderer/index.html",
   "dist/renderer/assets",
 ];
@@ -23,6 +24,8 @@ const preloadSource = await readFile("dist-electron/preload.cjs", "utf8");
 const runtimeSupervisorSource = await readFile("dist-electron/runtimeSupervisor.js", "utf8");
 const packagedCoreRuntimeSource = await readFile("dist-electron/runtime/core/start-runtime.mjs", "utf8");
 const packagedHarborRuntimeSource = await readFile("dist-electron/runtime/harbor/start-runtime.mjs", "utf8");
+const packagedRuntimeState = JSON.parse(await readFile("dist-electron/runtime/packaging-state.json", "utf8"));
+const runtimeSourceLock = JSON.parse(await readFile("scripts/runtime-source-lock.json", "utf8"));
 const rendererHtml = await readFile("dist/renderer/index.html", "utf8");
 const connectionConfigSource = await readFile("src/renderer/localConnectionConfig.ts", "utf8");
 const coreReadTaskClientSource = await readFile("src/renderer/coreReadTaskClient.ts", "utf8");
@@ -104,9 +107,26 @@ if (!packagedHarborRuntimeSource.includes("manual_authentication_supervisor_toke
 
 if (
   !packagedCoreRuntimeSource.includes("createFileTaskThreadStore") ||
-  !packagedCoreRuntimeSource.includes("taskThreadStore")
+  !packagedCoreRuntimeSource.includes("taskThreadStore") ||
+  !packagedCoreRuntimeSource.includes("createFileExecutionPolicyConfigStore") ||
+  !packagedCoreRuntimeSource.includes("executionPolicyConfigStore") ||
+  !packagedCoreRuntimeSource.includes("createFileAuthorizationDecisionStore") ||
+  !packagedCoreRuntimeSource.includes("authorizationDecisionStore") ||
+  !packagedCoreRuntimeSource.includes("createHttpHarborIdentityFactsReader") ||
+  !packagedCoreRuntimeSource.includes("harborIdentityFactsReader") ||
+  !packagedCoreRuntimeSource.includes('modes: { read: "auto", prepare: "confirm", commit: "confirm", destructive: "confirm" }')
 ) {
-  throw new Error("Packaged Core runtime smoke failed: task-thread persistence was not configured.");
+  throw new Error("Packaged Core runtime smoke failed: thread, policy, authorization, identity-facts, or default-policy wiring is missing.");
+}
+
+const expectedRuntimeHeads = {
+  core: "83139851688d17a2df57f532b2f322f4bbf98ea6",
+  harbor: "8d9f0a3b52764ce1efc1f80aef3aa5ed7c7a8a91",
+  lode: "1fbef74b4bf1b4f0a86aacd885386d7a62181207",
+};
+if (JSON.stringify(runtimeSourceLock) !== JSON.stringify(expectedRuntimeHeads) ||
+  packagedRuntimeState.status !== "ready" || packagedRuntimeState.packaged?.length !== 2) {
+  throw new Error("Packaged source-lock smoke failed: runtime or Lode assets were not produced from the pinned clean sources.");
 }
 
 const sharedSupervisorToken = "smoke-shared-runtime-supervisor-token";
@@ -183,6 +203,8 @@ for (const request of [
 
 for (const [request, expectedTimeout] of [
   [{ path: "/tasks", method: "POST" }, 65_000],
+  [{ path: "/threads/thread_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/turns", method: "POST" }, 65_000],
+  [{ path: "/execution-policy-configs/skill?skill_ref=lode%3A%2F%2Fsite-capability%2Ftest%40v1", method: "PUT" }, 5_000],
   [{ path: "/runtime/identity-environment-sessions", method: "POST" }, 20_000],
   [{ path: "/runtime/sessions/session_public/release", method: "POST" }, 20_000],
   [{ path: "/runtime/identity-environments", method: "GET" }, 5_000],
@@ -190,6 +212,21 @@ for (const [request, expectedTimeout] of [
   const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
   if (!parsed.ok || ownerApiRequestModule.ownerApiTimeoutMs(parsed) !== expectedTimeout) {
     throw new Error(`Electron owner API timeout smoke failed for ${request.method} ${request.path}.`);
+  }
+}
+
+const authorizationDecisionRef = "authorization-decision:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+for (const request of [
+  { path: `/authorization-decisions/${authorizationDecisionRef}`, method: "GET" },
+  { path: `/authorization-decisions/${encodeURIComponent(authorizationDecisionRef)}`, method: "GET" },
+  { path: `/authorization-decisions/${authorizationDecisionRef}/single-action`, method: "POST" },
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
+  if (!parsed.ok) throw new Error(`Owner API rejected a declared authorization-decision path: ${request.path}`);
+}
+for (const path of ["/authorization-decisions/password", "/authorization-decisions/not-a-ref/single-action"]) {
+  if (ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", path }).ok) {
+    throw new Error(`Owner API accepted a malformed authorization-decision path: ${path}`);
   }
 }
 
@@ -315,8 +352,8 @@ if (
   createTaskShellSource.includes("opaqueTargetRef") ||
   !appSourcesSource.includes("fetchCoreThreadState") ||
   !appSourcesSource.includes("retainLastKnownCoreThreads") ||
-  !appTasksSource.includes('task.runs[0]?.id ?? ""') ||
-  !appShellViewSource.includes("该线程已创建，尚未提交业务输入。") ||
+  !appTasksSource.includes('task.runs.at(-1)?.id ?? ""') ||
+  !appShellViewSource.includes("填写业务输入后即可提交第一个回合。") ||
   !coreThreadClientSource.includes('requestOwnerJson(endpoint, "/threads"') ||
   appSourcesSource.includes("fetchCoreReadTaskState(") ||
   appSourcesSource.includes("setInterval(refreshRuntimeSupervisor") ||
@@ -416,7 +453,7 @@ for (const expectedText of [
   "Submitted",
   "false",
   "submitted=false / 未提交",
-  "No-submit 边界",
+  "No-submit guard",
   "账号身份",
   "Harbor identity environment public summary",
   "Harbor live",
@@ -1343,10 +1380,11 @@ if (
   coreThreadState.status !== "ready" ||
   coreThreadState.tasks.length !== 2 ||
   projectedOwnerThread?.id !== "thread_11111111111111111111111111111111" ||
-  projectedOwnerThread.runs[0]?.turnStatus !== "cancelled" ||
-  projectedOwnerThread.runs[0]?.creationChannel !== "app" ||
-  projectedOwnerThread.runs[0]?.resultRows.some((row) => row.label === "创建渠道") ||
-  projectedOwnerThread.runs[1]?.resultRows.some((row) => row.label === "创建渠道" && row.value === "MCP") !== true ||
+  projectedOwnerThread.runs[0]?.creationChannel !== "mcp" ||
+  projectedOwnerThread.runs[0]?.resultRows.some((row) => row.label === "创建渠道" && row.value === "MCP") !== true ||
+  projectedOwnerThread.runs[1]?.turnStatus !== "cancelled" ||
+  projectedOwnerThread.runs[1]?.creationChannel !== "app" ||
+  projectedOwnerThread.runs[1]?.resultRows.some((row) => row.label === "创建渠道") ||
   !projectedOwnerThread.businessInput.includes("附件 1 个") ||
   coreThreadState.tasks[1]?.runs.length !== 0 ||
   invalidCoreThreadState.status !== "offline" ||

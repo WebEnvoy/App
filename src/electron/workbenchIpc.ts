@@ -54,6 +54,12 @@ export async function registerWorkbenchIpc(
       ? { status: "rejected" }
       : !store.available ? { status: "unavailable" } : { status: await store.deleteDraft(context) ? "ready" : "rejected" },
   );
+  ipcMain.handle("webenvoy:seal-protected-input", async (event, draft) => {
+    if (authorizedWorkbenchWindow(event.sender, mainWindows, expectedRendererUrl) == null) return { status: "rejected" };
+    if (!store.available) return { status: "unavailable" };
+    const refs = await store.sealInput(draft);
+    return refs == null ? { status: "rejected" } : { status: "ready", refs };
+  });
 }
 
 export function authorizedWorkbenchWindow(

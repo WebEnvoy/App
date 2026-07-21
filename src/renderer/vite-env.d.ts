@@ -56,7 +56,7 @@ type WebEnvoyRuntimeSupervisorState = {
 type WebEnvoyOwnerApiJsonRequest = {
   base: string;
   path: string;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 };
 type WebEnvoyManualAuthenticationCompletionIntent = {
@@ -79,6 +79,16 @@ type WebEnvoyProtectedDraftResult = {
   status: "ready" | "unavailable" | "rejected";
   draft?: unknown;
 };
+type WebEnvoySealedInputResult =
+  | {
+      status: "ready";
+      refs: {
+        ownerRef: string;
+        fieldOwnerRefs: Record<string, string>;
+        attachmentRefs: Record<string, string[]>;
+      };
+    }
+  | { status: "unavailable" | "rejected" };
 type WebEnvoyLodeCatalogField = {
   id: string;
   label: string;
@@ -98,6 +108,7 @@ type WebEnvoyLodeCatalogField = {
   patternSafety?: "linear";
   format?: "uri";
   integer?: boolean;
+  inputProjection: "safe_summary" | "sanitized_url" | "owner_ref";
 };
 type WebEnvoyLodeCatalogAction = {
   id: string;
@@ -174,6 +185,7 @@ interface Window {
     loadProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
     saveProtectedDraft?: (draft: unknown) => Promise<WebEnvoyProtectedDraftResult>;
     deleteProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
+    sealProtectedInput?: (draft: unknown) => Promise<WebEnvoySealedInputResult>;
     subscribeToSystemThemeVariant?: (
       listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
     ) => () => void;

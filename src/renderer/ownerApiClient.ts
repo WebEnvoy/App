@@ -1,7 +1,7 @@
 import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "../electron/boundedJsonResponse";
 import { projectOwnerApiError } from "../electron/ownerApiErrorProjection";
 
-export type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type OwnerApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type OwnerApiRequestOptions = {
   method?: OwnerApiMethod;
