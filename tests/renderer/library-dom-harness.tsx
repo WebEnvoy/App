@@ -92,7 +92,7 @@ function Harness() {
           onTaskCreated={setSubmittedTask}
         />
       )}
-      {submittedTask?.runs[0]?.businessInput == null ? null : <TaskTurnBusinessInput input={submittedTask.runs[0].businessInput} skill={xhsSkill} />}
+      {submittedTask?.runs[0]?.businessInput == null ? null : <TaskTurnBusinessInput input={submittedTask.runs[0].businessInput} />}
       {createSelection != null ? <button type="button" data-library-switch onClick={() => setCreateSelection(null)}>切换技能</button> : null}
       {createSelection != null ? <button type="button" data-catalog-refresh onClick={() => setCreateSelection((current) => current == null ? null : ({ ...current, skill: { ...current.skill, summary: `${current.skill.summary} refreshed` } }))}>刷新目录</button> : null}
       <output data-library-selection="">{selection}</output>
@@ -357,12 +357,12 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const submittedCard = document.querySelector(".task-turn-business-input")?.textContent ?? "";
   const createIndex = libraryOwnerRequests.findIndex((request) => request.path === "/threads" && request.method === "POST");
   const policyIndex = libraryOwnerRequests.findIndex((request, index) => index > createIndex && request.path.includes("/execution-policy?") && request.method === "PUT");
-  const turnIndex = libraryOwnerRequests.findIndex((request, index) => index > policyIndex && request.path.endsWith("/turns") && request.method === "POST");
+  const turnIndex = libraryOwnerRequests.findIndex((request, index) => index > createIndex && request.path.endsWith("/turns") && request.method === "POST");
   const acceptedTurnRequest = libraryOwnerRequests[turnIndex];
   const acceptedPayload = JSON.stringify(acceptedTurnRequest?.body);
   const acceptedSnapshot = (acceptedTurnRequest?.body as { input_snapshot?: { fields?: Array<{ field_id: string; kind: string; summary?: string }>; attachment_refs?: string[] } })?.input_snapshot;
   const acceptedFields = Object.fromEntries((acceptedSnapshot?.fields ?? []).map((field) => [field.field_id, field]));
-  const acceptedFlow = createIndex >= 0 && policyIndex > createIndex && turnIndex > policyIndex &&
+  const acceptedFlow = createIndex >= 0 && policyIndex === -1 && turnIndex > createIndex &&
     acceptedFields.url?.kind === "long_text" && acceptedFields.url?.owner_ref != null &&
     acceptedFields.keyword?.kind === "long_text" && acceptedFields.keyword?.owner_ref != null &&
     acceptedSnapshot?.attachment_refs?.length === 0 &&
@@ -372,12 +372,20 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === false, "thread composer readiness");
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
   await waitUntil(() => document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome" &&
-    document.querySelector(".create-task-submit-state") != null, "unknown outcome draft preservation");
-  const unknownDraftPreserved = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome";
+    document.querySelector(".create-task-submit-state.unknown")?.textContent?.includes("重新检查") === true, "unknown outcome draft preservation");
+  const unknownPostCount = libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length;
+  document.querySelector<HTMLButtonElement>(".create-task-submit-state.unknown button")?.click();
+  await twoFrames();
+  await waitUntil(() => libraryOwnerRequests.some((request) =>
+    request.path === "/threads/thread_11111111111111111111111111111111" && request.method === "GET") &&
+    document.querySelector(".create-task-submit-state.unknown") != null, "unknown outcome reconciliation");
+  const unknownDraftPreserved = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome" &&
+    document.querySelector(".create-task-submit-state.unknown") != null &&
+    libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length === unknownPostCount;
   await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === true &&
-    document.body.textContent?.includes("尚未结束") === true, "active turn submit blocking");
+    document.querySelector(".create-task-submit-state.unknown") != null, "active turn submit blocking");
   const activeSubmitBlocked = document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === true &&
-    document.body.textContent?.includes("尚未结束") === true;
+    document.querySelector(".create-task-submit-state.unknown") != null;
   const stopButton = document.querySelector<HTMLButtonElement>("[aria-label='停止当前回合']");
   stopButton?.click();
   await waitUntil(() => document.querySelector(".create-task-submit-state")?.textContent?.includes("当前回合已停止") === true,
@@ -389,6 +397,7 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   if (policyMenu != null) policyMenu.open = true;
   Array.from(document.querySelectorAll<HTMLButtonElement>("[role='group'][aria-label='读取和下载执行方式'] button"))
     .find((button) => button.textContent === "确认")?.click();
+  await nextFrame();
   Array.from(document.querySelectorAll<HTMLButtonElement>(".composer-execution-actions button"))
     .find((button) => button.textContent?.includes("另存为我的技能默认"))?.click();
   await waitUntil(() => libraryOwnerRequests.slice(policySaveStart).some((request) =>
@@ -398,8 +407,10 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const skillConfigWrite = policySaveRequests.findIndex((request) => request.path.startsWith("/execution-policy-configs/skill?") && request.method === "PUT");
   const threadEffectiveRefetch = policySaveRequests.findIndex((request, index) => index > skillConfigWrite &&
     request.path.startsWith("/execution-policies/effective?") && request.path.includes("thread_ref="));
+  const savedModes = (policySaveRequests[skillConfigWrite]?.body as { modes?: Record<string, string> })?.modes;
   const skillPolicyVersionSafe = skillConfigRead >= 0 && skillConfigWrite > skillConfigRead && threadEffectiveRefetch > skillConfigWrite &&
-    (policySaveRequests[skillConfigWrite]?.body as { expected_source_version?: string })?.expected_source_version === "5";
+    (policySaveRequests[skillConfigWrite]?.body as { expected_source_version?: string })?.expected_source_version === "5" &&
+    JSON.stringify(savedModes) === JSON.stringify({ read: "confirm" });
   const reusedThreadSafe = await checkReusedThreadPolicyRevision();
   setProtectedDraftSaveDelay(300);
   await new Promise((resolve) => setTimeout(resolve, 220));
@@ -422,7 +433,8 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
     !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked ||
     !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe ||
-    !submittedCard.includes("Keyword") || !submittedCard.includes("已提交受保护输入") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
+    !submittedCard.includes("keyword") || !submittedCard.includes("精确字段定义版本不可用") ||
+    !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
     !unavailableDeleteWarning || mode === "narrow" && !longFileLayoutSafe) {
     throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({
       selection, initialInvalid, submittedInvalid, attachmentAdded, attachmentRestored, attachmentRemoved, restoredKeyword,
@@ -456,6 +468,7 @@ async function checkReusedThreadPolicyRevision() {
     executionPolicy: policy.policy,
     runtime,
     threadModes: { read: "auto" },
+    threadModeOverrides: { read: "auto" },
   });
   const requests = libraryOwnerRequests.slice(start);
   const create = requests.findIndex((request) => request.path === "/threads" && request.method === "POST");

@@ -11,6 +11,7 @@ import { projectCoreThreadResponse } from "../../src/renderer/coreThreadClient";
 import { parseCoreThreadInputSnapshot } from "../../src/renderer/coreThreadInputContract";
 import { projectLodeCatalogDisplayCache, type LodeCatalogLoadState, type LodeCatalogSkill } from "../../src/renderer/lodeCatalogClient";
 import { createLatestRequestGate } from "../../src/renderer/latestRequestGate";
+import { executionPolicyModeMutation } from "../../src/renderer/executionPolicyClient";
 import { browserAttachments, refreshLocalAttachments, selectLocalAttachments } from "../../src/renderer/localFileClient";
 import { projectOwnerHttpStatusError } from "../../src/renderer/ownerApiClient";
 import { createSkillInputDraft, validateSkillInputDraft } from "../../src/renderer/skillInputDraft";
@@ -32,9 +33,20 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
   const request = checkRequestProjection(input);
   checkResponseProjection(request);
   checkTurnInputProjection(input.xhsSkill);
+  checkExecutionPolicyMutation();
   await checkDraftProjection(input);
   await checkOwnerBoundaries(input.catalog);
   await checkRejectedAuthorizationDecisions();
+}
+
+function checkExecutionPolicyMutation() {
+  const mutation = executionPolicyModeMutation(
+    { read: "auto", prepare: "confirm", commit: "deny", destructive: "auto" },
+    new Set(["prepare"] as const),
+  );
+  if (JSON.stringify(mutation) !== JSON.stringify({ prepare: "confirm" })) {
+    throw new Error("Thread execution policy mutation persisted inherited categories that the user did not modify.");
+  }
 }
 
 function checkTurnInputProjection(xhsSkill: LodeCatalogSkill) {

@@ -1,26 +1,23 @@
 import { FileText, Link, Paperclip } from "lucide-react";
 
 import type { CoreThreadInputField, CoreThreadInputSnapshot } from "./coreThreadInputContract";
-import type { LodeCatalogSkill } from "./lodeCatalogClient";
 
-export function TaskTurnBusinessInput({ input, skill }: {
+export function TaskTurnBusinessInput({ input }: {
   input: CoreThreadInputSnapshot;
-  skill?: LodeCatalogSkill;
 }) {
   if (input.fields.length === 0 && input.attachment_refs.length === 0) return null;
-  const definitions = new Map(skill?.inputFields.map((field) => [field.id, field]));
   return (
     <section className="task-turn-business-input" aria-label="本回合业务输入">
       <div className="task-turn-business-input-heading">
         <FileText size={15} />
-        <strong>{skill?.name ?? "业务输入"}</strong>
+        <strong>业务输入</strong>
+        <small>精确字段定义版本不可用</small>
       </div>
       <dl>
         {input.fields.map((field) => {
-          const definition = definitions.get(field.field_id);
           return (
             <div key={field.field_id}>
-              <dt>{definition?.label ?? field.field_id}</dt>
+              <dt>{field.field_id}</dt>
               <dd>{inputValue(field)}</dd>
             </div>
           );

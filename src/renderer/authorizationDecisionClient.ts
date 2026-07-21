@@ -42,14 +42,19 @@ export async function fetchPendingAuthorizationDecision(endpoint: string, expect
   }
 }
 
-export async function decideSingleAction(endpoint: string, decisionRef: string, choice: "allow_once" | "deny_once") {
+export async function decideSingleAction(
+  endpoint: string,
+  decisionRef: string,
+  choice: "allow_once" | "deny_once",
+  idempotencyKey = `app-single-action-${crypto.randomUUID()}`,
+) {
   try {
     const response = await requestOwnerJson(endpoint, `/authorization-decisions/${encodeURIComponent(decisionRef)}/single-action`, {
       method: "POST",
       timeoutMs: 5000,
       body: {
         schema_version: "webenvoy.single-action-decision-command.v0",
-        idempotency_key: `app-single-action-${crypto.randomUUID()}`,
+        idempotency_key: idempotencyKey,
         choice,
       },
     });

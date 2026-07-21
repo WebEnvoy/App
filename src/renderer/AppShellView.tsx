@@ -194,7 +194,6 @@ function WorkDetail({ controller }: { controller: AppController }) {
         coreEndpoint={sources.connectionConfig.coreEndpoint}
         coreReadState={tasks.effectiveCoreReadState} coreSubmitState={tasks.coreSubmitState}
         navigationItems={tasks.threadNavigationItems} runtimeSupervisorState={sources.runtimeSupervisorState}
-        skill={skill}
         selectedRun={tasks.selectedRun} selectedTask={tasks.selectedTask} onActiveRunChange={tasks.setSelectedRunId}
         onOpenPreview={tasks.requestRightPanel}
       />

@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { decideSingleAction, fetchPendingAuthorizationDecision, type PendingAuthorizationDecision } from "./authorizationDecisionClient";
 import { policySourceLabel } from "./executionPolicyClient";
-import type { LodeCatalogSkill } from "./lodeCatalogClient";
 import { outcomeLabel, SourceField } from "./TaskThreadFields";
 import { ThreadNavigationRail, type ThreadNavigationItem } from "./ThreadNavigationRail";
 import { RunStatusGlyph, runReportTitle } from "./RunStatusGlyph";
@@ -19,7 +18,6 @@ export function TaskThreadPage({
   coreSubmitState,
   navigationItems,
   runtimeSupervisorState,
-  skill,
   selectedRun,
   selectedTask,
   onActiveRunChange,
@@ -30,7 +28,6 @@ export function TaskThreadPage({
   coreSubmitState: CoreTaskSubmitState;
   navigationItems: ThreadNavigationItem[];
   runtimeSupervisorState: RuntimeSupervisorState;
-  skill?: LodeCatalogSkill;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   onActiveRunChange: (runId: string) => void;
@@ -72,7 +69,6 @@ export function TaskThreadPage({
               coreEndpoint={coreEndpoint}
               identityLabel={selectedTask.accountIdentity}
               threadRef={selectedTask.id}
-              skill={skill}
               isSelected={run.id === selectedRun.id}
               key={run.id}
               run={run}
@@ -251,7 +247,6 @@ function RunTurn({
   coreEndpoint,
   identityLabel,
   threadRef,
-  skill,
   run,
   isSelected,
   onOpenPreview,
@@ -259,7 +254,6 @@ function RunTurn({
   coreEndpoint: string;
   identityLabel: string;
   threadRef: string;
-  skill?: LodeCatalogSkill;
   run: RunProjection;
   isSelected: boolean;
   onOpenPreview: () => void;
@@ -280,7 +274,7 @@ function RunTurn({
         {isSelected ? <span className="badge">当前 Run</span> : null}
       </section>
 
-      {run.businessInput == null ? null : <TaskTurnBusinessInput input={run.businessInput} skill={skill} />}
+      {run.businessInput == null ? null : <TaskTurnBusinessInput input={run.businessInput} />}
       <SingleActionConfirmation endpoint={coreEndpoint} identityLabel={identityLabel} run={run} threadRef={threadRef} />
       <section className="process-card">
         <div className="card-title compact-title process-title">
@@ -374,7 +368,15 @@ type ConfirmationState =
   | { status: "ready"; decision: PendingAuthorizationDecision }
   | { status: "submitting"; decision: PendingAuthorizationDecision }
   | { status: "settled"; summary: string }
-  | { status: "failed"; summary: string };
+  | { status: "failed"; summary: string; retry: "fetch" }
+  | {
+      status: "failed";
+      summary: string;
+      retry: "submit";
+      decision: PendingAuthorizationDecision;
+      choice: "allow_once" | "deny_once";
+      idempotencyKey: string;
+    };
 
 export function SingleActionConfirmation({ endpoint, identityLabel, run, threadRef }: {
   endpoint: string;
@@ -383,6 +385,7 @@ export function SingleActionConfirmation({ endpoint, identityLabel, run, threadR
   threadRef: string;
 }) {
   const [state, setState] = useState<ConfirmationState>({ status: "idle" });
+  const [reloadKey, setReloadKey] = useState(0);
   const statusRef = useRef<HTMLElement>(null);
   const refsKey = (run.authorizationDecisionRefs ?? []).join("\u0000");
 
@@ -401,23 +404,46 @@ export function SingleActionConfirmation({ endpoint, identityLabel, run, threadR
       turnId: run.turnId!,
     }).then((result) => {
       if (cancelled) return;
-      setState(result.ok ? { status: "ready", decision: result.decision } : { status: "idle" });
+      setState(result.ok
+        ? { status: "ready", decision: result.decision }
+        : { status: "failed", summary: result.reason, retry: "fetch" });
     });
     return () => { cancelled = true; };
-  }, [endpoint, refsKey, run.id, run.turnId, run.turnStatus, threadRef]);
+  }, [endpoint, refsKey, reloadKey, run.id, run.turnId, run.turnStatus, threadRef]);
 
-  async function decide(choice: "allow_once" | "deny_once") {
-    if (state.status !== "ready") return;
-    const decision = state.decision;
+  async function submitDecision(
+    decision: PendingAuthorizationDecision,
+    choice: "allow_once" | "deny_once",
+    idempotencyKey = `app-single-action-${crypto.randomUUID()}`,
+  ) {
     setState({ status: "submitting", decision });
-    const result = await decideSingleAction(endpoint, decision.decisionRef, choice);
-    setState(result.ok ? { status: "settled", summary: result.summary } : { status: "failed", summary: result.reason });
+    const result = await decideSingleAction(endpoint, decision.decisionRef, choice, idempotencyKey);
+    setState(result.ok
+      ? { status: "settled", summary: result.summary }
+      : { status: "failed", summary: result.reason, retry: "submit", decision, choice, idempotencyKey });
     window.requestAnimationFrame(() => statusRef.current?.focus());
   }
 
+  function retryFailure() {
+    if (state.status !== "failed") return;
+    if (state.retry === "fetch") {
+      setReloadKey((current) => current + 1);
+      return;
+    }
+    void submitDecision(state.decision, state.choice, state.idempotencyKey);
+  }
+
   if (state.status === "idle" || state.status === "loading") return null;
-  if (state.status === "settled" || state.status === "failed") {
-    return <section ref={statusRef} className={`single-action-confirmation ${state.status}`} role="status" tabIndex={-1}><span>{state.summary}</span></section>;
+  if (state.status === "settled") {
+    return <section ref={statusRef} className="single-action-confirmation settled" role="status" tabIndex={-1}><span>{state.summary}</span></section>;
+  }
+  if (state.status === "failed") {
+    return (
+      <section ref={statusRef} className="single-action-confirmation failed" role="status" tabIndex={-1}>
+        <span>{state.summary}</span>
+        <button type="button" onClick={retryFailure}>{state.retry === "fetch" ? "重新检查" : "重试这次决定"}</button>
+      </section>
+    );
   }
   const decision = state.decision;
   const busy = state.status === "submitting";
@@ -432,8 +458,8 @@ export function SingleActionConfirmation({ endpoint, identityLabel, run, threadR
       </div>
       {decision.destructive ? <span className="single-action-risk"><AlertTriangle size={13} />危险行为</span> : null}
       <div className="single-action-actions">
-        <button type="button" disabled={busy} onClick={() => void decide("deny_once")}><X size={14} />拒绝这一次</button>
-        <button className="primary" type="button" disabled={busy} onClick={() => void decide("allow_once")}><Check size={14} />{busy ? "处理中" : "允许这一次"}</button>
+        <button type="button" disabled={busy} onClick={() => void submitDecision(decision, "deny_once")}><X size={14} />拒绝这一次</button>
+        <button className="primary" type="button" disabled={busy} onClick={() => void submitDecision(decision, "allow_once")}><Check size={14} />{busy ? "处理中" : "允许这一次"}</button>
       </div>
     </section>
   );

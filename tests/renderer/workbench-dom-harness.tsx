@@ -35,6 +35,7 @@ const emptyTaskId = "thread_cccccccccccccccccccccccccccccccc";
 const consumerBoundary = "Core stores bounded field summaries and owner refs only; raw content remains with its owner.";
 const authorizationDecisionRef = "authorization-decision:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const authorizationRequests: WebEnvoyOwnerApiJsonRequest[] = [];
+let singleActionAttempts = 0;
 const ownerPayload = {
   ok: true,
   threads: [
@@ -165,6 +166,8 @@ window.webenvoyShell = {
       } } };
     }
     if (request.path === `/authorization-decisions/${encodeURIComponent(authorizationDecisionRef)}/single-action`) {
+      singleActionAttempts += 1;
+      if (singleActionAttempts === 1) return { ok: false, error: "simulated_single_action_response_loss" };
       return { ok: true, body: { ok: true, single_action_decision: {
         schema_version: "webenvoy.single-action-decision.v0",
         confirmation_decision_ref: authorizationDecisionRef,
@@ -273,7 +276,6 @@ function WorkbenchDomHarness() {
             coreSubmitState={initialCoreTaskSubmitState}
             navigationItems={navigationItems}
             runtimeSupervisorState={runtimeState}
-            skill={undefined}
             selectedRun={displayedRun}
             selectedTask={displayedTask}
             onActiveRunChange={(runId) => setSelectedRunIds((current) => ({
@@ -364,9 +366,14 @@ async function runDesktopChecks() {
     .find((button) => button.textContent?.includes("拒绝这一次"));
   assert(denyOnce, "Single-action deny button is missing.");
   denyOnce.click();
+  await waitFor(() => document.body.textContent?.includes("重试这次决定") === true, "Single-action failure did not expose retry.");
+  document.querySelector<HTMLButtonElement>(".single-action-confirmation.failed button")?.click();
   await waitFor(() => document.body.textContent?.includes("已拒绝这一次。") === true, "Single-action deny did not settle in the UI.");
-  const decisionRequest = authorizationRequests.find((request) => request.path.endsWith("/single-action"));
-  assert(decisionRequest?.method === "POST" && (decisionRequest.body as { choice?: string })?.choice === "deny_once",
+  const decisionRequests = authorizationRequests.filter((request) => request.path.endsWith("/single-action"));
+  const decisionRequest = decisionRequests[0];
+  assert(decisionRequests.length === 2 && decisionRequest?.method === "POST" && (decisionRequest.body as { choice?: string })?.choice === "deny_once" &&
+    (decisionRequests[0]?.body as { idempotency_key?: string })?.idempotency_key ===
+      (decisionRequests[1]?.body as { idempotency_key?: string })?.idempotency_key,
     "Single-action choice was not sent to the Core owner endpoint.");
   assert(!authorizationRequests.some((request) => request.method === "PUT"), "Single-action confirmation mutated a persistent execution policy.");
 

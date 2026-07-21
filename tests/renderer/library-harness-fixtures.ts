@@ -166,6 +166,9 @@ export function installLibraryShellMock() {
           },
         };
       }
+      if (request.path === "/threads/thread_11111111111111111111111111111111" && request.method === "GET") {
+        return { ok: true, body: { ok: true, thread: coreThread(turns) } };
+      }
       if (request.path.startsWith("/execution-policies/effective?")) {
         const thread = request.path.includes("thread_ref=");
         return { ok: true, body: { ok: true, execution_policy: executionPolicy(thread) } };

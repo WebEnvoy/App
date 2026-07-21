@@ -8,6 +8,7 @@ export type OwnerApiRequestOptions = {
   body?: unknown;
   timeoutMs?: number;
   signal?: AbortSignal;
+  includeErrorBody?: boolean;
 };
 
 export async function requestOwnerJson(
@@ -25,7 +26,7 @@ export async function requestOwnerJson(
       ...(options.body === undefined ? {} : { body: options.body }),
     });
     options.signal?.throwIfAborted();
-    return unwrapOwnerApiResponse(result, path);
+    return unwrapOwnerApiResponse(result, path, options.includeErrorBody === true);
   }
 
   return requestOwnerJsonWithFetch(base, path, options);
@@ -50,7 +51,14 @@ async function requestOwnerJsonWithFetch(
       signal: options.signal == null ? controller.signal : AbortSignal.any([controller.signal, options.signal]),
     });
     const payload = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(path));
-    if (!response.ok) return { ok: false, error: projectOwnerHttpStatusError(path, response.status, payload) };
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: projectOwnerHttpStatusError(path, response.status, payload),
+        ...(options.includeErrorBody === true && payload !== undefined ? { body: payload } : {}),
+      };
+    }
     return payload ?? {};
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -59,7 +67,7 @@ async function requestOwnerJsonWithFetch(
   }
 }
 
-function unwrapOwnerApiResponse(value: unknown, path: string): unknown {
+function unwrapOwnerApiResponse(value: unknown, path: string, includeErrorBody: boolean): unknown {
   if (!isRecord(value)) return { ok: false, error: `${path} returned invalid owner API response.` };
   if (value.ok === true) return "body" in value ? value.body : {};
 
@@ -68,7 +76,7 @@ function unwrapOwnerApiResponse(value: unknown, path: string): unknown {
     ok: false,
     ...(typeof value.status === "number" ? { status: value.status } : {}),
     error,
-    ...(value.body === undefined ? {} : { body: value.body }),
+    ...(includeErrorBody && value.body !== undefined ? { body: value.body } : {}),
   };
 }
 

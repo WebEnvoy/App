@@ -128,6 +128,16 @@ export function policyModesByCategory(policy: EffectiveExecutionPolicy): Executi
   ));
 }
 
+export function executionPolicyModeMutation(
+  effectiveModes: ExecutionPolicyModes,
+  modifiedCategories: Iterable<ExecutionCategory>,
+): ExecutionPolicyModes {
+  return Object.fromEntries([...modifiedCategories].flatMap((category) => {
+    const mode = effectiveModes[category];
+    return mode == null ? [] : [[category, mode]];
+  })) as ExecutionPolicyModes;
+}
+
 export function policySourceForCategory(policy: EffectiveExecutionPolicy, category: ExecutionCategory) {
   return policy.actions.find((action) => action.category === category)?.policy ?? null;
 }

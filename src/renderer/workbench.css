@@ -143,11 +143,17 @@ summary:focus-visible {
 .composer-execution-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; padding: 8px 7px 0; }
 .composer-execution-actions button { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 6px; color: var(--we-foreground); background: var(--we-surface-secondary); font-size: 9px; }
 .composer-execution-popover > small { padding: 8px 7px 2px; }
+.composer-dangerous-auto-risk { display: inline-flex; min-width: 0; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 6px; color: var(--we-status-error); background: var(--we-status-error-background); font-size: 9px; font-weight: 700; }
+.composer-dangerous-auto-risk > svg { flex: 0 0 auto; }
+.composer-dangerous-auto-risk > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-dangerous-auto-risk > button { display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; border-radius: 4px; color: inherit; background: transparent; }
 .create-task-submit-state.submitting { color: var(--we-status-info); }
 .create-task-submit-state.ready { color: var(--we-status-success); }
+.create-task-submit-state.unknown { color: var(--we-status-warning); }
 .task-turn-business-input { display: grid; gap: 8px; margin: 7px 0; padding: 10px 12px; border-radius: 7px; background: var(--we-surface-secondary); }
 .task-turn-business-input-heading { display: flex; min-width: 0; align-items: center; gap: 7px; color: var(--we-foreground-muted); }
 .task-turn-business-input-heading strong { overflow: hidden; color: var(--we-foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.task-turn-business-input-heading small { margin-left: auto; font-size: 9px; white-space: nowrap; }
 .task-turn-business-input dl { display: flex; min-width: 0; flex-wrap: wrap; gap: 6px 18px; margin: 0; }
 .task-turn-business-input dl > div { display: grid; min-width: min(180px, 100%); grid-template-columns: auto minmax(0, 1fr); gap: 6px; align-items: baseline; }
 .task-turn-business-input dt { color: var(--we-foreground-muted); font-size: 10px; }
@@ -169,7 +175,8 @@ summary:focus-visible {
 .single-action-actions button.primary { border-color: var(--we-foreground); color: var(--we-inverted-foreground); background: var(--we-foreground); }
 .single-action-confirmation.settled,
 .single-action-confirmation.failed { display: block; color: var(--we-foreground-muted); font-size: 10px; }
-.single-action-confirmation.failed { border-color: var(--we-status-error-border); color: var(--we-status-error); background: var(--we-status-error-background); }
+.single-action-confirmation.failed { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-color: var(--we-status-error-border); color: var(--we-status-error); background: var(--we-status-error-background); }
+.single-action-confirmation.failed button { min-height: 26px; flex: 0 0 auto; padding: 3px 7px; border: 1px solid var(--we-status-error-border); border-radius: 5px; color: var(--we-foreground); background: var(--we-surface-primary); font-size: 9px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
 .task-list-heading,
@@ -433,8 +440,10 @@ summary:focus-visible {
   .create-task-submit-state { grid-template-columns: 18px minmax(0, 1fr); }
   .create-task-submit-state button { grid-column: 2; justify-self: start; }
   .composer-execution-menu > summary { max-width: 150px; }
+  .composer-dangerous-auto-risk > span { display: none; }
   .composer-execution-row { grid-template-columns: 1fr; }
   .single-action-confirmation { grid-template-columns: 1fr; }
+  .single-action-confirmation.failed { align-items: flex-start; flex-direction: column; }
   .single-action-risk { justify-self: start; }
 
   .owner-state button {

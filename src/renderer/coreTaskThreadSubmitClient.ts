@@ -17,14 +17,23 @@ export type TaskThreadSubmitState =
   | { status: "idle"; summary: string }
   | { status: "submitting"; summary: string }
   | { status: "blocked" | "failed"; summary: string; task?: TaskProjection }
+  | { status: "unknown"; summary: string; attempt: TaskTurnSubmissionAttempt; task?: TaskProjection }
   | { status: "ready"; summary: string; task: TaskProjection };
+
+export type TaskTurnSubmissionAttempt = {
+  threadRef: string;
+  idempotencyKey: string;
+};
 
 export const initialTaskThreadSubmitState: TaskThreadSubmitState = {
   status: "idle",
   summary: "填写技能声明的业务输入后提交。",
 };
 
-export async function createTaskThreadTurn(options: SubmitOptions & { threadModes: ExecutionPolicyModes }) {
+export async function createTaskThreadTurn(options: SubmitOptions & {
+  threadModes: ExecutionPolicyModes;
+  threadModeOverrides: ExecutionPolicyModes;
+}) {
   const prepared = prepareTaskTurn(options, options.threadModes);
   if (!prepared.ok) return blocked(prepared.reason);
   const created = await requestOwnerJson(options.endpoint, "/threads", {
@@ -37,22 +46,27 @@ export async function createTaskThreadTurn(options: SubmitOptions & { threadMode
   const createdRecord = asRecord(created);
   if (typeof createdRecord?.created !== "boolean") return failed(created, "Core 未声明任务线程是新建还是复用。");
   let expectedThreadVersion: string | null = null;
+  let effectivePolicy = options.executionPolicy;
   if (!createdRecord.created) {
     const currentPolicy = await fetchEffectiveExecutionPolicy(options.endpoint, options.skill.packageRef, threadTask.id);
     if (currentPolicy.status !== "ready") {
       return { status: "failed" as const, summary: currentPolicy.summary, task: threadTask };
     }
     expectedThreadVersion = sourceVersionForPolicy(currentPolicy.policy, "thread_revision");
+    effectivePolicy = currentPolicy.policy;
   }
-  const policy = await putThreadExecutionPolicy(
-    options.endpoint,
-    threadTask.id,
-    options.skill.packageRef,
-    options.threadModes,
-    expectedThreadVersion,
-  );
-  if (policy.status !== "ready") return { status: "failed" as const, summary: policy.summary, task: threadTask };
-  const policyBlock = executionPolicyReadiness(options.skill, policy.policy);
+  if (Object.keys(options.threadModeOverrides).length > 0) {
+    const policy = await putThreadExecutionPolicy(
+      options.endpoint,
+      threadTask.id,
+      options.skill.packageRef,
+      options.threadModeOverrides,
+      expectedThreadVersion,
+    );
+    if (policy.status !== "ready") return { status: "failed" as const, summary: policy.summary, task: threadTask };
+    effectivePolicy = policy.policy;
+  }
+  const policyBlock = executionPolicyReadiness(options.skill, effectivePolicy);
   if (policyBlock != null) return { status: "blocked" as const, summary: policyBlock, task: threadTask };
   return appendPreparedTurn(options.endpoint, threadTask.id, prepared.request);
 }
@@ -87,17 +101,44 @@ type SubmitOptions = {
 };
 
 async function appendPreparedTurn(endpoint: string, threadRef: string, request: JsonRecord): Promise<TaskThreadSubmitState> {
+  const attempt = submissionAttempt(threadRef, request);
+  if (attempt == null) return blocked("任务回合缺少稳定提交标识，提交保持停止。");
   const response = await requestOwnerJson(endpoint, `/threads/${encodeURIComponent(threadRef)}/turns`, {
     method: "POST",
     timeoutMs: 65_000,
     body: request,
+    includeErrorBody: true,
   });
-  const task = projectCoreThreadResponse(response);
   const record = asRecord(response);
-  if (task == null) return failed(response, "Core 未返回可消费的任务回合。");
-  return record?.ok === true
-    ? { status: "ready", summary: "任务回合已由 Core 接受。", task }
-    : { status: "failed", summary: ownerError(response, "Core 未接受当前任务回合。"), task };
+  const responseBody = asRecord(record?.body);
+  const taskPayload = projectCoreThreadResponse(response) == null ? responseBody : response;
+  const task = projectCoreThreadResponse(taskPayload);
+  if (task == null) {
+    return typeof record?.status === "number"
+      ? failed(response, "Core 未接受当前任务回合。")
+      : reconcileTaskThreadTurn(endpoint, attempt);
+  }
+  const turn = turnForAttempt(taskPayload, attempt.idempotencyKey);
+  if (record?.ok === true) return { status: "ready", summary: "任务回合已由 Core 接受。", task };
+  if (record?.outcome === "submission_status_unknown" || turn?.status === "status_unknown" || turn?.status === "submitting") {
+    return unknownAttempt(attempt, task);
+  }
+  return { status: "failed", summary: ownerError(response, "Core 未接受当前任务回合。"), task };
+}
+
+export async function reconcileTaskThreadTurn(
+  endpoint: string,
+  attempt: TaskTurnSubmissionAttempt,
+): Promise<TaskThreadSubmitState> {
+  const response = await requestOwnerJson(endpoint, `/threads/${encodeURIComponent(attempt.threadRef)}`, { timeoutMs: 5000 });
+  const task = projectCoreThreadResponse(response);
+  const turn = turnForAttempt(response, attempt.idempotencyKey);
+  if (task == null || turn == null) return unknownAttempt(attempt, task ?? undefined);
+  if (turn.status === "status_unknown" || turn.status === "submitting") return unknownAttempt(attempt, task);
+  if (turn.status === "failed" || turn.status === "cancelled" || turn.submission_state === "rejected") {
+    return { status: "failed", summary: "Core 已确认该提交没有进入可继续执行的回合。", task };
+  }
+  return { status: "ready", summary: "已按原提交标识确认任务回合由 Core 接受。", task };
 }
 
 function prepareTaskTurn(options: SubmitOptions, requestedModes?: ExecutionPolicyModes): { ok: true; capabilityRef: string; request: JsonRecord } | { ok: false; reason: string } {
@@ -306,6 +347,28 @@ function hasValue(value: SkillInputValue | undefined) {
 
 function blocked(reason: string): TaskThreadSubmitState {
   return { status: "blocked", summary: reason };
+}
+
+function submissionAttempt(threadRef: string, request: JsonRecord): TaskTurnSubmissionAttempt | null {
+  return typeof request.idempotency_key === "string" && request.idempotency_key.length > 0
+    ? { threadRef, idempotencyKey: request.idempotency_key }
+    : null;
+}
+
+function unknownAttempt(attempt: TaskTurnSubmissionAttempt, task?: TaskProjection): TaskThreadSubmitState {
+  return {
+    status: "unknown",
+    summary: "提交响应状态未知；请重新检查 Core 线程事实，不会生成新的提交标识。",
+    attempt,
+    ...(task == null ? {} : { task }),
+  };
+}
+
+function turnForAttempt(value: unknown, idempotencyKey: string) {
+  const record = asRecord(value);
+  const thread = asRecord(record?.thread);
+  if (!Array.isArray(thread?.turns)) return null;
+  return thread.turns.map(asRecord).find((turn) => turn?.idempotency_key === idempotencyKey) ?? null;
 }
 
 function failed(value: unknown, fallback: string): TaskThreadSubmitState {

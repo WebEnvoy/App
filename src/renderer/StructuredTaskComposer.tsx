@@ -1,9 +1,10 @@
-import { CircleAlert, CircleCheck, Save, Send, ShieldAlert, Square, Trash2 } from "lucide-react";
+import { AlertTriangle, CircleAlert, CircleCheck, Save, Send, ShieldAlert, Square, Trash2, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { CreateTaskFields } from "./CreateTaskFields";
 import {
   declaredExecutionCategories,
+  executionPolicyModeMutation,
   fetchEffectiveExecutionPolicy,
   fetchSkillExecutionPolicyConfiguration,
   loadingExecutionPolicyState,
@@ -25,7 +26,11 @@ import { releaseLocalAttachments } from "./localFileClient";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
 import { validateSkillInputDraft, type SkillInputAttachment, type SkillInputDraft, type SkillInputValue } from "./skillInputDraft";
 import { sealSkillInput, type SkillInputOwnerRefs } from "./skillInputOwnerClient";
-import { initialTaskThreadSubmitState, type TaskThreadSubmitState } from "./coreTaskThreadSubmitClient";
+import {
+  initialTaskThreadSubmitState,
+  reconcileTaskThreadTurn,
+  type TaskThreadSubmitState,
+} from "./coreTaskThreadSubmitClient";
 import { registerComposerInput } from "./focusComposer";
 import type { TaskProjection } from "./taskThreadFixtures";
 import { useCreateTaskDraft } from "./useCreateTaskDraft";
@@ -42,7 +47,13 @@ export type StructuredTaskComposerProps = {
   activeTurnLabel?: string;
   submitLabel: string;
   onPreSubmit?: (draft: SkillInputDraft) => Promise<{ ok: true } | { ok: false; reason: string }>;
-  onSubmit: (draft: SkillInputDraft, ownerRefs: SkillInputOwnerRefs, policy: EffectiveExecutionPolicy, modes: ExecutionPolicyModes) => Promise<TaskThreadSubmitState>;
+  onSubmit: (
+    draft: SkillInputDraft,
+    ownerRefs: SkillInputOwnerRefs,
+    policy: EffectiveExecutionPolicy,
+    modes: ExecutionPolicyModes,
+    modeOverrides: ExecutionPolicyModes,
+  ) => Promise<TaskThreadSubmitState>;
   onCancelActiveTurn?: () => Promise<TaskThreadSubmitState>;
   onTask: (task: TaskProjection) => void;
 };
@@ -55,6 +66,7 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
   const [submitState, setSubmitState] = useState<TaskThreadSubmitState>(initialTaskThreadSubmitState);
   const [policyState, setPolicyState] = useState<ExecutionPolicyLoadState>(loadingExecutionPolicyState);
   const [modes, setModes] = useState<ExecutionPolicyModes>({});
+  const [modifiedCategories, setModifiedCategories] = useState<Set<ExecutionCategory>>(() => new Set());
   const formRef = useRef<HTMLFormElement>(null);
   const errors = validateSkillInputDraft(props.skill, draft);
 
@@ -64,7 +76,10 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
     void fetchEffectiveExecutionPolicy(props.endpoint, props.skill.packageRef, props.threadRef).then((state) => {
       if (cancelled) return;
       setPolicyState(state);
-      if (state.status === "ready") setModes(policyModesByCategory(state.policy));
+      if (state.status === "ready") {
+        setModes(policyModesByCategory(state.policy));
+        setModifiedCategories(new Set());
+      }
     });
     return () => { cancelled = true; };
   }, [props.endpoint, props.skill.packageRef, props.threadRef]);
@@ -104,10 +119,20 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
       setSubmitState({ status: "blocked", summary: sealed.reason });
       return;
     }
-    const result = await props.onSubmit(draft, sealed.refs, policyState.policy, modes);
+    const result = await props.onSubmit(
+      draft,
+      sealed.refs,
+      policyState.policy,
+      modes,
+      executionPolicyModeMutation(modes, modifiedCategories),
+    );
     setSubmitState(result);
     if ("task" in result && result.task != null) props.onTask(result.task);
     if (result.status !== "ready") return;
+    await finishAcceptedTurn();
+  }
+
+  async function finishAcceptedTurn() {
     const persistence = await clearDraft();
     setTouched(new Set());
     setSubmitted(false);
@@ -123,21 +148,21 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
 
   function updateValue(id: string, value: SkillInputValue) {
     setDraft((current) => ({ ...current, values: { ...current.values, [id]: value } }));
-    setSubmitState(initialTaskThreadSubmitState);
+    setSubmitState((current) => current.status === "unknown" ? current : initialTaskThreadSubmitState);
   }
 
   function updateFiles(id: string, files: SkillInputAttachment[]) {
     const retained = new Set(files.map((file) => file.id));
     void releaseLocalAttachments((draft.files[id] ?? []).filter((file) => !retained.has(file.id)));
     setDraft((current) => ({ ...current, files: { ...current.files, [id]: files } }));
-    setSubmitState(initialTaskThreadSubmitState);
+    setSubmitState((current) => current.status === "unknown" ? current : initialTaskThreadSubmitState);
   }
 
   async function clearEntireDraft() {
     const persistence = await clearDraft();
     setTouched(new Set());
     setSubmitted(false);
-    setSubmitState(initialTaskThreadSubmitState);
+    setSubmitState((current) => current.status === "unknown" ? current : initialTaskThreadSubmitState);
     setAnnouncement(persistence === "ready"
       ? "业务输入已清空。"
       : "当前输入已清空，但无法确认系统受保护存储中的旧记录已删除。");
@@ -149,6 +174,16 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
     const result = await props.onCancelActiveTurn();
     setSubmitState(result);
     if ("task" in result && result.task != null) props.onTask(result.task);
+  }
+
+  async function reconcileUnknownTurn() {
+    if (submitState.status !== "unknown") return;
+    const attempt = submitState.attempt;
+    setSubmitState({ status: "submitting", summary: "正在按原提交标识检查 Core 线程事实。" });
+    const result = await reconcileTaskThreadTurn(props.endpoint, attempt);
+    setSubmitState(result);
+    if ("task" in result && result.task != null) props.onTask(result.task);
+    if (result.status === "ready") await finishAcceptedTurn();
   }
 
   return (
@@ -173,8 +208,21 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
           skill={props.skill}
         />
       </fieldset>
-      <ComposerFooter {...props} clearing={clearing} modes={modes} policyState={policyState} submitState={submitState} onCancel={cancelActiveTurn} onClear={clearEntireDraft} onModes={setModes} onPolicyState={setPolicyState} />
-      <ComposerStatus blockedReason={props.submitBlockedReason} state={submitState} />
+      <ComposerFooter
+        {...props}
+        clearing={clearing}
+        modes={modes}
+        modifiedCategories={modifiedCategories}
+        policyState={policyState}
+        submitState={submitState}
+        onCancel={cancelActiveTurn}
+        onClear={clearEntireDraft}
+        onModes={setModes}
+        onModifiedCategories={setModifiedCategories}
+        onPolicyState={setPolicyState}
+        onReconcile={reconcileUnknownTurn}
+      />
+      <ComposerStatus blockedReason={props.submitBlockedReason} state={submitState} onReconcile={reconcileUnknownTurn} />
     </form>
   );
 }
@@ -182,14 +230,18 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
 function ComposerFooter(props: StructuredTaskComposerProps & {
   clearing: boolean;
   modes: ExecutionPolicyModes;
+  modifiedCategories: Set<ExecutionCategory>;
   policyState: ExecutionPolicyLoadState;
   submitState: TaskThreadSubmitState;
   onCancel: () => void;
   onClear: () => void;
   onModes: (modes: ExecutionPolicyModes) => void;
+  onModifiedCategories: (categories: Set<ExecutionCategory>) => void;
   onPolicyState: (state: ExecutionPolicyLoadState) => void;
+  onReconcile: () => void;
 }) {
   const busy = props.clearing || props.submitState.status === "submitting";
+  const submitLocked = busy || props.submitState.status === "unknown";
   return (
     <div className="create-task-composer-toolbar">
       <button className="composer-icon-button" type="button" disabled={busy} aria-label="清空业务输入" title="清空业务输入" onClick={props.onClear}><Trash2 size={14} /></button>
@@ -197,10 +249,11 @@ function ComposerFooter(props: StructuredTaskComposerProps & {
         <strong>{catalogSkillName(props.skill)}</strong><small>{props.identity.accountLabel} · {catalogSkillSiteName(props.skill)}</small>
       </span>
       <ExecutionPolicyMenu {...props} />
+      <DangerousAutoRisk active={declaredExecutionCategories(props.skill).includes("destructive") && props.modes.destructive === "auto"} />
       {props.onCancelActiveTurn == null ? null : (
         <button className="composer-icon-button" type="button" disabled={busy} aria-label="停止当前回合" title="停止当前回合" onClick={props.onCancel}><Square size={13} /></button>
       )}
-      <button className="production-primary-button create-task-submit" type="submit" disabled={busy || props.submitBlockedReason != null || props.policyState.status !== "ready"}>
+      <button className="production-primary-button create-task-submit" type="submit" disabled={submitLocked || props.submitBlockedReason != null || props.policyState.status !== "ready"}>
         <Send size={14} />{busy ? "提交中" : props.submitLabel}
       </button>
     </div>
@@ -209,14 +262,16 @@ function ComposerFooter(props: StructuredTaskComposerProps & {
 
 function ExecutionPolicyMenu(props: StructuredTaskComposerProps & {
   modes: ExecutionPolicyModes;
+  modifiedCategories: Set<ExecutionCategory>;
   policyState: ExecutionPolicyLoadState;
   onModes: (modes: ExecutionPolicyModes) => void;
+  onModifiedCategories: (categories: Set<ExecutionCategory>) => void;
   onPolicyState: (state: ExecutionPolicyLoadState) => void;
 }) {
   const categories = declaredExecutionCategories(props.skill);
   const current = props.policyState.status === "ready" ? policySummary(props.policyState.policy, categories[0]) : props.policyState.summary;
   async function save(destination: "thread" | "skill") {
-    if (props.policyState.status !== "ready") return;
+    if (props.policyState.status !== "ready" || props.modifiedCategories.size === 0) return;
     props.onPolicyState({ status: "loading", summary: "正在保存执行方式。" });
     let sourceVersion = sourceVersionForPolicy(props.policyState.policy, "thread_revision");
     if (destination === "skill") {
@@ -227,16 +282,20 @@ function ExecutionPolicyMenu(props: StructuredTaskComposerProps & {
       }
       sourceVersion = configuration.configuration?.sourceVersion ?? null;
     }
+    const mutationModes = executionPolicyModeMutation(props.modes, props.modifiedCategories);
     const state = destination === "thread" && props.threadRef
-      ? await putThreadExecutionPolicy(props.endpoint, props.threadRef, props.skill.packageRef, props.modes, sourceVersion)
-      : await putSkillExecutionPolicy(props.endpoint, props.skill.packageRef, props.modes, sourceVersion);
+      ? await putThreadExecutionPolicy(props.endpoint, props.threadRef, props.skill.packageRef, mutationModes, sourceVersion)
+      : await putSkillExecutionPolicy(props.endpoint, props.skill.packageRef, mutationModes, sourceVersion);
     if (state.status !== "ready") {
       props.onPolicyState(state);
       return;
     }
     const effective = await fetchEffectiveExecutionPolicy(props.endpoint, props.skill.packageRef, props.threadRef);
     props.onPolicyState(effective);
-    if (effective.status === "ready") props.onModes(policyModesByCategory(effective.policy));
+    if (effective.status === "ready") {
+      props.onModes(policyModesByCategory(effective.policy));
+      props.onModifiedCategories(new Set());
+    }
   }
   return (
     <details className="composer-execution-menu">
@@ -247,27 +306,81 @@ function ExecutionPolicyMenu(props: StructuredTaskComposerProps & {
             <span><strong>{categoryLabel(category)}</strong><small>{categoryDetail(category)}</small></span>
             <div role="group" aria-label={`${categoryLabel(category)}执行方式`}>
               {(["auto", "confirm", "deny"] as ExecutionMode[]).map((mode) => (
-                <button type="button" className={props.modes[category] === mode ? "selected" : ""} aria-pressed={props.modes[category] === mode} onClick={() => props.onModes({ ...props.modes, [category]: mode })} key={mode}>{modeLabel(mode)}</button>
+                <button
+                  type="button"
+                  className={props.modes[category] === mode ? "selected" : ""}
+                  aria-pressed={props.modes[category] === mode}
+                  onClick={() => updateMode(props, category, mode)}
+                  key={mode}
+                >{modeLabel(mode)}</button>
               ))}
             </div>
           </div>
         ))}
         {props.threadRef ? (
           <div className="composer-execution-actions">
-            <button type="button" onClick={() => void save("thread")}><CircleCheck size={13} />保存到当前线程</button>
-            <button type="button" onClick={() => void save("skill")}><Save size={13} />另存为我的技能默认</button>
+            <button type="button" disabled={props.modifiedCategories.size === 0} onClick={() => void save("thread")}><CircleCheck size={13} />保存到当前线程</button>
+            <button type="button" disabled={props.modifiedCategories.size === 0} onClick={() => void save("skill")}><Save size={13} />另存为我的技能默认</button>
           </div>
-        ) : <small>所选方式将在创建时写入当前线程，不修改技能或全局默认。</small>}
+        ) : <small>未修改时沿用当前有效方式；仅修改项会写入新线程。</small>}
       </div>
     </details>
   );
 }
 
-function ComposerStatus({ blockedReason, state }: { blockedReason?: string; state: TaskThreadSubmitState }) {
+function updateMode(
+  props: {
+    modes: ExecutionPolicyModes;
+    modifiedCategories: Set<ExecutionCategory>;
+    policyState: ExecutionPolicyLoadState;
+    onModes: (modes: ExecutionPolicyModes) => void;
+    onModifiedCategories: (categories: Set<ExecutionCategory>) => void;
+  },
+  category: ExecutionCategory,
+  mode: ExecutionMode,
+) {
+  const modified = new Set(props.modifiedCategories);
+  const effective = props.policyState.status === "ready" ? policyModesByCategory(props.policyState.policy)[category] : undefined;
+  if (mode === effective) modified.delete(category);
+  else modified.add(category);
+  props.onModes({ ...props.modes, [category]: mode });
+  props.onModifiedCategories(modified);
+}
+
+function DangerousAutoRisk({ active }: { active: boolean }) {
+  const [copyDismissed, setCopyDismissed] = useState(false);
+  if (!active) return null;
+  return (
+    <span className="composer-dangerous-auto-risk" title="危险行为已设为自动执行">
+      <AlertTriangle size={15} />
+      {copyDismissed ? null : <span>危险行为自动执行</span>}
+      {copyDismissed ? null : (
+        <button type="button" aria-label="关闭危险行为说明" title="关闭说明" onClick={() => setCopyDismissed(true)}><X size={12} /></button>
+      )}
+    </span>
+  );
+}
+
+function ComposerStatus({ blockedReason, state, onReconcile }: {
+  blockedReason?: string;
+  state: TaskThreadSubmitState;
+  onReconcile: () => void;
+}) {
   if (state.status === "idle" && blockedReason == null) return null;
-  const status = blockedReason == null ? state.status : "blocked";
-  const summary = blockedReason ?? state.summary;
-  return <div className={`create-task-submit-state ${status}`} role="status"><CircleAlert size={15} /><span><strong>{status === "submitting" ? "正在处理" : status === "ready" ? "已处理" : "暂不可提交"}</strong><small>{summary}</small></span></div>;
+  const status = state.status === "unknown" ? "unknown" : blockedReason == null ? state.status : "blocked";
+  const summary = state.status === "unknown" ? state.summary : blockedReason ?? state.summary;
+  return (
+    <div className={`create-task-submit-state ${status}`} role="status">
+      <CircleAlert size={15} />
+      <span>
+        <strong>{status === "submitting" ? "正在处理" : status === "ready" ? "已处理" : status === "unknown" ? "状态未知" : "暂不可提交"}</strong>
+        <small>{summary}</small>
+      </span>
+      {state.status === "unknown" ? (
+        <button type="button" onClick={onReconcile}>重新检查</button>
+      ) : null}
+    </div>
+  );
 }
 
 function policySummary(policy: EffectiveExecutionPolicy, category: ExecutionCategory | undefined) {

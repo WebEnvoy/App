@@ -211,7 +211,7 @@ function CreateTaskComposer(props: CreateTaskComposerProps) {
         ? { ok: true }
         : { ok: false, reason: candidate == null ? "Core 未返回账号身份兼容性。" : compatibilityCandidateLabel(candidate) };
     }}
-    onSubmit={(draft, ownerRefs, executionPolicy, threadModes) => createTaskThreadTurn({
+    onSubmit={(draft, ownerRefs, executionPolicy, threadModes, threadModeOverrides) => createTaskThreadTurn({
       endpoint: props.coreEndpoint,
       skill: selection.skill,
       identity,
@@ -220,6 +220,7 @@ function CreateTaskComposer(props: CreateTaskComposerProps) {
       executionPolicy,
       runtime: props.runtimeSupervisorState,
       threadModes,
+      threadModeOverrides,
     })}
     onTask={props.onTaskCreated}
   />;
