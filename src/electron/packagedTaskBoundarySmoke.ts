@@ -111,7 +111,7 @@ export async function runPackagedTaskBoundarySmoke(
       );
       const firstTurnRecorded = readback?.ok === true && readback.status === 200 &&
         turn?.submission_state === "accepted" && turn.status === "waiting_for_user" &&
-        turn.failure_code === "identity_environment_unavailable";
+        turn.failure_code === "identity_environment_missing";
       if (!firstTurnRecorded) {
         throw new Error("Core did not retain the fail-closed packaged first-turn attempt: " + JSON.stringify({ readback, turn }));
       }
