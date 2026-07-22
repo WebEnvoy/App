@@ -18,6 +18,7 @@ export type CoreReadTaskSpec = {
   packageVersion: string;
   capabilities: CoreReadCapability[];
   resourceRequirementRefs: string[];
+  resourceRequirementProfileId: string;
   evidencePolicyRef: string;
   boundary: string;
 };
@@ -174,6 +175,7 @@ export const coreReadTaskSpecs: CoreReadTaskSpec[] = [
       },
     ],
     resourceRequirementRefs: ["xiaohongshu.search-notes.resources"],
+    resourceRequirementProfileId: "search-notes-logged-in-ready-page",
     evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 返回 run/result/evidence refs；App 不读取 raw evidence、DOM、截图正文、Cookie、token 或 profile storage。",
   },
@@ -195,6 +197,7 @@ export const coreReadTaskSpecs: CoreReadTaskSpec[] = [
       },
     ],
     resourceRequirementRefs: ["boss.job-search.resources"],
+    resourceRequirementProfileId: "job-search-logged-in-ready-page",
     evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 只暴露 BOSS 只读 run/result/evidence refs；App 不打招呼、不投递、不保存聊天或简历材料。",
   },
@@ -211,6 +214,7 @@ export const coreReadTaskSpecs: CoreReadTaskSpec[] = [
       },
     ],
     resourceRequirementRefs: ["xiaohongshu.publish-note-precheck.resources"],
+    resourceRequirementProfileId: "xhs-creator-publish-page-precheck",
     evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 返回小红书写前验证 run/result/evidence refs；App 只展示 expected_change、approval state 和 owner submitted 状态，不点击发布。",
   },
@@ -227,6 +231,7 @@ export const coreReadTaskSpecs: CoreReadTaskSpec[] = [
       },
     ],
     resourceRequirementRefs: ["boss.greet-precheck.resources"],
+    resourceRequirementProfileId: "boss-greet-target-precheck",
     evidencePolicyRef: "evidence-policy:refs-only",
     boundary: "Core owner API 返回 BOSS 打招呼写前验证 refs；App 只展示消息框预览、风险状态和 owner submitted 状态，不发送消息。",
   },

@@ -196,7 +196,12 @@ function prepareTaskTurn(options: SubmitOptions, requestedModes?: ExecutionPolic
         resource_requirement_profile_id: action.resourceRequirementProfileIds[0],
         evidence_policy_ref: "policy:no-raw-evidence",
       },
-      harbor: { identity_environment_ref: options.identity.identityEnvironmentRef, url: target.url, reuse_existing: true },
+      harbor: {
+        identity_environment_ref: options.identity.identityEnvironmentRef,
+        url: target.url,
+        reuse_existing: true,
+        timeout_ms: 60_000,
+      },
     },
   };
 }
