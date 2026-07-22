@@ -192,6 +192,7 @@ function prepareTaskTurn(options: SubmitOptions, requestedModes?: ExecutionPolic
           timeout_ms: 60_000,
         },
         resource_requirement_refs: resourceRefs,
+        resource_requirement_profile_id: action.resourceRequirementProfileIds[0],
         evidence_policy_ref: "policy:no-raw-evidence",
       },
       harbor: { identity_environment_ref: options.identity.identityEnvironmentRef, url: target.url, reuse_existing: true },
@@ -206,7 +207,11 @@ function submissionReadiness(options: SubmitOptions, requestedModes?: ExecutionP
     return "Core 或 Harbor live runtime 尚未 ready；提交保持停止。";
   }
   if (options.identity.source !== "Harbor live" || options.identity.login.recoveryRequired) return "账号身份尚未由 Harbor live 证明可用。";
-  if (options.skill.actions.length !== 1 || options.skill.actions[0]?.operationMode !== "read") {
+  if (
+    options.skill.actions.length !== 1 ||
+    options.skill.actions[0]?.operationMode !== "read" ||
+    options.skill.actions[0].resourceRequirementProfileIds.length !== 1
+  ) {
     return "当前 Core 仅接入已声明的单一只读动作；准备、发布与危险行为保持停止。";
   }
   if (requestedModes != null) {

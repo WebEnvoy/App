@@ -120,7 +120,7 @@ if (
 }
 
 const expectedRuntimeHeads = {
-  core: "83139851688d17a2df57f532b2f322f4bbf98ea6",
+  core: "645314956bd0897b8873e6ab9697013625550798",
   harbor: "8d9f0a3b52764ce1efc1f80aef3aa5ed7c7a8a91",
   lode: "1fbef74b4bf1b4f0a86aacd885386d7a62181207",
 };
@@ -612,6 +612,8 @@ if (
   xhsSearchSkill.name !== "Search Xiaohongshu notes" ||
   xhsSearchSkill.summary !== "Read Xiaohongshu search result cards from a logged-in browser page and return note refs for detail follow-up." ||
   xhsSearchSkill.actions[0]?.category !== "read" ||
+  xhsSearchSkill.actions[0]?.resourceRequirementProfileIds?.length !== 1 ||
+  xhsSearchSkill.actions[0].resourceRequirementProfileIds[0] !== "search-notes-logged-in-ready-page" ||
   !xhsSearchSkill.inputFields.some((field) =>
     field.id === "keyword" && field.label === "keyword" && field.required && field.minLength === 1 && field.maxLength === 80
   ) ||

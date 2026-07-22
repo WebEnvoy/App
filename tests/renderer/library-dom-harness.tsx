@@ -361,10 +361,12 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const acceptedTurnRequest = libraryOwnerRequests[turnIndex];
   const acceptedPayload = JSON.stringify(acceptedTurnRequest?.body);
   const acceptedSnapshot = (acceptedTurnRequest?.body as { input_snapshot?: { fields?: Array<{ field_id: string; kind: string; summary?: string }>; attachment_refs?: string[] } })?.input_snapshot;
+  const acceptedTaskIntent = (acceptedTurnRequest?.body as { task_intent?: { resource_requirement_profile_id?: string } })?.task_intent;
   const acceptedFields = Object.fromEntries((acceptedSnapshot?.fields ?? []).map((field) => [field.field_id, field]));
   const acceptedFlow = createIndex >= 0 && policyIndex === -1 && turnIndex > createIndex &&
     acceptedFields.url?.kind === "long_text" && acceptedFields.url?.owner_ref != null &&
     acceptedFields.keyword?.kind === "long_text" && acceptedFields.keyword?.owner_ref != null &&
+    acceptedTaskIntent?.resource_requirement_profile_id === xhsSkill.actions[0]?.resourceRequirementProfileIds[0] &&
     acceptedSnapshot?.attachment_refs?.length === 0 &&
     !acceptedPayload.includes("library-harness-attachment.txt");
   setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
@@ -421,6 +423,7 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     (policySaveRequests[skillConfigWrite]?.body as { expected_source_version?: string })?.expected_source_version === "5" &&
     JSON.stringify(savedModes) === JSON.stringify({ read: "confirm" });
   const reusedThreadSafe = await checkReusedThreadPolicyRevision();
+  const resourceProfileBoundarySafe = await checkResourceProfileSubmissionBoundary();
   setProtectedDraftSaveDelay(300);
   await new Promise((resolve) => setTimeout(resolve, 220));
   const attachmentRemoved = document.querySelector(".create-task-file-control") == null;
@@ -441,18 +444,48 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid < 2 || !attachmentAdded ||
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
     !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
-    !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe ||
+    !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe || !resourceProfileBoundarySafe ||
     !submittedCard.includes("keyword") || !submittedCard.includes("精确字段定义版本不可用") ||
     !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
     !unavailableDeleteWarning || mode === "narrow" && !longFileLayoutSafe) {
     throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({
       selection, initialInvalid, submittedInvalid, attachmentAdded, attachmentRestored, attachmentRemoved, restoredKeyword,
       catalogRefreshPreserved, cleared, clearedDraftStayedDeleted, firstErrorFocused, live, acceptedFlow,
-      unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, submittedCard, overflow,
+      unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedCard, overflow,
       unavailableDeleteWarning, mode, longFileLayoutSafe, searchHeight,
     })}`);
   }
-  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
+  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
+}
+
+async function checkResourceProfileSubmissionBoundary() {
+  const draft = createSkillInputDraft(xhsSkill);
+  draft.values.url = "https://www.xiaohongshu.com/explore";
+  draft.values.keyword = "profile boundary";
+  draft.values.limit = "8";
+  const ownerRef = "draft:app-protected/00000000-0000-4000-8000-000000000031";
+  const requestCount = libraryOwnerRequests.length;
+  const submitWithProfiles = (resourceRequirementProfileIds: string[]) => createTaskThreadTurn({
+    endpoint: "http://127.0.0.1:8787",
+    skill: {
+      ...xhsSkill,
+      actions: [{ ...xhsSkill.actions[0]!, resourceRequirementProfileIds }],
+    },
+    identity,
+    draft,
+    ownerRefs: {
+      ownerRef,
+      fieldOwnerRefs: Object.fromEntries(xhsSkill.inputFields.map((field) => [field.id, `${ownerRef}/${field.id}`])),
+      attachmentRefs: {},
+    },
+    executionPolicy: { skillRef: xhsSkill.packageRef, actions: [] },
+    runtime,
+    threadModes: { read: "auto" },
+    threadModeOverrides: {},
+  });
+  const missing = await submitWithProfiles([]);
+  const ambiguous = await submitWithProfiles(["profile-a", "profile-b"]);
+  return missing.status === "blocked" && ambiguous.status === "blocked" && libraryOwnerRequests.length === requestCount;
 }
 
 async function checkReusedThreadPolicyRevision() {
