@@ -46,7 +46,7 @@ try {
     result.packagedTaskBoundary.firstTurnSubmitStatus !== 503 ||
     !result.packagedTaskBoundary.firstTurnRecorded ||
     result.packagedTaskBoundary.firstTurnStatus !== "waiting_for_user" ||
-    result.packagedTaskBoundary.firstTurnFailureCode !== "identity_environment_unavailable"
+    result.packagedTaskBoundary.firstTurnFailureCode !== "identity_environment_missing"
   ) {
     throw new Error(`Packaged runtime smoke failed: task boundary probe did not fail closed as expected. ${JSON.stringify(result.packagedTaskBoundary)}`);
   }
