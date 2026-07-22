@@ -63,8 +63,6 @@ type CoreTaskSubmitOptions = {
 
 const sensitivePayloadPattern =
   /\b(token|cookie|secret|bearer|credential|password|authorization|profile_storage|raw_evidence|dom|har|trace)\b/i;
-const requiredRestrictedFallbackWarnings = ["provider_conflict", "fingerprint_conflict"];
-const allowedRestrictedFallbackWarnings = new Set(requiredRestrictedFallbackWarnings);
 const supportedBossCityCodes = new Set(["101020100"]);
 
 export const initialCoreTaskSubmitState: CoreTaskSubmitState = {
@@ -98,14 +96,11 @@ export function coreTaskSubmitReadiness(
   }
 
   const site = siteForTask(task);
-  const identity = identities.find(
-    (item) =>
-      item.source === "Harbor live" &&
-      item.siteId === site &&
-      isReadOnlyIdentityAdmitted(item, site, spec),
-  );
-  if (!identity) {
-    return { ok: false, reason: "缺少符合只读 admission 的 Harbor live identity；未证明的 warning、needs-auth、fixture/local identity 不可提交真实任务。" };
+  const identityRef = task.threadContext?.accountIdentityKey;
+  if (!identityRef) return { ok: false, reason: "任务线程未固定 Harbor identity environment；不选择同站点其他身份。" };
+  const identity = identities.find((item) => item.identityEnvironmentRef === identityRef);
+  if (!identity || identity.source !== "Harbor live" || identity.siteId !== site || !isReadOnlyIdentityAdmitted(identity, site, spec)) {
+    return { ok: false, reason: "线程固定的 Harbor identity 当前不可用于只读任务；不切换到同站点其他身份。" };
   }
 
   const bossQuery = site === "boss" ? parseBossJobSearchInput(task.businessInput) : null;
@@ -211,14 +206,19 @@ export function isReadOnlyIdentityAdmitted(
   spec: CoreReadTaskSpec,
 ) {
   if (spec.mode !== "read") return false;
+  const facts = identity.admissionFacts;
   if (
+    identity.source === "Harbor live" &&
     identity.readiness.state === "ready" &&
     identity.provider.state === "ready" &&
-    !identity.login.recoveryRequired
+    !identity.login.recoveryRequired &&
+    facts?.loginState === "logged_in" &&
+    (facts.manualAuthenticationState === "not_required" || facts.manualAuthenticationState === "completed") &&
+    facts.recoveryRequired === false &&
+    facts.browserStorageState === "present"
   ) {
     return true;
   }
-  const facts = identity.admissionFacts;
   const warnings = facts?.warningReasonCodes ?? [];
   const allowsMissingProxy =
     site === "boss" &&
@@ -226,6 +226,7 @@ export function isReadOnlyIdentityAdmitted(
     spec.capabilities.some((capability) => capability.capabilityRef === "lode:capability/job-search");
   return (
     identity.readiness.state === "warning" &&
+    identity.source === "Harbor live" &&
     identity.provider.state === "warning" &&
     facts?.providerId === "chrome_official" &&
     facts.providerRole === "restricted_fallback" &&
@@ -234,8 +235,7 @@ export function isReadOnlyIdentityAdmitted(
     facts.manualAuthenticationState === "completed" &&
     facts.recoveryRequired === false &&
     facts.browserStorageState === "present" &&
-    requiredRestrictedFallbackWarnings.every((code) => warnings.includes(code)) &&
-    warnings.every((code) => allowedRestrictedFallbackWarnings.has(code) || (allowsMissingProxy && code === "proxy_missing"))
+    warnings.every((code) => allowsMissingProxy && code === "proxy_missing")
   );
 }
 
@@ -246,8 +246,11 @@ export function readOnlyIdentityAdmissionBlockReason(
   if (identity.source !== "Harbor live") {
     return "缺少 Harbor live identity；fixture/local identity 只能管理或认证，不能启动真实 Core task。";
   }
-  if (identity.login.recoveryRequired || identity.readiness.state === "needs-auth") {
+  if (identity.readiness.state === "needs-auth") {
     return "需要先在 Harbor 身份浏览器完成登录/人工认证；未登录身份不能启动真实 Core task。";
+  }
+  if (identity.readiness.state === "blocked" || identity.login.recoveryRequired) {
+    return "需要先修复浏览器环境；当前身份不能启动真实 Core task。";
   }
   const readSpec = coreReadTaskSpecs.find((spec) => spec.taskId === taskId && spec.mode === "read");
   if (!readSpec) {
@@ -274,11 +277,12 @@ export async function submitCoreReadOnlyTask(
   const submitResponse = await requestJson(endpoint, "/tasks", {
     method: "POST",
     body: JSON.stringify(readiness.payload),
+    includeErrorBody: true,
   });
   const runId = runIdFromSubmitResponse(submitResponse) ?? readiness.payload.run_id;
 
   if (!isOkResponse(submitResponse)) {
-    return { status: "failed", runId, summary: responseError(submitResponse, "Core /tasks did not accept the read-only task.") };
+    return { status: "failed", runId, summary: coreTaskSubmitFailureSummary(submitResponse, "Core /tasks did not accept the read-only task.") };
   }
 
   const projected = await pollSubmittedRun(endpoint, runId, readiness.spec, options);
@@ -354,11 +358,12 @@ async function pollSubmittedRun(
   return { ok: false as const, error: `Core run ${runId} was accepted but not yet queryable: ${lastError}` };
 }
 
-async function requestJson(base: string, path: string, init: RequestInit): Promise<unknown> {
+async function requestJson(base: string, path: string, init: RequestInit & { includeErrorBody?: boolean }): Promise<unknown> {
   return requestOwnerJson(base, path, {
     method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
     body: typeof init.body === "string" ? parseJson(init.body) : undefined,
     timeoutMs: path === "/tasks" && init.method === "POST" ? 65_000 : 3500,
+    includeErrorBody: init.includeErrorBody,
   });
 }
 
@@ -385,6 +390,42 @@ function responseError(value: unknown, fallback: string) {
   if (!isRecord(value)) return fallback;
   const error = recordValue(value.error) ?? recordValue(value.failure);
   return stringValue(error?.message) ?? stringValue(error?.code) ?? stringValue(value.error) ?? fallback;
+}
+
+export function coreTaskSubmitFailureSummary(value: unknown, fallback: string) {
+  const recoveryCode = coreTaskRecoveryCode(value);
+  if (["browser_environment_repair_required", "repair_browser_environment", "identity_storage_unavailable",
+    "browser_provider_unavailable", "identity_environment_unavailable", "connect_identity_environment", "install_or_select_provider"].includes(recoveryCode ?? "")) {
+    return "需要修复浏览器环境后重试。";
+  }
+  if (recoveryCode === "identity_auth_required" || recoveryCode === "open_manual_auth") {
+    return "需要登录或完成人工认证后重试。";
+  }
+  return responseError(value, fallback);
+}
+
+function coreTaskRecoveryCode(value: unknown) {
+  if (!isRecord(value)) return undefined;
+  const records = [value, recordValue(value.body)].filter((item): item is Record<string, unknown> => item != null);
+  const candidates = records.flatMap((record) => {
+    const error = recordValue(record.error) ?? recordValue(record.failure);
+    return [error?.recovery_action, error?.recoveryAction, error?.recovery_hint, error?.recoveryHint,
+      error?.code, record.recovery_action, record.recoveryAction, record.recovery_hint, record.recoveryHint, record.error]
+      .map(stringValue)
+      .filter((item): item is string => item != null);
+  });
+  const knownCodes = [
+    "browser_environment_repair_required",
+    "repair_browser_environment",
+    "identity_storage_unavailable",
+    "browser_provider_unavailable",
+    "identity_environment_unavailable",
+    "connect_identity_environment",
+    "install_or_select_provider",
+    "identity_auth_required",
+    "open_manual_auth",
+  ];
+  return knownCodes.find((code) => candidates.some((candidate) => candidate === code || candidate.includes(`: ${code}`)));
 }
 
 function recordValue(value: unknown): Record<string, unknown> | null {

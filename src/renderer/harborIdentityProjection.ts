@@ -14,6 +14,7 @@ import type {
   ProviderId,
   SiteId,
 } from "./harborIdentityTypes";
+import { isAuthenticationRecoveryReason, isBrowserEnvironmentRepairReason, requiresManualAuthentication } from "./harborIdentityRecovery";
 
 export function projectHarborIdentity(
   facts: HarborIdentityFacts,
@@ -26,6 +27,7 @@ export function projectHarborIdentity(
     ...facts.login_state.human_verification.map(authLabel),
     ...facts.credential_recovery.recovery_actions.map(authLabel),
   ];
+  const manualAuthenticationRequired = factsRequireManualAuthentication(facts);
   const readiness = readinessFromFacts(facts);
   return {
     id: facts.identity_environment_ref,
@@ -57,7 +59,7 @@ export function projectHarborIdentity(
     },
     login: {
       state: loginLabel(facts.login_state.state),
-      recoveryRequired: facts.login_state.recovery_required,
+      recoveryRequired: manualAuthenticationRequired,
       manualAuthenticationState: manualAuthLabel(facts.login_state.manual_authentication_state),
       recoveryActions: Array.from(new Set(recoveryActions)),
       reason: facts.login_state.reason ?? "登录恢复和人工认证由 Harbor 浏览器现场完成。",
@@ -151,13 +153,42 @@ function providerProjection(provider: HarborProviderStatus): BrowserProviderProj
 }
 
 function readinessFromFacts(facts: HarborIdentityFacts): { state: IdentityStatus; label: string; reasons: string[] } {
-  if (!facts.provider_binding.selected_provider) return { state: "blocked", label: "provider 不可用", reasons: facts.diagnostics };
-  if (facts.login_state.recovery_required) return { state: "needs-auth", label: "需要人工认证", reasons: facts.login_state.human_verification.map(authLabel) };
+  const selectedProvider = facts.provider_binding.selected_provider;
+  const providerUnavailable = selectedProvider == null || selectedProvider.install.status !== "installed" ||
+    selectedProvider.install.launchability !== "launchable";
+  const browserStorageUnavailable = facts.browser_storage.state !== "present" || facts.browser_storage.cookies_session_state !== "present";
+  const allowedNoticeWarnings = facts.site_binding.site_id === "boss" && facts.provider_binding.requires_user_notice
+    ? new Set(["proxy_missing"])
+    : new Set<string>();
+  const environmentReasons = facts.provider_binding.warnings.filter((reason) =>
+    !allowedNoticeWarnings.has(reason) && isBrowserEnvironmentRepairReason(reason),
+  );
+  if (providerUnavailable || browserStorageUnavailable || environmentReasons.length > 0) {
+    const reasons = environmentReasons.length > 0
+      ? environmentReasons
+      : facts.diagnostics.length > 0
+      ? facts.diagnostics
+      : [providerUnavailable ? "browser_provider_unavailable" : "identity_storage_unavailable"];
+    return { state: "blocked", label: "需要修复浏览器环境", reasons };
+  }
+  if (factsRequireManualAuthentication(facts)) {
+    return { state: "needs-auth", label: "需要登录或人工认证", reasons: facts.login_state.human_verification.map(authLabel) };
+  }
+  if (facts.login_state.recovery_required) {
+    return { state: "blocked", label: "需要修复浏览器环境", reasons: facts.diagnostics };
+  }
   return {
     state: facts.provider_binding.requires_user_notice ? "warning" : "ready",
     label: facts.provider_binding.requires_user_notice ? "受限后备" : "可用于只读任务",
     reasons: facts.provider_binding.warnings.length ? facts.provider_binding.warnings : ["Harbor public summary 可用。"],
   };
+}
+
+function factsRequireManualAuthentication(facts: HarborIdentityFacts) {
+  return requiresManualAuthentication(facts.login_state.state, facts.login_state.manual_authentication_state) ||
+    facts.provider_binding.warnings.some(isAuthenticationRecoveryReason) ||
+    facts.login_state.human_verification.length > 0 ||
+    facts.credential_recovery.recovery_actions.some((action) => action === "manual_login" || isAuthenticationRecoveryReason(action));
 }
 
 function emptySession(provider: BrowserSessionProjection["provider"], identityRef: string): BrowserSessionProjection {

@@ -13,6 +13,7 @@ export type IdentityCompatibilityCandidate = {
     | "refresh_owner_facts"
     | "select_matching_identity"
     | "open_manual_auth"
+    | "repair_browser_environment"
     | "install_or_select_provider"
     | "connect_identity_environment"
     | "fix_target"
@@ -73,6 +74,7 @@ const recoveryActions = new Set([
   "refresh_owner_facts",
   "select_matching_identity",
   "open_manual_auth",
+  "repair_browser_environment",
   "install_or_select_provider",
   "connect_identity_environment",
   "fix_target",

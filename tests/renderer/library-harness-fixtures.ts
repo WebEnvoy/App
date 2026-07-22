@@ -91,6 +91,16 @@ export const identity = {
   ...identityEnvironmentFixtures[0],
   identityEnvironmentRef: "identity-env_aaaaaaaaaaaaaaaaaaaaaaaa",
   source: "Harbor live" as const,
+  admissionFacts: {
+    providerId: "cloakbrowser" as const,
+    providerRole: "primary" as const,
+    authenticationProvenance: "user_confirmed_managed_session",
+    loginState: "logged_in",
+    manualAuthenticationState: "completed",
+    recoveryRequired: false,
+    browserStorageState: "present",
+    warningReasonCodes: [],
+  },
 };
 export const identityB = {
   ...identity,

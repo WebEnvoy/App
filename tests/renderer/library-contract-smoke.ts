@@ -7,6 +7,7 @@ import {
   projectCompatibilityTarget,
 } from "../../src/renderer/coreIdentityCompatibilityClient";
 import { buildCoreThreadInputSnapshot } from "../../src/renderer/coreTaskThreadSubmitClient";
+import { coreTaskSubmitFailureSummary, coreTaskSubmitReadiness, readOnlyIdentityAdmissionBlockReason } from "../../src/renderer/coreTaskSubmitClient";
 import { projectCoreThreadResponse } from "../../src/renderer/coreThreadClient";
 import { parseCoreThreadInputSnapshot } from "../../src/renderer/coreThreadInputContract";
 import { projectLodeCatalogDisplayCache, type LodeCatalogLoadState, type LodeCatalogSkill } from "../../src/renderer/lodeCatalogClient";
@@ -19,6 +20,10 @@ import { clearSkillInputDraft, loadSkillInputDraft, saveSkillInputDraft } from "
 import { compatibilityRecoveryCopy } from "../../src/renderer/skillCompatibilityPresentation";
 import { terminalSkillInputOwnerRefs } from "../../src/renderer/skillInputOwnerClient";
 import { findCatalogSkillForTask } from "../../src/renderer/useAppController";
+import { identityFactsFromPublicRecord } from "../../src/renderer/harborIdentityClient";
+import { projectHarborIdentity } from "../../src/renderer/harborIdentityProjection";
+import { identity, identityB, runtime } from "./library-harness-fixtures";
+import { taskThreadFixtures } from "../../src/renderer/taskThreadFixtures";
 
 type SmokeInput = {
   catalog: LodeCatalogLoadState;
@@ -158,6 +163,17 @@ function checkResponseProjection(request: NonNullable<ReturnType<typeof createSk
   const response = compatibilityResponse(request);
   const now = Date.parse("2026-07-20T00:00:30.000Z");
   const parsed = parseSkillIdentityCompatibilityResponse(response, request, now);
+  const repair = parseSkillIdentityCompatibilityResponse({
+    ...response,
+    candidates: [{
+      ...response.candidates[0],
+      status: "requires_setup",
+      reason_codes: ["provider_conflict"],
+      missing_requirement_categories: ["browser_environment"],
+      fact_freshness: [],
+      recovery_action: "repair_browser_environment",
+    }],
+  }, request, now);
   const rejects = (candidate: Record<string, unknown>) => parseSkillIdentityCompatibilityResponse({
     ...response,
     candidates: [{ ...response.candidates[0], ...candidate }],
@@ -178,7 +194,8 @@ function checkResponseProjection(request: NonNullable<ReturnType<typeof createSk
     candidates: [{ ...response.candidates[0], owner_status: { lode: "available", harbor: "stale" }, freshness: { state: "stale", observed_at: "2026-07-20T00:00:00.000Z", age_ms: 30_000 } }],
   }, request, now);
   const expired = parseSkillIdentityCompatibilityResponse({ ...response, generated_at: "2026-07-19T00:00:00.000Z" }, request, now);
-  if (parsed?.[0]?.status !== "unknown_until_runtime" || malformed !== null || stale !== null || expired !== null || !invalidSemantics) {
+  if (parsed?.[0]?.status !== "unknown_until_runtime" || repair?.[0]?.recoveryAction !== "repair_browser_environment" ||
+    malformed !== null || stale !== null || expired !== null || !invalidSemantics) {
     throw new Error("Compatibility response validation accepted stale, malformed, or contradictory owner data.");
   }
 }
@@ -332,10 +349,51 @@ async function checkOwnerBoundaries(catalog: LodeCatalogLoadState) {
   const safeError = projectOwnerHttpStatusError("/owner", 409, { error: { category: "owner_contract", code: "identity_not_ready", message: "Bearer raw-secret" }, token: "raw-secret" });
   const unsafeError = projectOwnerHttpStatusError("/owner", 409, { error: { category: "Bearer raw-secret", code: "token=raw-secret" } });
   const recoveries = [
-    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "incompatible", reasonCodes: [], recoveryAction: "repair_package_contract" })?.destination,
-    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "incompatible", reasonCodes: [], recoveryAction: "select_matching_identity" })?.destination,
-    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "requires_setup", reasonCodes: [], recoveryAction: "install_or_select_provider" })?.destination,
+    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "incompatible", reasonCodes: [], recoveryAction: "repair_package_contract" }),
+    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "incompatible", reasonCodes: [], recoveryAction: "select_matching_identity" }),
+    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "requires_setup", reasonCodes: [], recoveryAction: "install_or_select_provider" }),
+    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "requires_setup", reasonCodes: [], recoveryAction: "connect_identity_environment" }),
+    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "requires_setup", reasonCodes: [], recoveryAction: "repair_browser_environment" }),
+    compatibilityRecoveryCopy({ identityEnvironmentRef: "a", status: "requires_setup", reasonCodes: [], recoveryAction: "open_manual_auth" }),
   ];
+  const environmentFacts = identityFactsFromPublicRecord(environmentRepairPublicRecord(), providerCatalog());
+  const environmentIdentity = environmentFacts == null ? null : projectHarborIdentity(environmentFacts, providerCatalog(), "2026-07-22T00:00:00Z");
+  const authenticationFacts = identityFactsFromPublicRecord(authenticationRecoveryPublicRecord(), providerCatalog());
+  const authenticationIdentity = authenticationFacts == null ? null : projectHarborIdentity(authenticationFacts, providerCatalog(), "2026-07-22T00:00:00Z");
+  const fallbackFacts = identityFactsFromPublicRecord(healthyChromeFallbackPublicRecord(), providerCatalog());
+  const fallbackIdentity = fallbackFacts == null ? null : projectHarborIdentity(fallbackFacts, providerCatalog(), "2026-07-22T00:00:00Z");
+  const fallbackNoticeIdentity = fallbackFacts == null ? null : projectHarborIdentity({
+    ...fallbackFacts,
+    provider_binding: { ...fallbackFacts.provider_binding, warnings: ["provider_restricted_fallback"] },
+  }, providerCatalog(), "2026-07-22T00:00:00Z");
+  const missingStorageFacts = identityFactsFromPublicRecord(missingStoragePublicRecord(), providerCatalog());
+  const missingStorageIdentity = missingStorageFacts == null ? null : projectHarborIdentity(missingStorageFacts, providerCatalog(), "2026-07-22T00:00:00Z");
+  const authBlock = readOnlyIdentityAdmissionBlockReason({ ...identity, readiness: { state: "needs-auth", label: "需要登录", reasons: [] } }, "task-xhs-real-read");
+  const environmentBlock = environmentIdentity == null ? null : readOnlyIdentityAdmissionBlockReason(environmentIdentity, "task-xhs-real-read");
+  const failureCopies = [
+    coreTaskSubmitFailureSummary({ error: { code: "browser_environment_repair_required", recovery_action: "repair_browser_environment" } }, "fallback"),
+    coreTaskSubmitFailureSummary({ error: { code: "identity_auth_required", recovery_action: "open_manual_auth" } }, "fallback"),
+    coreTaskSubmitFailureSummary({ error: { code: "identity_environment_unavailable", recovery_hint: "connect_identity_environment" } }, "fallback"),
+  ];
+  const readTask = taskThreadFixtures.find((task) => task.id === "task-xhs-real-read");
+  const fixedTask = readTask == null ? null : {
+    ...readTask,
+    threadContext: { siteLabel: "小红书", siteSkillKey: "xhs", accountIdentityKey: identityB.identityEnvironmentRef },
+  };
+  const fixedReadiness = fixedTask == null ? null : coreTaskSubmitReadiness(fixedTask, runtime, [identity, identityB]);
+  const missingIdentityReadiness = fixedTask == null ? null : coreTaskSubmitReadiness({
+    ...fixedTask,
+    threadContext: { ...fixedTask.threadContext, accountIdentityKey: "identity-env_missing" },
+  }, runtime, [identity, identityB]);
+  const fixtureIdentityReadiness = fixedTask == null ? null : coreTaskSubmitReadiness(fixedTask, runtime, [{
+    ...identityB,
+    source: "Harbor fixture",
+  }]);
+  const fallbackReadiness = fixedTask == null || fallbackIdentity == null ? null : coreTaskSubmitReadiness({
+    ...fixedTask,
+    threadContext: { ...fixedTask.threadContext, accountIdentityKey: fallbackIdentity.identityEnvironmentRef },
+  }, runtime, [fallbackIdentity]);
+  const missingIdentityReason = missingIdentityReadiness != null && !missingIdentityReadiness.ok ? missingIdentityReadiness.reason : "";
   let cancelled = false;
   await readBoundedJsonResponse(new Response(new ReadableStream<Uint8Array>({
     start(controller) { controller.enqueue(new Uint8Array(64 * 1024 + 1)); },
@@ -346,8 +404,91 @@ async function checkOwnerBoundaries(catalog: LodeCatalogLoadState) {
   );
   if (/secret|credential|token|pattern/.test(cache) || !supersededCorrectly || latest.isCurrent() ||
     safeError !== "/owner returned 409: owner_contract: identity_not_ready" || unsafeError !== "/owner returned 409" ||
-    recoveries.join(",") !== "skill_repair,identity_selection,identity" || !cancelled ||
+    recoveries.map((item) => `${item?.destination}:${item?.label}`).join(",") !==
+      "skill_repair:更新或修复站点技能,identity_selection:选择其他账号身份,identity:修复浏览器环境,identity:修复浏览器环境,identity:修复浏览器环境,identity:登录账号" ||
+    environmentFacts?.login_state.human_verification.length !== 0 || environmentFacts?.credential_recovery.recovery_actions.length !== 0 ||
+    environmentIdentity?.readiness.state !== "blocked" || environmentIdentity.readiness.label !== "需要修复浏览器环境" ||
+    authenticationFacts?.credential_recovery.recovery_actions[0] !== "manual_login" ||
+    authenticationIdentity?.readiness.state !== "needs-auth" || authenticationIdentity.readiness.label !== "需要登录或人工认证" ||
+    fallbackIdentity?.readiness.state !== "warning" || fallbackNoticeIdentity?.readiness.state !== "warning" || fallbackReadiness?.ok !== true ||
+    missingStorageIdentity?.readiness.state !== "blocked" || missingStorageIdentity.readiness.label !== "需要修复浏览器环境" ||
+    environmentIdentity.login.recoveryRequired || environmentBlock !== "需要先修复浏览器环境；当前身份不能启动真实 Core task。" ||
+    !authBlock?.includes("登录/人工认证") || failureCopies.join(",") !== "需要修复浏览器环境后重试。,需要登录或完成人工认证后重试。,需要修复浏览器环境后重试。" || !cancelled ||
+    fixedReadiness?.ok !== true || fixedReadiness.payload.harbor.identity_environment_ref !== identityB.identityEnvironmentRef ||
+    missingIdentityReadiness?.ok !== false || !missingIdentityReason.includes("不切换到同站点其他身份") ||
+    fixtureIdentityReadiness?.ok !== false ||
     ownerApiResponseMaxBytes("/threads") <= 64 * 1024 || ownerApiResponseMaxBytes("/runtime/identity-environments") <= 64 * 1024) {
     throw new Error("Display cache, request freshness, recovery projection, or response budget boundary failed.");
   }
+}
+
+function authenticationRecoveryPublicRecord() {
+  const value = environmentRepairPublicRecord();
+  return {
+    ...value,
+    identity_environment_ref: "identity-env_dddddddddddddddddddddddd",
+    status: {
+      ...value.status,
+      login_state: "unknown",
+      manual_authentication_state: "not_required",
+      authentication_provenance: null,
+      blocking_reasons: ["login_state_missing"],
+      repair_reasons: [],
+    },
+  };
+}
+
+function healthyChromeFallbackPublicRecord() {
+  const value = environmentRepairPublicRecord();
+  return {
+    ...value,
+    identity_environment_ref: "identity-env_eeeeeeeeeeeeeeeeeeeeeeee",
+    status: {
+      ...value.status,
+      recovery_required: false,
+      blocking_reasons: [],
+      repair_reasons: [],
+    },
+  };
+}
+
+function missingStoragePublicRecord() {
+  const value = healthyChromeFallbackPublicRecord();
+  return {
+    ...value,
+    identity_environment_ref: "identity-env_ffffffffffffffffffffffff",
+    status: { ...value.status, browser_storage_state: "missing" },
+  };
+}
+
+function environmentRepairPublicRecord() {
+  return {
+    schema_version: "harbor-local-identity-environment-store/v0",
+    identity_environment_ref: "identity-env_cccccccccccccccccccccccc",
+    site: { site_id: "xiaohongshu", origin: "https://www.xiaohongshu.com", display_name: "小红书", account_ref: "环境修复测试号" },
+    refs: { execution_identity_ref: "execution_ref_public", profile_ref: "profile_ref_public", profile_storage_ref: "storage_ref_public" },
+    environment_summary: { provider_id: "chrome_official", browser_storage_state: "present", browser_family: "chrome" },
+    status: {
+      login_state: "logged_in",
+      manual_authentication_state: "completed",
+      authentication_provenance: "user_confirmed_managed_session",
+      browser_storage_state: "present",
+      recovery_required: true,
+      blocking_reasons: ["provider_conflict", "not a bounded reason"],
+      repair_reasons: ["fingerprint_conflict"],
+    },
+  };
+}
+
+function providerCatalog() {
+  return {
+    schema_version: "harbor-browser-provider-status/v0",
+    providers: [{
+      provider_id: "chrome_official",
+      display_name: "官方 Chrome",
+      role: "restricted_fallback",
+      install: { status: "installed", path: null, version: "test", launchability: "launchable", reason: null },
+    }],
+    excluded_providers: [],
+  } as const;
 }

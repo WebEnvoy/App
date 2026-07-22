@@ -1,4 +1,5 @@
 import type { EffectiveExecutionPolicy, ExecutionPolicyModes } from "./executionPolicyClient";
+import { coreTaskSubmitFailureSummary } from "./coreTaskSubmitClient";
 import { fetchEffectiveExecutionPolicy, putThreadExecutionPolicy, sourceVersionForPolicy } from "./executionPolicyClient";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import type { LodeCatalogSkill } from "./lodeCatalogClient";
@@ -206,7 +207,12 @@ function submissionReadiness(options: SubmitOptions, requestedModes?: ExecutionP
   if (!options.runtime.canUseLiveRuntime || core?.health.state !== "ready" || core.admission?.state !== "ready" || harbor?.health.state !== "ready") {
     return "Core 或 Harbor live runtime 尚未 ready；提交保持停止。";
   }
-  if (options.identity.source !== "Harbor live" || options.identity.login.recoveryRequired) return "账号身份尚未由 Harbor live 证明可用。";
+  if (options.identity.source !== "Harbor live") return "账号身份尚未由 Harbor live 证明可用。";
+  if (options.identity.readiness.state === "blocked") return "需要修复浏览器环境后再提交。";
+  if (options.identity.readiness.state === "needs-auth" || options.identity.login.recoveryRequired) {
+    return "需要登录或完成人工认证后再提交。";
+  }
+  if (options.identity.readiness.state === "unknown") return "账号身份状态尚未确认；提交保持停止。";
   if (
     options.skill.actions.length !== 1 ||
     options.skill.actions[0]?.operationMode !== "read" ||
@@ -407,9 +413,7 @@ function failed(value: unknown, fallback: string): TaskThreadSubmitState {
 }
 
 function ownerError(value: unknown, fallback: string) {
-  const record = asRecord(value);
-  const error = asRecord(record?.error);
-  return typeof error?.code === "string" ? error.code : typeof record?.error === "string" ? record.error : fallback;
+  return coreTaskSubmitFailureSummary(value, fallback);
 }
 
 function asRecord(value: unknown): JsonRecord | null {

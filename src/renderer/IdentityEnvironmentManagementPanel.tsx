@@ -1,6 +1,6 @@
 import { Check, X } from "lucide-react";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
 import type { HarborProviderStatus } from "./harborIdentityTypes";
@@ -20,6 +20,7 @@ export type IdentityEditorValue = {
 
 export function IdentityEnvironmentManagementPanel({
   busy,
+  focusProviderRequestKey,
   identity,
   message,
   mode,
@@ -28,6 +29,7 @@ export function IdentityEnvironmentManagementPanel({
   providers,
 }: {
   busy: boolean;
+  focusProviderRequestKey?: number;
   identity?: IdentityEnvironmentProjection;
   message: string;
   mode: IdentityManagementMode;
@@ -37,11 +39,16 @@ export function IdentityEnvironmentManagementPanel({
 }) {
   const [submitted, setSubmitted] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState(() => providerId(identity, providers));
+  const providerSelectRef = useRef<HTMLSelectElement>(null);
   const title = mode === "edit" ? "编辑账号身份" : mode === "import" ? "导入账号身份" : "创建账号身份";
   const provider = providers.find((candidate) => candidate.provider_id === selectedProviderId);
   const supportsLocale = supports(provider, "locale");
   const supportsTimezone = supports(provider, "timezone");
   const supportsViewport = supports(provider, "viewport");
+
+  useEffect(() => {
+    if (focusProviderRequestKey != null) providerSelectRef.current?.focus();
+  }, [focusProviderRequestKey]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,7 +84,7 @@ export function IdentityEnvironmentManagementPanel({
           {mode === "import" ? <label>导入来源<input name="importSourceRef" required maxLength={240} placeholder="Harbor 可读取的导入来源标识" /></label> : null}
         </div> : null}
         <div className="identity-editor-grid">
-          <label>浏览器 Provider<select name="providerId" value={selectedProviderId} onChange={(event) => setSelectedProviderId(event.target.value === "chrome_official" ? "chrome_official" : "cloakbrowser")}>{providerOptions(providers, selectedProviderId)}</select></label>
+          <label>浏览器 Provider<select ref={providerSelectRef} name="providerId" value={selectedProviderId} onChange={(event) => setSelectedProviderId(event.target.value === "chrome_official" ? "chrome_official" : "cloakbrowser")}>{providerOptions(providers, selectedProviderId)}</select></label>
           <label>代理<select name="proxyMode" defaultValue={identity?.environment.proxyRef ? "preserve" : "system"}>{identity?.environment.proxyRef ? <option value="preserve">保留当前代理</option> : null}<option value="system">不使用代理</option><option value="disabled">禁用代理配置</option></select></label>
           {supportsLocale ? <label>语言<input name="language" maxLength={40} defaultValue={known(identity?.environment.language)} placeholder="例如：zh-CN" /></label> : null}
           {supportsTimezone ? <label>时区<input name="timezone" maxLength={80} defaultValue={known(identity?.environment.timezone)} placeholder="例如：Asia/Shanghai" /></label> : null}

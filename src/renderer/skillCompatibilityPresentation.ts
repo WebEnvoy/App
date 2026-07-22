@@ -19,10 +19,11 @@ export function compatibilityCandidateLabel(candidate: IdentityCompatibilityCand
 export function compatibilityRecoveryCopy(candidate: IdentityCompatibilityCandidate | undefined) {
   switch (candidate?.recoveryAction) {
     case "open_manual_auth":
-    case "connect_identity_environment":
       return { label: "登录账号", destination: "identity" as const };
+    case "repair_browser_environment":
+    case "connect_identity_environment":
     case "install_or_select_provider":
-      return { label: "安装或修复浏览器", destination: "identity" as const };
+      return { label: "修复浏览器环境", destination: "identity" as const };
     case "refresh_owner_facts":
       return { label: "刷新账号状态", destination: "identity" as const };
     case "select_supported_package_version":
