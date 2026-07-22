@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 
 import { fetchPendingAuthorizationDecision } from "../../src/renderer/authorizationDecisionClient";
 import { initialCoreTaskSubmitState } from "../../src/renderer/coreTaskSubmitClient";
+import { fetchCoreRunResult } from "../../src/renderer/coreRunResultClient";
+import type { LodeCatalogSkill } from "../../src/renderer/lodeCatalogClient";
 import { OwnerState } from "../../src/renderer/OwnerState";
 import {
   fetchCoreThreadState,
@@ -21,8 +23,10 @@ import {
   ThreadWorkspace,
 } from "../../src/renderer/shellPrimitives";
 import { SingleActionConfirmation, TaskThreadPage } from "../../src/renderer/TaskThreadPage";
+import { projectBusinessResultMessage, projectStandardBusinessResult } from "../../src/renderer/TaskBusinessResult";
 import { TaskThreadRightPanel } from "../../src/renderer/TaskThreadRightPanel";
 import type { ThreadNavigationItem } from "../../src/renderer/ThreadNavigationRail";
+import type { TaskPreviewSelection } from "../../src/renderer/useAppTasks";
 import { WorkbenchSidebar } from "../../src/renderer/WorkbenchSidebar";
 import "../../src/renderer/uiFoundation.css";
 import "../../src/renderer/styles.css";
@@ -36,6 +40,19 @@ const consumerBoundary = "Core stores bounded field summaries and owner refs onl
 const authorizationDecisionRef = "authorization-decision:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const authorizationRequests: WebEnvoyOwnerApiJsonRequest[] = [];
 let singleActionAttempts = 0;
+const resultSkills = [{
+  outputKind: "collection",
+  outputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
+  packageRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+  version: "0.1.0",
+  lockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+}, {
+  outputKind: "object",
+  outputSchemaId: "lode://schema/site-capability/boss/job-search/output@0.1.0",
+  packageRef: "lode://site-capability/boss/job-search@0.1.0",
+  version: "0.1.0",
+  lockRef: "lode://lock/site-capability/boss/job-search@0.1.0",
+}] as LodeCatalogSkill[];
 const ownerPayload = {
   ok: true,
   threads: [
@@ -136,6 +153,46 @@ window.webenvoyShell = {
   }),
   requestOwnerJson: async (request) => {
     authorizationRequests.push(request);
+    if (/^\/runs\/[^/]+\/result$/.test(request.path)) {
+      const runId = decodeURIComponent(request.path.split("/")[2] ?? "");
+      if (runId === "run-owner-unavailable") return { ok: false, error: "owner unavailable" };
+      const job = runId === "run-owner-b-completed";
+      return { ok: true, body: { ok: true, result: {
+        schema_version: "webenvoy.result-query.v0",
+        run_id: runId,
+        status: "succeeded",
+        terminal: true,
+        result: {
+          envelope_state: "available",
+          payload_state: runId === "run-result-ref-missing" ? "unavailable" : runId === "run-contradictory" || runId === "run-not-persisted" ? "not_persisted_in_core" : "available",
+          ...(runId === "run-result-ref-missing" ? { unavailable_reason: "result_ref_missing" } : {}),
+          ...(runId === "run-result-ref-missing" ? {} : { result_ref: `result:core/${runId}` }),
+          result_envelope: {
+            schema_version: "webenvoy.result-envelope.v0",
+            run_record_ref: runId,
+            ok: true,
+            outcome: "success",
+            terminal: true,
+            capability_ref: job ? "lode:capability/job-search" : "lode:capability/search-notes",
+            capability_version: "0.1.0",
+            capability_lock_ref: job ? "lode://lock/site-capability/boss/job-search@0.1.0" : "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+            package_ref: job ? "lode://site-capability/boss/job-search@0.1.0" : "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+            result_kind: job ? "boss_job_detail" : "xhs_note_search",
+            output_schema_id: job ? "lode://schema/site-capability/boss/job-search/output@0.1.0" : "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
+            ...(runId === "run-not-persisted" || runId === "run-result-ref-missing" ? {} : { data: runId.startsWith("run-forbidden") ? { [runId.replace("run-forbidden-", "") || "cookie"]: "private" } : runId === "run-contradictory" ? { title: "not allowed" } : job ? { title: "产品经理", company: "WebEnvoy", city: "上海" } : {
+              status: "available",
+              normalized: { result_count: 8, notes: Array.from({ length: 8 }, (_, index) => ({
+                title: `AI 工具笔记 ${index + 1}`,
+                author: `作者 ${index + 1}`,
+                interactions: 100 + index,
+                readAt: "今天 14:28",
+              })) },
+            } }),
+          },
+        },
+        evidence_refs: [],
+      } } };
+    }
     if (request.path === `/authorization-decisions/${encodeURIComponent(authorizationDecisionRef)}`) {
       return { ok: true, body: { ok: true, authorization_decision: {
         schema_version: "webenvoy.authorization-decision.v0",
@@ -201,6 +258,7 @@ const tasks = projectRuntimeGatedTasks(
 function WorkbenchDomHarness() {
   const [selectedTaskId, setSelectedTaskId] = useState(tasks[0]?.id ?? "");
   const [selectedRunIds, setSelectedRunIds] = useState<Record<string, string>>({});
+  const [previewSelections, setPreviewSelections] = useState<Record<string, TaskPreviewSelection>>({});
   const [rightPanelOpenRequestKey, setRightPanelOpenRequestKey] = useState<number>();
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
@@ -210,6 +268,8 @@ function WorkbenchDomHarness() {
   ) ?? selectedTask?.runs.find((run) => run.lifecycle === "completed") ?? selectedTask?.runs[0];
   const displayedTask = selectedTask;
   const displayedRun = displayedTask?.runs.find((run) => run.id === selectedRun?.id);
+  const previewSelection = selectedTask == null ? undefined : previewSelections[selectedTask.id];
+  const previewRun = previewSelection == null ? undefined : selectedTask?.runs.find((run) => run.id === previewSelection.runId);
   const confirmationRun = selectedTask.id === taskAId && displayedRun != null ? {
     ...displayedRun,
     id: authorizationBinding.runId,
@@ -272,17 +332,18 @@ function WorkbenchDomHarness() {
         <ThreadWorkspace workspaceKey={`work:${selectedTask.id}`}>
           <TaskThreadPage
             coreEndpoint={coreEndpoint}
-            coreReadState={retainedState}
-            coreSubmitState={initialCoreTaskSubmitState}
             navigationItems={navigationItems}
-            runtimeSupervisorState={runtimeState}
             selectedRun={displayedRun}
             selectedTask={displayedTask}
+            skills={resultSkills}
             onActiveRunChange={(runId) => setSelectedRunIds((current) => ({
               ...current,
               [selectedTask.id]: runId,
             }))}
-            onOpenPreview={() => setRightPanelOpenRequestKey((key) => (key ?? 0) + 1)}
+            onOpenPreview={(selection) => {
+              setPreviewSelections((current) => ({ ...current, [selectedTask.id]: selection }));
+              setRightPanelOpenRequestKey((key) => (key ?? 0) + 1);
+            }}
           />
           {confirmationRun == null ? null : (
             <SingleActionConfirmation
@@ -298,14 +359,17 @@ function WorkbenchDomHarness() {
           <OwnerState title="暂无任务回合" summary="该线程已创建，尚未提交业务输入。" />
         </ThreadWorkspace>
       )}
-      right={displayedRun ? (
+      right={previewRun && previewSelection ? (
         <RightPanel>
           <TaskThreadRightPanel
+            coreEndpoint={coreEndpoint}
             coreReadState={retainedState}
             coreSubmitState={initialCoreTaskSubmitState}
             runtimeSupervisorState={runtimeState}
-            selectedRun={displayedRun}
+            previewSelection={previewSelection}
+            selectedRun={previewRun}
             selectedTask={displayedTask}
+            skills={resultSkills}
             shellDiagnostics={{ colorScheme: "light", configScope: "local-ui-only", platform: "darwin" }}
           />
         </RightPanel>
@@ -350,11 +414,58 @@ async function runDesktopChecks() {
   assert(taskButton(emptyTaskId), "Empty owner thread was not rendered safely in the sidebar.");
   const taskA = tasks.find((task) => task.id === taskAId);
   assert(taskA, "Projected owner task A is missing.");
+  const resultRun = taskA.runs.find((run) => run.id === "run-owner-a-completed");
+  assert(resultRun, "Completed owner run is missing for the result matrix.");
+  const matrix = [
+    resultModel(resultRun, "collection", { normalized: { notes: [{ title: "A" }], result_count: 1 } }, "search_results"),
+    resultModel(resultRun, "object", { title: "A" }, "content_detail"),
+    resultModel(resultRun, "images", { normalized: { images: [{ name: "cover.png", size: "2 MB" }] } }, "image_gallery"),
+    resultModel(resultRun, "media", { normalized: { media: [{ name: "clip.mp4", duration: "10 秒" }] } }, "video_collection"),
+    resultModel(resultRun, "files", { normalized: { files: [{ name: "report.pdf", size: "1 MB" }] } }, "file_collection"),
+    projectStandardBusinessResult({ ...resultRun, resultRows: [] }, readyResult(undefined, "unknown_owner_type")),
+  ].map((model) => model.kind);
+  assert(matrix.join(",") === "collection,object,images,media,files,generic", "Standard result type matrix is incomplete.");
+  const unboundResult = projectStandardBusinessResult(
+    resultRun,
+    readyResult({ normalized: { notes: [{ title: "A" }] } }, "search_results"),
+  );
+  assert(unboundResult.kind === "generic", "A result without an exact package/version/lock/schema binding used a specialized renderer.");
+  const stateTitles = [
+    projectBusinessResultMessage({ ...resultRun, turnStatus: "cancelled" }, { status: "fixture" })?.title,
+    projectBusinessResultMessage({ ...resultRun, turnStatus: "status_unknown" }, { status: "fixture" })?.title,
+    projectBusinessResultMessage(resultRun, { status: "unavailable", reason: "owner", summary: "owner unavailable" })?.title,
+    projectBusinessResultMessage({ ...resultRun, outcome: "failure", lifecycle: "blocked" }, readyFailure("runtime_timeout"))?.title,
+    projectBusinessResultMessage(resultRun, readyUnavailableResult("result_ref_missing"))?.title,
+    projectBusinessResultMessage(resultRun, readyUnavailableResult("projection_unavailable"))?.title,
+    projectBusinessResultMessage(resultRun, readyPayloadState("not_persisted_in_core"))?.title,
+  ];
+  assert(stateTitles.join(",") === "已取消,执行状态待确认,结果暂不可用,执行超时,结果引用缺失,结果不可读取,结果内容暂不可用", "Terminal result states are not distinct.");
+  const forbiddenRuns = ["cookie", "access_token", "sessionToken", "Authorization", "password", "secret", "api_key", "access_key", "private_key", "encryption_key"];
+  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult] = await Promise.all([
+    Promise.all(forbiddenRuns.map((field) => fetchCoreRunResult(coreEndpoint, `run-forbidden-${field}`))),
+    fetchCoreRunResult(coreEndpoint, "run-contradictory"),
+    fetchCoreRunResult(coreEndpoint, "run-not-persisted"),
+    fetchCoreRunResult(coreEndpoint, "run-owner-unavailable"),
+    fetchCoreRunResult(coreEndpoint, "run-result-ref-missing"),
+  ]);
+  assert(forbiddenResults.every((result) => result.status === "unavailable" && result.reason === "invalid") &&
+    contradictoryResult.status === "unavailable" && contradictoryResult.reason === "invalid" &&
+    notPersistedResult.status === "ready" && notPersistedResult.result.data == null && unavailableResult.status === "unavailable" && unavailableResult.reason === "owner" &&
+    missingRefResult.status === "ready" && missingRefResult.result.unavailableReason === "result_ref_missing",
+    "Core result client did not fail closed for unsafe or unavailable owner payloads.");
   assert(taskA.runs.some((run) => run.id === "run-owner-a-completed"), "Completed owner turn was not retained.");
   assert(taskA.runs.some((run) => run.id === `runtime-blocked-${taskAId}`), "Active owner turn did not fail closed.");
   assert(!taskA.runs.some((run) => run.id === "run-owner-a-running"), "Active owner turn remained usable after runtime loss.");
-  assert(document.body.textContent?.includes("创建渠道API"), "Non-App creation channel is not visible in the DOM.");
-  assert(!document.body.textContent?.includes("创建渠道APP"), "App creation channel should stay implicit.");
+  await waitFor(() => Boolean(document.querySelector(".thread-content .business-result-table")), "Collection business result did not render.");
+  const firstTimestamp = document.querySelector<HTMLElement>(".task-turn-timestamp");
+  assert(firstTimestamp?.textContent?.includes("API"), "Non-App creation channel is not visible beside the timestamp.");
+  assert(!document.querySelector(".task-turn-timestamp")?.textContent?.includes("APP"), "App creation channel should stay implicit.");
+  assert(!document.body.textContent?.includes("执行过程") && !document.body.textContent?.includes("Capability attribution"),
+    "Technical run details still dominate the business timeline.");
+  const selectionCell = document.querySelector<HTMLElement>(".thread-content .business-result-table .selection-cell");
+  assert(selectionCell && selectionCell.getBoundingClientRect().width <= 40, "Collection selection column is wider than the compact contract.");
+  assert(document.querySelectorAll(".thread-content .business-result-table tbody tr").length === 5 && document.body.textContent?.includes("共 8 条，点击查看更多"),
+    "Collection pagination summary does not match the approved result pattern.");
   assert(appShell.dataset.rightPanelOpen === "false", "Right panel should be closed initially.");
   assert(appShell.dataset.leftPanelWidth === "300", "Corrupt left-panel width did not use the default.");
   assert(matchMedia("(prefers-reduced-motion: reduce)").matches, "Reduced motion was not emulated.");
@@ -385,6 +496,10 @@ async function runDesktopChecks() {
     () => appShell.dataset.rightPanelOpen === "true" && document.activeElement === rightPanel(),
     "Opening the right panel did not move focus into it.",
   );
+  assert(document.querySelector('[role="tab"][data-state="active"]')?.textContent?.includes("结果"),
+    "A result preview did not activate the result tab.");
+  await waitFor(() => document.querySelectorAll(".right-panel .business-result-table tbody tr").length === 1,
+    "A row preview did not preserve the selected item in the right panel.");
   assert(Number(appShell.dataset.rightPanelWidth) > 320, "Corrupt right-panel preferences did not use the default width.");
 
   const closeButton = document.querySelector<HTMLButtonElement>('[data-shell-panel-toggle="right"]');
@@ -428,6 +543,66 @@ async function runDesktopChecks() {
     corruptPreferenceFallback: true,
     reducedMotion: true,
     singleActionDecision: true,
+  };
+}
+
+function resultModel(run: (typeof tasks)[number]["runs"][number], expected: string, data: Record<string, unknown>, resultKind: string) {
+  const model = projectStandardBusinessResult(run, readyResult(data, resultKind), [{
+    outputKind: resultKind,
+    outputSchemaId: "schema:result/v1",
+    packageRef: "package:result@1.0.0",
+    version: "1.0.0",
+    lockRef: "lock:result@1.0.0",
+  }]);
+  assert(model.kind === expected, `${expected} result did not use the standard renderer.`);
+  return model;
+}
+
+function readyResult(data: Record<string, unknown> | undefined, resultKind: string) {
+  return {
+    status: "ready" as const,
+    result: {
+      outcome: "success",
+      resultKind,
+      outputSchemaId: "schema:result/v1",
+      packageRef: "package:result@1.0.0",
+      capabilityVersion: "1.0.0",
+      capabilityLockRef: "lock:result@1.0.0",
+      ...(data == null ? {} : { data }),
+      payloadState: "available",
+      envelopeState: "available",
+    },
+  };
+}
+
+function readyFailure(code: string) {
+  return {
+    status: "ready" as const,
+    result: {
+      outcome: "failed",
+      payloadState: "unavailable",
+      envelopeState: "available",
+      failure: { code, recoveryHint: "retry" },
+    },
+  };
+}
+
+function readyUnavailableResult(unavailableReason: string) {
+  return {
+    status: "ready" as const,
+    result: {
+      outcome: "success",
+      payloadState: "unavailable",
+      envelopeState: "unavailable",
+      unavailableReason,
+    },
+  };
+}
+
+function readyPayloadState(payloadState: string) {
+  return {
+    status: "ready" as const,
+    result: { outcome: "success", payloadState, envelopeState: "available" },
   };
 }
 

@@ -117,7 +117,7 @@ export function WorkbenchSidebar({
               >
                 {grouping === "skill" ? <IdentityGlyph label={task.accountIdentity} /> : <SiteGlyph site={task.threadContext!.siteLabel} />}
                 <span>{grouping === "skill" ? task.accountIdentity : task.siteSkill}</span>
-                {task.runs[0] ? <RunStatusGlyph compact run={task.runs[0]} /> : null}
+                {task.runs.at(-1) ? <RunStatusGlyph compact run={task.runs.at(-1)!} /> : null}
               </button>
             ))}
           </section>
@@ -294,7 +294,7 @@ function IdentityGlyph({ label }: { label: string }) {
 }
 
 function taskPriority(task: TaskProjection) {
-  switch (task.runs[0]?.lifecycle) {
+  switch (task.runs.at(-1)?.lifecycle) {
     case "needs-action": return 0;
     case "running": return 1;
     case "queued": return 2;

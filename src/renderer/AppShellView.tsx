@@ -192,10 +192,9 @@ function WorkDetail({ controller }: { controller: AppController }) {
     }>
       <TaskThreadPage
         coreEndpoint={sources.connectionConfig.coreEndpoint}
-        coreReadState={tasks.effectiveCoreReadState} coreSubmitState={tasks.coreSubmitState}
-        navigationItems={tasks.threadNavigationItems} runtimeSupervisorState={sources.runtimeSupervisorState}
+        navigationItems={tasks.threadNavigationItems}
         selectedRun={tasks.selectedRun} selectedTask={tasks.selectedTask} onActiveRunChange={tasks.setSelectedRunId}
-        onOpenPreview={tasks.requestRightPanel}
+        skill={skill} skills={sources.lodeCatalogState.skills} onOpenPreview={tasks.requestRightPanel}
       />
     </ThreadWorkspace>
   );
@@ -203,12 +202,14 @@ function WorkDetail({ controller }: { controller: AppController }) {
 
 function AppRightPanel({ controller }: { controller: AppController }) {
   const { navigation, sources, tasks } = controller;
-  if (navigation.activeView !== "work" || navigation.workMode !== "detail" || tasks.selectedTask == null || tasks.selectedRun == null) return null;
+  if (navigation.activeView !== "work" || navigation.workMode !== "detail" || tasks.selectedTask == null || tasks.previewRun == null || tasks.previewSelection == null) return null;
   return (
     <RightPanel>
       <TaskThreadRightPanel
+        coreEndpoint={sources.connectionConfig.coreEndpoint}
         coreReadState={tasks.effectiveCoreReadState} coreSubmitState={tasks.coreSubmitState}
-        runtimeSupervisorState={sources.runtimeSupervisorState} selectedRun={tasks.selectedRun} selectedTask={tasks.selectedTask}
+        runtimeSupervisorState={sources.runtimeSupervisorState} selectedRun={tasks.previewRun} selectedTask={tasks.selectedTask}
+        previewSelection={tasks.previewSelection} skills={sources.lodeCatalogState.skills}
         shellDiagnostics={{ colorScheme: sources.shellContext?.colorScheme, configScope: sources.shellContext?.configScope, platform: sources.shellContext?.platform }}
       />
     </RightPanel>
