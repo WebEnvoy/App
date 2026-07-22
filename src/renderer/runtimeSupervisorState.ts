@@ -76,6 +76,10 @@ export function runtimeSupervisorUnavailableState(summary: string): RuntimeSuper
   };
 }
 
+export function runtimeSupervisorIsChecking(runtime: RuntimeSupervisorState) {
+  return runtime.services.length === 0 && runtime.summary.startsWith("正在检查");
+}
+
 export function projectRuntimeGatedTasks(
   tasks: TaskProjection[],
   runtime: RuntimeSupervisorState,

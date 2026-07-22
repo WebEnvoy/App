@@ -43,16 +43,27 @@ function useAppNavigation() {
   const [taskGrouping, setTaskGrouping] = useState<TaskGrouping>(readTaskGrouping);
   const [taskSort, setTaskSort] = useState<TaskSort>(readTaskSort);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const settingsReturnFocusKeyRef = useRef<string | null>(null);
   useEffect(() => writeTaskGrouping(taskGrouping), [taskGrouping]);
   useEffect(() => writeTaskSort(taskSort), [taskSort]);
 
   function closeSettings() {
+    const returnFocusKey = settingsReturnFocusKeyRef.current;
+    settingsReturnFocusKeyRef.current = null;
     setActiveView(settingsReturnView);
-    window.requestAnimationFrame(() => settingsTriggerRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      const returnFocus = returnFocusKey == null
+        ? settingsTriggerRef.current
+        : document.querySelector<HTMLElement>(`[data-settings-return-focus="${returnFocusKey}"]`) ?? settingsTriggerRef.current;
+      returnFocus?.focus();
+    });
   }
 
   function openSettings() {
     if (activeView !== "settings") setSettingsReturnView(activeView);
+    settingsReturnFocusKeyRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement.dataset.settingsReturnFocus ?? null
+      : null;
     setActiveView("settings");
   }
 

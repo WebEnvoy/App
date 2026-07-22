@@ -6,6 +6,7 @@ import { createTaskThreadTurn } from "../../src/renderer/coreTaskThreadSubmitCli
 import { fetchEffectiveExecutionPolicy } from "../../src/renderer/executionPolicyClient";
 import { AppShellView } from "../../src/renderer/AppShellView";
 import { CreateTaskShell, type CreateTaskSelection } from "../../src/renderer/CreateTaskShell";
+import { RuntimeBlockedOwnerState, RuntimeCheckingOwnerState } from "../../src/renderer/RuntimeOwnerState";
 import { SiteSkillLibrary } from "../../src/renderer/SiteSkillPages";
 import { TaskThreadComposer } from "../../src/renderer/TaskThreadComposer";
 import { TaskTurnBusinessInput } from "../../src/renderer/TaskTurnBusinessInput";
@@ -87,6 +88,8 @@ function Harness() {
           })}
           onRecover={() => setSelection("check-task-owner")}
           onRecoverCandidate={(_skill, identityId, candidate) => setSelection(`${identityId}:${candidate.recoveryAction}`)}
+          onRecoverRuntimeIdentity={(_skill, identityId) => setSelection(`${identityId}:runtime`)}
+          onRecoverRuntimeSkill={(skill) => setSelection(`${skill.id}:runtime`)}
           onRecoverExactTarget={() => setSelection("use-search-skill")} onTargetChange={() => {}}
           coreEndpoint="http://127.0.0.1:8787"
           onTaskCreated={setSubmittedTask}
@@ -107,6 +110,7 @@ createRoot(document.getElementById("root")!).render(productionMode ? <Production
 window.__runLibraryDomSmoke = async (mode) => {
   await twoFrames();
   if (mode === "production") return runProductionShellFlow();
+  const runtimeOwnerState = mode === "desktop" ? await checkRuntimeOwnerStates() : true;
   const directory = await checkDirectory(mode);
   if (mode === "stale") return { mode, staleCreateDisabled: true };
   const controllerRecovery = mode === "desktop" ? await checkControllerIdentityRecovery() : true;
@@ -134,8 +138,51 @@ window.__runLibraryDomSmoke = async (mode) => {
   await nextFrame();
   document.querySelector<HTMLButtonElement>(".skill-detail-heading .production-primary-button")?.click();
   await twoFrames();
-  return { ...await runComposerFlow(mode, directory.searchHeight), controllerRecovery };
+  return { ...await runComposerFlow(mode, directory.searchHeight), controllerRecovery, runtimeOwnerState };
 };
+
+async function checkRuntimeOwnerStates() {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const blockedRuntime = structuredClone(runtime);
+  const harbor = blockedRuntime.services.find((service) => service.id === "harbor");
+  if (harbor == null) throw new Error("Runtime owner-state fixture is missing Harbor.");
+  harbor.health = { ...harbor.health, state: "unavailable", summary: "fixture unavailable" };
+  blockedRuntime.canUseLiveRuntime = false;
+  blockedRuntime.failClosed = true;
+  let recovery = "";
+  root.render(
+    <RuntimeBlockedOwnerState
+      runtime={blockedRuntime}
+      onOpenBrowser={() => { recovery = "browser"; }}
+      onOpenSettings={() => { recovery = "settings"; }}
+    />,
+  );
+  await twoFrames();
+  const status = container.querySelector<HTMLElement>("[data-testid='runtime-supervisor-status']");
+  const action = status?.querySelector<HTMLButtonElement>("button");
+  if (
+    status?.getAttribute("aria-label") !== "运行环境状态" ||
+    status.dataset.runtimeCoreHealth !== "ready" ||
+    status.dataset.runtimeCoreAdmission !== "ready" ||
+    status.dataset.runtimeHarborHealth !== "unavailable" ||
+    !status.textContent?.includes("检查账号身份") ||
+    action == null
+  ) {
+    throw new Error("Runtime blocked state did not expose the matching Harbor recovery surface.");
+  }
+  action.click();
+  if (recovery !== "browser") throw new Error("Runtime blocked state did not route Harbor recovery to Browser.");
+  root.render(<RuntimeCheckingOwnerState />);
+  await twoFrames();
+  if (!container.textContent?.includes("正在检查运行环境")) {
+    throw new Error("Runtime checking state was presented as a settled failure.");
+  }
+  root.unmount();
+  container.remove();
+  return true;
+}
 
 async function runProductionShellFlow() {
   await waitForController();
@@ -243,6 +290,38 @@ async function checkControllerIdentityRecovery() {
     resumed.skillWorkbench.createTaskSelection?.skill.packageRef !== xhsSkill.packageRef ||
     resumed.skillWorkbench.createTaskSelection.identityId !== identityB.id) {
     throw new Error("Controller did not consume identity recovery while preserving task creation context.");
+  }
+  resumed.skillWorkbench.recoverRuntimeIdentity(xhsSkill, identity.id);
+  await twoFrames();
+  const runtimeRecovery = controllerSnapshot!;
+  if (runtimeRecovery.navigation.activeView !== "browser" || runtimeRecovery.skillWorkbench.identityRecoveryRequest?.destination !== "refresh" ||
+    runtimeRecovery.skillWorkbench.createTaskSelection?.skill.packageRef !== xhsSkill.packageRef ||
+    runtimeRecovery.skillWorkbench.createTaskSelection.identityId !== identity.id) {
+    throw new Error("Runtime recovery did not preserve the selected skill and identity while opening Browser.");
+  }
+  runtimeRecovery.actions.openView("work");
+  await twoFrames();
+  if (controllerSnapshot!.skillWorkbench.identityRecoveryRequest != null ||
+    controllerSnapshot!.skillWorkbench.createTaskSelection?.skill.packageRef !== xhsSkill.packageRef ||
+    controllerSnapshot!.skillWorkbench.createTaskSelection.identityId !== identity.id) {
+    throw new Error("Runtime recovery did not restore task creation context after Browser.");
+  }
+  controllerSnapshot!.skillWorkbench.recoverRuntimeSkill(xhsSkill);
+  await twoFrames();
+  const skillOnlyRuntimeRecovery = controllerSnapshot!;
+  if (skillOnlyRuntimeRecovery.navigation.activeView !== "browser" ||
+    skillOnlyRuntimeRecovery.skillWorkbench.identityRecoveryRequest?.destination !== "refresh" ||
+    skillOnlyRuntimeRecovery.skillWorkbench.identityRecoveryRequest.identityId != null ||
+    skillOnlyRuntimeRecovery.skillWorkbench.createTaskSelection?.skill.packageRef !== xhsSkill.packageRef ||
+    skillOnlyRuntimeRecovery.skillWorkbench.createTaskSelection.identityId != null) {
+    throw new Error("Runtime recovery selected an identity while preserving a skill-only creation context.");
+  }
+  skillOnlyRuntimeRecovery.actions.openView("work");
+  await twoFrames();
+  if (controllerSnapshot!.skillWorkbench.identityRecoveryRequest != null ||
+    controllerSnapshot!.skillWorkbench.createTaskSelection?.skill.packageRef !== xhsSkill.packageRef ||
+    controllerSnapshot!.skillWorkbench.createTaskSelection.identityId != null) {
+    throw new Error("Skill-only runtime recovery did not restore the task creation context after Browser.");
   }
   await assertIdentityRecoveryAbandoned("library", () => controllerSnapshot!.actions.openView("library"));
   const task = controllerSnapshot!.tasks.taskThreads[0];

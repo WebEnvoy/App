@@ -9,7 +9,8 @@ import {
   type LodeCatalogSkill,
 } from "./lodeCatalogClient";
 import { OwnerState } from "./OwnerState";
-import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
+import { RuntimeBlockedOwnerState, RuntimeCheckingOwnerState } from "./RuntimeOwnerState";
+import { runtimeSupervisorIsChecking, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import {
   compatibilityTargetFieldId,
   isCandidateUsable,
@@ -49,6 +50,8 @@ type CreateTaskShellProps = {
   onCheckCompatibility: CheckCompatibility;
   onRecover: () => void;
   onRecoverCandidate: (skill: LodeCatalogSkill, identityId: string, candidate: IdentityCompatibilityCandidate) => void;
+  onRecoverRuntimeIdentity: (skill: LodeCatalogSkill, identityId: string) => void;
+  onRecoverRuntimeSkill: (skill: LodeCatalogSkill) => void;
   onRecoverExactTarget: (skill: LodeCatalogSkill, identityId: string) => void;
   onTargetChange: (skill: LodeCatalogSkill, identityId: string) => void;
   onTaskCreated: (task: TaskProjection) => void;
@@ -102,6 +105,7 @@ function CreateTaskContent(props: CreateTaskShellProps) {
       onCheckCompatibility={props.onCheckCompatibility}
       onRecover={onRecover}
       onRecoverCandidate={props.onRecoverCandidate}
+      onRecoverRuntimeIdentity={props.onRecoverRuntimeIdentity}
       onRecoverExactTarget={props.onRecoverExactTarget}
       onTargetChange={props.onTargetChange}
       coreEndpoint={props.coreEndpoint}
@@ -113,9 +117,10 @@ function CreateTaskContent(props: CreateTaskShellProps) {
 
 function CreateTaskChooser(props: CreateTaskShellProps & { focusIdentitySelection?: boolean; selectedSkill?: LodeCatalogSkill }) {
   const chooserRef = useRef<HTMLDivElement>(null);
-  const skills = props.selectedSkill == null
+  const selectedSkill = props.selectedSkill;
+  const skills = selectedSkill == null
     ? props.catalog.skills
-    : props.catalog.skills.filter((skill) => skill.packageRef === props.selectedSkill?.packageRef);
+    : props.catalog.skills.filter((skill) => skill.packageRef === selectedSkill.packageRef);
   const combinations = createTaskCombinations(skills, props.compatibilityBySkill, props.identities);
   const compatibilityLoading = skills.some((skill) =>
     skill.availability === "available" &&
@@ -130,6 +135,16 @@ function CreateTaskChooser(props: CreateTaskShellProps & { focusIdentitySelectio
     return props.identities.length === 0
       ? <OwnerState title="还没有账号身份" summary="先创建账号身份，再继续创建任务。" actionLabel="创建账号身份" onRecover={props.onCreateIdentity} />
       : <OwnerState title="没有匹配站点的账号身份" summary={props.selectedSkill == null ? "已有账号身份与当前站点技能不匹配。" : "当前技能没有可用的账号身份。"} actionLabel="管理账号身份" onRecover={props.onCreateIdentity} />;
+  }
+  if (runtimeSupervisorIsChecking(props.runtimeSupervisorState)) return <RuntimeCheckingOwnerState />;
+  if (!props.runtimeSupervisorState.canUseLiveRuntime) {
+    return <RuntimeBlockedOwnerState
+      runtime={props.runtimeSupervisorState}
+      onOpenBrowser={selectedSkill == null
+        ? props.onCreateIdentity
+        : () => props.onRecoverRuntimeSkill(selectedSkill)}
+      onOpenSettings={props.onRecover}
+    />;
   }
   if (compatibilityLoading && combinations.every(({ candidate }) => candidate == null)) {
     return <OwnerState title="正在检查账号身份" summary="Core 正在预检查站点技能与账号身份是否兼容。" />;
@@ -187,6 +202,7 @@ type CreateTaskComposerProps = {
   onCheckCompatibility: CheckCompatibility;
   onRecover: () => void;
   onRecoverCandidate: (skill: LodeCatalogSkill, identityId: string, candidate: IdentityCompatibilityCandidate) => void;
+  onRecoverRuntimeIdentity: (skill: LodeCatalogSkill, identityId: string) => void;
   onRecoverExactTarget: (skill: LodeCatalogSkill, identityId: string) => void;
   onTargetChange: (skill: LodeCatalogSkill, identityId: string) => void;
   coreEndpoint: string;
@@ -197,6 +213,14 @@ type CreateTaskComposerProps = {
 function CreateTaskComposer(props: CreateTaskComposerProps) {
   const { identity, selection } = props;
   if (identity == null) return <OwnerState title="账号身份不可用" summary="重新选择兼容账号身份后再创建任务。" />;
+  if (runtimeSupervisorIsChecking(props.runtimeSupervisorState)) return <RuntimeCheckingOwnerState />;
+  if (!props.runtimeSupervisorState.canUseLiveRuntime) {
+    return <RuntimeBlockedOwnerState
+      runtime={props.runtimeSupervisorState}
+      onOpenBrowser={() => props.onRecoverRuntimeIdentity(selection.skill, identity.id)}
+      onOpenSettings={props.onRecover}
+    />;
+  }
   return <StructuredTaskComposer
     endpoint={props.coreEndpoint}
     identity={identity}

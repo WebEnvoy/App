@@ -7,6 +7,6 @@ export type SiteSkillRecoveryRequest = {
 
 export type IdentityRecoveryRequest = {
   key: number;
-  identityId: string;
+  identityId?: string;
   destination: "authentication" | "provider" | "refresh";
 };
