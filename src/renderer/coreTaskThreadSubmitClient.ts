@@ -50,7 +50,7 @@ export async function createTaskThreadTurn(options: SubmitOptions & {
   if (!createdRecord.created) {
     const currentPolicy = await fetchEffectiveExecutionPolicy(options.endpoint, options.skill.packageRef, threadTask.id);
     if (currentPolicy.status !== "ready") {
-      return { status: "failed" as const, summary: currentPolicy.summary, task: threadTask };
+      return withExactSkillPackage({ status: "failed" as const, summary: currentPolicy.summary, task: threadTask }, options.skill);
     }
     expectedThreadVersion = sourceVersionForPolicy(currentPolicy.policy, "thread_revision");
     effectivePolicy = currentPolicy.policy;
@@ -63,13 +63,17 @@ export async function createTaskThreadTurn(options: SubmitOptions & {
       options.threadModeOverrides,
       expectedThreadVersion,
     );
-    if (policy.status !== "ready") return { status: "failed" as const, summary: policy.summary, task: threadTask };
+    if (policy.status !== "ready") {
+      return withExactSkillPackage({ status: "failed" as const, summary: policy.summary, task: threadTask }, options.skill);
+    }
     effectivePolicy = policy.policy;
   }
   const policyBlock = executionPolicyReadiness(options.skill, effectivePolicy);
-  if (policyBlock != null) return { status: "blocked" as const, summary: policyBlock, task: threadTask };
+  if (policyBlock != null) {
+    return withExactSkillPackage({ status: "blocked" as const, summary: policyBlock, task: threadTask }, options.skill);
+  }
   const result = await appendPreparedTurn(options.endpoint, threadTask.id, prepared.request);
-  return createdRecord.created ? withExactSkillPackage(result, options.skill) : result;
+  return withExactSkillPackage(result, options.skill);
 }
 
 export async function appendTaskThreadTurn(options: SubmitOptions & { threadRef: string }) {

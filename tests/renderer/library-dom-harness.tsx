@@ -485,7 +485,8 @@ async function checkReusedThreadPolicyRevision() {
   const write = requests.findIndex((request, index) => index > read && request.path.includes("/execution-policy?") && request.method === "PUT");
   const turn = requests.findIndex((request, index) => index > write && request.path.endsWith("/turns") && request.method === "POST");
   return result.status === "ready" && create >= 0 && read > create && write > read && turn > write &&
-    (requests[write]?.body as { expected_source_version?: string })?.expected_source_version === "1";
+    (requests[write]?.body as { expected_source_version?: string })?.expected_source_version === "1" &&
+    result.task.packageSource.sourceRef === xhsSkill.packageRef && result.task.packageSource.version === xhsSkill.version;
 }
 
 async function reopenComposer() {
