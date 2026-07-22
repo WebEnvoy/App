@@ -108,26 +108,32 @@ const ownerPayload = {
       identity_environment_ref: "identity-env:recruiting-a",
       created_at: "2026-07-20T07:00:00Z",
       updated_at: "2026-07-20T08:30:00Z",
-      turns: [
-        {
-          turn_id: "turn_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1",
-          sequence: 1,
-          idempotency_key: "owner-b-turn-1",
-          run_id: "run-owner-b-completed",
-          creation_channel: "sdk",
+      turns: Array.from({ length: 4 }, (_, index) => {
+        const sequence = index + 1;
+        const hour = String(6 + sequence).padStart(2, "0");
+        return {
+          turn_id: `turn_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb${sequence}`,
+          sequence,
+          idempotency_key: `owner-b-turn-${sequence}`,
+          run_id: sequence === 1 ? "run-owner-b-completed" : `run-owner-b-completed-${sequence}`,
+          creation_channel: sequence === 1 ? "sdk" : "app",
           input: {
             schema_version: "webenvoy.task-turn-input.v0",
-            fields: [{ field_id: "keyword", kind: "scalar", summary: "产品经理" }],
+            fields: [{
+              field_id: "keyword",
+              kind: "scalar",
+              summary: sequence === 1 ? "产品经理" : `产品经理 ${sequence}`,
+            }],
             attachment_refs: [],
             consumer_boundary: consumerBoundary,
           },
-          created_at: "2026-07-20T07:00:00Z",
-          updated_at: "2026-07-20T08:30:00Z",
-          terminal_at: "2026-07-20T08:30:00Z",
+          created_at: `2026-07-20T${hour}:00:00Z`,
+          updated_at: `2026-07-20T${hour}:01:00Z`,
+          terminal_at: `2026-07-20T${hour}:01:00Z`,
           submission_state: "accepted",
           status: "completed",
-        },
-      ],
+        };
+      }),
     },
     {
       schema_version: "webenvoy.task-thread.v0",
@@ -156,7 +162,7 @@ window.webenvoyShell = {
     if (/^\/runs\/[^/]+\/result$/.test(request.path)) {
       const runId = decodeURIComponent(request.path.split("/")[2] ?? "");
       if (runId === "run-owner-unavailable") return { ok: false, error: "owner unavailable" };
-      const job = runId === "run-owner-b-completed";
+      const job = runId.startsWith("run-owner-b-completed");
       return { ok: true, body: { ok: true, result: {
         schema_version: "webenvoy.result-query.v0",
         run_id: runId,
@@ -462,6 +468,7 @@ async function runDesktopChecks() {
   assert(!document.querySelector(".task-turn-timestamp")?.textContent?.includes("APP"), "App creation channel should stay implicit.");
   assert(!document.body.textContent?.includes("执行过程") && !document.body.textContent?.includes("Capability attribution"),
     "Technical run details still dominate the business timeline.");
+  assertThreadContentGeometry(false);
   const selectionCell = document.querySelector<HTMLElement>(".thread-content .business-result-table .selection-cell");
   assert(selectionCell && selectionCell.getBoundingClientRect().width <= 40, "Collection selection column is wider than the compact contract.");
   assert(document.querySelectorAll(".thread-content .business-result-table tbody tr").length === 5 && document.body.textContent?.includes("共 8 条，点击查看更多"),
@@ -519,6 +526,7 @@ async function runDesktopChecks() {
       && appShell.dataset.rightPanelOpen === "false",
     "Task B did not restore its closed right-panel state.",
   );
+  assertThreadContentGeometry(true);
   taskButton(taskAId)?.click();
   await waitFor(
     () => taskButton(taskAId)?.getAttribute("aria-current") === "page"
@@ -606,6 +614,18 @@ function readyPayloadState(payloadState: string) {
   };
 }
 
+function assertThreadContentGeometry(expectRail: boolean) {
+  const threadBody = document.querySelector<HTMLElement>(".thread-body");
+  const threadContent = document.querySelector<HTMLElement>(".thread-content");
+  const gridColumns = threadBody == null ? [] : getComputedStyle(threadBody).gridTemplateColumns.split(" ");
+  const contentTrack = Number.parseFloat(gridColumns.at(-1) ?? "");
+  const contentWidth = threadContent?.getBoundingClientRect().width ?? Number.NaN;
+  const railVisible = document.querySelector(".thread-navigation-rail") != null;
+  assert(threadBody && threadContent && getComputedStyle(threadContent).gridColumnStart === "2" &&
+    Math.abs(contentWidth - contentTrack) <= 1 && railVisible === expectRail,
+    `Task thread geometry did not preserve the business-content column with rail ${expectRail ? "visible" : "hidden"}.`);
+}
+
 async function runNarrowChecks() {
   const appShell = shell();
   assert(appShell, "AppShell is missing at narrow width.");
@@ -613,6 +633,7 @@ async function runNarrowChecks() {
     () => innerWidth === 720 && appShell.dataset.rightPanelOpen === "false",
     "Narrow layout did not collapse the right panel.",
   );
+  assertThreadContentGeometry(false);
   const opener = previewButton();
   assert(opener, "Narrow preview opener is missing.");
   opener.focus();
