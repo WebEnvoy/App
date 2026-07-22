@@ -117,7 +117,6 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         const rightFullscreenButton = document.querySelector('[data-shell-panel-fullscreen="right"]');
         const panelButtons = [leftPanelButton, rightPanelButton].filter(Boolean);
         const composer = document.querySelector("[data-webenvoy-composer]");
-        const runtimeGate = document.querySelector("[aria-label='Runtime supervisor status']");
         const waitUntil = async (predicate, attempts = 40, delayMs = 250) => {
           let latest = null;
           for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -135,12 +134,36 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
               coreEndpoint: ${JSON.stringify(packagedSmokeCoreEndpoint)},
               harborEndpoint: ${JSON.stringify(packagedSmokeHarborEndpoint)}
             });
-            if (${JSON.stringify(packagedSmokeRuntimeExpectation)} !== "live_ready" || latest?.canUseLiveRuntime) return latest;
+            if (${JSON.stringify(packagedSmokeRuntimeExpectation)} === "live_ready" && latest?.canUseLiveRuntime) return latest;
+            if (
+              ${JSON.stringify(packagedSmokeRuntimeExpectation)} !== "live_ready" &&
+              latest?.failClosed &&
+              latest.services?.length === 2 &&
+              latest.services?.every((service) => service.processState === "running")
+            ) return latest;
             await new Promise((resolve) => setTimeout(resolve, 750));
           }
           return latest;
         };
         const runtimeSupervisorState = await readRuntimeSupervisorState();
+        const coreRuntime = runtimeSupervisorState?.services?.find((service) => service.id === "core");
+        const harborRuntime = runtimeSupervisorState?.services?.find((service) => service.id === "harbor");
+        const matchingRuntimeGate = () => {
+          const candidate = document.querySelector("[data-testid='runtime-supervisor-status']");
+          if (!candidate) return null;
+          return candidate.getAttribute("data-runtime-core-health") === (coreRuntime?.health?.state ?? "unknown") &&
+            candidate.getAttribute("data-runtime-core-admission") === (coreRuntime?.admission?.state ?? "unknown") &&
+            candidate.getAttribute("data-runtime-harbor-health") === (harborRuntime?.health?.state ?? "unknown")
+            ? candidate
+            : null;
+        };
+        const matchingBlockedSurface = () => matchingRuntimeGate() ??
+          (document.querySelector(".owner-state")?.textContent?.includes("还没有账号身份")
+            ? document.querySelector(".owner-state")
+            : null);
+        const runtimeGate = ${JSON.stringify(packagedSmokeRuntimeExpectation)} === "live_ready"
+          ? matchingRuntimeGate()
+          : await waitUntil(matchingBlockedSurface);
         const coreThreadReadReady = Boolean(await waitUntil(
           () => document.querySelector(".task-list-empty")?.textContent?.trim() === "暂无任务线程"
         ));
@@ -257,6 +280,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
           coreThreadReadReady,
           hasRuntimeGate: Boolean(runtimeGate),
           runtimeGateText: runtimeGate?.textContent ?? "",
+          ownerStateText: document.querySelector(".owner-state")?.textContent ?? "",
           panelControls: panelButtons.length,
           hasComposer: Boolean(composer),
           composerFocused,
@@ -317,12 +341,13 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       runtimeSupervisorState: {
         canUseLiveRuntime?: boolean;
         failClosed?: boolean;
-        services?: { id: string; health?: { state?: string }; admission?: { state?: string } }[];
+        services?: { id: string; processState?: string; health?: { state?: string }; admission?: { state?: string } }[];
         lodeAssets?: { state?: string; packageCount?: number };
       } | null;
       coreThreadReadReady: boolean;
       hasRuntimeGate: boolean;
       runtimeGateText: string;
+      ownerStateText: string;
       panelControls: number;
       hasComposer: boolean;
       composerFocused: boolean;
@@ -362,9 +387,18 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
 
     if (
       packagedSmokeRuntimeExpectation !== "live_ready" &&
-      (!result.runtimeSupervisorState.failClosed || !result.runtimeGateText.includes("生产运行已阻断"))
+      (!result.runtimeSupervisorState.failClosed ||
+        (!result.runtimeGateText.includes("运行环境暂不可用") && !result.ownerStateText.includes("还没有账号身份")))
     ) {
-      throw new Error("packaged renderer smoke failed: runtime supervisor fail-closed gate is missing.");
+      throw new Error(
+        `packaged renderer smoke failed: runtime supervisor fail-closed gate is missing. ${JSON.stringify({
+          runtimeSupervisorState: result.runtimeSupervisorState,
+          hasRuntimeGate: result.hasRuntimeGate,
+          runtimeGateText: result.runtimeGateText,
+          ownerStateText: result.ownerStateText,
+          coreThreadReadReady: result.coreThreadReadReady,
+        })}`,
+      );
     }
 
     if (result.panelControls < (result.coreThreadReadReady ? 1 : 2) || !result.panelToggleSmoke) {

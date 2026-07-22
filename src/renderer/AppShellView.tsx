@@ -4,12 +4,14 @@ import type { ReactNode } from "react";
 import { CreateTaskShell } from "./CreateTaskShell";
 import { IdentityEnvironmentsPage } from "./IdentityEnvironmentsPage";
 import { OwnerState } from "./OwnerState";
+import { RuntimeBlockedOwnerState, RuntimeCheckingOwnerState } from "./RuntimeOwnerState";
 import { SettingsPage } from "./SettingsPage";
 import { AppShell, LeftPanel, RightPanel, ThreadWorkspace } from "./shellPrimitives";
 import { SiteSkillLibrary } from "./SiteSkillPages";
 import { TaskThreadComposer } from "./TaskThreadComposer";
 import { TaskThreadPage } from "./TaskThreadPage";
 import { TaskThreadRightPanel } from "./TaskThreadRightPanel";
+import { runtimeSupervisorIsChecking } from "./runtimeSupervisorState";
 import { findCatalogSkillForTask, type AppController } from "./useAppController";
 import { WorkbenchSidebar } from "./WorkbenchSidebar";
 
@@ -147,6 +149,8 @@ function WorkWorkspace({ controller }: { controller: AppController }) {
           coreEndpoint={sources.connectionConfig.coreEndpoint} runtimeSupervisorState={sources.runtimeSupervisorState} onSelect={skillWorkbench.useSiteSkill}
           onCreateIdentity={() => controller.actions.openView("browser")} onCheckCompatibility={skillWorkbench.checkCreateTaskCompatibility}
           onRecover={controller.actions.openSettings} onRecoverCandidate={skillWorkbench.recoverCandidate}
+          onRecoverRuntimeIdentity={skillWorkbench.recoverRuntimeIdentity}
+          onRecoverRuntimeSkill={skillWorkbench.recoverRuntimeSkill}
           onRecoverExactTarget={skillWorkbench.recoverExactTarget} onTargetChange={skillWorkbench.resetTargetCompatibility}
           onTaskCreated={controller.actions.acceptCreatedTask}
         />
@@ -176,6 +180,20 @@ function WorkDetail({ controller }: { controller: AppController }) {
     );
   }
   if (tasks.selectedTask == null || tasks.selectedRun == null || tasks.selectedSubmitTask == null) {
+    if (tasks.effectiveCoreReadState.status !== "loading" && runtimeSupervisorIsChecking(sources.runtimeSupervisorState)) {
+      return <ThreadWorkspace workspaceKey="work-empty"><RuntimeCheckingOwnerState /></ThreadWorkspace>;
+    }
+    if (tasks.effectiveCoreReadState.status !== "loading" && sources.runtimeSupervisorState.failClosed) {
+      return (
+        <ThreadWorkspace workspaceKey="work-empty">
+          <RuntimeBlockedOwnerState
+            runtime={sources.runtimeSupervisorState}
+            onOpenBrowser={() => controller.actions.openView("browser")}
+            onOpenSettings={controller.actions.openSettings}
+          />
+        </ThreadWorkspace>
+      );
+    }
     return <ThreadWorkspace workspaceKey="work-empty"><OwnerState title={emptyTitle(tasks.effectiveCoreReadState.status)} summary={emptySummary(tasks.effectiveCoreReadState.status, tasks.effectiveCoreReadState.summary)} onRecover={tasks.effectiveCoreReadState.status === "loading" ? undefined : controller.actions.openSettings} /></ThreadWorkspace>;
   }
   return (

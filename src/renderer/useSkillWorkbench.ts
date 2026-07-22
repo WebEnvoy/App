@@ -92,6 +92,8 @@ export function useSkillWorkbench(options: SkillWorkbenchOptions) {
     clearCreateTaskSelection: () => setCreateTaskSelection(null),
     invalidateRequests: () => requestGateRef.current.invalidate(),
     recoverCandidate: recovery.recoverCandidate,
+    recoverRuntimeIdentity: recovery.recoverRuntimeIdentity,
+    recoverRuntimeSkill: recovery.recoverRuntimeSkill,
     recoverExactTarget: recovery.recoverExactTarget,
     resumeCreateTaskAfterIdentityRecovery: recovery.resumeCreateTaskAfterIdentityRecovery,
     resetTargetCompatibility,
@@ -117,13 +119,27 @@ function useSkillRecovery(
       setSiteSkillRecoveryRequest({ key: ++keyRef.current, skillId: skill.id, identityId, destination: copy.destination });
       options.onOpenLibrary();
     } else if (copy?.destination === "identity") {
-      setSelection({ skill, identityId });
-      window.localStorage.setItem(identitySelectionStorageKey, identityId);
       const destination = candidate.recoveryAction === "install_or_select_provider"
         ? "provider" : candidate.recoveryAction === "refresh_owner_facts" ? "refresh" : "authentication";
-      setIdentityRecoveryRequest({ key: ++keyRef.current, identityId, destination });
-      options.onOpenIdentity();
+      openIdentityRecovery(skill, identityId, destination);
     }
+  }
+
+  function recoverRuntimeIdentity(skill: LodeCatalogSkill, identityId: string) {
+    openIdentityRecovery(skill, identityId, "refresh");
+  }
+
+  function recoverRuntimeSkill(skill: LodeCatalogSkill) {
+    setSelection({ skill });
+    setIdentityRecoveryRequest({ key: ++keyRef.current, destination: "refresh" });
+    options.onOpenIdentity();
+  }
+
+  function openIdentityRecovery(skill: LodeCatalogSkill, identityId: string, destination: IdentityRecoveryRequest["destination"]) {
+    setSelection({ skill, identityId });
+    window.localStorage.setItem(identitySelectionStorageKey, identityId);
+    setIdentityRecoveryRequest({ key: ++keyRef.current, identityId, destination });
+    options.onOpenIdentity();
   }
 
   function recoverExactTarget(skill: LodeCatalogSkill, identityId: string) {
@@ -157,6 +173,8 @@ function useSkillRecovery(
     abandonSiteSkillRecovery,
     identityRecoveryRequest,
     recoverCandidate,
+    recoverRuntimeIdentity,
+    recoverRuntimeSkill,
     recoverExactTarget,
     resumeCreateTaskAfterIdentityRecovery,
     siteSkillRecoveryRequest,
