@@ -49,6 +49,7 @@ const workbenchPreferencesSource = await readFile("src/renderer/workbenchPrefere
 const workbenchSidebarSource = await readFile("src/renderer/WorkbenchSidebar.tsx", "utf8");
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
+const harborIdentityRecoverySource = await readFile("src/renderer/harborIdentityRecovery.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
 const harborIdentityMutationClientSource = await readFile("src/renderer/harborIdentityMutationClient.ts", "utf8");
 const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
@@ -121,8 +122,8 @@ if (
 }
 
 const expectedRuntimeHeads = {
-  core: "645314956bd0897b8873e6ab9697013625550798",
-  harbor: "8d9f0a3b52764ce1efc1f80aef3aa5ed7c7a8a91",
+  core: "1f04c5f6cd350625f022689b95c1475fd41ac631",
+  harbor: "7daa810d859c6577876aac924944118522be0b02",
   lode: "1fbef74b4bf1b4f0a86aacd885386d7a62181207",
 };
 if (JSON.stringify(runtimeSourceLock) !== JSON.stringify(expectedRuntimeHeads) ||
@@ -1135,6 +1136,13 @@ const { outputText: identityEnvironmentFixturesModuleSource } = ts.transpileModu
   },
 });
 const identityEnvironmentFixturesModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(identityEnvironmentFixturesModuleSource)}`;
+const { outputText: harborIdentityRecoveryModuleSource } = ts.transpileModule(harborIdentityRecoverySource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const harborIdentityRecoveryModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(harborIdentityRecoveryModuleSource)}`;
 const { outputText: harborIdentityProjectionModuleSource } = ts.transpileModule(harborIdentityProjectionSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -1142,10 +1150,15 @@ const { outputText: harborIdentityProjectionModuleSource } = ts.transpileModule(
   },
 });
 const harborIdentityProjectionModuleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(
-  harborIdentityProjectionModuleSource.replace(
-    'from "./identityEnvironmentFixtures";',
-    `from "${identityEnvironmentFixturesModuleUrl}";`,
-  ),
+  harborIdentityProjectionModuleSource
+    .replace(
+      'from "./identityEnvironmentFixtures";',
+      `from "${identityEnvironmentFixturesModuleUrl}";`,
+    )
+    .replace(
+      'from "./harborIdentityRecovery";',
+      `from "${harborIdentityRecoveryModuleUrl}";`,
+    ),
 )}`;
 const harborIdentityProjectionModule = await import(harborIdentityProjectionModuleUrl);
 const { outputText: harborIdentityClientModuleSource } = ts.transpileModule(harborIdentityClientSource, {
@@ -1164,6 +1177,10 @@ const harborIdentityClientModule = await import(
       .replace(
         'from "./harborIdentityTypes";',
         `from "${harborIdentityTypesModuleUrl}";`,
+      )
+      .replace(
+        'from "./harborIdentityRecovery";',
+        `from "${harborIdentityRecoveryModuleUrl}";`,
       )
       .replace(
         'from "./ownerPayloadGuards";',
@@ -1831,6 +1848,11 @@ const liveRuntimeForSubmit = {
 };
 const readonlySubmitTask = {
   id: "task-xhs-real-read",
+  threadContext: {
+    siteLabel: "小红书",
+    siteSkillKey: "lode:capability/search-notes",
+    accountIdentityKey: readyXhsIdentity.identityEnvironmentRef,
+  },
   title: "小红书搜索与笔记读取",
   accountIdentity: "小红书运营号 A",
   siteSkill: "小红书搜索和笔记读取",
@@ -1863,12 +1885,51 @@ if (
   submitReadiness.payload.public_query?.query !== "AI 工具" ||
   submitReadiness.payload.task_intent.input.summary !== readonlySubmitTask.title ||
   submitReadiness.payload.task_intent.resource_requirement_refs[0] !== "xiaohongshu.search-notes.resources" ||
+  submitReadiness.payload.task_intent.resource_requirement_profile_id !== "search-notes-logged-in-ready-page" ||
+  submitReadiness.payload.harbor.timeout_ms !== 60_000 ||
   submitReadiness.payload.task_intent.evidence_policy_ref !== "evidence-policy:refs-only"
 ) {
   throw new Error(`Core submit smoke failed: task intent payload is malformed: ${JSON.stringify(submitReadiness.payload)}`);
 }
 if (JSON.stringify(submitReadiness.payload).includes(readonlySubmitTask.businessInput)) {
   throw new Error("Core submit smoke failed: free-form businessInput leaked into the payload.");
+}
+
+const originalXhsRequirementProfile = coreReadTaskClientModule.coreReadTaskSpecs[0].resourceRequirementProfileId;
+coreReadTaskClientModule.coreReadTaskSpecs[0].resourceRequirementProfileId = "";
+try {
+  const missingProfileReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
+    readonlySubmitTask,
+    liveRuntimeForSubmit,
+    [readyXhsIdentity],
+  );
+  if (missingProfileReadiness.ok || !missingProfileReadiness.reason.includes("resource requirement profile")) {
+    throw new Error(`Core submit smoke failed: missing resource requirement profile did not fail closed: ${JSON.stringify(missingProfileReadiness)}`);
+  }
+} finally {
+  coreReadTaskClientModule.coreReadTaskSpecs[0].resourceRequirementProfileId = originalXhsRequirementProfile;
+}
+
+for (const recoveryCode of [
+  "runtime_session_busy",
+  "launch_failed",
+  "profile_locked",
+  "provider_conflict",
+  "fingerprint_conflict",
+]) {
+  const summary = coreTaskSubmitClientModule.coreTaskSubmitFailureSummary(
+    { error: { code: recoveryCode } },
+    "fallback",
+  );
+  if (summary !== "需要修复浏览器环境后重试。") {
+    throw new Error(`Core submit smoke failed: ${recoveryCode} did not route to browser environment repair.`);
+  }
+}
+if (coreTaskSubmitClientModule.coreTaskSubmitFailureSummary(
+  { error: { code: "identity_auth_required" } },
+  "fallback",
+) !== "需要登录或完成人工认证后重试。") {
+  throw new Error("Core submit smoke failed: identity_auth_required did not preserve the authentication recovery route.");
 }
 
 const needsAuthReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -1900,8 +1961,8 @@ for (const source of ["App local-only", "Harbor fixture"]) {
 
 const restrictedChromeIdentity = {
   ...readyXhsIdentity,
-  provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", role: "受限后备", state: "warning", reason: "provider_conflict" },
-  readiness: { state: "warning", label: "受限后备", reasons: ["provider_conflict"] },
+  provider: { ...readyXhsIdentity.provider, selected: "官方 Chrome", role: "受限后备", state: "warning", reason: "official_chrome_fallback" },
+  readiness: { state: "warning", label: "受限后备", reasons: ["official_chrome_fallback"] },
   admissionFacts: {
     providerId: "chrome_official",
     providerRole: "restricted_fallback",
@@ -1910,7 +1971,7 @@ const restrictedChromeIdentity = {
     manualAuthenticationState: "completed",
     recoveryRequired: false,
     browserStorageState: "present",
-    warningReasonCodes: ["provider_conflict", "fingerprint_conflict"],
+    warningReasonCodes: [],
   },
 };
 const chromeFallbackReadiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness(
@@ -1938,12 +1999,17 @@ const restrictedChromeBossIdentity = {
   identityEnvironmentRef: "identity-env-live-boss-chrome-contract",
   admissionFacts: {
     ...restrictedChromeIdentity.admissionFacts,
-    warningReasonCodes: ["provider_conflict", "proxy_missing", "fingerprint_conflict"],
+    warningReasonCodes: ["proxy_missing"],
   },
 };
 const bossSearchTask = {
   ...readonlySubmitTask,
   id: "task-boss-real-read",
+  threadContext: {
+    siteLabel: "BOSS",
+    siteSkillKey: "lode:capability/job-search",
+    accountIdentityKey: restrictedChromeBossIdentity.identityEnvironmentRef,
+  },
   title: "BOSS 职位搜索",
   siteSkill: "BOSS 职位搜索",
   businessInput: JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 15 }),
@@ -1966,6 +2032,7 @@ if (
   bossReadiness.payload.task_intent.scope.target_type !== "boss_job_search" ||
   bossReadiness.payload.harbor.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" ||
   bossReadiness.payload.task_intent.capability.ref !== "lode:capability/job-search" ||
+  bossReadiness.payload.task_intent.resource_requirement_profile_id !== "job-search-logged-in-ready-page" ||
   JSON.stringify(bossReadiness.payload).includes("detail_ref") ||
   JSON.stringify(bossReadiness.payload).includes("read-job-detail")
 ) {
@@ -1999,15 +2066,16 @@ for (const [label, warningReasonCodes] of [
     ...restrictedChromeBossIdentity,
     admissionFacts: { ...restrictedChromeBossIdentity.admissionFacts, warningReasonCodes },
   };
-  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
-    throw new Error(`Core BOSS submit smoke failed: restricted Chrome ${label} case was accepted.`);
+  const accepted = coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok;
+  if (label === "proxy-only" ? !accepted : accepted) {
+    throw new Error(`Core BOSS submit smoke failed: restricted Chrome ${label} case had the wrong admission result.`);
   }
 }
 const xhsMissingProxyIdentity = {
   ...restrictedChromeIdentity,
   admissionFacts: {
     ...restrictedChromeIdentity.admissionFacts,
-    warningReasonCodes: ["provider_conflict", "proxy_missing", "fingerprint_conflict"],
+    warningReasonCodes: ["proxy_missing"],
   },
 };
 if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(readonlySubmitTask, liveRuntimeForSubmit, [xhsMissingProxyIdentity]).ok) {
@@ -2018,7 +2086,11 @@ if (coreTaskSubmitClientModule.isReadOnlyIdentityAdmitted(xhsMissingProxyIdentit
 }
 for (const [length, accepted] of [[80, true], [81, false]]) {
   const businessInput = JSON.stringify({ query: "x".repeat(length), city_code: "101020100", page: 1, limit: 15 });
-  const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]);
+  const readiness = coreTaskSubmitClientModule.coreTaskSubmitReadiness({
+    ...bossSearchTask,
+    threadContext: { ...bossSearchTask.threadContext, accountIdentityKey: readyBossIdentity.identityEnvironmentRef },
+    businessInput,
+  }, liveRuntimeForSubmit, [readyBossIdentity]);
   if (readiness.ok !== accepted) {
     throw new Error(`Core BOSS submit smoke failed: ${length}-character query acceptance was ${readiness.ok}.`);
   }
@@ -2033,7 +2105,11 @@ const invalidBossInputs = [
   ["bulk limit", JSON.stringify({ query: "前端工程师", city_code: "101020100", page: 1, limit: 16 })],
 ];
 for (const [label, businessInput] of invalidBossInputs) {
-  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({ ...bossSearchTask, businessInput }, liveRuntimeForSubmit, [readyBossIdentity]).ok) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({
+    ...bossSearchTask,
+    threadContext: { ...bossSearchTask.threadContext, accountIdentityKey: readyBossIdentity.identityEnvironmentRef },
+    businessInput,
+  }, liveRuntimeForSubmit, [readyBossIdentity]).ok) {
     throw new Error(`Core BOSS submit smoke failed: ${label} was accepted.`);
   }
 }
@@ -2042,7 +2118,10 @@ for (const identity of [
   { ...readyBossIdentity, source: "App local-only" },
   { ...readyBossIdentity, login: { recoveryRequired: true }, readiness: { state: "needs-auth" } },
 ]) {
-  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness(bossSearchTask, liveRuntimeForSubmit, [identity]).ok) {
+  if (coreTaskSubmitClientModule.coreTaskSubmitReadiness({
+    ...bossSearchTask,
+    threadContext: { ...bossSearchTask.threadContext, accountIdentityKey: identity.identityEnvironmentRef },
+  }, liveRuntimeForSubmit, [identity]).ok) {
     throw new Error("Core BOSS submit smoke failed: fixture or unlogged identity was accepted.");
   }
 }
@@ -2078,7 +2157,6 @@ const restrictedChromeNegativeMatrix = [
   ["manual auth", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, manualAuthenticationState: "required" } }],
   ["recovery", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, recoveryRequired: true } }],
   ["storage", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, browserStorageState: "unknown" } }],
-  ["empty warning", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, warningReasonCodes: [] } }],
   ["unexpected warning", { admissionFacts: { ...restrictedChromeIdentity.admissionFacts, warningReasonCodes: ["provider_conflict", "other"] } }],
   ["generally ready", { provider: { ...restrictedChromeIdentity.provider, state: "ready" } }],
 ];
@@ -2296,6 +2374,7 @@ let submittedBossPayload;
 const acceptsCore273BossPayload = (payload) =>
   payload?.task_intent?.capability?.ref === "lode:capability/job-search" &&
   payload?.task_intent?.capability?.source_ref === "lode://site-capability/boss/job-search@0.1.0" &&
+  payload?.task_intent?.resource_requirement_profile_id === "job-search-logged-in-ready-page" &&
   payload?.task_intent?.scope?.target_type === "boss_job_search" &&
   payload?.task_intent?.scope?.target_ref === "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100" &&
   payload?.public_query?.query === "前端工程师" &&
@@ -2321,7 +2400,7 @@ const acceptedBossRun = await coreTaskSubmitClientModule.submitCoreReadOnlyTask(
   "http://core.test",
   bossSearchTask,
   liveRuntimeForSubmit,
-  [readyBossIdentity],
+  [restrictedChromeBossIdentity],
   { pollAttempts: 1, pollIntervalMs: 0 },
 );
 const acceptedBossPayload = submittedBossPayload;
@@ -2345,6 +2424,7 @@ if (
   acceptedBossPayload?.public_query?.limit !== 15 ||
   Object.keys(acceptedBossPayload?.public_query ?? {}).length !== 4 ||
   acceptedBossPayload?.task_intent?.scope?.target_type !== "boss_job_search" ||
+  acceptedBossPayload?.harbor?.timeout_ms !== 60_000 ||
   acceptedBossPayload?.harbor?.url !== "https://www.zhipin.com/web/geek/job?query=%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%B8%88&city=101020100"
 ) {
   throw new Error(`Core BOSS submit smoke failed: mock POST /tasks did not accept the Core #273 payload: ${JSON.stringify({ acceptedBossRun, acceptedBossPayload })}`);

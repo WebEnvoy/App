@@ -47,12 +47,14 @@ type CoreTaskPayload = {
       timeout_ms: number;
     };
     resource_requirement_refs: string[];
+    resource_requirement_profile_id: string;
     evidence_policy_ref: string;
   };
   harbor: {
     identity_environment_ref: string;
     url: string;
     reuse_existing: true;
+    timeout_ms: number;
   };
 };
 
@@ -93,6 +95,9 @@ export function coreTaskSubmitReadiness(
   }
   if (spec.resourceRequirementRefs.length === 0) {
     return { ok: false, reason: "当前任务缺少 Lode resource requirement refs；不构造 Core task payload。" };
+  }
+  if (!spec.resourceRequirementProfileId.trim()) {
+    return { ok: false, reason: "当前任务缺少 Lode resource requirement profile；不构造 Core task payload。" };
   }
 
   const site = siteForTask(task);
@@ -154,12 +159,14 @@ export function coreTaskSubmitReadiness(
         timeout_ms: 60_000,
       },
       resource_requirement_refs: spec.resourceRequirementRefs,
+      resource_requirement_profile_id: spec.resourceRequirementProfileId,
       evidence_policy_ref: spec.evidencePolicyRef,
     },
     harbor: {
       identity_environment_ref: identity.identityEnvironmentRef,
       url: targetRef,
       reuse_existing: true,
+      timeout_ms: 60_000,
     },
   };
 
@@ -395,7 +402,8 @@ function responseError(value: unknown, fallback: string) {
 export function coreTaskSubmitFailureSummary(value: unknown, fallback: string) {
   const recoveryCode = coreTaskRecoveryCode(value);
   if (["browser_environment_repair_required", "repair_browser_environment", "identity_storage_unavailable",
-    "browser_provider_unavailable", "identity_environment_unavailable", "connect_identity_environment", "install_or_select_provider"].includes(recoveryCode ?? "")) {
+    "browser_provider_unavailable", "identity_environment_unavailable", "connect_identity_environment", "install_or_select_provider",
+    "profile_locked", "launch_failed", "runtime_session_busy", "core_task_session_lock_mismatch", "provider_conflict", "fingerprint_conflict"].includes(recoveryCode ?? "")) {
     return "需要修复浏览器环境后重试。";
   }
   if (recoveryCode === "identity_auth_required" || recoveryCode === "open_manual_auth") {
@@ -422,6 +430,12 @@ function coreTaskRecoveryCode(value: unknown) {
     "identity_environment_unavailable",
     "connect_identity_environment",
     "install_or_select_provider",
+    "profile_locked",
+    "launch_failed",
+    "runtime_session_busy",
+    "core_task_session_lock_mismatch",
+    "provider_conflict",
+    "fingerprint_conflict",
     "identity_auth_required",
     "open_manual_auth",
   ];
