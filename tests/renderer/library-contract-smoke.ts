@@ -17,6 +17,8 @@ import { projectOwnerHttpStatusError } from "../../src/renderer/ownerApiClient";
 import { createSkillInputDraft, validateSkillInputDraft } from "../../src/renderer/skillInputDraft";
 import { clearSkillInputDraft, loadSkillInputDraft, saveSkillInputDraft } from "../../src/renderer/skillInputDraftStore";
 import { compatibilityRecoveryCopy } from "../../src/renderer/skillCompatibilityPresentation";
+import { terminalSkillInputOwnerRefs } from "../../src/renderer/skillInputOwnerClient";
+import { findCatalogSkillForTask } from "../../src/renderer/useAppController";
 
 type SmokeInput = {
   catalog: LodeCatalogLoadState;
@@ -59,10 +61,41 @@ function checkTurnInputProjection(xhsSkill: LodeCatalogSkill) {
     updated_at: "2026-07-20T00:00:00.000Z",
     turns: [],
   };
-  if (projectCoreThreadResponse({ ok: true, thread }) == null ||
+  const historicalTask = projectCoreThreadResponse({ ok: true, thread });
+  if (historicalTask == null ||
     projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "identity-env:legacy-safe" } }) == null ||
     projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "harbor://identity-environment/unsafe" } }) != null) {
     throw new Error("Core thread projection did not distinguish canonical, safe legacy, and unsupported identity refs.");
+  }
+  const exactTask = {
+    ...historicalTask,
+    packageSource: { ...historicalTask.packageSource, sourceRef: xhsSkill.packageRef, version: xhsSkill.version },
+  };
+  if (findCatalogSkillForTask(historicalTask, [xhsSkill]) != null || findCatalogSkillForTask(exactTask, [xhsSkill]) !== xhsSkill) {
+    throw new Error("Historical thread mounted a current Catalog skill without an exact package and version binding.");
+  }
+  const ownerRef = "draft:app-protected/00000000-0000-4000-8000-000000000020";
+  const terminalTask = projectCoreThreadResponse({ ok: true, thread: { ...thread, turns: [{
+    turn_id: "turn_22222222222222222222222222222222",
+    sequence: 1,
+    idempotency_key: "app-turn-22222222-2222-4222-8222-222222222222",
+    run_id: "app-xhs-22222222-2222-4222-8222-222222222222",
+    creation_channel: "app",
+    input: {
+      schema_version: "webenvoy.task-turn-input.v0",
+      fields: [{ field_id: "keyword", kind: "long_text", owner_ref: `${ownerRef}/keyword` }],
+      attachment_refs: [`attachment:app-protected/${ownerRef.slice("draft:app-protected/".length)}/attachments/0`],
+      consumer_boundary: "Core stores bounded field summaries and owner refs only; raw content remains with its owner.",
+    },
+    created_at: "2026-07-20T00:00:00.000Z",
+    updated_at: "2026-07-20T00:01:00.000Z",
+    submission_state: "accepted",
+    status: "completed",
+    terminal_at: "2026-07-20T00:01:00.000Z",
+  }] } });
+  if (terminalTask == null || JSON.stringify(terminalSkillInputOwnerRefs([terminalTask])) !== JSON.stringify([ownerRef]) ||
+    terminalSkillInputOwnerRefs([{ ...terminalTask, runs: terminalTask.runs.map((run) => ({ ...run, turnStatus: "running" })) }]).length !== 0) {
+    throw new Error("Terminal task inputs were not selected for owner cleanup or active inputs were released early.");
   }
   const skill: LodeCatalogSkill = {
     ...xhsSkill,
@@ -78,7 +111,6 @@ function checkTurnInputProjection(xhsSkill: LodeCatalogSkill) {
   draft.values.limit = "8";
   draft.values.body = "long-text-private-sentinel";
   draft.files.attachments = browserAttachments([new File(["file-private-sentinel"], "private-name.txt", { type: "text/plain" })]);
-  const ownerRef = "draft:app-protected/00000000-0000-4000-8000-000000000020";
   const result = buildCoreThreadInputSnapshot(skill, draft, {
     ownerRef,
     fieldOwnerRefs: Object.fromEntries(skill.inputFields.map((field) => [field.id, `${ownerRef}/${field.id}`])),

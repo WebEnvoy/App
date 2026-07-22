@@ -68,12 +68,14 @@ export async function createTaskThreadTurn(options: SubmitOptions & {
   }
   const policyBlock = executionPolicyReadiness(options.skill, effectivePolicy);
   if (policyBlock != null) return { status: "blocked" as const, summary: policyBlock, task: threadTask };
-  return appendPreparedTurn(options.endpoint, threadTask.id, prepared.request);
+  const result = await appendPreparedTurn(options.endpoint, threadTask.id, prepared.request);
+  return createdRecord.created ? withExactSkillPackage(result, options.skill) : result;
 }
 
 export async function appendTaskThreadTurn(options: SubmitOptions & { threadRef: string }) {
   const prepared = prepareTaskTurn(options);
-  return prepared.ok ? appendPreparedTurn(options.endpoint, options.threadRef, prepared.request) : blocked(prepared.reason);
+  if (!prepared.ok) return blocked(prepared.reason);
+  return withExactSkillPackage(await appendPreparedTurn(options.endpoint, options.threadRef, prepared.request), options.skill);
 }
 
 export async function cancelTaskThreadTurn(endpoint: string, threadRef: string, turnId: string): Promise<TaskThreadSubmitState> {
@@ -113,17 +115,21 @@ async function appendPreparedTurn(endpoint: string, threadRef: string, request: 
   const responseBody = asRecord(record?.body);
   const taskPayload = projectCoreThreadResponse(response) == null ? responseBody : response;
   const task = projectCoreThreadResponse(taskPayload);
+  const status = typeof record?.status === "number" ? record.status : null;
   if (task == null) {
-    return typeof record?.status === "number"
+    return status != null && status >= 400 && status < 500
       ? failed(response, "Core 未接受当前任务回合。")
       : reconcileTaskThreadTurn(endpoint, attempt);
   }
   const turn = turnForAttempt(taskPayload, attempt.idempotencyKey);
-  if (record?.ok === true) return { status: "ready", summary: "任务回合已由 Core 接受。", task };
-  if (record?.outcome === "submission_status_unknown" || turn?.status === "status_unknown" || turn?.status === "submitting") {
-    return unknownAttempt(attempt, task);
+  if (turn == null) return status != null && status >= 400 && status < 500
+    ? { status: "failed", summary: ownerError(response, "Core 未接受当前任务回合。"), task }
+    : unknownAttempt(attempt, task);
+  if (turn.status === "status_unknown" || turn.status === "submitting") return unknownAttempt(attempt, task);
+  if (turn.status === "failed" || turn.status === "cancelled" || turn.submission_state === "rejected") {
+    return { status: "failed", summary: ownerError(response, "Core 已确认当前任务回合未被接受。"), task };
   }
-  return { status: "failed", summary: ownerError(response, "Core 未接受当前任务回合。"), task };
+  return { status: "ready", summary: "任务回合已由 Core 接受。", task };
 }
 
 export async function reconcileTaskThreadTurn(
@@ -361,6 +367,22 @@ function unknownAttempt(attempt: TaskTurnSubmissionAttempt, task?: TaskProjectio
     summary: "提交响应状态未知；请重新检查 Core 线程事实，不会生成新的提交标识。",
     attempt,
     ...(task == null ? {} : { task }),
+  };
+}
+
+function withExactSkillPackage(state: TaskThreadSubmitState, skill: LodeCatalogSkill): TaskThreadSubmitState {
+  if (!("task" in state) || state.task == null) return state;
+  return {
+    ...state,
+    task: {
+      ...state.task,
+      packageSource: {
+        ...state.task.packageSource,
+        version: skill.version,
+        sourceRef: skill.packageRef,
+        ...(skill.lockRef == null ? {} : { lockRef: skill.lockRef }),
+      },
+    },
   };
 }
 

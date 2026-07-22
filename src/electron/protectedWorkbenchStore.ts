@@ -56,6 +56,7 @@ const maxFiles = 256;
 const maxDrafts = 64;
 const maxSealedInputs = 32;
 const localRefPattern = /^local_file_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const sealedInputRefPattern = /^draft:app-protected\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ProtectedWorkbenchStore {
   private state = emptyState();
@@ -172,6 +173,21 @@ export class ProtectedWorkbenchStore {
       refs = { ownerRef, fieldOwnerRefs, attachmentRefs };
     });
     return saved ? refs : null;
+  }
+
+  async releaseSealedInputs(value: unknown) {
+    const ownerRefs = parseSealedInputRefs(value);
+    if (!this.available || ownerRefs == null) return false;
+    return this.update((state) => {
+      const localRefs = new Set<string>();
+      for (const ownerRef of ownerRefs) {
+        const input = state.sealedInputs[ownerRef];
+        if (input == null) continue;
+        for (const localRef of sealedInputLocalRefs(input)) localRefs.add(localRef);
+        delete state.sealedInputs[ownerRef];
+      }
+      removeUnusedFiles(state, localRefs);
+    });
   }
 
   private async restore() {
@@ -303,6 +319,13 @@ function validAttachments(value: unknown): value is ProtectedDraftAttachment[] {
 function parseLocalRefs(value: unknown) {
   return Array.isArray(value) && value.length <= 32 && value.every((item) => typeof item === "string" && localRefPattern.test(item))
     ? value as string[]
+    : null;
+}
+
+function parseSealedInputRefs(value: unknown) {
+  return Array.isArray(value) && value.length <= maxSealedInputs &&
+    value.every((item) => typeof item === "string" && sealedInputRefPattern.test(item))
+    ? [...new Set(value)] as string[]
     : null;
 }
 

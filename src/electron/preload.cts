@@ -38,6 +38,7 @@ const shellApi = {
   saveProtectedDraft: (draft: unknown) => ipcRenderer.invoke("webenvoy:save-protected-draft", draft),
   deleteProtectedDraft: (context: unknown) => ipcRenderer.invoke("webenvoy:delete-protected-draft", context),
   sealProtectedInput: (draft: unknown) => ipcRenderer.invoke("webenvoy:seal-protected-input", draft),
+  releaseProtectedInputs: (ownerRefs: string[]) => ipcRenderer.invoke("webenvoy:release-protected-inputs", ownerRefs),
   subscribeToSystemThemeVariant: (listener: (colorScheme: WebEnvoyColorScheme) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, colorScheme: WebEnvoyColorScheme) => {
       listener(colorScheme);

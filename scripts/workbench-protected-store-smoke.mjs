@@ -106,6 +106,17 @@ try {
   }) != null) {
     throw new Error("Sealed input capacity silently evicted an existing owner ref.");
   }
+  if (await first.releaseSealedInputs(["draft:app-protected/not-a-valid-ref"]) ||
+    !await first.releaseSealedInputs([sealedRefs.ownerRef]) ||
+    (await first.checkLocalRef(sealedLocalRef)).reason !== "invalid_reference") {
+    throw new Error("Sealed input release accepted an invalid ref or retained its attachment.");
+  }
+  const replacementSealedRefs = await first.sealInput({
+    ...sealedDraft,
+    context: { ...sealedDraft.context, identityId: "identity-sealed-replacement" },
+    attachments: {},
+  });
+  if (replacementSealedRefs == null) throw new Error("Released sealed-input capacity was not reusable.");
   if (await first.sealInput({ ...sealedDraft, attachments: { attachments: [{ ...sealedDraft.attachments.attachments[0], localRef: `local_file_ref_${randomUUID()}` }] } })) {
     throw new Error("Sealed input accepted an unregistered attachment ref.");
   }
@@ -132,8 +143,9 @@ try {
   const pathProbe = await restarted.checkLocalRef(selectedPath);
   const forgedProbe = await restarted.checkLocalRef("local_file_ref_00000000-0000-4000-8000-000000000099");
   if (restored?.values.body !== "restart draft" || restored.attachments.attachments?.[0]?.name !== "selected.txt" ||
-    Object.keys(restartedState.sealedInputs ?? {}).length !== 32 || !Object.hasOwn(restartedState.sealedInputs, sealedRefs.ownerRef) ||
-    !(await restarted.checkLocalRef(sealedLocalRef)).readable ||
+    Object.keys(restartedState.sealedInputs ?? {}).length !== 32 || Object.hasOwn(restartedState.sealedInputs, sealedRefs.ownerRef) ||
+    !Object.hasOwn(restartedState.sealedInputs, replacementSealedRefs.ownerRef) ||
+    (await restarted.checkLocalRef(sealedLocalRef)).reason !== "invalid_reference" ||
     !readable.readable || pathProbe.reason !== "invalid_reference" || forgedProbe.reason !== "invalid_reference") {
     throw new Error("Restart restoration or arbitrary-path rejection failed.");
   }
@@ -194,7 +206,7 @@ try {
   if (unavailable.available || await unavailable.saveDraft({ context, values: {}, attachments: {}, omittedFieldIds: [] })) {
     throw new Error("Unavailable safe storage did not fail closed.");
   }
-  process.stdout.write(`${JSON.stringify({ restartRestored: true, sealedOwnerRefs: true, sealedAttachmentRetained: true, sealedCapacityFailedClosed: true, v1Migrated: true, unknownTopLevelRejected: true, arbitraryPathRejected: true, capacityPreservedOwnedRef: true, queueRecovered: true, orphanRefReleased: true, removedRefRevoked: true, sensitiveValuesRejected: true, corruptRecovered: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ restartRestored: true, sealedOwnerRefs: true, sealedInputReleased: true, sealedCapacityReused: true, sealedCapacityFailedClosed: true, v1Migrated: true, unknownTopLevelRejected: true, arbitraryPathRejected: true, capacityPreservedOwnedRef: true, queueRecovered: true, orphanRefReleased: true, removedRefRevoked: true, sensitiveValuesRejected: true, corruptRecovered: true })}\n`);
 } finally {
   await rm(root, { recursive: true, force: true });
 }

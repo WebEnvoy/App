@@ -60,6 +60,11 @@ export async function registerWorkbenchIpc(
     const refs = await store.sealInput(draft);
     return refs == null ? { status: "rejected" } : { status: "ready", refs };
   });
+  ipcMain.handle("webenvoy:release-protected-inputs", async (event, ownerRefs) =>
+    authorizedWorkbenchWindow(event.sender, mainWindows, expectedRendererUrl) == null
+      ? { status: "rejected" }
+      : !store.available ? { status: "unavailable" } : { status: await store.releaseSealedInputs(ownerRefs) ? "ready" : "rejected" },
+  );
 }
 
 export function authorizedWorkbenchWindow(

@@ -197,6 +197,9 @@ export function installLibraryShellMock() {
         const body = request.body as Record<string, unknown>;
         const publicQuery = body.public_query as { query?: string } | undefined;
         const unknown = publicQuery?.query === "unknown outcome";
+        if (publicQuery?.query === "server unavailable") {
+          return { ok: false, status: 503, error: "owner_temporarily_unavailable", body: { ok: false, thread: coreThread(turns) } };
+        }
         turns = [...turns, {
           turn_id: `turn_${String(turns.length + 1).padStart(32, "0")}`,
           sequence: turns.length + 1,

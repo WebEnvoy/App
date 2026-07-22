@@ -25,7 +25,7 @@ import { catalogSkillName, catalogSkillSiteName, type LodeCatalogSkill } from ".
 import { releaseLocalAttachments } from "./localFileClient";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
 import { validateSkillInputDraft, type SkillInputAttachment, type SkillInputDraft, type SkillInputValue } from "./skillInputDraft";
-import { sealSkillInput, type SkillInputOwnerRefs } from "./skillInputOwnerClient";
+import { releaseSkillInputOwnerRefs, sealSkillInput, type SkillInputOwnerRefs } from "./skillInputOwnerClient";
 import {
   initialTaskThreadSubmitState,
   reconcileTaskThreadTurn,
@@ -128,6 +128,9 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
     );
     setSubmitState(result);
     if ("task" in result && result.task != null) props.onTask(result.task);
+    if (result.status === "blocked" || result.status === "failed") {
+      await releaseSkillInputOwnerRefs([sealed.refs.ownerRef]);
+    }
     if (result.status !== "ready") return;
     await finishAcceptedTurn();
   }

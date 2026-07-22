@@ -5,6 +5,7 @@ import { mergeSubmittedCoreTaskOverrides } from "./coreThreadClient";
 import { coreTaskSubmitReadiness, initialCoreTaskSubmitState, promoteSubmittedCoreTask, submitCoreReadOnlyTask, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import { projectRuntimeGatedTasks, type RuntimeSupervisorState } from "./runtimeSupervisorState";
+import { releaseSkillInputOwnerRefs, terminalSkillInputOwnerRefs } from "./skillInputOwnerClient";
 import type { TaskProjection } from "./taskThreadFixtures";
 import { outcomeLabel } from "./TaskThreadFields";
 import type { ThreadNavigationItem } from "./ThreadNavigationRail";
@@ -20,10 +21,18 @@ export function useAppTasks(
   const [submitStates, setSubmitStates] = useState<Record<string, CoreTaskSubmitState>>({});
   const [submittedOverrides, setSubmittedOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
   const [businessInputs, setBusinessInputs] = useState<Record<string, string>>({});
+  const releasedOwnerRefs = useRef(new Set<string>());
   const currentOverrides = useMemo(() => Object.values(submittedOverrides).filter((item) => item.endpoint === endpoint), [endpoint, submittedOverrides]);
   const effectiveCoreReadState = useMemo(() => mergeSubmittedCoreTaskOverrides(coreReadState, currentOverrides), [coreReadState, currentOverrides]);
   const effectiveCoreReadTasks = useMemo(() => effectiveCoreReadState.tasks.map((task) => applyLocalTaskContext(task, businessInputs)), [businessInputs, effectiveCoreReadState.tasks]);
   const taskThreads = useMemo(() => projectRuntimeGatedTasks(effectiveCoreReadTasks, runtime, effectiveCoreReadState.liveTaskIds), [effectiveCoreReadState.liveTaskIds, effectiveCoreReadTasks, runtime]);
+  useEffect(() => {
+    const ownerRefs = terminalSkillInputOwnerRefs(effectiveCoreReadTasks).filter((ownerRef) => !releasedOwnerRefs.current.has(ownerRef));
+    if (ownerRefs.length === 0) return;
+    void releaseSkillInputOwnerRefs(ownerRefs).then((released) => {
+      if (released) for (const ownerRef of ownerRefs) releasedOwnerRefs.current.add(ownerRef);
+    });
+  }, [effectiveCoreReadTasks]);
   const workbenchTaskThreads = useMemo(() => taskThreads.filter((task) => task.threadContext != null), [taskThreads]);
   const selection = useTaskSelection(taskThreads);
   const selectedSubmitTask = selection.selectedTask == null

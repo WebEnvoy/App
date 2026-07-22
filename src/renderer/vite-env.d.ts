@@ -89,6 +89,7 @@ type WebEnvoySealedInputResult =
       };
     }
   | { status: "unavailable" | "rejected" };
+type WebEnvoyProtectedInputReleaseResult = { status: "ready" | "unavailable" | "rejected" };
 type WebEnvoyLodeCatalogField = {
   id: string;
   label: string;
@@ -185,7 +186,8 @@ interface Window {
     loadProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
     saveProtectedDraft?: (draft: unknown) => Promise<WebEnvoyProtectedDraftResult>;
     deleteProtectedDraft?: (context: unknown) => Promise<WebEnvoyProtectedDraftResult>;
-    sealProtectedInput?: (draft: unknown) => Promise<WebEnvoySealedInputResult>;
+      sealProtectedInput?: (draft: unknown) => Promise<WebEnvoySealedInputResult>;
+      releaseProtectedInputs?: (ownerRefs: string[]) => Promise<WebEnvoyProtectedInputReleaseResult>;
     subscribeToSystemThemeVariant?: (
       listener: (colorScheme: WebEnvoyShellContext["colorScheme"]) => void,
     ) => () => void;

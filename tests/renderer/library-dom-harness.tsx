@@ -392,6 +392,15 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     "active turn cancellation");
   const cancellationPreservedDraft = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome";
   const terminateRequest = libraryOwnerRequests.find((request) => request.path.endsWith("/terminate"));
+  setInputValue(document.querySelector("[name='keyword']"), "server unavailable");
+  const serverFailurePostCount = libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length;
+  document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
+  await waitUntil(() => document.querySelector(".create-task-submit-state.unknown") != null, "503 submission outcome stayed unknown");
+  document.querySelector<HTMLButtonElement>(".create-task-submit-state.unknown button")?.click();
+  await twoFrames();
+  const serverFailureStayedUnknown = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "server unavailable" &&
+    document.querySelector(".create-task-submit-state.unknown") != null &&
+    libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length === serverFailurePostCount + 1;
   const policySaveStart = libraryOwnerRequests.length;
   const policyMenu = document.querySelector<HTMLDetailsElement>(".composer-execution-menu");
   if (policyMenu != null) policyMenu.open = true;
@@ -431,7 +440,7 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
   if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid < 2 || !attachmentAdded ||
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
-    !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked ||
+    !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
     !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe ||
     !submittedCard.includes("keyword") || !submittedCard.includes("精确字段定义版本不可用") ||
     !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
