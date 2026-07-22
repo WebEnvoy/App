@@ -177,8 +177,20 @@ async function run() {
   );
   if (window.webContents.getZoomFactor() !== 2) throw new Error("Production shell checks did not run at 200% zoom.");
   window.webContents.setZoomFactor(1);
+  window.setContentSize(1200, 900);
+  await withTimeout(window.loadURL(`${baseUrl}/tests/renderer/identity-dom.html`), "Identity desktop harness load");
+  const identityDesktop = await withTimeout(
+    runRendererCheck("window.__runIdentityDomSmoke('desktop')", "Identity desktop DOM checks"),
+    "Identity desktop DOM checks",
+  );
+  window.setContentSize(720, 900);
+  await withTimeout(window.loadURL(`${baseUrl}/tests/renderer/identity-dom.html`), "Identity narrow harness load");
+  const identityNarrow = await withTimeout(
+    runRendererCheck("window.__runIdentityDomSmoke('narrow')", "Identity narrow DOM checks"),
+    "Identity narrow DOM checks",
+  );
   stage("checks passed");
-  process.stdout.write(`${JSON.stringify({ desktop, narrow, libraryDesktop, libraryNarrow, libraryStale, productionShell }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ desktop, narrow, libraryDesktop, libraryNarrow, libraryStale, productionShell, identityDesktop, identityNarrow }, null, 2)}\n`);
 }
 
 async function checkRendererSecurityBoundary(baseUrl) {
@@ -268,7 +280,7 @@ async function cleanup(exitCode) {
   process.exit(exitCode);
 }
 
-void withTimeout(run(), "Electron DOM smoke", 45_000)
+void withTimeout(run(), "Electron DOM smoke", 60_000)
   .then(() => cleanup(0))
   .catch((error) => {
     process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);

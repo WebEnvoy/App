@@ -17,6 +17,7 @@ import {
   isHarborSupervisorProtectedRequest,
   ownerApiTimeoutMs,
   parseOwnerApiRequest,
+  projectHarborIdentityMutationErrorBody,
   projectOwnerApiError,
   type OwnerApiJsonRequest,
 } from "./ownerApiRequest.js";
@@ -542,11 +543,14 @@ async function requestOwnerApiJson(request: OwnerApiJsonRequest) {
     const json = await readBoundedJsonResponse(response, ownerApiResponseMaxBytes(parsed.path));
     if (!response.ok) {
       const projectedError = projectOwnerApiError(json);
+      const identityMutationError = projectHarborIdentityMutationErrorBody(parsed.path, json);
       return {
         ok: false,
         status: response.status,
         error: `${parsed.path} returned ${response.status}`,
-        ...(projectedError == null ? {} : { body: { error: projectedError } }),
+        ...(identityMutationError !== undefined
+          ? { body: identityMutationError }
+          : projectedError == null ? {} : { body: { error: projectedError } }),
       };
     }
     return { ok: true, status: response.status, body: json ?? {} };

@@ -67,7 +67,7 @@ function AppHeader({ controller, panelControls }: {
         <button className="topbar-icon-button we-toolbar-icon-button cursor-interaction" type="button" aria-label="后退" disabled={!settings} onClick={navigation.closeSettings}><ArrowLeft size={15} /></button>
         <button className="topbar-icon-button we-toolbar-icon-button cursor-interaction" type="button" aria-label="前进" disabled><ArrowRight size={15} /></button>
       </div>
-      <div className="topbar-center-surface"><span className="topbar-thread-symbol" aria-hidden="true"><Icon size={15} /></span><h2 id="thread-title">{pageTitle(controller)}</h2></div>
+      <div className="topbar-center-surface"><span className="topbar-thread-symbol" aria-hidden="true"><Icon size={15} /></span><h2 id="thread-title">{pageTitle(controller)}</h2>{navigation.activeView === "browser" ? <div id="identity-topbar-actions" className="prototype-center-actions" /> : null}</div>
       <div className="topbar-right-slot production-right-topbar">
         {workDetail ? <><span className="right-panel-topbar-title">预览</span>{panelControls.rightFullscreen}{panelControls.right}</> : null}
       </div>
@@ -83,21 +83,17 @@ function AppWorkspace({ controller }: { controller: AppController }) {
 }
 
 function IdentityWorkspace({ controller }: { controller: AppController }) {
-  const { actions, skillWorkbench, sources } = controller;
-  const live = sources.harborIdentityState.identities.some((identity) => identity.source === "Harbor live");
-  if (sources.harborIdentityState.status === "loading") return <ThreadWorkspace workspaceKey="browser"><OwnerState title="正在读取账号身份" summary="正在同步账号、登录状态和浏览器环境。" /></ThreadWorkspace>;
-  if (!live) {
-    const ready = sources.harborIdentityState.status === "ready";
-    return <ThreadWorkspace workspaceKey="browser"><OwnerState title={ready ? "暂无账号身份" : "账号身份暂不可用"} summary={ready ? "当前没有可用的账号身份。" : "暂时无法读取账号身份，请检查连接后重试。"} onRecover={actions.openSettings} /></ThreadWorkspace>;
-  }
+  const { actions, sources, tasks } = controller;
   return (
     <ThreadWorkspace workspaceKey="browser">
       <IdentityEnvironmentsPage
         harborEndpoint={sources.connectionConfig.harborEndpoint}
         initialState={sources.harborIdentityState}
         runtimeSupervisorState={sources.runtimeSupervisorState}
+        tasks={tasks.workbenchTaskThreads}
         onHarborStateChange={actions.onHarborStateChange}
-        onOpenTask={actions.openTaskById}
+        onOpenLibrary={() => actions.openView("library")}
+        onOpenSettings={actions.openSettings}
       />
     </ThreadWorkspace>
   );

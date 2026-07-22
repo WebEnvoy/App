@@ -11,13 +11,12 @@ import {
   type IdentityCompatibilityCandidate,
   type SkillIdentityCompatibilityState,
 } from "./coreIdentityCompatibilityClient";
-import type { HarborIdentityLoadState } from "./harborIdentityTypes";
+import { identitySelectionStorageKey, type HarborIdentityLoadState } from "./harborIdentityTypes";
 import {
   fetchLodeCatalog,
   type LodeCatalogLoadState,
   type LodeCatalogSkill,
 } from "./lodeCatalogClient";
-import { localIdentitySelectionStorageKey } from "./localIdentityEnvironmentStore";
 import { createLatestRequestGate } from "./latestRequestGate";
 import { compatibilityRecoveryCopy } from "./skillCompatibilityPresentation";
 import type { IdentityRecoveryRequest, SiteSkillRecoveryRequest } from "./siteSkillRecovery";
@@ -119,7 +118,7 @@ function useSkillRecovery(
       options.onOpenLibrary();
     } else if (copy?.destination === "identity") {
       setSelection({ skill, identityId });
-      window.localStorage.setItem(localIdentitySelectionStorageKey, identityId);
+      window.localStorage.setItem(identitySelectionStorageKey, identityId);
       const destination = candidate.recoveryAction === "install_or_select_provider"
         ? "provider" : candidate.recoveryAction === "refresh_owner_facts" ? "refresh" : "authentication";
       setIdentityRecoveryRequest({ key: ++keyRef.current, identityId, destination });
@@ -276,12 +275,10 @@ function skillVersionKey(skill: LodeCatalogSkill) {
 function focusIdentityRecovery(request: IdentityRecoveryRequest | undefined) {
   if (request == null) return;
   const frame = window.requestAnimationFrame(() => {
-    const selector = request.destination === "provider"
-      ? ".identity-provider-grid"
-      : request.destination === "refresh"
-      ? ".identity-recovery-panel button:last-of-type"
-      : ".identity-recovery-panel button:first-of-type";
-    const target = document.querySelector<HTMLElement>(selector);
+    const target = request.destination === "refresh"
+      ? document.querySelector<HTMLElement>("[aria-label='刷新账号身份']")
+      : Array.from(document.querySelectorAll<HTMLElement>(".identity-catalog-row"))
+          .find((candidate) => candidate.dataset.identityRef === request.identityId) ?? null;
     if (target == null) return;
     if (!target.matches("button, input, select, textarea, a[href], [tabindex]")) target.tabIndex = -1;
     target.focus();

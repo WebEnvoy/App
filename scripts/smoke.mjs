@@ -33,7 +33,6 @@ const coreThreadClientSource = await readFile("src/renderer/coreThreadClient.ts"
 const coreThreadInputContractSource = await readFile("src/renderer/coreThreadInputContract.ts", "utf8");
 const coreTaskSubmitClientSource = await readFile("src/renderer/coreTaskSubmitClient.ts", "utf8");
 const identityEnvironmentFixturesSource = await readFile("src/renderer/identityEnvironmentFixtures.ts", "utf8");
-const identityEnvironmentDetailsSource = await readFile("src/renderer/IdentityEnvironmentDetails.tsx", "utf8");
 const identityEnvironmentsPageSource = await readFile("src/renderer/IdentityEnvironmentsPage.tsx", "utf8");
 const appSource = await readFile("src/renderer/App.tsx", "utf8");
 const appControllerSource = await readFile("src/renderer/useAppController.ts", "utf8");
@@ -51,7 +50,7 @@ const workbenchSidebarSource = await readFile("src/renderer/WorkbenchSidebar.tsx
 const harborIdentityClientSource = await readFile("src/renderer/harborIdentityClient.ts", "utf8");
 const harborIdentityProjectionSource = await readFile("src/renderer/harborIdentityProjection.ts", "utf8");
 const harborIdentityTypesSource = await readFile("src/renderer/harborIdentityTypes.ts", "utf8");
-const localIdentityStoreSource = await readFile("src/renderer/localIdentityEnvironmentStore.ts", "utf8");
+const harborIdentityMutationClientSource = await readFile("src/renderer/harborIdentityMutationClient.ts", "utf8");
 const ownerApiClientSource = await readFile("src/renderer/ownerApiClient.ts", "utf8");
 const ownerPayloadGuardsSource = await readFile("src/renderer/ownerPayloadGuards.ts", "utf8");
 const runtimeSupervisorStateSource = await readFile("src/renderer/runtimeSupervisorState.ts", "utf8");
@@ -163,6 +162,8 @@ if (
 }
 
 for (const path of [
+  "/runtime/identity-environment-mutations",
+  "/runtime/identity-environments",
   "/runtime/identity-environment-sessions",
   "/runtime/sessions/identity-environment",
   "/identity-environment-sessions",
@@ -187,8 +188,21 @@ for (const path of [
 }
 
 for (const request of [
+  { path: "/runtime/identity-environments/identity-env%3Aowner%2Faccount", method: "PATCH" },
+  { path: "/runtime/identity-environments/identity-env%3Aowner%2Faccount", method: "DELETE" },
+]) {
+  const parsed = ownerApiRequestModule.parseOwnerApiRequest({ base: "http://127.0.0.1:8788", ...request });
+  if (
+    !parsed.ok ||
+    !ownerApiRequestModule.isHarborSupervisorProtectedRequest(parsed) ||
+    ownerApiRequestModule.harborSupervisorAuthorizationHeader(parsed, sharedSupervisorToken) !== `Bearer ${sharedSupervisorToken}`
+  ) {
+    throw new Error(`Owner API supervisor smoke failed: protected Harbor path did not receive bearer authorization: ${request.method} ${request.path}`);
+  }
+}
+
+for (const request of [
   { path: "/tasks", method: "POST" },
-  { path: "/runtime/identity-environments", method: "POST" },
   { path: "/runtime/identity-environment-sessions", method: "GET" },
   { path: "/runtime/sessions/session_opaque", method: "GET" },
   { path: "/runtime/sessions/session_opaque/snapshots", method: "POST" },
@@ -208,6 +222,10 @@ for (const [request, expectedTimeout] of [
   [{ path: "/threads/thread_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/turns", method: "POST" }, 65_000],
   [{ path: "/execution-policy-configs/skill?skill_ref=lode%3A%2F%2Fsite-capability%2Ftest%40v1", method: "PUT" }, 5_000],
   [{ path: "/runtime/identity-environment-sessions", method: "POST" }, 20_000],
+  [{ path: "/runtime/identity-environment-mutations", method: "POST" }, 20_000],
+  [{ path: "/runtime/identity-environments", method: "POST" }, 20_000],
+  [{ path: "/runtime/identity-environments/identity-env%3Aowner%2Faccount", method: "PATCH" }, 20_000],
+  [{ path: "/runtime/identity-environments/identity-env%3Aowner%2Faccount", method: "DELETE" }, 20_000],
   [{ path: "/runtime/sessions/session_public/release", method: "POST" }, 20_000],
   [{ path: "/runtime/identity-environments", method: "GET" }, 5_000],
 ]) {
@@ -251,6 +269,30 @@ if (
   ownerApiRequestModule.projectOwnerApiError({ error: { code: "Bearer raw-secret" } }) !== undefined
 ) {
   throw new Error("Electron owner API error projection exposed non-allowlisted or credential-bearing fields.");
+}
+
+const projectedIdentityMutationError = ownerApiRequestModule.projectHarborIdentityMutationErrorBody(
+  "/runtime/identity-environment-mutations",
+  {
+    schema_version: "harbor-identity-environment-mutation/v1",
+    operation: "edit",
+    status: "rejected",
+    identity_environment_ref: "identity-env_public",
+    source_identity_environment_ref: null,
+    record: { credential: "must-not-cross-ipc" },
+    effects: { index: "unchanged", local_data: "unchanged", login_state: "unchanged" },
+    failure: { code: "proxy_unreachable", retryable: true, recovery_actions: ["revise_configuration", "retry"] },
+    public_boundary: { output: "status_and_redacted_refs_only", raw_material: "not_exposed" },
+    token: "must-not-cross-ipc",
+  },
+);
+if (
+  projectedIdentityMutationError?.failure?.code !== "proxy_unreachable" ||
+  "record" in projectedIdentityMutationError ||
+  JSON.stringify(projectedIdentityMutationError).includes("must-not-cross-ipc") ||
+  ownerApiRequestModule.projectHarborIdentityMutationErrorBody("/tasks", projectedIdentityMutationError) !== undefined
+) {
+  throw new Error("Electron identity mutation error projection lost recovery facts or exposed non-allowlisted fields.");
 }
 
 const splitOutputToken = "smoke-split-supervisor-token";
@@ -311,16 +353,12 @@ if (!rendererHtml.includes("WebEnvoy App")) {
   throw new Error("Renderer smoke failed: WebEnvoy title is missing.");
 }
 
-if (!identityEnvironmentDetailsSource.includes("onOpenAuthenticationSite") || !identityEnvironmentDetailsSource.includes("onClick={onOpenAuthenticationSite}")) {
-  throw new Error("Identity recovery smoke failed: authentication site button is not wired to a session launch handler.");
-}
-
-if (!identityEnvironmentsPageSource.includes("startAuthenticationBrowser") || !identityEnvironmentsPageSource.includes("candidate.id === selected.siteId")) {
+if (!identityEnvironmentsPageSource.includes("openBrowser") || !identityEnvironmentsPageSource.includes("item.id === selected.siteId")) {
   throw new Error("Identity recovery smoke failed: authentication site launch does not prefer the selected identity site target.");
 }
 
 if (
-  !identityEnvironmentsPageSource.includes("onHarborStateChange(nextState)") ||
+  !identityEnvironmentsPageSource.includes("onHarborStateChange(retained)") ||
   !appShellViewSource.includes("onHarborStateChange={actions.onHarborStateChange}") ||
   !appControllerSource.includes("skillWorkbench.invalidateRequests();") ||
   !appControllerSource.includes("sources.setHarborIdentityState(state);")
@@ -380,8 +418,9 @@ const hasRuntimeTaskFixtureImport = appSyntax.statements.some((statement) =>
 if (
   hasRuntimeTaskFixtureImport ||
   !identityEnvironmentsPageSource.includes('identity.source === "Harbor live"') ||
-  !identityEnvironmentsPageSource.includes("mergeIdentityEnvironmentProjections(") ||
-  !identityEnvironmentsPageSource.includes("[],")
+  appSourcesSource.includes("loadLocalIdentityEnvironmentDrafts") ||
+  identityEnvironmentsPageSource.includes("localIdentityEnvironment") ||
+  !identityEnvironmentsPageSource.includes("mutateHarborIdentityEnvironment")
 ) {
   throw new Error("Workbench owner isolation smoke failed: production shell still depends on task or identity fixture rows.");
 }
@@ -452,71 +491,40 @@ for (const expectedText of [
   "submitted=false / 未提交",
   "No-submit guard",
   "账号身份",
-  "Harbor identity environment public summary",
-  "Harbor live",
-  "Harbor offline",
-  "Harbor endpoint 未返回可消费的 provider/identity JSON",
-  "Core owner API projection",
-  "创建本地身份环境配置",
-  "导入 Harbor public summary",
-  "保存本地允许配置",
-  "不保存账号密码、Cookie、token、profile 原始内容",
-  "真实任务结果来自 Core owner API",
-  "身份环境、登录态、provider 和一致性事实归属 Harbor",
+  "管理账号、登录状态与独立浏览器环境。",
+  "创建账号身份",
+  "导入账号身份",
+  "最近使用",
+  "站点名称",
+  "需要登录",
+  "需要修复",
   "CloakBrowser",
   "官方 Chrome",
-  "Chromium / Donut Browser 不进入用户 provider 管理",
-  "身份浏览器",
-  "手动身份浏览是 Browser/Harbor session，不是 Core 任务运行。",
-  "推荐主力",
-  "受限后备",
-  "默认打开首页/发现页",
-  "默认打开职位入口",
-  "控制者",
-  "当前网址",
-  "小红书 - 发现",
-  "查看会话",
+  "完整复制",
+  "仅复制环境配置",
+  "包含账号资料、登录状态和环境配置",
+  "不包含账号资料和站点数据",
+  "打开浏览器并登录",
   "接管",
-  "释放",
-  "停止",
-  "智能体直接浏览",
-  "只有 Core task path 才产生任务运行、结果和 evidence。",
-  "小红书运营号 A",
+  "已完成，继续",
+  "放弃接管",
+  "停止实例",
+  "选择技能",
   "代理",
-  "地区 / 语言",
-  "时区",
+  "地区与语言",
   "指纹摘要",
-  "敏感材料状态",
-  "Cookie/session",
-  "打开认证现场",
-  "我已完成认证",
-  "Harbor 已接受认证完成确认",
-  "不展示密码、验证码、Cookie、令牌",
-  "小红书搜索和笔记读取",
-  "小红书发布草稿写前验证",
-  "BOSS 打招呼写前验证",
-  "小红书发布草稿写前预览",
-  "BOSS 打招呼写前预览",
-  "审批请求",
-  "过期请求",
-  "取消记录",
-  "未发布",
-  "未发送",
-  "页面状态已过期",
-  "记录取消意图",
-  "从身份浏览器会话启动真实只读任务",
-  "字段来源",
-  "未登录",
-  "验证码",
-  "页面变化",
-  "字段缺失",
+  "高级环境信息",
+  "检查环境依赖",
+  "从 App 移除",
+  "删除本机数据",
+  "本机数据仍保留",
   "任务",
   "账号身份",
   "站点技能",
   "任务线程",
   "任务暂不可用",
   "暂无任务线程",
-  "暂无账号身份",
+  "尚未创建账号身份",
   "站点技能暂不可用",
   "这次要让 WebEnvoy 完成什么？",
   "生产运行已阻断",
@@ -1167,18 +1175,17 @@ const harborIdentityClientModule = await import(
       ),
   )}`
 );
-const { outputText: localIdentityStoreModuleSource } = ts.transpileModule(localIdentityStoreSource, {
+const { outputText: harborIdentityMutationClientModuleSource } = ts.transpileModule(harborIdentityMutationClientSource, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
     target: ts.ScriptTarget.ES2022,
   },
 });
-const localIdentityStoreModule = await import(
+const harborIdentityMutationClientModule = await import(
   `data:text/javascript;charset=utf-8,${encodeURIComponent(
-    localIdentityStoreModuleSource.replace(
-      'from "./harborIdentityTypes";',
-      `from "${harborIdentityTypesModuleUrl}";`,
-    ),
+    harborIdentityMutationClientModuleSource
+      .replace('from "./ownerPayloadGuards";', `from "${ownerPayloadGuardsModuleUrl}";`)
+      .replace('from "./ownerApiClient";', `from "${ownerApiClientModuleUrl}";`),
   )}`
 );
 const { outputText: coreReadTaskClientModuleSource } = ts.transpileModule(coreReadTaskClientSource, {
@@ -1553,93 +1560,6 @@ if (sensitiveSave.ok || sensitiveStore.has(connectionConfigModule.localConnectio
   throw new Error("Connection config smoke failed: sensitive endpoint was saved.");
 }
 
-const safeIdentityStore = installLocalStorage();
-const localDraft = localIdentityStoreModule.createLocalIdentityEnvironmentDraft({
-  siteId: "xiaohongshu",
-  accountLabel: "运营号 A",
-  identityEnvironmentRef: "identity-env_smoke",
-  profileRef: "profile_smoke",
-  requestedProviderId: "cloakbrowser",
-  loginState: "manual_auth_required",
-});
-localIdentityStoreModule.upsertLocalIdentityEnvironmentDraft(localDraft);
-const savedIdentities = safeIdentityStore.get(localIdentityStoreModule.localIdentityEnvironmentStorageKey) ?? "";
-
-if (!savedIdentities.includes("identity-env_smoke") || savedIdentities.includes("password") || savedIdentities.includes("cookie_value")) {
-  throw new Error("Identity store smoke failed: safe identity draft was not saved correctly.");
-}
-
-const sensitiveImport = localIdentityStoreModule.parseImportedIdentityEnvironment(JSON.stringify({
-  siteId: "boss",
-  accountLabel: "招聘号",
-  cookie_value: "do-not-store",
-}));
-
-if (sensitiveImport.ok) {
-  throw new Error("Identity store smoke failed: sensitive import was accepted.");
-}
-
-const ambiguousCookieStateImport = localIdentityStoreModule.parseImportedIdentityEnvironment(JSON.stringify({
-  siteId: "boss",
-  accountLabel: "招聘号",
-  cookie_state: "raw-or-ambiguous",
-}));
-
-if (ambiguousCookieStateImport.ok) {
-  throw new Error("Identity store smoke failed: ambiguous cookie state import was accepted.");
-}
-
-const safeHarborImport = localIdentityStoreModule.parseImportedIdentityEnvironment(JSON.stringify({
-  schema_version: "harbor-local-identity-environment/v0",
-  identity_environment_ref: "identity-env_imported",
-  execution_identity_ref: "execution-imported",
-  profile_ref: "profile-imported",
-  site_binding: {
-    site_id: "boss",
-    origin: "https://www.zhipin.com",
-    display_name: "BOSS",
-    account_label: "招聘号"
-  },
-  login_state: {
-    state: "manual_auth_required",
-    reason: "manual login required",
-    recovery_required: true,
-    manual_authentication_state: "required",
-    human_verification: ["qr_scan"]
-  },
-  browser_storage: {
-    profile_storage_ref: "profile-storage-ref",
-    state: "present",
-    cookies_session_state: "unknown"
-  },
-  environment: {
-    proxy: { state: "configured", proxy_ref: "proxy-ref", label: "proxy summary" },
-    region: "CN-SH",
-    language: "zh-CN",
-    timezone: "Asia/Shanghai",
-    browser_family: "cloakbrowser",
-    user_agent_summary: "Chrome family",
-    viewport: "1440 x 900",
-    fingerprint_summary: "provider_claim"
-  },
-  provider_binding: {
-    selected_provider_id: "cloakbrowser",
-    selection_reason: "cloakbrowser_default",
-    requires_user_notice: false,
-    selected_provider: null,
-    warnings: [],
-    unavailable_reason: null
-  },
-  credential_recovery: {
-    credential_ref: "credential-ref",
-    recovery_actions: ["manual_login"]
-  },
-  diagnostics: []
-}));
-
-if (!safeHarborImport.ok || safeHarborImport.draft.siteId !== "boss") {
-  throw new Error("Identity store smoke failed: safe Harbor public summary import was rejected.");
-}
 const projectedHarborIdentity = harborIdentityProjectionModule.projectHarborIdentity(
   harborIdentityFacts(),
   harborProviderCatalog(),
@@ -1653,33 +1573,24 @@ const harborContract = await startHarborIdentityContractServer();
 let readyXhsIdentity;
 let harborRuntimeSession;
 try {
-  const createPayload = await harborIdentityClientModule.createHarborIdentityEnvironment(harborContract.endpoint, {
-    id: "harbor://identity-environment/xhs-contract",
-    name: "小红书 smoke",
-    siteId: "xiaohongshu",
-    accountLabel: "运营号 smoke",
-    identityEnvironmentRef: "harbor://identity-environment/xhs-contract",
-    executionIdentityRef: "harbor://execution-identity/xhs-contract",
-    profileRef: "harbor://profile/xhs-contract",
-    requestedProviderId: "cloakbrowser",
-    loginState: "logged_in",
-    manualAuthenticationState: "not_required",
-    profileStorageRef: "harbor://profile-storage/xhs-contract",
-    credentialRef: "credential:contract-ref",
-    proxyRef: "proxy:contract",
-    proxyLabel: "local contract proxy ref",
-    region: "CN-SH",
-    language: "zh-CN",
-    timezone: "Asia/Shanghai",
-    userAgentSummary: "Chrome family contract",
-    viewport: "1440 x 900",
-    fingerprintSummary: "provider_claim_contract",
+  const createPayload = await harborIdentityMutationClientModule.mutateHarborIdentityEnvironment(harborContract.endpoint, {
+    operation: "create",
+    identity_environment: {
+      site: { site_id: "xiaohongshu", origin: "https://www.xiaohongshu.com", display_name: "小红书", account_identifier: "运营号 smoke" },
+      requested_provider_id: "cloakbrowser",
+      language: "zh-CN",
+      timezone: "Asia/Shanghai",
+      viewport: "1440 x 900",
+    },
   });
   if (createPayload.ok !== true) {
     throw new Error(`Harbor identity contract smoke failed: create was not accepted: ${JSON.stringify(createPayload)}`);
   }
+  if ("record" in createPayload.result) {
+    throw new Error("Harbor identity contract smoke failed: mutation client exposed the owner public record instead of the redacted result projection.");
+  }
 
-  const harborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
+  const harborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint);
   readyXhsIdentity = harborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
   if (harborReadback.status !== "ready" || readyXhsIdentity?.source !== "Harbor live" || readyXhsIdentity.readiness.state !== "needs-auth") {
     throw new Error(`Harbor identity contract smoke failed: initial readback did not require manual authentication: ${JSON.stringify(harborReadback)}`);
@@ -1803,7 +1714,7 @@ try {
     }
   }
 
-  const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint, []);
+  const refreshedHarborReadback = await harborIdentityClientModule.fetchHarborIdentityState(harborContract.endpoint);
   readyXhsIdentity = refreshedHarborReadback.identities.find((identity) => identity.identityEnvironmentRef === "harbor://identity-environment/xhs-contract");
   if (
     readyXhsIdentity?.readiness.state !== "ready" ||
@@ -1903,7 +1814,7 @@ const fixtureIdentityHarbor = await startJsonServer((pathname) =>
       : null,
 );
 try {
-  const fixtureState = await harborIdentityClientModule.fetchHarborIdentityState(fixtureIdentityHarbor.endpoint, []);
+  const fixtureState = await harborIdentityClientModule.fetchHarborIdentityState(fixtureIdentityHarbor.endpoint);
   if (fixtureState.status !== "offline" || fixtureState.identities.some((identity) => identity.source === "Harbor live")) {
     throw new Error(`Harbor identity smoke failed: fixture identity payload was accepted as live. ${JSON.stringify(fixtureState)}`);
   }
@@ -3472,10 +3383,29 @@ async function startHarborIdentityContractServer() {
       return;
     }
 
-    if (request.method === "POST" && pathname === "/runtime/identity-environments") {
+    if (request.method === "POST" && pathname === "/runtime/identity-environment-mutations") {
       const body = await readRequestJson(request);
-      created = body?.identity_environment_ref === identity.identity_environment_ref;
-      sendJson(response, created ? 200 : 422, created ? { ok: true, identity_environment: identity } : { ok: false, error: "identity_ref_mismatch" });
+      const input = body?.identity_environment;
+      created = body?.operation === "create" &&
+        typeof body?.idempotency_key === "string" &&
+        input?.site?.site_id === "xiaohongshu" &&
+        input?.site?.account_identifier === "运营号 smoke" &&
+        input?.identity_environment_ref == null &&
+        input?.execution_identity_ref == null &&
+        input?.profile_ref == null &&
+        input?.cookie == null &&
+        input?.token == null;
+      sendJson(response, created ? 201 : 422, {
+        schema_version: "harbor-identity-environment-mutation/v1",
+        operation: "create",
+        status: created ? "completed" : "rejected",
+        identity_environment_ref: created ? identity.identity_environment_ref : null,
+        source_identity_environment_ref: null,
+        record: null,
+        effects: { index: created ? "registered" : "unchanged", local_data: created ? "created" : "unchanged", login_state: "unchanged" },
+        failure: created ? null : { code: "invalid_request", retryable: false, recovery_actions: [] },
+        public_boundary: { output: "status_and_redacted_refs_only", raw_material: "not_exposed", not_exposed: ["cookie", "token", "password", "profile_storage", "local_path"] },
+      });
       return;
     }
 

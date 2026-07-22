@@ -6,7 +6,6 @@ import { fetchHarborIdentityState } from "./harborIdentityClient";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import { defaultConnectionConfig, loadLocalConnectionConfig, saveLocalConnectionConfig, type LocalConnectionConfig } from "./localConnectionConfig";
 import { fetchLodeCatalog, loadingLodeCatalogState, type LodeCatalogLoadState } from "./lodeCatalogClient";
-import { loadLocalIdentityEnvironmentDrafts } from "./localIdentityEnvironmentStore";
 import { runtimeSupervisorCheckingState, runtimeSupervisorUnavailableState, type RuntimeSupervisorState } from "./runtimeSupervisorState";
 
 export type ShellContext = {
@@ -20,6 +19,7 @@ const initialHarborIdentityState: HarborIdentityLoadState = {
   fetchedAt: "pending",
   summary: "正在读取 Harbor live identity public facts。",
   identities: [],
+  providers: [],
 };
 
 export function useAppSources() {
@@ -114,7 +114,7 @@ function useHarborSource(
   useEffect(() => {
     let cancelled = false;
     setState(initialHarborIdentityState);
-    void fetchHarborIdentityState(endpoint, loadLocalIdentityEnvironmentDrafts()).then((state) => {
+    void fetchHarborIdentityState(endpoint).then((state) => {
       if (!cancelled) setState(state);
     });
     return () => { cancelled = true; };

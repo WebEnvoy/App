@@ -1,154 +1,131 @@
-import { RefreshCw, ShieldCheck } from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { FormEvent } from "react";
+import { useState } from "react";
 
-import type { HarborIdentityLoadState } from "./harborIdentityTypes";
+import type { IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
+import type { HarborProviderStatus } from "./harborIdentityTypes";
 
-export type IdentityManagementMode = "closed" | "create" | "import";
+export type IdentityManagementMode = "create" | "import" | "edit";
 
-export function HarborConnectionStrip({
-  harborEndpoint,
-  state,
-  onRefresh,
+export type IdentityEditorValue = {
+  siteId: "xiaohongshu" | "boss";
+  accountIdentifier: string;
+  importSourceRef: string;
+  providerId: "cloakbrowser" | "chrome_official";
+  proxyMode: "preserve" | "system" | "disabled";
+  language: string;
+  timezone: string;
+  viewport: string;
+};
+
+export function IdentityEnvironmentManagementPanel({
+  busy,
+  identity,
+  message,
+  mode,
+  onCancel,
+  onSubmit,
+  providers,
 }: {
-  harborEndpoint: string;
-  state: HarborIdentityLoadState;
-  onRefresh: () => void;
+  busy: boolean;
+  identity?: IdentityEnvironmentProjection;
+  message: string;
+  mode: IdentityManagementMode;
+  onCancel: () => void;
+  onSubmit: (value: IdentityEditorValue) => void;
+  providers: HarborProviderStatus[];
 }) {
+  const [submitted, setSubmitted] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState(() => providerId(identity, providers));
+  const title = mode === "edit" ? "编辑账号身份" : mode === "import" ? "导入账号身份" : "创建账号身份";
+  const provider = providers.find((candidate) => candidate.provider_id === selectedProviderId);
+  const supportsLocale = supports(provider, "locale");
+  const supportsTimezone = supports(provider, "timezone");
+  const supportsViewport = supports(provider, "viewport");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitted(true);
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = new FormData(form);
+    onSubmit({
+      siteId: field(values, "siteId") === "boss" ? "boss" : "xiaohongshu",
+      accountIdentifier: field(values, "accountIdentifier"),
+      importSourceRef: field(values, "importSourceRef"),
+      providerId: selectedProviderId,
+      proxyMode: proxyModeValue(field(values, "proxyMode")),
+      language: field(values, "language"),
+      timezone: field(values, "timezone"),
+      viewport: field(values, "viewport"),
+    });
+  }
+
   return (
-    <section className={`identity-connection-strip identity-connection-${state.status}`} aria-label="Harbor 连接状态">
-      <div>
-        <strong>{state.status === "ready" ? "Harbor live" : state.status === "loading" ? "Harbor checking" : "Harbor offline"}</strong>
-        <span>{harborEndpoint}</span>
-      </div>
-      <p>{state.summary}</p>
-      <button type="button" onClick={onRefresh}>
-        <RefreshCw size={14} />
-        刷新 Harbor
-      </button>
+    <section className="identity-editor" aria-labelledby="identity-editor-title">
+      <header className="identity-editor-heading">
+        <div>
+          <h1 id="identity-editor-title">{title}</h1>
+          <p>{mode === "edit" ? `${identity?.siteName ?? "站点"} · ${identity?.accountLabel ?? "账号"}` : "Harbor 将在本机创建并管理独立浏览器环境。"}</p>
+        </div>
+        <button className="topbar-icon-button" type="button" aria-label="关闭" title="关闭" onClick={onCancel}><X size={15} /></button>
+      </header>
+      <form className={`identity-editor-form${submitted ? " submitted" : ""}`} noValidate onSubmit={submit}>
+        {mode !== "edit" ? <div className="identity-editor-grid">
+          <label>站点<select name="siteId" defaultValue="xiaohongshu"><option value="xiaohongshu">小红书</option><option value="boss">BOSS 直聘</option></select></label>
+          <label>账号名称<input name="accountIdentifier" required maxLength={120} placeholder="例如：品牌运营号" /></label>
+          {mode === "import" ? <label>导入来源<input name="importSourceRef" required maxLength={240} placeholder="Harbor 可读取的导入来源标识" /></label> : null}
+        </div> : null}
+        <div className="identity-editor-grid">
+          <label>浏览器 Provider<select name="providerId" value={selectedProviderId} onChange={(event) => setSelectedProviderId(event.target.value === "chrome_official" ? "chrome_official" : "cloakbrowser")}>{providerOptions(providers, selectedProviderId)}</select></label>
+          <label>代理<select name="proxyMode" defaultValue={identity?.environment.proxyRef ? "preserve" : "system"}>{identity?.environment.proxyRef ? <option value="preserve">保留当前代理</option> : null}<option value="system">不使用代理</option><option value="disabled">禁用代理配置</option></select></label>
+          {supportsLocale ? <label>语言<input name="language" maxLength={40} defaultValue={known(identity?.environment.language)} placeholder="例如：zh-CN" /></label> : null}
+          {supportsTimezone ? <label>时区<input name="timezone" maxLength={80} defaultValue={known(identity?.environment.timezone)} placeholder="例如：Asia/Shanghai" /></label> : null}
+        </div>
+        {supportsViewport ? <details className="identity-editor-advanced">
+          <summary>高级环境配置</summary>
+          <div className="identity-editor-grid">
+            <label>视口<input name="viewport" maxLength={40} defaultValue={known(identity?.environment.viewport)} placeholder="例如：1440x900" /></label>
+          </div>
+        </details> : null}
+        {message ? <p className="identity-editor-message" role="status">{message}</p> : null}
+        <footer className="identity-editor-actions">
+          <button type="button" onClick={onCancel}>取消</button>
+          <button className="primary" type="submit" disabled={busy}><Check size={14} />{busy ? "正在处理" : mode === "edit" ? "保存" : mode === "import" ? "导入" : "创建"}</button>
+        </footer>
+      </form>
     </section>
   );
 }
 
-export function IdentityEnvironmentManagementPanel({
-  importText,
-  message,
-  mode,
-  onCancel,
-  onCreate,
-  onImport,
-  onImportTextChange,
-}: {
-  importText: string;
-  message: string;
-  mode: IdentityManagementMode;
-  onCancel: () => void;
-  onCreate: (event: FormEvent<HTMLFormElement>) => void;
-  onImport: () => void;
-  onImportTextChange: (value: string) => void;
-}) {
-  if (mode === "closed" && !message) return null;
+function field(values: FormData, name: string) {
+  const value = values.get(name);
+  return typeof value === "string" ? value.trim() : "";
+}
 
-  return (
-    <section className="identity-management-panel" aria-label="身份环境创建导入">
-      <div className="identity-management-heading">
-        <ShieldCheck size={16} />
-        <div>
-          <strong>{mode === "import" ? "导入 Harbor public summary" : mode === "create" ? "创建本地身份环境配置" : "身份环境状态"}</strong>
-          <span>只保存允许的配置、选择和脱敏引用；不保存账号密码、Cookie、token、profile 原始内容。</span>
-        </div>
-      </div>
+function known(value: string | undefined) {
+  return value == null || value === "未知" ? "" : value;
+}
 
-      {message ? <p className="identity-management-message">{message}</p> : null}
+function providerId(identity: IdentityEnvironmentProjection | undefined, providers: HarborProviderStatus[]) {
+  if (identity?.provider.selected === "官方 Chrome") return "chrome_official";
+  if (identity?.provider.selected === "CloakBrowser") return "cloakbrowser";
+  return providers.find((provider) => provider.install.status === "installed" && provider.install.launchability === "launchable")?.provider_id ?? "cloakbrowser";
+}
 
-      {mode === "create" ? (
-        <form className="identity-management-form" onSubmit={onCreate}>
-          <label>
-            名称
-            <input name="name" placeholder="小红书运营号 A" />
-          </label>
-          <label>
-            站点
-            <select name="siteId" defaultValue="xiaohongshu">
-              <option value="xiaohongshu">小红书</option>
-              <option value="boss">BOSS</option>
-            </select>
-          </label>
-          <label>
-            账号标签
-            <input name="accountLabel" placeholder="运营号 / 招聘号" />
-          </label>
-          <label>
-            Identity ref
-            <input name="identityEnvironmentRef" placeholder="identity-env_local-ref" />
-          </label>
-          <label>
-            Profile ref
-            <input name="profileRef" placeholder="profile_local-ref" />
-          </label>
-          <label>
-            Provider
-            <select name="requestedProviderId" defaultValue="cloakbrowser">
-              <option value="cloakbrowser">CloakBrowser</option>
-              <option value="chrome_official">官方 Chrome 受限后备</option>
-            </select>
-          </label>
-          <label>
-            登录态
-            <select name="loginState" defaultValue="unknown">
-              <option value="logged_in">已登录</option>
-              <option value="manual_auth_required">需要人工认证</option>
-              <option value="expired">已过期</option>
-              <option value="unknown">未知</option>
-            </select>
-          </label>
-          <label>
-            人工认证
-            <select name="manualAuthenticationState" defaultValue="required">
-              <option value="not_required">无需认证</option>
-              <option value="required">需要认证</option>
-              <option value="in_progress">认证中</option>
-            </select>
-          </label>
-          <label>
-            代理摘要
-            <input name="proxyLabel" placeholder="proxy_ref 或地区摘要" />
-          </label>
-          <label>
-            地区
-            <input name="region" placeholder="CN-SH" />
-          </label>
-          <label>
-            语言
-            <input name="language" placeholder="zh-CN" />
-          </label>
-          <label>
-            时区
-            <input name="timezone" placeholder="Asia/Shanghai" />
-          </label>
-          <label>
-            指纹摘要
-            <input name="fingerprintSummary" placeholder="provider_claim 或 configured summary" />
-          </label>
-          <div className="identity-management-actions">
-            <button type="submit">保存本地允许配置</button>
-            <button type="button" onClick={onCancel}>取消</button>
-          </div>
-        </form>
-      ) : null}
+function providerOptions(providers: HarborProviderStatus[], selected: "cloakbrowser" | "chrome_official") {
+  const available = providers.filter((provider) => provider.install.status === "installed" && provider.install.launchability === "launchable");
+  const options = available.some((provider) => provider.provider_id === selected)
+    ? available
+    : [{ provider_id: selected, display_name: selected === "cloakbrowser" ? "CloakBrowser" : "官方 Chrome" } as HarborProviderStatus, ...available];
+  return options.map((provider) => <option key={provider.provider_id} value={provider.provider_id}>{provider.display_name}</option>);
+}
 
-      {mode === "import" ? (
-        <div className="identity-management-import">
-          <textarea
-            value={importText}
-            onChange={(event) => onImportTextChange(event.currentTarget.value)}
-            placeholder='{"schema_version":"harbor-local-identity-environment/v0", ...}'
-          />
-          <div className="identity-management-actions">
-            <button type="button" onClick={onImport}>导入脱敏摘要</button>
-            <button type="button" onClick={onCancel}>取消</button>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  );
+function supports(provider: HarborProviderStatus | undefined, key: NonNullable<HarborProviderStatus["capabilities"]>[number]["key"]) {
+  const capability = provider?.capabilities?.find((candidate) => candidate.key === key);
+  return capability != null && capability.source !== "provider_claim" && (capability.state === "supported" || capability.state === "limited");
+}
+
+function proxyModeValue(value: string): IdentityEditorValue["proxyMode"] {
+  return value === "preserve" || value === "disabled" ? value : "system";
 }
