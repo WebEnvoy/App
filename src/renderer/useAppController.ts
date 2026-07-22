@@ -88,6 +88,11 @@ function createAppActions(
     navigation.setWorkMode("detail");
     tasks.selectTask(task);
   }
+  function acceptCreatedTask(task: TaskProjection) {
+    tasks.acceptTaskThreadProjection(task);
+    navigation.setActiveView("work");
+    navigation.setWorkMode("detail");
+  }
   function openTaskById(taskId: string) {
     const task = tasks.taskThreads.find((item) => item.id === taskId);
     if (task != null) selectTask(task);
@@ -108,7 +113,8 @@ function createAppActions(
     skillWorkbench.invalidateRequests();
     skillWorkbench.abandonIdentityRecovery();
     skillWorkbench.abandonSiteSkillRecovery();
-    const skill = task == null ? undefined : findCatalogSkillForTask(task, sources.lodeCatalogState.skills);
+    const skill = task == null ? undefined : findCatalogSkillForTask(task, sources.lodeCatalogState.skills) ??
+      findCurrentCatalogSkillForTaskGroup(task, sources.lodeCatalogState.skills);
     skillWorkbench.selectCreateTaskSkill(skill);
     navigation.setWorkMode("create");
     navigation.setActiveView("work");
@@ -124,7 +130,7 @@ function createAppActions(
     sources.updateEndpoint(field, value);
   }
   return {
-    createTask, openSettings, openTaskById, openView, selectTask, updateEndpoint,
+    acceptCreatedTask, createTask, openSettings, openTaskById, openView, selectTask, updateEndpoint,
     onHarborStateChange: (state: typeof sources.harborIdentityState) => {
       skillWorkbench.invalidateRequests();
       sources.setHarborIdentityState(state);
@@ -132,7 +138,13 @@ function createAppActions(
   };
 }
 
-function findCatalogSkillForTask(task: TaskProjection, skills: LodeCatalogSkill[]) {
+export function findCatalogSkillForTask(task: TaskProjection, skills: LodeCatalogSkill[]) {
+  return skills.find((skill) =>
+    skill.packageRef === task.packageSource.sourceRef && skill.version === task.packageSource.version,
+  );
+}
+
+function findCurrentCatalogSkillForTaskGroup(task: TaskProjection, skills: LodeCatalogSkill[]) {
   const capabilityId = task.threadContext?.siteSkillKey.split(/[/:]/).filter(Boolean).at(-1);
   return capabilityId == null ? undefined : skills.find((skill) => skill.packageRef.includes(`/${capabilityId}@`));
 }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { ownerApiResponseMaxBytes, readBoundedJsonResponse } from "./boundedJsonResponse.js";
+import { runPackagedTaskBoundarySmoke } from "./packagedTaskBoundarySmoke.js";
 import { createRuntimeSupervisor } from "./runtimeSupervisor.js";
 import { readLodeCatalog } from "./lodeCatalog.js";
 import {
@@ -25,6 +26,7 @@ import { secureRendererNavigation } from "./rendererNavigationGuard.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rendererDevUrl = process.env.WEBENVOY_RENDERER_URL;
 const packagedSmoke = process.env.WEBENVOY_PACKAGED_SMOKE === "1";
+const packagedSmokeTaskBoundary = process.env.WEBENVOY_PACKAGED_SMOKE_TASK_BOUNDARY === "1";
 const packagedSmokeScreenshot = process.env.WEBENVOY_PACKAGED_SMOKE_SCREENSHOT;
 const packagedSmokeRuntimeExpectation = process.env.WEBENVOY_PACKAGED_SMOKE_RUNTIME_EXPECTATION ?? "fail_closed";
 const packagedSmokeCoreEndpoint = process.env.WEBENVOY_PACKAGED_SMOKE_CORE_ENDPOINT ?? "http://127.0.0.1:8787";
@@ -139,7 +141,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
         };
         const runtimeSupervisorState = await readRuntimeSupervisorState();
         const coreThreadReadReady = Boolean(await waitUntil(
-          () => document.body.textContent?.includes("当前没有任务线程。")
+          () => document.querySelector(".task-list-empty")?.textContent?.trim() === "暂无任务线程"
         ));
         const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         const readPanels = () => ({
@@ -419,9 +421,13 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       await writeFile(packagedSmokeScreenshot, image.toPNG());
     }
 
+    const packagedTaskBoundary = packagedSmokeTaskBoundary
+      ? await runPackagedTaskBoundarySmoke(window, packagedSmokeCoreEndpoint)
+      : null;
     console.log(`WEBSMOKE_RESULT ${JSON.stringify({
       ...result,
       packagedViewport: { windowWidth: packagedWindowWidth, ...packagedViewport, horizontalOverflow: false },
+      packagedTaskBoundary,
     })}`);
     app.exit(0);
   } catch (error) {

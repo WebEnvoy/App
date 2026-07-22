@@ -45,6 +45,7 @@ type CoreThreadTurn = {
     recovery_hint: string;
   };
   input_gaps?: CoreThreadInputGap[];
+  authorization_decision_refs?: string[];
   terminal_at?: string;
   terminated_at?: string;
 };
@@ -55,7 +56,7 @@ type CoreThreadInputGap = {
   recovery_action: "restore_owner_content" | "reselect_attachment" | "retry_owner_check";
 };
 
-type CoreThread = {
+export type CoreThread = {
   schema_version: "webenvoy.task-thread.v0";
   thread_id: string;
   capability_ref: string;
@@ -138,10 +139,14 @@ export function mergeSubmittedCoreTaskOverrides(
 ): CoreReadTaskLoadState {
   if (current.status !== "ready" || submitted.length === 0) return current;
   const submittedTasksById = new Map(submitted.map((override) => [override.taskId, override.task]));
+  const existingIds = new Set(current.tasks.map((task) => task.id));
   return {
     ...current,
     summary: `${current.summary} 已包含 UI 提交产生的 live run。`,
-    tasks: current.tasks.map((task) => submittedTasksById.get(task.id) ?? task),
+    tasks: [
+      ...submitted.filter((override) => !existingIds.has(override.taskId)).map((override) => override.task),
+      ...current.tasks.map((task) => submittedTasksById.get(task.id) ?? task),
+    ],
     liveTaskIds: Array.from(new Set([...current.liveTaskIds, ...submittedTasksById.keys()])),
   };
 }
@@ -152,11 +157,17 @@ export function projectCoreThreads(threads: CoreThread[], fetchedAt: string): Ta
     .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""));
 }
 
+export function projectCoreThreadResponse(value: unknown, fetchedAt = new Date().toISOString()): TaskProjection | null {
+  const envelope = asRecord(value);
+  const thread = parseCoreThread(envelope?.thread);
+  return envelope?.thread != null && thread != null ? projectCoreThread(thread, fetchedAt) : null;
+}
+
 function projectCoreThread(thread: CoreThread, fetchedAt: string): TaskProjection {
   const capabilityLabels = labelsForCapabilityRef(thread.capability_ref);
   const identityLabel = thread.identity_environment_ref;
   const turns = [...thread.turns]
-    .sort((left, right) => right.sequence - left.sequence)
+    .sort((left, right) => left.sequence - right.sequence)
     .map(projectCoreTurn);
   const latestInput = [...thread.turns]
     .sort((left, right) => right.sequence - left.sequence)[0]?.input;
@@ -202,6 +213,7 @@ function projectCoreTurn(turn: CoreThreadTurn): RunProjection {
   ];
   return {
     id: turn.run_id,
+    turnId: turn.turn_id,
     label: `第 ${turn.sequence} 回合`,
     lifecycle,
     outcome,
@@ -222,6 +234,16 @@ function projectCoreTurn(turn: CoreThreadTurn): RunProjection {
     createdAt: turn.created_at,
     updatedAt: turn.updated_at,
     terminalAt: turn.terminal_at ?? turn.terminated_at,
+    businessInput: cloneInputSnapshot(turn.input),
+    ...(turn.authorization_decision_refs == null ? {} : { authorizationDecisionRefs: [...turn.authorization_decision_refs] }),
+  };
+}
+
+function cloneInputSnapshot(input: CoreThreadInputSnapshot): CoreThreadInputSnapshot {
+  return {
+    ...input,
+    fields: input.fields.map((field) => ({ ...field })),
+    attachment_refs: [...input.attachment_refs],
   };
 }
 
@@ -337,8 +359,10 @@ function parseCoreTurn(value: unknown): CoreThreadTurn | null {
   ) return null;
   const submissionError = parseSubmissionError(turn.submission_error);
   const inputGaps = parseInputGaps(turn.input_gaps);
+  const authorizationDecisionRefs = parseAuthorizationDecisionRefs(turn.authorization_decision_refs);
   if (turn.submission_error !== undefined && submissionError == null) return null;
   if (turn.input_gaps !== undefined && inputGaps == null) return null;
+  if (turn.authorization_decision_refs !== undefined && authorizationDecisionRefs == null) return null;
   if (
     !isOptionalString(turn.failure_code) ||
     !isOptionalDateTime(turn.terminal_at) ||
@@ -349,6 +373,7 @@ function parseCoreTurn(value: unknown): CoreThreadTurn | null {
     input,
     ...(submissionError ? { submission_error: submissionError } : {}),
     ...(inputGaps ? { input_gaps: inputGaps } : {}),
+    ...(authorizationDecisionRefs ? { authorization_decision_refs: authorizationDecisionRefs } : {}),
   } as CoreThreadTurn;
 }
 
@@ -388,7 +413,7 @@ const threadKeys = new Set([
 ]);
 const turnKeys = new Set([
   "turn_id", "sequence", "idempotency_key", "run_id", "creation_channel", "input", "created_at", "updated_at",
-  "submission_state", "failure_code", "submission_error", "terminated_at", "terminal_at", "status", "run_status", "input_gaps",
+  "submission_state", "failure_code", "submission_error", "terminated_at", "terminal_at", "status", "run_status", "input_gaps", "authorization_decision_refs",
 ]);
 const submissionErrorKeys = new Set(["category", "code", "phase", "recovery_hint"]);
 const inputGapKeys = new Set(["location", "code", "recovery_action"]);
@@ -417,7 +442,10 @@ function isCapabilityRef(value: unknown): value is string {
 }
 
 function isIdentityEnvironmentRef(value: unknown): value is string {
-  return typeof value === "string" && /^identity-env:[A-Za-z0-9][A-Za-z0-9._~:/-]{0,2030}$/.test(value);
+  return typeof value === "string" && (
+    /^identity-env_[a-f0-9]{24}$/.test(value) ||
+    /^identity-env:[A-Za-z0-9][A-Za-z0-9._~:/-]{0,2030}$/.test(value)
+  );
 }
 
 function isDateTime(value: unknown): value is string {
@@ -458,4 +486,12 @@ function isTurnStatus(value: unknown): value is CoreThreadTurn["status"] {
 
 function isOptionalRunStatus(value: unknown): value is CoreThreadTurn["run_status"] {
   return value === undefined || value === "pending" || value === "admitted" || value === "running" || value === "succeeded" || value === "failed" || value === "blocked" || value === "requires_user_action" || value === "manual_recovery_required" || value === "unknown_outcome" || value === "cancelled" || value === "expired";
+}
+
+function parseAuthorizationDecisionRefs(value: unknown): string[] | null | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) && value.length <= 64 && new Set(value).size === value.length &&
+    value.every((item) => typeof item === "string" && /^authorization-decision:[a-f0-9]{32}:[a-f0-9]{32}$/.test(item))
+    ? value as string[]
+    : null;
 }

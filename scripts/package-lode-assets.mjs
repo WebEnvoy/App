@@ -1,8 +1,10 @@
-import { cp, mkdir, rm } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
 const outDir = path.resolve("dist-electron/lode");
+const sourceLock = JSON.parse(await readFile(new URL("./runtime-source-lock.json", import.meta.url), "utf8"));
 const sourceRoot = findLodeRoot();
 
 await rm(outDir, { recursive: true, force: true });
@@ -25,7 +27,23 @@ function findLodeRoot() {
     path.resolve("../../Lode"),
   ].filter(Boolean);
 
-  return candidates.find((candidate) => existsSync(path.join(candidate, "registry/local-packages.json")));
+  for (const candidate of candidates) {
+    if (!existsSync(path.join(candidate, "registry/local-packages.json"))) continue;
+    if (isLockedCleanSource(candidate, sourceLock.lode, ["registry", "sites"])) return candidate;
+    if (candidate === process.env.WEBENVOY_LODE_ASSETS_SOURCE_DIR) {
+      throw new Error(`Lode source must be clean and pinned to ${sourceLock.lode}: ${candidate}`);
+    }
+  }
+  return null;
+}
+
+function isLockedCleanSource(candidate, expectedHead, paths) {
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: candidate, encoding: "utf8" });
+  const status = spawnSync("git", ["status", "--porcelain", "--untracked-files=all", "--", ...paths], {
+    cwd: candidate,
+    encoding: "utf8",
+  });
+  return head.status === 0 && head.stdout.trim() === expectedHead && status.status === 0 && status.stdout.trim() === "";
 }
 
 async function copyJsonTree(from, to) {

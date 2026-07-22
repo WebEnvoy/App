@@ -13,7 +13,7 @@ type RuntimeEndpointConfig = {
 type OwnerApiJsonRequest = {
   base: string;
   path: string;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 };
 type ManualAuthenticationCompletionIntent = {
@@ -37,6 +37,8 @@ const shellApi = {
   loadProtectedDraft: (context: unknown) => ipcRenderer.invoke("webenvoy:load-protected-draft", context),
   saveProtectedDraft: (draft: unknown) => ipcRenderer.invoke("webenvoy:save-protected-draft", draft),
   deleteProtectedDraft: (context: unknown) => ipcRenderer.invoke("webenvoy:delete-protected-draft", context),
+  sealProtectedInput: (draft: unknown) => ipcRenderer.invoke("webenvoy:seal-protected-input", draft),
+  releaseProtectedInputs: (ownerRefs: string[]) => ipcRenderer.invoke("webenvoy:release-protected-inputs", ownerRefs),
   subscribeToSystemThemeVariant: (listener: (colorScheme: WebEnvoyColorScheme) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, colorScheme: WebEnvoyColorScheme) => {
       listener(colorScheme);

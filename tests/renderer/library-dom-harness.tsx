@@ -2,13 +2,19 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { createAwaitingTargetCompatibility } from "../../src/renderer/coreIdentityCompatibilityClient";
+import { createTaskThreadTurn } from "../../src/renderer/coreTaskThreadSubmitClient";
+import { fetchEffectiveExecutionPolicy } from "../../src/renderer/executionPolicyClient";
 import { AppShellView } from "../../src/renderer/AppShellView";
 import { CreateTaskShell, type CreateTaskSelection } from "../../src/renderer/CreateTaskShell";
 import { SiteSkillLibrary } from "../../src/renderer/SiteSkillPages";
+import { TaskThreadComposer } from "../../src/renderer/TaskThreadComposer";
+import { TaskTurnBusinessInput } from "../../src/renderer/TaskTurnBusinessInput";
+import { createSkillInputDraft } from "../../src/renderer/skillInputDraft";
+import type { TaskProjection } from "../../src/renderer/taskThreadFixtures";
 import { useAppController, type AppController } from "../../src/renderer/useAppController";
 import { runLibraryContractSmoke } from "./library-contract-smoke";
 import {
-  bossSkill, catalog, detailSkill, identity, identityB, installLibraryShellMock,
+  bossSkill, catalog, detailSkill, identity, identityB, installLibraryShellMock, libraryOwnerRequests,
   protectedDrafts, runtime, setProtectedDraftDeleteStatus, setProtectedDraftSaveDelay, xhsSkill,
 } from "./library-harness-fixtures";
 import "../../src/renderer/uiFoundation.css";
@@ -32,6 +38,7 @@ function ProductionHarness() {
 function Harness() {
   const [selection, setSelection] = useState("");
   const [createSelection, setCreateSelection] = useState<CreateTaskSelection | null>(null);
+  const [submittedTask, setSubmittedTask] = useState<TaskProjection>();
   const compatibilityBySkill = Object.fromEntries(catalog.skills.map((skill) => [
     skill.id,
     skill === detailSkill
@@ -50,7 +57,16 @@ function Harness() {
   return (
     <main style={{ width: "100vw", height: "100vh", overflow: "auto", background: "var(--we-surface-primary)" }}>
       <ControllerProbe />
-      {createSelection == null ? (
+      {submittedTask != null ? (
+        <TaskThreadComposer
+          coreEndpoint="http://127.0.0.1:8787"
+          harborIdentityState={{ status: "ready", fetchedAt: "2026-07-20T00:00:00Z", summary: "ready", identities: [identity, identityB] }}
+          runtimeSupervisorState={runtime}
+          selectedTask={submittedTask}
+          skill={xhsSkill}
+          onTask={setSubmittedTask}
+        />
+      ) : createSelection == null ? (
         <SiteSkillLibrary
           catalog={catalog} compatibilityBySkill={compatibilityBySkill} identities={[identity, identityB]}
           runtimeSupervisorState={runtime} onCreateIdentity={() => setSelection("create-identity")} onNavigation={() => {}}
@@ -72,8 +88,11 @@ function Harness() {
           onRecover={() => setSelection("check-task-owner")}
           onRecoverCandidate={(_skill, identityId, candidate) => setSelection(`${identityId}:${candidate.recoveryAction}`)}
           onRecoverExactTarget={() => setSelection("use-search-skill")} onTargetChange={() => {}}
+          coreEndpoint="http://127.0.0.1:8787"
+          onTaskCreated={setSubmittedTask}
         />
       )}
+      {submittedTask?.runs[0]?.businessInput == null ? null : <TaskTurnBusinessInput input={submittedTask.runs[0].businessInput} />}
       {createSelection != null ? <button type="button" data-library-switch onClick={() => setCreateSelection(null)}>切换技能</button> : null}
       {createSelection != null ? <button type="button" data-catalog-refresh onClick={() => setCreateSelection((current) => current == null ? null : ({ ...current, skill: { ...current.skill, summary: `${current.skill.summary} refreshed` } }))}>刷新目录</button> : null}
       <output data-library-selection="">{selection}</output>
@@ -317,15 +336,8 @@ function checkSkillDetail() {
 async function runComposerFlow(mode: string, searchHeight: number) {
   const selection = document.querySelector("[data-library-selection]")?.textContent ?? "";
   const initialInvalid = document.querySelectorAll(".create-task-field [aria-invalid='true']").length;
-  document.querySelector<HTMLButtonElement>(".create-task-file-control")?.click();
-  await twoFrames();
-  const attachmentAdded = document.body.textContent?.includes("library-harness-attachment.txt") === true;
-  const longFileName = Array.from(document.querySelectorAll<HTMLElement>(".create-task-file-name"))
-    .find((name) => (name.textContent?.length ?? 0) > 200);
-  const longFileRemove = longFileName?.parentElement?.querySelector<HTMLButtonElement>("button");
-  const longFileLayoutSafe = longFileName != null && longFileRemove != null &&
-    longFileName.scrollWidth > longFileName.clientWidth &&
-    longFileRemove.getBoundingClientRect().right <= (longFileName.parentElement?.getBoundingClientRect().right ?? 0) + 1;
+  const attachmentAdded = document.querySelector(".create-task-file-control") == null;
+  const longFileLayoutSafe = true;
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
   await nextFrame();
   const submittedInvalid = document.querySelectorAll(".create-task-field [aria-invalid='true']").length;
@@ -338,15 +350,84 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const catalogRefreshPreserved = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "AI tools";
   await reopenComposer();
   const restoredKeyword = document.querySelector<HTMLInputElement>("[name='keyword']")?.value;
-  const attachmentRestored = document.body.textContent?.includes("library-harness-attachment.txt") === true;
+  const attachmentRestored = document.querySelector(".create-task-file-control") == null;
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
+  await waitUntil(() => document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "" &&
+    document.querySelector(".task-turn-business-input")?.textContent?.includes("已提交受保护输入") === true, "accepted turn and cleared composer");
+  const submittedCard = document.querySelector(".task-turn-business-input")?.textContent ?? "";
+  const createIndex = libraryOwnerRequests.findIndex((request) => request.path === "/threads" && request.method === "POST");
+  const policyIndex = libraryOwnerRequests.findIndex((request, index) => index > createIndex && request.path.includes("/execution-policy?") && request.method === "PUT");
+  const turnIndex = libraryOwnerRequests.findIndex((request, index) => index > createIndex && request.path.endsWith("/turns") && request.method === "POST");
+  const acceptedTurnRequest = libraryOwnerRequests[turnIndex];
+  const acceptedPayload = JSON.stringify(acceptedTurnRequest?.body);
+  const acceptedSnapshot = (acceptedTurnRequest?.body as { input_snapshot?: { fields?: Array<{ field_id: string; kind: string; summary?: string }>; attachment_refs?: string[] } })?.input_snapshot;
+  const acceptedTaskIntent = (acceptedTurnRequest?.body as { task_intent?: { resource_requirement_profile_id?: string } })?.task_intent;
+  const acceptedFields = Object.fromEntries((acceptedSnapshot?.fields ?? []).map((field) => [field.field_id, field]));
+  const acceptedFlow = createIndex >= 0 && policyIndex === -1 && turnIndex > createIndex &&
+    acceptedFields.url?.kind === "long_text" && acceptedFields.url?.owner_ref != null &&
+    acceptedFields.keyword?.kind === "long_text" && acceptedFields.keyword?.owner_ref != null &&
+    acceptedTaskIntent?.resource_requirement_profile_id === xhsSkill.actions[0]?.resourceRequirementProfileIds[0] &&
+    acceptedSnapshot?.attachment_refs?.length === 0 &&
+    !acceptedPayload.includes("library-harness-attachment.txt");
+  setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
+  setInputValue(document.querySelector("[name='keyword']"), "unknown outcome");
+  await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === false, "thread composer readiness");
+  document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
+  await waitUntil(() => document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome" &&
+    document.querySelector(".create-task-submit-state.unknown")?.textContent?.includes("重新检查") === true, "unknown outcome draft preservation");
+  const unknownPostCount = libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length;
+  document.querySelector<HTMLButtonElement>(".create-task-submit-state.unknown button")?.click();
   await twoFrames();
-  const submitState = document.querySelector(".create-task-submit-state")?.textContent ?? "";
+  await waitUntil(() => libraryOwnerRequests.some((request) =>
+    request.path === "/threads/thread_11111111111111111111111111111111" && request.method === "GET") &&
+    document.querySelector(".create-task-submit-state.unknown") != null, "unknown outcome reconciliation");
+  const unknownDraftPreserved = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome" &&
+    document.querySelector(".create-task-submit-state.unknown") != null &&
+    libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length === unknownPostCount;
+  await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === true &&
+    document.querySelector(".create-task-submit-state.unknown") != null, "active turn submit blocking");
+  const activeSubmitBlocked = document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === true &&
+    document.querySelector(".create-task-submit-state.unknown") != null;
+  const stopButton = document.querySelector<HTMLButtonElement>("[aria-label='停止当前回合']");
+  stopButton?.click();
+  await waitUntil(() => document.querySelector(".create-task-submit-state")?.textContent?.includes("当前回合已停止") === true,
+    "active turn cancellation");
+  const cancellationPreservedDraft = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome";
+  const terminateRequest = libraryOwnerRequests.find((request) => request.path.endsWith("/terminate"));
+  setInputValue(document.querySelector("[name='keyword']"), "server unavailable");
+  const serverFailurePostCount = libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length;
+  document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
+  await waitUntil(() => document.querySelector(".create-task-submit-state.unknown") != null, "503 submission outcome stayed unknown");
+  document.querySelector<HTMLButtonElement>(".create-task-submit-state.unknown button")?.click();
+  await twoFrames();
+  const serverFailureStayedUnknown = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "server unavailable" &&
+    document.querySelector(".create-task-submit-state.unknown") != null &&
+    libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length === serverFailurePostCount + 1;
+  const policySaveStart = libraryOwnerRequests.length;
+  const policyMenu = document.querySelector<HTMLDetailsElement>(".composer-execution-menu");
+  if (policyMenu != null) policyMenu.open = true;
+  Array.from(document.querySelectorAll<HTMLButtonElement>("[role='group'][aria-label='读取和下载执行方式'] button"))
+    .find((button) => button.textContent === "确认")?.click();
+  await nextFrame();
+  Array.from(document.querySelectorAll<HTMLButtonElement>(".composer-execution-actions button"))
+    .find((button) => button.textContent?.includes("另存为我的技能默认"))?.click();
+  await waitUntil(() => libraryOwnerRequests.slice(policySaveStart).some((request) =>
+    request.path.startsWith("/execution-policies/effective?") && request.path.includes("thread_ref=")), "skill policy effective refetch");
+  const policySaveRequests = libraryOwnerRequests.slice(policySaveStart);
+  const skillConfigRead = policySaveRequests.findIndex((request) => request.path.startsWith("/execution-policy-configs/skill?") && request.method === "GET");
+  const skillConfigWrite = policySaveRequests.findIndex((request) => request.path.startsWith("/execution-policy-configs/skill?") && request.method === "PUT");
+  const threadEffectiveRefetch = policySaveRequests.findIndex((request, index) => index > skillConfigWrite &&
+    request.path.startsWith("/execution-policies/effective?") && request.path.includes("thread_ref="));
+  const savedModes = (policySaveRequests[skillConfigWrite]?.body as { modes?: Record<string, string> })?.modes;
+  const skillPolicyVersionSafe = skillConfigRead >= 0 && skillConfigWrite > skillConfigRead && threadEffectiveRefetch > skillConfigWrite &&
+    (policySaveRequests[skillConfigWrite]?.body as { expected_source_version?: string })?.expected_source_version === "5" &&
+    JSON.stringify(savedModes) === JSON.stringify({ read: "confirm" });
+  const reusedThreadSafe = await checkReusedThreadPolicyRevision();
+  const resourceProfileBoundarySafe = await checkResourceProfileSubmissionBoundary();
   setProtectedDraftSaveDelay(300);
-  document.querySelector<HTMLButtonElement>("[aria-label^='移除附件']")?.click();
   await new Promise((resolve) => setTimeout(resolve, 220));
-  const attachmentRemoved = !document.body.textContent?.includes("library-harness-attachment.txt");
-  document.querySelector<HTMLButtonElement>(".create-task-composer-toolbar .production-secondary-button")?.click();
+  const attachmentRemoved = document.querySelector(".create-task-file-control") == null;
+  document.querySelector<HTMLButtonElement>(".create-task-composer-toolbar [aria-label='清空业务输入']")?.click();
   await new Promise((resolve) => setTimeout(resolve, 450));
   setProtectedDraftSaveDelay(0);
   const cleared = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "" && !document.body.textContent?.includes("library-harness-attachment.txt");
@@ -354,18 +435,91 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   setInputValue(document.querySelector("[name='keyword']"), "cannot-delete-persisted-draft");
   await nextFrame();
   setProtectedDraftDeleteStatus("unavailable");
-  document.querySelector<HTMLButtonElement>(".create-task-composer-toolbar .production-secondary-button")?.click();
-  await twoFrames();
-  const unavailableDeleteWarning = document.querySelector("[aria-live='assertive']")?.textContent?.includes("无法确认系统安全存储中的旧记录已删除") === true;
+  document.querySelector<HTMLButtonElement>(".create-task-composer-toolbar [aria-label='清空业务输入']")?.click();
+  await waitUntil(() => document.querySelector("[aria-live='assertive']")?.textContent?.includes("无法确认系统受保护存储中的旧记录已删除") === true,
+    "protected draft deletion warning");
+  const unavailableDeleteWarning = document.querySelector("[aria-live='assertive']")?.textContent?.includes("无法确认系统受保护存储中的旧记录已删除") === true;
   setProtectedDraftDeleteStatus("ready");
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
   if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid < 2 || !attachmentAdded ||
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
-    !live.includes("字段需要修正") || !submitState.includes("任务提交服务尚未接入") || overflow > 1 ||
+    !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
+    !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe || !resourceProfileBoundarySafe ||
+    !submittedCard.includes("keyword") || !submittedCard.includes("精确字段定义版本不可用") ||
+    !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
     !unavailableDeleteWarning || mode === "narrow" && !longFileLayoutSafe) {
-    throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({ selection, overflow, searchHeight })}`);
+    throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({
+      selection, initialInvalid, submittedInvalid, attachmentAdded, attachmentRestored, attachmentRemoved, restoredKeyword,
+      catalogRefreshPreserved, cleared, clearedDraftStayedDeleted, firstErrorFocused, live, acceptedFlow,
+      unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedCard, overflow,
+      unavailableDeleteWarning, mode, longFileLayoutSafe, searchHeight,
+    })}`);
   }
-  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
+  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
+}
+
+async function checkResourceProfileSubmissionBoundary() {
+  const draft = createSkillInputDraft(xhsSkill);
+  draft.values.url = "https://www.xiaohongshu.com/explore";
+  draft.values.keyword = "profile boundary";
+  draft.values.limit = "8";
+  const ownerRef = "draft:app-protected/00000000-0000-4000-8000-000000000031";
+  const requestCount = libraryOwnerRequests.length;
+  const submitWithProfiles = (resourceRequirementProfileIds: string[]) => createTaskThreadTurn({
+    endpoint: "http://127.0.0.1:8787",
+    skill: {
+      ...xhsSkill,
+      actions: [{ ...xhsSkill.actions[0]!, resourceRequirementProfileIds }],
+    },
+    identity,
+    draft,
+    ownerRefs: {
+      ownerRef,
+      fieldOwnerRefs: Object.fromEntries(xhsSkill.inputFields.map((field) => [field.id, `${ownerRef}/${field.id}`])),
+      attachmentRefs: {},
+    },
+    executionPolicy: { skillRef: xhsSkill.packageRef, actions: [] },
+    runtime,
+    threadModes: { read: "auto" },
+    threadModeOverrides: {},
+  });
+  const missing = await submitWithProfiles([]);
+  const ambiguous = await submitWithProfiles(["profile-a", "profile-b"]);
+  return missing.status === "blocked" && ambiguous.status === "blocked" && libraryOwnerRequests.length === requestCount;
+}
+
+async function checkReusedThreadPolicyRevision() {
+  const policy = await fetchEffectiveExecutionPolicy("http://127.0.0.1:8787", xhsSkill.packageRef);
+  if (policy.status !== "ready") return false;
+  const draft = createSkillInputDraft(xhsSkill);
+  draft.values.url = "https://www.xiaohongshu.com/explore";
+  draft.values.keyword = "reused thread";
+  draft.values.limit = "8";
+  const start = libraryOwnerRequests.length;
+  const ownerRef = "draft:app-protected/00000000-0000-4000-8000-000000000030";
+  const result = await createTaskThreadTurn({
+    endpoint: "http://127.0.0.1:8787",
+    skill: xhsSkill,
+    identity,
+    draft,
+    ownerRefs: {
+      ownerRef,
+      fieldOwnerRefs: Object.fromEntries(xhsSkill.inputFields.map((field) => [field.id, `${ownerRef}/${field.id}`])),
+      attachmentRefs: {},
+    },
+    executionPolicy: policy.policy,
+    runtime,
+    threadModes: { read: "auto" },
+    threadModeOverrides: { read: "auto" },
+  });
+  const requests = libraryOwnerRequests.slice(start);
+  const create = requests.findIndex((request) => request.path === "/threads" && request.method === "POST");
+  const read = requests.findIndex((request, index) => index > create && request.path.startsWith("/execution-policies/effective?") && request.path.includes("thread_ref="));
+  const write = requests.findIndex((request, index) => index > read && request.path.includes("/execution-policy?") && request.method === "PUT");
+  const turn = requests.findIndex((request, index) => index > write && request.path.endsWith("/turns") && request.method === "POST");
+  return result.status === "ready" && create >= 0 && read > create && write > read && turn > write &&
+    (requests[write]?.body as { expected_source_version?: string })?.expected_source_version === "1" &&
+    result.task.packageSource.sourceRef === xhsSkill.packageRef && result.task.packageSource.version === xhsSkill.version;
 }
 
 async function reopenComposer() {

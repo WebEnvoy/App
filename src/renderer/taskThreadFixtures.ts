@@ -1,4 +1,5 @@
 import { realWritePreviewTaskFixtures } from "./realWritePreviewFixtures";
+import type { CoreThreadInputSnapshot } from "./coreThreadInputContract";
 
 export type OwnerSource =
   | "Core live"
@@ -22,6 +23,7 @@ export type OutcomeKind =
 
 export type RunProjection = {
   id: string;
+  turnId?: string;
   label: string;
   lifecycle: "queued" | "running" | "completed" | "needs-action" | "blocked";
   outcome: OutcomeKind;
@@ -107,6 +109,8 @@ export type RunProjection = {
   createdAt?: string;
   updatedAt?: string;
   terminalAt?: string;
+  businessInput?: CoreThreadInputSnapshot;
+  authorizationDecisionRefs?: string[];
 };
 
 export type TaskProjection = {

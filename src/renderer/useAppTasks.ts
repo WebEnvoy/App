@@ -5,6 +5,7 @@ import { mergeSubmittedCoreTaskOverrides } from "./coreThreadClient";
 import { coreTaskSubmitReadiness, initialCoreTaskSubmitState, promoteSubmittedCoreTask, submitCoreReadOnlyTask, type CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import { projectRuntimeGatedTasks, type RuntimeSupervisorState } from "./runtimeSupervisorState";
+import { releaseSkillInputOwnerRefs, terminalSkillInputOwnerRefs } from "./skillInputOwnerClient";
 import type { TaskProjection } from "./taskThreadFixtures";
 import { outcomeLabel } from "./TaskThreadFields";
 import type { ThreadNavigationItem } from "./ThreadNavigationRail";
@@ -20,10 +21,18 @@ export function useAppTasks(
   const [submitStates, setSubmitStates] = useState<Record<string, CoreTaskSubmitState>>({});
   const [submittedOverrides, setSubmittedOverrides] = useState<Record<string, SubmittedTaskOverride>>({});
   const [businessInputs, setBusinessInputs] = useState<Record<string, string>>({});
+  const releasedOwnerRefs = useRef(new Set<string>());
   const currentOverrides = useMemo(() => Object.values(submittedOverrides).filter((item) => item.endpoint === endpoint), [endpoint, submittedOverrides]);
   const effectiveCoreReadState = useMemo(() => mergeSubmittedCoreTaskOverrides(coreReadState, currentOverrides), [coreReadState, currentOverrides]);
   const effectiveCoreReadTasks = useMemo(() => effectiveCoreReadState.tasks.map((task) => applyLocalTaskContext(task, businessInputs)), [businessInputs, effectiveCoreReadState.tasks]);
   const taskThreads = useMemo(() => projectRuntimeGatedTasks(effectiveCoreReadTasks, runtime, effectiveCoreReadState.liveTaskIds), [effectiveCoreReadState.liveTaskIds, effectiveCoreReadTasks, runtime]);
+  useEffect(() => {
+    const ownerRefs = terminalSkillInputOwnerRefs(effectiveCoreReadTasks).filter((ownerRef) => !releasedOwnerRefs.current.has(ownerRef));
+    if (ownerRefs.length === 0) return;
+    void releaseSkillInputOwnerRefs(ownerRefs).then((released) => {
+      if (released) for (const ownerRef of ownerRefs) releasedOwnerRefs.current.add(ownerRef);
+    });
+  }, [effectiveCoreReadTasks]);
   const workbenchTaskThreads = useMemo(() => taskThreads.filter((task) => task.threadContext != null), [taskThreads]);
   const selection = useTaskSelection(taskThreads);
   const selectedSubmitTask = selection.selectedTask == null
@@ -36,9 +45,14 @@ export function useAppTasks(
     setSubmitStates, setSubmittedOverrides,
   });
   const threadNavigationItems = useThreadNavigation(selection.selectedTask);
+  function acceptTaskThreadProjection(task: TaskProjection) {
+    const key = coreSubmitStateKey(task.id, endpoint);
+    setSubmittedOverrides((current) => ({ ...current, [key]: { endpoint, taskId: task.id, task } }));
+    selection.selectTask(task);
+  }
   return {
     ...selection, ...submission, coreSubmitState, effectiveCoreReadState, selectedSubmitTask,
-    taskThreads, threadNavigationItems, workbenchTaskThreads,
+    taskThreads, threadNavigationItems, workbenchTaskThreads, acceptTaskThreadProjection,
   };
 }
 
@@ -48,20 +62,20 @@ function useTaskSelection(tasks: TaskProjection[]) {
   const [rightPanelOpenRequestKey, setRightPanelOpenRequestKey] = useState<number>();
   const selectedTaskIdRef = useRef(selectedTaskId);
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
-  const selectedRun = selectedTask?.runs.find((run) => run.id === selectedRunId) ?? selectedTask?.runs[0];
+  const selectedRun = selectedTask?.runs.find((run) => run.id === selectedRunId) ?? selectedTask?.runs.at(-1);
   useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
   useEffect(() => {
     const task = tasks.find((item) => item.id === selectedTaskId) ?? tasks[0];
     if (task == null) return;
     if (task.id !== selectedTaskId) {
       setSelectedTaskId(task.id);
-      setSelectedRunId(task.runs[0]?.id ?? "");
-    } else if (!task.runs.some((run) => run.id === selectedRunId)) setSelectedRunId(task.runs[0]?.id ?? "");
+      setSelectedRunId(task.runs.at(-1)?.id ?? "");
+    } else if (!task.runs.some((run) => run.id === selectedRunId)) setSelectedRunId(task.runs.at(-1)?.id ?? "");
   }, [selectedRunId, selectedTaskId, tasks]);
 
   function selectTask(task: TaskProjection) {
     setSelectedTaskId(task.id);
-    setSelectedRunId(task.runs[0]?.id ?? "");
+    setSelectedRunId(task.runs.at(-1)?.id ?? "");
   }
 
   return {

@@ -39,6 +39,18 @@ try {
     throw new Error("Packaged runtime smoke failed: renderer did not consume Core /threads.");
   }
   if (
+    !result.packagedTaskBoundary?.lodeActionDeclared ||
+    result.packagedTaskBoundary.effectivePolicyStatus !== 200 ||
+    !result.packagedTaskBoundary.effectivePolicyReady ||
+    result.packagedTaskBoundary.threadCreateStatus !== 201 ||
+    result.packagedTaskBoundary.firstTurnSubmitStatus !== 503 ||
+    !result.packagedTaskBoundary.firstTurnRecorded ||
+    result.packagedTaskBoundary.firstTurnStatus !== "waiting_for_user" ||
+    result.packagedTaskBoundary.firstTurnFailureCode !== "identity_environment_unavailable"
+  ) {
+    throw new Error(`Packaged runtime smoke failed: task boundary probe did not fail closed as expected. ${JSON.stringify(result.packagedTaskBoundary)}`);
+  }
+  if (
     result.packagedViewport?.windowWidth !== 720 ||
     result.packagedViewport?.horizontalOverflow !== false ||
     result.packagedViewport?.scrollWidth > result.packagedViewport?.innerWidth
@@ -54,6 +66,7 @@ try {
       `Core pid: ${core.pid}`,
       `Harbor pid: ${harbor.pid}`,
       "Core /threads: ready",
+      "Packaged Lode action + Core policy + first-turn boundary: verified fail-closed before Harbor session creation",
       "Production viewport: 720px without horizontal overflow",
       `Lode asset source: ${result.runtimeSupervisorState.lodeAssets.source}`,
       `Screenshot: ${screenshotPath}`,
@@ -74,6 +87,7 @@ async function runElectronSmoke({ coreEndpoint, harborEndpoint, screenshotPath, 
       WEBENVOY_PACKAGED_SMOKE_HARBOR_ENDPOINT: harborEndpoint,
       WEBENVOY_PACKAGED_SMOKE_USER_DATA_DIR: userDataDir,
       WEBENVOY_PACKAGED_SMOKE_SCREENSHOT: screenshotPath,
+      WEBENVOY_PACKAGED_SMOKE_TASK_BOUNDARY: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

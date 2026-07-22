@@ -123,6 +123,60 @@ summary:focus-visible {
 .create-task-submit-state strong { color: var(--we-foreground); font-size: 11px; }
 .create-task-submit-state small { color: var(--we-foreground-muted); font-size: 10px; }
 .create-task-submit-state button { min-width: auto; color: var(--we-foreground); }
+.structured-task-composer { position: relative; }
+.composer-owner-state { display: flex; min-height: 54px; align-items: center; gap: 8px; padding: 12px; color: var(--we-foreground-muted); font-size: 11px; }
+.composer-execution-menu { position: relative; min-width: 0; }
+.composer-execution-menu > summary { display: flex; max-width: 240px; min-height: 30px; align-items: center; gap: 6px; padding: 4px 7px; border-radius: 6px; color: var(--we-foreground-muted); font-size: 10px; cursor: pointer; list-style: none; }
+.composer-execution-menu > summary::-webkit-details-marker { display: none; }
+.composer-execution-menu > summary:hover,
+.composer-execution-menu[open] > summary { color: var(--we-foreground); background: var(--we-list-hover-background); }
+.composer-execution-menu > summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-execution-popover { position: absolute; right: 0; bottom: 36px; z-index: 80; display: grid; width: min(430px, calc(100vw - 36px)); padding: 8px; border: 1px solid var(--we-border); border-radius: 8px; background: var(--we-surface-overlay); box-shadow: var(--we-shadow-popover); }
+.composer-execution-row { display: grid; grid-template-columns: minmax(0, 1fr) 174px; gap: 10px; align-items: center; padding: 7px; border-bottom: 1px solid var(--we-border-subtle); }
+.composer-execution-row > span { display: grid; min-width: 0; gap: 2px; }
+.composer-execution-row strong { font-size: 11px; }
+.composer-execution-row small,
+.composer-execution-popover > small { color: var(--we-foreground-muted); font-size: 9px; line-height: 1.4; }
+.composer-execution-row > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+.composer-execution-row button { min-height: 26px; border: 1px solid var(--we-border); border-radius: 5px; color: var(--we-foreground-muted); background: transparent; font-size: 9px; }
+.composer-execution-row button.selected { border-color: var(--we-focus-border); color: var(--we-foreground); background: var(--we-status-info-background); }
+.composer-execution-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; padding: 8px 7px 0; }
+.composer-execution-actions button { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 6px; color: var(--we-foreground); background: var(--we-surface-secondary); font-size: 9px; }
+.composer-execution-popover > small { padding: 8px 7px 2px; }
+.composer-dangerous-auto-risk { display: inline-flex; min-width: 0; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 6px; color: var(--we-status-error); background: var(--we-status-error-background); font-size: 9px; font-weight: 700; }
+.composer-dangerous-auto-risk > svg { flex: 0 0 auto; }
+.composer-dangerous-auto-risk > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-dangerous-auto-risk > button { display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; border-radius: 4px; color: inherit; background: transparent; }
+.create-task-submit-state.submitting { color: var(--we-status-info); }
+.create-task-submit-state.ready { color: var(--we-status-success); }
+.create-task-submit-state.unknown { color: var(--we-status-warning); }
+.task-turn-business-input { display: grid; gap: 8px; margin: 7px 0; padding: 10px 12px; border-radius: 7px; background: var(--we-surface-secondary); }
+.task-turn-business-input-heading { display: flex; min-width: 0; align-items: center; gap: 7px; color: var(--we-foreground-muted); }
+.task-turn-business-input-heading strong { overflow: hidden; color: var(--we-foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.task-turn-business-input-heading small { margin-left: auto; font-size: 9px; white-space: nowrap; }
+.task-turn-business-input dl { display: flex; min-width: 0; flex-wrap: wrap; gap: 6px 18px; margin: 0; }
+.task-turn-business-input dl > div { display: grid; min-width: min(180px, 100%); grid-template-columns: auto minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.task-turn-business-input dt { color: var(--we-foreground-muted); font-size: 10px; }
+.task-turn-business-input dd { min-width: 0; margin: 0; overflow: hidden; color: var(--we-foreground); font-size: 11px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.task-turn-business-input dd,
+.task-turn-input-url { display: inline-flex; align-items: center; gap: 4px; }
+.task-turn-business-input dd > svg,
+.task-turn-input-url > svg { flex: 0 0 auto; color: var(--we-foreground-muted); }
+.single-action-confirmation { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; margin: 8px 0; padding: 10px 12px; border: 1px solid var(--we-status-warning-border); border-radius: 8px; background: var(--we-status-warning-background); }
+.single-action-confirmation.destructive { border-color: var(--we-status-error-border); background: var(--we-status-error-background); }
+.single-action-copy { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.single-action-copy > svg { flex: 0 0 auto; color: var(--we-status-warning); }
+.single-action-copy > span { display: grid; min-width: 0; gap: 2px; }
+.single-action-copy strong { font-size: 11px; }
+.single-action-copy small { overflow: hidden; color: var(--we-foreground-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.single-action-risk { display: inline-flex; align-items: center; gap: 4px; color: var(--we-status-error); font-size: 9px; font-weight: 600; }
+.single-action-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; }
+.single-action-actions button { display: inline-flex; min-height: 28px; align-items: center; gap: 5px; padding: 4px 8px; border: 1px solid var(--we-border); border-radius: 6px; color: var(--we-foreground); background: var(--we-surface-primary); font-size: 10px; }
+.single-action-actions button.primary { border-color: var(--we-foreground); color: var(--we-inverted-foreground); background: var(--we-foreground); }
+.single-action-confirmation.settled,
+.single-action-confirmation.failed { display: block; color: var(--we-foreground-muted); font-size: 10px; }
+.single-action-confirmation.failed { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-color: var(--we-status-error-border); color: var(--we-status-error); background: var(--we-status-error-background); }
+.single-action-confirmation.failed button { min-height: 26px; flex: 0 0 auto; padding: 3px 7px; border: 1px solid var(--we-status-error-border); border-radius: 5px; color: var(--we-foreground); background: var(--we-surface-primary); font-size: 9px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 
 .task-list-heading,
@@ -385,6 +439,12 @@ summary:focus-visible {
   .create-task-field.wide { grid-column: auto; }
   .create-task-submit-state { grid-template-columns: 18px minmax(0, 1fr); }
   .create-task-submit-state button { grid-column: 2; justify-self: start; }
+  .composer-execution-menu > summary { max-width: 150px; }
+  .composer-dangerous-auto-risk > span { display: none; }
+  .composer-execution-row { grid-template-columns: 1fr; }
+  .single-action-confirmation { grid-template-columns: 1fr; }
+  .single-action-confirmation.failed { align-items: flex-start; flex-direction: column; }
+  .single-action-risk { justify-self: start; }
 
   .owner-state button {
     grid-column: 2;

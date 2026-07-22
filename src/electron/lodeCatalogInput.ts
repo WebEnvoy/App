@@ -26,6 +26,7 @@ export type LodeCatalogField = {
   patternSafety?: "linear";
   format?: "uri";
   integer?: boolean;
+  inputProjection: "safe_summary" | "sanitized_url" | "owner_ref";
 };
 
 const maxCatalogFields = 100;
@@ -52,11 +53,16 @@ export function projectInputFields(schema: Record<string, unknown>, contract?: I
     throw new Error("Input schema does not match the selected business action.");
   }
   const properties = requiredRecord(schema.properties, "input schema properties");
+  const extension = isRecord(schema["x-lode"]) ? schema["x-lode"] : null;
+  const sensitivity = isRecord(extension?.sensitivity) ? extension.sensitivity : null;
+  if (contract != null && sensitivity == null) throw new Error("Input schema sensitivity contract is missing.");
   const required = new Set(schema.required === undefined ? [] : requiredStringArray(schema.required, "input schema required", maxCatalogFields));
   if (Object.keys(properties).length > maxCatalogFields || [...required].some((id) => !Object.hasOwn(properties, id))) {
     throw new Error("Input schema field declaration is invalid.");
   }
-  return Object.entries(properties).map(([id, value]) => projectField(id, value, required.has(id)));
+  return Object.entries(properties).map(([id, value]) =>
+    projectField(id, value, required.has(id), optionalString(sensitivity?.[id])),
+  );
 }
 
 function inputContractMatches(schema: Record<string, unknown>, contract: InputContract) {
@@ -66,18 +72,23 @@ function inputContractMatches(schema: Record<string, unknown>, contract: InputCo
     extension.operation_mode === contract.operationMode;
 }
 
-function projectField(id: string, value: unknown, required: boolean): LodeCatalogField {
+function projectField(id: string, value: unknown, required: boolean, sensitivity: string | undefined): LodeCatalogField {
   if (!/^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(id) || !isRecord(value) || !hasOnlyAllowedKeys(value, fieldKeys)) {
     return incompatibleField(id, required);
   }
   try {
-    return projectSupportedField(id, value, required);
+    return projectSupportedField(id, value, required, sensitivity);
   } catch {
     return incompatibleField(id, required);
   }
 }
 
-function projectSupportedField(id: string, value: Record<string, unknown>, required: boolean): LodeCatalogField {
+function projectSupportedField(
+  id: string,
+  value: Record<string, unknown>,
+  required: boolean,
+  sensitivity: string | undefined,
+): LodeCatalogField {
   const type = optionalString(value.type);
   const constant = primitive(value.const);
   const options = value.enum === undefined ? undefined : requiredStringArray(value.enum, `${id} enum`);
@@ -100,6 +111,7 @@ function projectSupportedField(id: string, value: Record<string, unknown>, requi
     kind,
     required,
     description: optionalString(value.description) ?? "由技能合同定义。",
+    inputProjection: fieldProjection(value, sensitivity),
     ...(options == null && array == null ? {} : { options: options ?? array?.options }),
     ...(defaultValue === undefined ? {} : { defaultValue }),
     ...(minimum === undefined ? {} : { minimum }),
@@ -119,6 +131,27 @@ function projectSupportedField(id: string, value: Record<string, unknown>, requi
   }
   if (!defaultMatchesField(field)) throw new Error(`Invalid ${id} default.`);
   return field;
+}
+
+function fieldProjection(
+  schema: Record<string, unknown>,
+  sensitivity: string | undefined,
+): LodeCatalogField["inputProjection"] {
+  if (schema.type === "string" && (schema.format === "uri" || schema.format === "uri-reference")) {
+    return sensitivity === "public" ? "sanitized_url" : "owner_ref";
+  }
+  if (
+    sensitivity === "public" ||
+    sensitivity === "public_safe_summary" ||
+    schema.type === "boolean" ||
+    schema.type === "integer" ||
+    schema.type === "number" ||
+    primitive(schema.const) !== undefined ||
+    Array.isArray(schema.enum) && schema.enum.length > 0 && schema.enum.every((item) => primitive(item) !== undefined)
+  ) {
+    return "safe_summary";
+  }
+  return "owner_ref";
 }
 
 function projectArray(value: Record<string, unknown>, id: string) {
@@ -249,7 +282,14 @@ function nonNegativeInteger(value: unknown) {
 }
 
 function incompatibleField(id: string, required: boolean): LodeCatalogField {
-  return { id, label: fieldLabel(id), kind: "unknown", required, description: "字段合同不兼容。" };
+  return {
+    id,
+    label: fieldLabel(id),
+    kind: "unknown",
+    required,
+    description: "字段合同不兼容。",
+    inputProjection: "owner_ref",
+  };
 }
 
 function fieldLabel(id: string) {

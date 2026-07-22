@@ -10,7 +10,7 @@ import { SiteSkillLibrary } from "./SiteSkillPages";
 import { TaskThreadComposer } from "./TaskThreadComposer";
 import { TaskThreadPage } from "./TaskThreadPage";
 import { TaskThreadRightPanel } from "./TaskThreadRightPanel";
-import type { AppController } from "./useAppController";
+import { findCatalogSkillForTask, type AppController } from "./useAppController";
 import { WorkbenchSidebar } from "./WorkbenchSidebar";
 
 export function AppShellView({ controller }: { controller: AppController }) {
@@ -148,10 +148,11 @@ function WorkWorkspace({ controller }: { controller: AppController }) {
         <CreateTaskShell
           catalog={sources.lodeCatalogState} compatibilityBySkill={skillWorkbench.compatibilityBySkill}
           identities={sources.harborIdentityState.identities} selection={skillWorkbench.createTaskSelection}
-          runtimeSupervisorState={sources.runtimeSupervisorState} onSelect={skillWorkbench.useSiteSkill}
+          coreEndpoint={sources.connectionConfig.coreEndpoint} runtimeSupervisorState={sources.runtimeSupervisorState} onSelect={skillWorkbench.useSiteSkill}
           onCreateIdentity={() => controller.actions.openView("browser")} onCheckCompatibility={skillWorkbench.checkCreateTaskCompatibility}
           onRecover={controller.actions.openSettings} onRecoverCandidate={skillWorkbench.recoverCandidate}
           onRecoverExactTarget={skillWorkbench.recoverExactTarget} onTargetChange={skillWorkbench.resetTargetCompatibility}
+          onTaskCreated={controller.actions.acceptCreatedTask}
         />
       </ThreadWorkspace>
     );
@@ -161,20 +162,36 @@ function WorkWorkspace({ controller }: { controller: AppController }) {
 
 function WorkDetail({ controller }: { controller: AppController }) {
   const { sources, tasks } = controller;
-  if (tasks.selectedTask != null && tasks.selectedTask.runs.length === 0) return <ThreadWorkspace workspaceKey={`work:${tasks.selectedTask.id}`}><OwnerState title="暂无任务回合" summary="该线程已创建，尚未提交业务输入。" /></ThreadWorkspace>;
+  const skill = tasks.selectedTask == null ? undefined : findCatalogSkillForTask(tasks.selectedTask, sources.lodeCatalogState.skills);
+  if (tasks.selectedTask != null && tasks.selectedTask.runs.length === 0 && tasks.selectedSubmitTask != null) {
+    return (
+      <ThreadWorkspace workspaceKey={`work:${tasks.selectedTask.id}`} composer={
+        <TaskThreadComposer
+          coreEndpoint={sources.connectionConfig.coreEndpoint}
+          harborIdentityState={sources.harborIdentityState}
+          runtimeSupervisorState={sources.runtimeSupervisorState}
+          selectedTask={tasks.selectedSubmitTask}
+          skill={skill}
+          onTask={tasks.acceptTaskThreadProjection}
+        />
+      }>
+        <OwnerState title="暂无任务回合" summary="填写业务输入后即可提交第一个回合。" />
+      </ThreadWorkspace>
+    );
+  }
   if (tasks.selectedTask == null || tasks.selectedRun == null || tasks.selectedSubmitTask == null) {
     return <ThreadWorkspace workspaceKey="work-empty"><OwnerState title={emptyTitle(tasks.effectiveCoreReadState.status)} summary={emptySummary(tasks.effectiveCoreReadState.status, tasks.effectiveCoreReadState.summary)} onRecover={tasks.effectiveCoreReadState.status === "loading" ? undefined : controller.actions.openSettings} /></ThreadWorkspace>;
   }
   return (
     <ThreadWorkspace workspaceKey={`work:${tasks.selectedTask.id}`} composer={
       <TaskThreadComposer
-        coreSubmitState={tasks.coreSubmitState} harborIdentityState={sources.harborIdentityState}
-        runtimeSupervisorState={sources.runtimeSupervisorState} businessInput={tasks.selectedSubmitTask.businessInput}
-        selectedRun={tasks.selectedRun} selectedTask={tasks.selectedSubmitTask}
-        onBusinessInputChange={tasks.updateSelectedTaskBusinessInput} onSubmitCoreTask={tasks.submitSelectedCoreTask}
+        coreEndpoint={sources.connectionConfig.coreEndpoint} harborIdentityState={sources.harborIdentityState}
+        runtimeSupervisorState={sources.runtimeSupervisorState} selectedTask={tasks.selectedSubmitTask}
+        skill={skill} onTask={tasks.acceptTaskThreadProjection}
       />
     }>
       <TaskThreadPage
+        coreEndpoint={sources.connectionConfig.coreEndpoint}
         coreReadState={tasks.effectiveCoreReadState} coreSubmitState={tasks.coreSubmitState}
         navigationItems={tasks.threadNavigationItems} runtimeSupervisorState={sources.runtimeSupervisorState}
         selectedRun={tasks.selectedRun} selectedTask={tasks.selectedTask} onActiveRunChange={tasks.setSelectedRunId}

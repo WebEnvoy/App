@@ -147,6 +147,10 @@ function enqueuePersistence<T>(key: string, operation: () => Promise<T>) {
   return result;
 }
 
+export function projectProtectedSkillInput(skill: LodeCatalogSkill, identityId: string | undefined, draft: SkillInputDraft): ProtectedDraft {
+  return projectProtectedDraft(skill, draftContext(skill, identityId), draft);
+}
+
 function projectProtectedDraft(skill: LodeCatalogSkill, context: DraftContext, draft: SkillInputDraft): ProtectedDraft {
   return {
     context,

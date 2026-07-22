@@ -1,11 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const outRoot = path.resolve("dist-electron/runtime");
-const coreRoot = findRoot("WEBENVOY_CORE_RUNTIME_SOURCE_DIR", ["../WebEnvoy", "../../WebEnvoy"], "packages/api-server/package.json");
-const harborRoot = findRoot("WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR", ["../Harbor", "../../Harbor"], "packages/runtime-api/src/runtime-server.ts");
+const sourceLock = JSON.parse(await readFile(new URL("./runtime-source-lock.json", import.meta.url), "utf8"));
+const coreRoot = findRoot("WEBENVOY_CORE_RUNTIME_SOURCE_DIR", ["../WebEnvoy", "../../WebEnvoy"], "packages/api-server/package.json", sourceLock.core);
+const harborRoot = findRoot("WEBENVOY_HARBOR_RUNTIME_SOURCE_DIR", ["../Harbor", "../../Harbor"], "packages/runtime-api/src/runtime-server.ts", sourceLock.harbor);
 const requirePackagedRuntime = process.env.WEBENVOY_REQUIRE_PACKAGED_RUNTIME === "1";
 const packaged = [];
 const missing = [];
@@ -62,8 +63,18 @@ async function packageCoreRuntime(sourceRoot, outDir) {
 async function packageHarborRuntime(sourceRoot, outDir) {
   await mkdir(outDir, { recursive: true });
   await cp(path.join(sourceRoot, "dist"), path.join(outDir, "dist"), { recursive: true });
+  await copyProductionDependencies(sourceRoot, outDir);
   await writeFile(path.join(outDir, "start-runtime.mjs"), harborStartScript());
   console.log(`Packaged Harbor runtime from ${sourceRoot} into ${outDir}`);
+}
+
+async function copyProductionDependencies(sourceRoot, outDir) {
+  const packageJson = JSON.parse(await readFile(path.join(sourceRoot, "package.json"), "utf8"));
+  for (const dependency of Object.keys(packageJson.dependencies ?? {})) {
+    const from = path.join(sourceRoot, "node_modules", dependency);
+    if (!existsSync(from)) throw new Error(`Harbor production dependency is missing: ${dependency}`);
+    await cp(from, path.join(outDir, "node_modules", dependency), { recursive: true, dereference: true });
+  }
 }
 
 async function copyPackage(from, to) {
@@ -79,16 +90,37 @@ function buildRuntime(cwd, name) {
   }
 }
 
-function findRoot(envName, candidates, requiredPath) {
+function findRoot(envName, candidates, requiredPath, expectedHead) {
   const roots = [process.env[envName], ...candidates.map((candidate) => path.resolve(candidate))].filter(Boolean);
-  return roots.find((candidate) => existsSync(path.join(candidate, requiredPath))) ?? null;
+  for (const candidate of roots) {
+    if (!existsSync(path.join(candidate, requiredPath))) continue;
+    if (isLockedCleanSource(candidate, expectedHead)) return candidate;
+    if (candidate === process.env[envName]) {
+      throw new Error(`${envName} must reference a clean source pinned to ${expectedHead}: ${candidate}`);
+    }
+  }
+  return null;
+}
+
+function isLockedCleanSource(candidate, expectedHead) {
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: candidate, encoding: "utf8" });
+  const status = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: candidate, encoding: "utf8" });
+  return head.status === 0 && head.stdout.trim() === expectedHead && status.status === 0 && status.stdout.trim() === "";
 }
 
 function coreStartScript() {
   return `import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createApiServer } from "@webenvoy/api-server";
-import { createFileRunRecordStore, createHttpHarborRuntimeClient, createLocalLodePackageResolver, createLocalTaskTurnInputPolicyResolver } from "@webenvoy/core-runtime";
+import {
+  createFileAuthorizationDecisionStore,
+  createFileExecutionPolicyConfigStore,
+  createFileRunRecordStore,
+  createHttpHarborIdentityFactsReader,
+  createHttpHarborRuntimeClient,
+  createLocalLodePackageResolver,
+  createLocalTaskTurnInputPolicyResolver
+} from "@webenvoy/core-runtime";
 import { createFileTaskThreadStore } from "@webenvoy/core-runtime/internal/task-thread-store";
 
 const host = process.env.WEBENVOY_CORE_RUNTIME_HOST ?? "127.0.0.1";
@@ -97,6 +129,15 @@ const runtimeDataDir = process.env.WEBENVOY_RUNTIME_DATA_DIR ?? join(process.cwd
 const runRecordDir = process.env.WEBENVOY_RUN_RECORD_DIR ?? join(runtimeDataDir, "core-runs");
 mkdirSync(runRecordDir, { recursive: true });
 const runRecordStore = createFileRunRecordStore({ directory: runRecordDir });
+const executionPolicyConfigStore = createFileExecutionPolicyConfigStore({ directory: join(runtimeDataDir, "core-policies") });
+if (await executionPolicyConfigStore.getGlobalConfiguration() === undefined) {
+  await executionPolicyConfigStore.putGlobalConfiguration({
+    schema_version: "webenvoy.execution-policy-mutation.v0",
+    idempotency_key: "packaged-runtime-default-policy-v1",
+    expected_source_version: null,
+    modes: { read: "auto", prepare: "confirm", commit: "confirm", destructive: "confirm" }
+  });
+}
 const lodeRegistryPath = process.env.WEBENVOY_LODE_REGISTRY_PATH;
 const taskThreadStore = createFileTaskThreadStore({
   directory: process.env.WEBENVOY_TASK_THREAD_DIR ?? join(runRecordDir, "threads"),
@@ -105,9 +146,17 @@ const taskThreadStore = createFileTaskThreadStore({
     resolveInputPolicy: createLocalTaskTurnInputPolicyResolver({ registryPath: lodeRegistryPath })
   } : {})
 });
+const authorizationDecisionStore = createFileAuthorizationDecisionStore({
+  directory: join(runtimeDataDir, "core-authorization-decisions"),
+  runRecordStore,
+  taskThreadStore
+});
+const harborRuntimeUrl = process.env.WEBENVOY_HARBOR_RUNTIME_URL;
 
 const server = createApiServer({
   runRecordStore,
+  authorizationDecisionStore,
+  executionPolicyConfigStore,
   taskThreadStore,
   ...(lodeRegistryPath ? {
     lodePackageResolver: createLocalLodePackageResolver({
@@ -115,8 +164,9 @@ const server = createApiServer({
       ...(process.env.WEBENVOY_LODE_ASSETS_PATH ? { rootDir: process.env.WEBENVOY_LODE_ASSETS_PATH } : {})
     })
   } : {}),
-  ...(process.env.WEBENVOY_HARBOR_RUNTIME_URL ? {
-    harborRuntimeClient: createHttpHarborRuntimeClient({ baseUrl: process.env.WEBENVOY_HARBOR_RUNTIME_URL })
+  ...(harborRuntimeUrl ? {
+    harborIdentityFactsReader: createHttpHarborIdentityFactsReader({ baseUrl: harborRuntimeUrl }),
+    harborRuntimeClient: createHttpHarborRuntimeClient({ baseUrl: harborRuntimeUrl })
   } : {})
 });
 

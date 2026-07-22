@@ -9,7 +9,7 @@ export type OwnerApiJsonRequest = {
   body?: unknown;
 };
 
-type OwnerApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type OwnerApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type ParsedOwnerApiRequest =
   | { ok: true; base: string; url: string; path: string; method: OwnerApiMethod; body?: unknown }
@@ -18,6 +18,7 @@ export type ParsedOwnerApiRequest =
 const ownerApiAllowedHosts = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const sensitiveOwnerApiFragment =
   /\b(token|cookie|secret|bearer|profile|credential|password|authorization)\b|raw[\s_-]*evidence/i;
+const authorizationDecisionRefPattern = /^authorization-decision:[a-f0-9]{32}:[a-f0-9]{32}$/;
 
 export function parseOwnerApiRequest(request: OwnerApiJsonRequest): ParsedOwnerApiRequest {
   if (typeof request?.base !== "string" || typeof request.path !== "string") {
@@ -28,7 +29,8 @@ export function parseOwnerApiRequest(request: OwnerApiJsonRequest): ParsedOwnerA
   if (!request.path.startsWith("/") || request.path.startsWith("//")) {
     return { ok: false, error: "Owner API path must be an absolute local path." };
   }
-  if (sensitiveOwnerApiFragment.test(request.base) || sensitiveOwnerApiFragment.test(request.path)) {
+  const knownAuthorizationPath = isAuthorizationDecisionPath(request.path);
+  if (sensitiveOwnerApiFragment.test(request.base) || sensitiveOwnerApiFragment.test(request.path) && !knownAuthorizationPath) {
     return { ok: false, error: "Owner API URL cannot include sensitive fragments." };
   }
 
@@ -65,6 +67,16 @@ export function parseOwnerApiRequest(request: OwnerApiJsonRequest): ParsedOwnerA
   };
 }
 
+function isAuthorizationDecisionPath(value: string) {
+  const match = /^\/authorization-decisions\/([^/]+)(?:\/single-action)?$/.exec(value);
+  if (!match) return false;
+  try {
+    return authorizationDecisionRefPattern.test(decodeURIComponent(match[1]!));
+  } catch {
+    return false;
+  }
+}
+
 export function isHarborSupervisorProtectedRequest(request: Extract<ParsedOwnerApiRequest, { ok: true }>) {
   if (request.method !== "POST") return false;
   const pathname = new URL(request.url).pathname;
@@ -88,14 +100,14 @@ export function harborSupervisorAuthorizationHeader(
 }
 
 export function ownerApiTimeoutMs(request: Extract<ParsedOwnerApiRequest, { ok: true }>) {
-  if (request.method === "POST" && request.path === "/tasks") return 65_000;
+  if (request.method === "POST" && (request.path === "/tasks" || /^\/threads\/[^/]+\/turns$/.test(new URL(request.url).pathname))) return 65_000;
   if (isHarborSupervisorProtectedRequest(request)) return 20_000;
   return 5_000;
 }
 
 function ownerApiMethod(value: unknown): OwnerApiMethod | null {
   if (value === undefined) return "GET";
-  return value === "GET" || value === "POST" || value === "PATCH" || value === "DELETE" ? value : null;
+  return value === "GET" || value === "POST" || value === "PUT" || value === "PATCH" || value === "DELETE" ? value : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
