@@ -540,13 +540,20 @@ export function PanelTabs({
   tabs,
   defaultValue,
   ariaLabel,
+  value,
+  onValueChange,
 }: {
   tabs: Array<{ id: string; label: string; content: ReactNode }>;
   defaultValue: string;
   ariaLabel: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }) {
   return (
-    <Tabs.Root className="panel-tabs we-panel-tabs" defaultValue={defaultValue}>
+    <Tabs.Root
+      className="panel-tabs we-panel-tabs"
+      {...(value == null ? { defaultValue } : { value, onValueChange })}
+    >
       <div className="panel-tab-strip">
         <div className="panel-tab-scroll">
           <Tabs.List className="panel-tab-list" aria-label={ariaLabel}>

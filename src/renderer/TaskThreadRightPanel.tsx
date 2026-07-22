@@ -6,13 +6,18 @@ import {
   Globe2,
   ShieldCheck,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { fetchCoreRunResult, type CoreRunResultState } from "./coreRunResultClient";
+import type { LodeCatalogSkill } from "./lodeCatalogClient";
+import { TaskBusinessResult } from "./TaskBusinessResult";
 import { ContextPanel, SourceField } from "./TaskThreadFields";
 import { PanelTabs } from "./shellPrimitives";
 import type { CoreReadTaskLoadState } from "./coreReadTaskClient";
 import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
+import type { TaskPreviewSelection } from "./useAppTasks";
 
 type SourceHealth = {
   id: "core" | "harbor" | "lode";
@@ -29,6 +34,7 @@ type ShellDiagnostics = {
 };
 
 const contextTabs = [
+  { id: "result", label: "结果" },
   { id: "evidence", label: "结果依据" },
   { id: "session", label: "执行现场" },
   { id: "identity", label: "账号身份" },
@@ -41,29 +47,41 @@ function statusLabel(status: SourceHealth["status"]) {
 }
 
 export function TaskThreadRightPanel({
+  coreEndpoint,
   coreReadState,
   coreSubmitState,
   runtimeSupervisorState,
   selectedRun,
   selectedTask,
+  previewSelection,
+  skills,
   shellDiagnostics,
 }: {
+  coreEndpoint: string;
   coreReadState: CoreReadTaskLoadState;
   coreSubmitState: CoreTaskSubmitState;
   runtimeSupervisorState: RuntimeSupervisorState;
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
+  previewSelection: TaskPreviewSelection;
+  skills?: LodeCatalogSkill[];
   shellDiagnostics: ShellDiagnostics;
 }) {
+  const [activeTab, setActiveTab] = useState<string>(previewSelection.tab);
+  useEffect(() => setActiveTab(previewSelection.tab), [previewSelection.runId, previewSelection.tab]);
   return (
     <aside className="context-panel codex-scrollbar" aria-label="Task context">
       <PanelTabs
         ariaLabel="Task context tabs"
-        defaultValue="evidence"
+        defaultValue="result"
+        value={activeTab}
+        onValueChange={setActiveTab}
         tabs={contextTabs.map((tab) => ({
           ...tab,
           content:
-            tab.id === "evidence" ? (
+            tab.id === "result" ? (
+              <ResultTab coreEndpoint={coreEndpoint} selectedItemIds={previewSelection.itemIds} selectedRun={selectedRun} skills={skills} />
+            ) : tab.id === "evidence" ? (
               <EvidenceTab selectedRun={selectedRun} />
             ) : tab.id === "session" ? (
               <SessionTab selectedRun={selectedRun} selectedTask={selectedTask} />
@@ -87,6 +105,33 @@ export function TaskThreadRightPanel({
         selectedTask={selectedTask}
       />
     </aside>
+  );
+}
+
+function ResultTab({ coreEndpoint, selectedItemIds, selectedRun, skills }: {
+  coreEndpoint: string;
+  selectedItemIds?: string[];
+  selectedRun: RunProjection;
+  skills?: LodeCatalogSkill[];
+}) {
+  const [state, setState] = useState<CoreRunResultState | { status: "fixture" }>(() => selectedRun.source === "Core live" ? { status: "loading" } : { status: "fixture" });
+  useEffect(() => {
+    if (selectedRun.source !== "Core live") {
+      setState({ status: "fixture" });
+      return;
+    }
+    const controller = new AbortController();
+    setState({ status: "loading" });
+    void fetchCoreRunResult(coreEndpoint, selectedRun.id, controller.signal).then((next) => {
+      if (!controller.signal.aborted) setState(next);
+    });
+    return () => controller.abort();
+  }, [coreEndpoint, selectedRun.id, selectedRun.source, selectedRun.updatedAt]);
+  return (
+    <div className="context-copy task-result-preview">
+      <div className="card-title"><Box size={18} /><h3>{selectedRun.label}</h3></div>
+      <TaskBusinessResult resultState={state} run={selectedRun} selectedItemIds={selectedItemIds} skills={skills} />
+    </div>
   );
 }
 

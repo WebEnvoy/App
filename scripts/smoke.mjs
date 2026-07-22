@@ -42,6 +42,8 @@ const appSourcesSource = await readFile("src/renderer/useAppSources.ts", "utf8")
 const appTasksSource = await readFile("src/renderer/useAppTasks.ts", "utf8");
 const createTaskShellSource = await readFile("src/renderer/CreateTaskShell.tsx", "utf8");
 const taskThreadPageSource = await readFile("src/renderer/TaskThreadPage.tsx", "utf8");
+const taskBusinessResultSource = await readFile("src/renderer/TaskBusinessResult.tsx", "utf8");
+const coreRunResultClientSource = await readFile("src/renderer/coreRunResultClient.ts", "utf8");
 const taskThreadRightPanelSource = await readFile("src/renderer/TaskThreadRightPanel.tsx", "utf8");
 const shellPrimitivesSource = await readFile("src/renderer/shellPrimitives.tsx", "utf8");
 const workbenchPreferencesSource = await readFile("src/renderer/workbenchPreferences.ts", "utf8");
@@ -427,8 +429,6 @@ for (const expectedText of [
   "Evidence card only links owner viewer refs",
   "raw evidence body",
   "当前仅展示 Core 线程绑定的 capability ref",
-  "Capability attribution",
-  "Failure class",
   "site_changed",
   "Status",
   "Freshness",
@@ -440,12 +440,9 @@ for (const expectedText of [
   "Lock ref",
   "Runtime session",
   "App 不使用无关本机浏览器现场代替任务现场",
-  "direct Identity Runtime Session",
-  "Write-pre preview",
   "真实页面写前验证",
   "No-submit guard",
   "page_changed",
-  "Risk and approval",
   "pending",
   "expired",
   "blocked",
@@ -459,10 +456,7 @@ for (const expectedText of [
   "Harbor live",
   "Harbor offline",
   "Harbor endpoint 未返回可消费的 provider/identity JSON",
-  "Core read task status",
   "Core owner API projection",
-  "实时结果",
-  "本地展示",
   "创建本地身份环境配置",
   "导入 Harbor public summary",
   "保存本地允许配置",
@@ -525,11 +519,9 @@ for (const expectedText of [
   "暂无账号身份",
   "站点技能暂不可用",
   "这次要让 WebEnvoy 完成什么？",
-  "Runtime supervisor status",
   "生产运行已阻断",
   "fixture/demo 不作为可用结果",
   "App runtime supervisor",
-  "Core health / admission",
   "Harbor health",
   "Lode assets",
   "runtime 未连接",
@@ -537,6 +529,15 @@ for (const expectedText of [
   if (!rendererAssets.includes(expectedText)) {
     throw new Error(`Renderer smoke failed: ${expectedText} is missing.`);
   }
+}
+
+if (!taskThreadPageSource.includes("<TaskBusinessResult") || taskThreadPageSource.includes("Capability attribution") ||
+  !taskBusinessResultSource.includes("business-result-table") || !taskBusinessResultSource.includes("findExactResultSkill") ||
+  !taskBusinessResultSource.includes("data.normalized") || !taskBusinessResultSource.includes("exportCollectionRows") ||
+  !taskBusinessResultSource.includes("没有匹配数据") || !taskBusinessResultSource.includes("执行状态待确认") ||
+  !coreRunResultClientSource.includes("webenvoy.result-query.v0") || !coreRunResultClientSource.includes("payloadState !== \"available\"") ||
+  !coreRunResultClientSource.includes("isForbiddenResultKey")) {
+  throw new Error("Business result smoke failed: standard renderer, terminal states, or owner payload boundary is missing.");
 }
 
 const lodeAssetBundleModule = await import(

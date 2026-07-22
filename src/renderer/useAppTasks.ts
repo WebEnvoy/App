@@ -11,6 +11,11 @@ import { outcomeLabel } from "./TaskThreadFields";
 import type { ThreadNavigationItem } from "./ThreadNavigationRail";
 
 type SubmittedTaskOverride = { endpoint: string; taskId: string; task: TaskProjection };
+export type TaskPreviewSelection = {
+  runId: string;
+  tab: "result" | "evidence";
+  itemIds?: string[];
+};
 
 export function useAppTasks(
   coreReadState: CoreReadTaskLoadState,
@@ -59,10 +64,13 @@ export function useAppTasks(
 function useTaskSelection(tasks: TaskProjection[]) {
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedRunId, setSelectedRunId] = useState("");
+  const [previewSelections, setPreviewSelections] = useState<Record<string, TaskPreviewSelection>>({});
   const [rightPanelOpenRequestKey, setRightPanelOpenRequestKey] = useState<number>();
   const selectedTaskIdRef = useRef(selectedTaskId);
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
   const selectedRun = selectedTask?.runs.find((run) => run.id === selectedRunId) ?? selectedTask?.runs.at(-1);
+  const previewSelection = selectedTask == null ? undefined : previewSelections[selectedTask.id];
+  const previewRun = previewSelection == null ? undefined : selectedTask?.runs.find((run) => run.id === previewSelection.runId);
   useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
   useEffect(() => {
     const task = tasks.find((item) => item.id === selectedTaskId) ?? tasks[0];
@@ -79,8 +87,13 @@ function useTaskSelection(tasks: TaskProjection[]) {
   }
 
   return {
-    rightPanelOpenRequestKey, selectedRun, selectedTask, selectedTaskIdRef, selectTask, setSelectedRunId,
-    requestRightPanel: () => setRightPanelOpenRequestKey((key) => (key ?? 0) + 1),
+    previewRun, previewSelection, rightPanelOpenRequestKey, selectedRun, selectedTask, selectedTaskIdRef, selectTask, setSelectedRunId,
+    requestRightPanel: (selection: TaskPreviewSelection) => {
+      if (selectedTask != null && selectedTask.runs.some((run) => run.id === selection.runId)) {
+        setPreviewSelections((current) => ({ ...current, [selectedTask.id]: selection }));
+        setRightPanelOpenRequestKey((key) => (key ?? 0) + 1);
+      }
+    },
   };
 }
 

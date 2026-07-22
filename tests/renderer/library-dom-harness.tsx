@@ -445,7 +445,7 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
     !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
     !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe || !resourceProfileBoundarySafe ||
-    !submittedCard.includes("keyword") || !submittedCard.includes("精确字段定义版本不可用") ||
+    !submittedCard.includes("keyword") || !submittedCard.includes("历史字段") ||
     !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
     !unavailableDeleteWarning || mode === "narrow" && !longFileLayoutSafe) {
     throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({
