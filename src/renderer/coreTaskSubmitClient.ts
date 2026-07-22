@@ -403,7 +403,7 @@ export function coreTaskSubmitFailureSummary(value: unknown, fallback: string) {
   const recoveryCode = coreTaskRecoveryCode(value);
   if (["browser_environment_repair_required", "repair_browser_environment", "identity_storage_unavailable",
     "browser_provider_unavailable", "identity_environment_unavailable", "connect_identity_environment", "install_or_select_provider",
-    "profile_locked", "launch_failed", "runtime_session_busy", "core_task_session_lock_mismatch", "provider_conflict", "fingerprint_conflict"].includes(recoveryCode ?? "")) {
+    "profile_locked", "launch_failed", "runtime_session_busy", "core_task_session_lock_mismatch", "provider_conflict", "fingerprint_conflict", "resource_unavailable"].includes(recoveryCode ?? "")) {
     return "需要修复浏览器环境后重试。";
   }
   if (recoveryCode === "identity_auth_required" || recoveryCode === "open_manual_auth") {
@@ -436,6 +436,7 @@ function coreTaskRecoveryCode(value: unknown) {
     "core_task_session_lock_mismatch",
     "provider_conflict",
     "fingerprint_conflict",
+    "resource_unavailable",
     "identity_auth_required",
     "open_manual_auth",
   ];
