@@ -91,6 +91,7 @@ function IdentityWorkspace({ controller }: { controller: AppController }) {
       <IdentityEnvironmentsPage
         harborEndpoint={sources.connectionConfig.harborEndpoint}
         initialState={sources.harborIdentityState}
+        recoveryRequest={controller.skillWorkbench.identityRecoveryRequest}
         runtimeSupervisorState={sources.runtimeSupervisorState}
         tasks={tasks.workbenchTaskThreads}
         onHarborStateChange={actions.onHarborStateChange}

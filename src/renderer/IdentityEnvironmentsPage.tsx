@@ -39,6 +39,7 @@ import {
   type IdentityEnvironmentMutationIntent,
 } from "./harborIdentityMutationClient";
 import { identitySelectionStorageKey, type HarborIdentityLoadState } from "./harborIdentityTypes";
+import type { IdentityRecoveryRequest } from "./siteSkillRecovery";
 import type {
   BrowserSessionProjection,
   IdentityEnvironmentProjection,
@@ -56,6 +57,7 @@ const initialHarborState: HarborIdentityLoadState = { status: "loading", fetched
 export function IdentityEnvironmentsPage({
   harborEndpoint,
   initialState = initialHarborState,
+  recoveryRequest,
   runtimeSupervisorState,
   tasks,
   onHarborStateChange,
@@ -64,6 +66,7 @@ export function IdentityEnvironmentsPage({
 }: {
   harborEndpoint: string;
   initialState?: HarborIdentityLoadState;
+  recoveryRequest?: IdentityRecoveryRequest;
   runtimeSupervisorState: RuntimeSupervisorState;
   tasks: TaskProjection[];
   onHarborStateChange: (state: HarborIdentityLoadState) => void;
@@ -88,6 +91,7 @@ export function IdentityEnvironmentsPage({
   const harborStateRef = useRef(initialState);
   const refreshGateRef = useRef(createLatestRequestGate());
   const mutationRetryRef = useRef<{ intent: string; idempotencyKey: string } | null>(null);
+  const handledRecoveryKeyRef = useRef<number | undefined>(undefined);
 
   const identities = useMemo(
     () => projectRuntimeGatedIdentities(harborState.identities.filter((identity) => identity.source === "Harbor live"), runtimeSupervisorState),
@@ -112,6 +116,24 @@ export function IdentityEnvironmentsPage({
   useEffect(() => {
     if ((mode === "detail" || mode === "edit") && selected == null) setMode("catalog");
   }, [mode, selected]);
+  useEffect(() => {
+    if (recoveryRequest == null || handledRecoveryKeyRef.current === recoveryRequest.key) return;
+    if (recoveryRequest.identityId == null) {
+      handledRecoveryKeyRef.current = recoveryRequest.key;
+      if (recoveryRequest.destination === "refresh") void refreshHarborState();
+      return;
+    }
+    const identity = identities.find((candidate) =>
+      candidate.id === recoveryRequest.identityId || candidate.identityEnvironmentRef === recoveryRequest.identityId,
+    );
+    if (identity == null) return;
+    handledRecoveryKeyRef.current = recoveryRequest.key;
+    setSelectedId(identity.id);
+    window.localStorage.setItem(identitySelectionStorageKey, identity.id);
+    setMessage("");
+    setMode(recoveryRequest.destination === "provider" ? "edit" : "detail");
+    if (recoveryRequest.destination === "refresh") void refreshHarborState();
+  }, [recoveryRequest?.key, identities]);
 
   async function refreshHarborState() {
     const request = refreshGateRef.current.begin();
@@ -219,7 +241,7 @@ export function IdentityEnvironmentsPage({
   ) : null;
 
   if (mode === "create" || mode === "import" || mode === "edit") {
-    return <div className="identity-page production-identity-page">{topbarActions}<IdentityEnvironmentManagementPanel busy={busy} identity={selected} message={message} mode={mode} providers={harborState.providers} onCancel={() => setMode(selected ? "detail" : "catalog")} onSubmit={submitEditor} /></div>;
+    return <div className="identity-page production-identity-page">{topbarActions}<IdentityEnvironmentManagementPanel busy={busy} focusProviderRequestKey={recoveryRequest?.destination === "provider" ? recoveryRequest.key : undefined} identity={selected} message={message} mode={mode} providers={harborState.providers ?? []} onCancel={() => setMode(selected ? "detail" : "catalog")} onSubmit={submitEditor} /></div>;
   }
 
   if (mode === "catalog") {

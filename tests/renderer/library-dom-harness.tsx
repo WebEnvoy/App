@@ -193,6 +193,20 @@ async function runProductionShellFlow() {
     identities: [identity, identityB],
   });
   await waitUntil(() => controllerSnapshot?.skillWorkbench.compatibilityBySkill[xhsSkill.id]?.status === "ready", "initial compatibility");
+  controllerSnapshot!.skillWorkbench.recoverCandidate(xhsSkill, identityB.id, {
+    identityEnvironmentRef: identityB.identityEnvironmentRef,
+    status: "requires_setup",
+    reasonCodes: ["provider_conflict"],
+    recoveryAction: "repair_browser_environment",
+  });
+  await waitUntil(() => controllerSnapshot?.navigation.activeView === "browser" &&
+    controllerSnapshot?.skillWorkbench.identityRecoveryRequest?.destination === "provider" &&
+    document.activeElement === document.querySelector("select[name='providerId']"), "provider recovery focus");
+  if (!document.body.textContent?.includes(identityB.accountLabel)) {
+    throw new Error("Browser environment recovery did not open the requested identity editor.");
+  }
+  controllerSnapshot!.actions.openView("work");
+  await waitUntil(() => controllerSnapshot?.skillWorkbench.identityRecoveryRequest == null, "provider recovery resume");
   const sidebarAdd = document.querySelector<HTMLButtonElement>(".task-group-add");
   if (sidebarAdd == null) throw new Error("Production sidebar did not render the skill-group create control.");
   sidebarAdd.click();

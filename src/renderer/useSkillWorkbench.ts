@@ -48,7 +48,7 @@ export function useSkillWorkbench(options: SkillWorkbenchOptions) {
   const contextKey = skillWorkbenchContextKey(options);
   contextRef.current = contextKey;
   const recovery = useSkillRecovery(options, setCreateTaskSelection);
-  useSkillWorkbenchEffects(options, contextKey, recovery.identityRecoveryRequest, requestGateRef, setCompatibilityBySkill, setCreateTaskSelection);
+  useSkillWorkbenchEffects(options, contextKey, requestGateRef, setCompatibilityBySkill, setCreateTaskSelection);
 
   async function resolveCompatibility(skill: LodeCatalogSkill, identityId?: string, targetRef?: string) {
     const request = requestGateRef.current.begin();
@@ -119,8 +119,11 @@ function useSkillRecovery(
       setSiteSkillRecoveryRequest({ key: ++keyRef.current, skillId: skill.id, identityId, destination: copy.destination });
       options.onOpenLibrary();
     } else if (copy?.destination === "identity") {
-      const destination = candidate.recoveryAction === "install_or_select_provider"
-        ? "provider" : candidate.recoveryAction === "refresh_owner_facts" ? "refresh" : "authentication";
+      const destination = candidate.recoveryAction === "refresh_owner_facts"
+        ? "refresh"
+        : candidate.recoveryAction === "open_manual_auth"
+        ? "authentication"
+        : "provider";
       openIdentityRecovery(skill, identityId, destination);
     }
   }
@@ -184,7 +187,6 @@ function useSkillRecovery(
 function useSkillWorkbenchEffects(
   options: SkillWorkbenchOptions,
   contextKey: string,
-  identityRecoveryRequest: IdentityRecoveryRequest | undefined,
   requestGateRef: React.RefObject<ReturnType<typeof createLatestRequestGate>>,
   setCompatibility: React.Dispatch<React.SetStateAction<Record<string, SkillIdentityCompatibilityState>>>,
   setSelection: React.Dispatch<React.SetStateAction<CreateTaskSelection | null>>,
@@ -198,7 +200,6 @@ function useSkillWorkbenchEffects(
     if (options.catalog.status !== "ready") return;
     setSelection((current) => refreshSelection(current, options.catalog));
   }, [options.catalog]);
-  useEffect(() => focusIdentityRecovery(identityRecoveryRequest), [identityRecoveryRequest]);
 }
 
 function loadCompatibility(
@@ -288,19 +289,4 @@ function skillVersionKey(skill: LodeCatalogSkill) {
   return [skill.packageRef, skill.lockRef ?? "", skill.version, skill.availability,
     ...skill.actions.map((action) => `${action.id}:${action.operationMode}:${action.resourceRequirementRef}:${action.resourceRequirementProfileIds.join(",")}`),
   ].join(":");
-}
-
-function focusIdentityRecovery(request: IdentityRecoveryRequest | undefined) {
-  if (request == null) return;
-  const frame = window.requestAnimationFrame(() => {
-    const target = request.destination === "refresh"
-      ? document.querySelector<HTMLElement>("[aria-label='刷新账号身份']")
-      : Array.from(document.querySelectorAll<HTMLElement>(".identity-catalog-row"))
-          .find((candidate) => candidate.dataset.identityRef === request.identityId) ?? null;
-    if (target == null) return;
-    if (!target.matches("button, input, select, textarea, a[href], [tabindex]")) target.tabIndex = -1;
-    target.focus();
-    target.scrollIntoView({ block: "nearest" });
-  });
-  return () => window.cancelAnimationFrame(frame);
 }

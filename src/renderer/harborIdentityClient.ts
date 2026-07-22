@@ -10,6 +10,7 @@ import {
   isRecord,
 } from "./harborIdentityTypes";
 import type { BrowserSessionProjection, BrowserTargetProjection, IdentityEnvironmentProjection } from "./identityEnvironmentFixtures";
+import { boundedRecoveryReasonCodes, isAuthenticationRecoveryReason, requiresManualAuthentication } from "./harborIdentityRecovery";
 import { requestOwnerJson } from "./ownerApiClient";
 
 export type ManualAuthenticationCompletionResult =
@@ -242,7 +243,7 @@ function sessionPaths(sessionRef: string, action: "lock" | "release" | "stop") {
   return [`/runtime/sessions/${encoded}/${action}`, `/sessions/${encoded}/${action}`];
 }
 
-function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts | null {
+export function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts | null {
   if (!isRecord(value) || value.schema_version !== "harbor-local-identity-environment-store/v0") return null;
   const site = recordValue(value.site);
   const status = recordValue(value.status);
@@ -260,8 +261,12 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
 
   const loginState = loginStateValue(status?.login_state);
   const storageState = storageStateValue(status?.browser_storage_state);
-  const manualAuthenticationState = manualAuthStateValue(status?.manual_authentication_state);
-  const blockingReasons = arrayStrings(status?.blocking_reasons);
+  const manualAuthenticationState = manualAuthStateValue(status?.manual_authentication_state, loginState);
+  const recoveryReasons = boundedRecoveryReasonCodes(status?.blocking_reasons, status?.repair_reasons);
+  const environmentRecoveryReasons = recoveryReasons.filter((reason) => !isAuthenticationRecoveryReason(reason));
+  const recoveryRequired = status?.recovery_required === true;
+  const manualAuthenticationRequired = requiresManualAuthentication(loginState, manualAuthenticationState) ||
+    recoveryReasons.some(isAuthenticationRecoveryReason);
   const authenticationProvenance = stringValue(status?.authentication_provenance);
   const selectedProvider = providerId ? catalog?.providers.find((provider) => provider.provider_id === providerId) ?? null : null;
 
@@ -280,10 +285,10 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
       state: loginState,
       reason: authenticationProvenance === "user_confirmed_managed_session"
         ? "认证状态由用户在 Harbor 受控会话中明确确认。"
-        : blockingReasons.join("；") || null,
-      recovery_required: status?.recovery_required === true,
+        : manualAuthenticationRequired ? "Harbor 要求完成登录或人工认证。" : null,
+      recovery_required: recoveryRequired,
       manual_authentication_state: manualAuthenticationState,
-      human_verification: status?.recovery_required === true ? ["manual_login"] : [],
+      human_verification: manualAuthenticationRequired ? ["manual_login"] : [],
     },
     browser_storage: {
       profile_storage_ref: stringValue(refs?.profile_storage_ref) ?? `${profileRef}:storage`,
@@ -315,14 +320,14 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
       selection_reason: "harbor_public_record",
       requires_user_notice: providerId === "chrome_official",
       selected_provider: selectedProvider,
-      warnings: blockingReasons,
+      warnings: environmentRecoveryReasons,
       unavailable_reason: providerId ? null : "Harbor public record did not expose a selected provider.",
     },
     credential_recovery: {
       credential_ref: stringValue(refs?.credential_ref) ?? null,
-      recovery_actions: status?.recovery_required === true ? ["manual_login"] : [],
+      recovery_actions: manualAuthenticationRequired ? ["manual_login"] : [],
     },
-    diagnostics: blockingReasons,
+    diagnostics: recoveryReasons,
     authentication_provenance: authenticationProvenance ?? null,
   };
 }
@@ -356,10 +361,6 @@ function fingerprintStrategyValue(value: unknown) {
   return value === "provider_default" || value === "stable" ? value : null;
 }
 
-function arrayStrings(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
-}
-
 function providerIdValue(value: unknown) {
   return value === "cloakbrowser" || value === "chrome_official" ? value : null;
 }
@@ -368,10 +369,13 @@ function loginStateValue(value: unknown): HarborIdentityFacts["login_state"]["st
   return value === "logged_in" || value === "logged_out" || value === "expired" || value === "manual_auth_required" ? value : "unknown";
 }
 
-function manualAuthStateValue(value: unknown): HarborIdentityFacts["login_state"]["manual_authentication_state"] {
+function manualAuthStateValue(
+  value: unknown,
+  loginState: HarborIdentityFacts["login_state"]["state"],
+): HarborIdentityFacts["login_state"]["manual_authentication_state"] {
   return value === "not_required" || value === "required" || value === "in_progress" || value === "completed" || value === "failed"
     ? value
-    : "required";
+    : loginState === "logged_out" || loginState === "expired" || loginState === "manual_auth_required" ? "required" : "not_required";
 }
 
 function storageStateValue(value: unknown): HarborIdentityFacts["browser_storage"]["state"] {
