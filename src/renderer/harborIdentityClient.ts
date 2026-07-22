@@ -1,12 +1,10 @@
-import { projectHarborIdentity, projectHarborSession, projectLocalDraft } from "./harborIdentityProjection";
+import { projectHarborIdentity, projectHarborSession } from "./harborIdentityProjection";
 import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 import {
   type HarborIdentityFacts,
   type HarborIdentityLoadState,
   type HarborProviderCatalog,
   type HarborRuntimeSession,
-  type LocalIdentityEnvironmentDraft,
-  type SiteId,
   isHarborIdentityFacts,
   isProviderCatalog,
   isRecord,
@@ -20,7 +18,7 @@ export type ManualAuthenticationCompletionResult =
 
 export async function fetchHarborIdentityState(
   harborEndpoint: string,
-  localDrafts: LocalIdentityEnvironmentDraft[],
+  signal?: AbortSignal,
 ): Promise<HarborIdentityLoadState> {
   const fetchedAt = new Date().toISOString();
   const [catalogResult, identityResult] = await Promise.all([
@@ -28,34 +26,35 @@ export async function fetchHarborIdentityState(
       "/runtime/browser-providers",
       "/runtime/browser-provider-status",
       "/browser-providers",
-    ]),
+    ], signal),
     fetchFirstJson<unknown>(harborEndpoint, [
       "/runtime/identity-environments",
       "/identity-environments",
       "/runtime/local-identity-environments",
-    ]),
+    ], signal),
   ]);
   const catalog = catalogResult.ok && isProviderCatalog(catalogResult.value) && !fixtureOrDemoPayloadReason(catalogResult.value) ? catalogResult.value : null;
-  const liveIdentities = identityResult.ok && !fixtureOrDemoPayloadReason(identityResult.value)
-    ? parseIdentityList(identityResult.value, catalog).map((item) => projectHarborIdentity(item, catalog, fetchedAt))
-    : [];
-  const localIdentities = localDrafts.map((draft) => projectLocalDraft(draft, catalog, fetchedAt));
-  const identities = [...liveIdentities, ...localIdentities];
+  const parsedIdentities = identityResult.ok && !fixtureOrDemoPayloadReason(identityResult.value)
+    ? parseIdentityList(identityResult.value, catalog)
+    : null;
+  const identities = parsedIdentities?.map((item) => projectHarborIdentity(item, catalog, fetchedAt)) ?? [];
 
-  if (catalog || liveIdentities.length > 0) {
+  if (parsedIdentities != null) {
     return {
       status: "ready",
       fetchedAt,
       summary: catalog ? "已读取 Harbor provider/identity public facts。" : "已读取 Harbor identity public facts；provider endpoint 未返回。",
       identities,
+      providers: catalog?.providers ?? [],
     };
   }
 
   return {
     status: "offline",
     fetchedAt,
-    summary: `Harbor endpoint 未返回可消费的 provider/identity JSON；本页保留 App 本地允许配置和离线 fixture。${catalogResult.error ? ` ${catalogResult.error}` : ""}`,
+    summary: `Harbor identity endpoint 未返回可消费的 owner facts。${identityResult.error ? ` ${identityResult.error}` : ""}`,
     identities,
+    providers: catalog?.providers ?? [],
   };
 }
 
@@ -83,20 +82,6 @@ export async function openHarborIdentitySession(
     holder_ref: "app-browser-page",
     reuse_existing: true,
   });
-}
-
-export async function createHarborIdentityEnvironment(harborEndpoint: string, draft: LocalIdentityEnvironmentDraft) {
-  const result = await postFirstJson<unknown>(
-    harborEndpoint,
-    ["/runtime/identity-environments", "/identity-environments"],
-    identityInputFromDraft(draft),
-    "Harbor endpoint 未接受 identity environment 创建请求。",
-  );
-  if (!result.ok) return result;
-  const createdRef = identityEnvironmentRefFromCreateResponse(result.value);
-  return createdRef === draft.identityEnvironmentRef
-    ? { ok: true as const }
-    : { ok: false as const, error: "Harbor 创建响应未回传匹配的 identity_environment_ref；保持 App local-only 草稿。" };
 }
 
 export async function lockHarborSession(harborEndpoint: string, sessionRef: string) {
@@ -176,9 +161,9 @@ async function postHarborSession(harborEndpoint: string, paths: string[], body: 
   return result.ok ? result.value : { status: "unavailable", message: result.error, retryable: true };
 }
 
-async function fetchFirstJson<T>(base: string, paths: string[]) {
+async function fetchFirstJson<T>(base: string, paths: string[], signal?: AbortSignal) {
   for (const path of paths) {
-    const result = await requestJson<T>(base, path, { method: "GET" });
+    const result = await requestJson<T>(base, path, { method: "GET", signal });
     if (result.ok) return result;
   }
   return { ok: false as const, error: `无法读取 ${base}` };
@@ -201,13 +186,18 @@ async function postFirstJson<T>(
 }
 
 async function requestJson<T>(base: string, path: string, init: RequestInit) {
-  const payload = await requestOwnerJson(base, path, {
-    method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
-    body: typeof init.body === "string" ? parseJson(init.body) : undefined,
-    timeoutMs: 2500,
-  });
-  if (isOkFailure(payload)) return { ok: false as const, error: payload.error };
-  return { ok: true as const, value: payload as T };
+  try {
+    const payload = await requestOwnerJson(base, path, {
+      method: init.method === "POST" || init.method === "PATCH" || init.method === "DELETE" ? init.method : "GET",
+      body: typeof init.body === "string" ? parseJson(init.body) : undefined,
+      timeoutMs: 2500,
+      signal: init.signal ?? undefined,
+    });
+    if (isOkFailure(payload)) return { ok: false as const, error: payload.error };
+    return { ok: true as const, value: payload as T };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 function isOkFailure(value: unknown): value is { ok: false; error: string } {
@@ -230,60 +220,21 @@ function parseJson(value: string): unknown {
   }
 }
 
-function parseIdentityList(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts[] {
+function parseIdentityList(value: unknown, catalog: HarborProviderCatalog | null): HarborIdentityFacts[] | null {
   const items = Array.isArray(value)
     ? value
     : isRecord(value) && Array.isArray(value.identity_environments)
       ? value.identity_environments
       : isRecord(value) && Array.isArray(value.items)
         ? value.items
-        : [];
-  return items.flatMap((item) => {
+        : null;
+  if (items == null) return null;
+  const parsed = items.map((item) => {
     if (isHarborIdentityFacts(item)) return [item];
     const publicFacts = identityFactsFromPublicRecord(item, catalog);
     return publicFacts ? [publicFacts] : [];
-  });
-}
-
-function identityInputFromDraft(draft: LocalIdentityEnvironmentDraft) {
-  return {
-    identity_environment_ref: draft.identityEnvironmentRef,
-    execution_identity_ref: draft.executionIdentityRef,
-    profile_ref: draft.profileRef,
-    profile_storage_ref: draft.profileStorageRef,
-    site: {
-      site_id: draft.siteId,
-      origin: siteOrigin(draft.siteId),
-      display_name: draft.siteId === "boss" ? "BOSS" : "小红书",
-      account_identifier: draft.accountLabel,
-    },
-    login_state: draft.loginState,
-    storage_state: draft.profileStorageRef ? "present" : "unknown",
-    credential_ref: draft.credentialRef || undefined,
-    proxy_ref: draft.proxyRef || undefined,
-    proxy_label: draft.proxyLabel,
-    region: draft.region,
-    language: draft.language,
-    timezone: draft.timezone,
-    browser_family: draft.requestedProviderId,
-    requested_provider_id: draft.requestedProviderId,
-    user_agent_summary: draft.userAgentSummary,
-    viewport: draft.viewport,
-    fingerprint_summary: draft.fingerprintSummary,
-    login_method: "manual",
-    manual_authentication_state: draft.manualAuthenticationState,
-    human_verification: draft.manualAuthenticationState === "not_required" ? [] : ["manual_login"],
-  };
-}
-
-function identityEnvironmentRefFromCreateResponse(value: unknown): string | undefined {
-  const record = recordValue(value);
-  const nested = recordValue(record?.identity_environment);
-  return stringValue(record?.identity_environment_ref) ?? stringValue(nested?.identity_environment_ref);
-}
-
-function siteOrigin(siteId: SiteId) {
-  return siteId === "boss" ? "https://www.zhipin.com" : "https://www.xiaohongshu.com";
+  }).flat();
+  return parsed.length === items.length ? parsed : null;
 }
 
 function sessionPaths(sessionRef: string, action: "lock" | "release" | "stop") {
@@ -346,11 +297,17 @@ function identityFactsFromPublicRecord(value: unknown, catalog: HarborProviderCa
         label: stringValue(refs?.proxy_ref) ? "Harbor redacted proxy ref" : null,
       },
       region: stringValue(environment?.region) ?? null,
+      geoip_mode: geoipModeValue(environment?.geoip_mode),
       language: stringValue(environment?.language) ?? null,
       timezone: stringValue(environment?.timezone) ?? null,
       browser_family: stringValue(environment?.browser_family) ?? providerId ?? "unknown",
       user_agent_summary: null,
-      viewport: null,
+      viewport: stringValue(environment?.viewport) ?? null,
+      hardware_concurrency: numberValue(environment?.hardware_concurrency),
+      device_memory_gb: numberValue(environment?.device_memory_gb),
+      gpu_profile: stringValue(environment?.gpu_profile) ?? null,
+      interaction_preset: interactionPresetValue(environment?.interaction_preset),
+      fingerprint_strategy: fingerprintStrategyValue(environment?.fingerprint_strategy),
       fingerprint_summary: stringValue(environment?.fingerprint_summary) ?? "not_configured",
     },
     provider_binding: {
@@ -381,6 +338,22 @@ function recordValue(value: unknown) {
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function geoipModeValue(value: unknown) {
+  return value === "proxy" || value === "system" || value === "disabled" ? value : null;
+}
+
+function interactionPresetValue(value: unknown) {
+  return value === "default" || value === "humanized" ? value : null;
+}
+
+function fingerprintStrategyValue(value: unknown) {
+  return value === "provider_default" || value === "stable" ? value : null;
 }
 
 function arrayStrings(value: unknown) {

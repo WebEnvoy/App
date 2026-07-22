@@ -5,28 +5,7 @@ export type ProviderId = "cloakbrowser" | "chrome_official";
 export type LoginState = "logged_in" | "logged_out" | "expired" | "unknown" | "manual_auth_required";
 export type ManualAuthState = "not_required" | "required" | "in_progress" | "completed" | "failed";
 
-export type LocalIdentityEnvironmentDraft = {
-  id: string;
-  name: string;
-  siteId: SiteId;
-  accountLabel: string;
-  identityEnvironmentRef: string;
-  executionIdentityRef: string;
-  profileRef: string;
-  requestedProviderId: ProviderId;
-  loginState: LoginState;
-  manualAuthenticationState: ManualAuthState;
-  profileStorageRef: string;
-  credentialRef: string;
-  proxyRef: string;
-  proxyLabel: string;
-  region: string;
-  language: string;
-  timezone: string;
-  userAgentSummary: string;
-  viewport: string;
-  fingerprintSummary: string;
-};
+export const identitySelectionStorageKey = "webenvoy.browser.selected-identity.v2";
 
 export type HarborProviderCatalog = {
   schema_version: "harbor-browser-provider-status/v0";
@@ -48,6 +27,12 @@ export type HarborProviderStatus = {
   limitations?: string[];
   download_guide?: { install_hint: string; missing_impacts: string[] };
   diagnostics?: Array<{ app_summary: string; suggested_action: string }>;
+  capabilities?: Array<{
+    key: "proxy" | "timezone" | "locale" | "viewport" | "native_fingerprint_control" | "automation_exposure_reduction";
+    state: "supported" | "limited" | "unsupported" | "unknown";
+    source: "runtime_verification" | "provider_api" | "provider_claim" | "app_default";
+    reason?: string | null;
+  }>;
 };
 
 export type HarborIdentityFacts = {
@@ -76,11 +61,17 @@ export type HarborIdentityFacts = {
   environment: {
     proxy: { state: "configured" | "missing" | "unknown"; proxy_ref: string | null; label: string | null };
     region: string | null;
+    geoip_mode?: "proxy" | "system" | "disabled" | null;
     language: string | null;
     timezone: string | null;
     browser_family: string;
     user_agent_summary: string | null;
     viewport: string | null;
+    hardware_concurrency?: number | null;
+    device_memory_gb?: number | null;
+    gpu_profile?: string | null;
+    interaction_preset?: "default" | "humanized" | null;
+    fingerprint_strategy?: "provider_default" | "stable" | null;
     fingerprint_summary: string;
   };
   provider_binding: {
@@ -129,6 +120,7 @@ export type HarborIdentityLoadState = {
   fetchedAt: string;
   summary: string;
   identities: IdentityEnvironmentProjection[];
+  providers: HarborProviderStatus[];
 };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

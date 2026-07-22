@@ -81,12 +81,19 @@ export type IdentityEnvironmentProjection = {
   };
   environment: {
     proxy: string;
+    proxyRef: string | null;
+    geoipMode: "proxy" | "system" | "disabled" | null;
     region: string;
     language: string;
     timezone: string;
     browser: string;
     userAgent: string;
     viewport: string;
+    hardwareConcurrency: number | null;
+    deviceMemoryGb: number | null;
+    gpuProfile: string | null;
+    interactionPreset: "default" | "humanized" | null;
+    fingerprintStrategy: "provider_default" | "stable" | null;
     fingerprint: string;
   };
   storage: {
@@ -180,12 +187,19 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
     },
     environment: {
       proxy: "上海住宅代理 · proxy_ref 已配置",
+      proxyRef: "proxy_ref_fixture_xhs",
+      geoipMode: "proxy",
       region: "CN-SH",
       language: "zh-CN",
       timezone: "Asia/Shanghai",
       browser: "CloakBrowser 145",
       userAgent: "Chrome family / desktop",
       viewport: "1440 x 900",
+      hardwareConcurrency: 8,
+      deviceMemoryGb: 8,
+      gpuProfile: "desktop-default",
+      interactionPreset: "default",
+      fingerprintStrategy: "provider_default",
       fingerprint: "provider_claim: cloak-native-fingerprint / validation required",
     },
     storage: {
@@ -264,12 +278,19 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
     },
     environment: {
       proxy: "北京办公出口 · proxy_ref 已配置",
+      proxyRef: "proxy_ref_fixture_boss",
+      geoipMode: "proxy",
       region: "CN-BJ",
       language: "zh-CN",
       timezone: "Asia/Shanghai",
       browser: "CloakBrowser 145",
       userAgent: "Chrome family / desktop",
       viewport: "1366 x 900",
+      hardwareConcurrency: 8,
+      deviceMemoryGb: 8,
+      gpuProfile: "desktop-default",
+      interactionPreset: "default",
+      fingerprintStrategy: "provider_default",
       fingerprint: "configured: stable desktop fingerprint summary",
     },
     storage: {
@@ -348,12 +369,19 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
     },
     environment: {
       proxy: "缺失",
+      proxyRef: null,
+      geoipMode: "system",
       region: "未知",
       language: "zh-CN",
       timezone: "Asia/Shanghai",
       browser: "Google Chrome",
       userAgent: "Chrome official / desktop",
       viewport: "系统默认",
+      hardwareConcurrency: null,
+      deviceMemoryGb: null,
+      gpuProfile: null,
+      interactionPreset: "default",
+      fingerprintStrategy: "provider_default",
       fingerprint: "not_configured",
     },
     storage: {
@@ -397,10 +425,4 @@ export const identityEnvironmentFixtures: IdentityEnvironmentProjection[] = [
       },
     ],
   },
-];
-
-export const identityEnvironmentBoundaries = [
-  "身份环境、登录态、provider 和一致性事实归属 Harbor；App 只展示 public summary 和发送用户意图。",
-  "敏感材料只显示状态或脱敏引用；密码、Cookie、令牌、profile storage 和 raw evidence 不进入 App。",
-  "Provider 只展示 CloakBrowser 和官方 Chrome；Chromium 是内部开发实现，Donut Browser 只作机制参考。",
 ];

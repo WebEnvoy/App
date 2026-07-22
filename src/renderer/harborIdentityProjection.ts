@@ -11,18 +11,9 @@ import type {
   HarborProviderCatalog,
   HarborProviderStatus,
   HarborRuntimeSession,
-  LocalIdentityEnvironmentDraft,
   ProviderId,
   SiteId,
 } from "./harborIdentityTypes";
-
-export function mergeIdentityEnvironmentProjections(
-  primary: IdentityEnvironmentProjection[],
-  fallback: IdentityEnvironmentProjection[],
-) {
-  const seen = new Set(primary.map((identity) => identity.identityEnvironmentRef));
-  return [...primary, ...fallback.filter((identity) => !seen.has(identity.identityEnvironmentRef))];
-}
 
 export function projectHarborIdentity(
   facts: HarborIdentityFacts,
@@ -73,12 +64,19 @@ export function projectHarborIdentity(
     },
     environment: {
       proxy: facts.environment.proxy.label ?? facts.environment.proxy.proxy_ref ?? facts.environment.proxy.state,
+      proxyRef: facts.environment.proxy.proxy_ref,
+      geoipMode: facts.environment.geoip_mode ?? null,
       region: facts.environment.region ?? "未知",
       language: facts.environment.language ?? "未知",
       timezone: facts.environment.timezone ?? "未知",
       browser: facts.environment.browser_family,
       userAgent: facts.environment.user_agent_summary ?? "未知",
       viewport: facts.environment.viewport ?? "未知",
+      hardwareConcurrency: facts.environment.hardware_concurrency ?? null,
+      deviceMemoryGb: facts.environment.device_memory_gb ?? null,
+      gpuProfile: facts.environment.gpu_profile ?? null,
+      interactionPreset: facts.environment.interaction_preset ?? null,
+      fingerprintStrategy: facts.environment.fingerprint_strategy ?? null,
       fingerprint: facts.environment.fingerprint_summary,
     },
     storage: {
@@ -96,70 +94,6 @@ export function projectHarborIdentity(
       boundary: "App 只发送启动、查看、接管、释放、停止意图；Harbor 拥有 session、controller、viewer 和 provider truth。",
     },
     taskEntries: [],
-  };
-}
-
-export function projectLocalDraft(
-  draft: LocalIdentityEnvironmentDraft,
-  catalog: HarborProviderCatalog | null,
-  fetchedAt: string,
-): IdentityEnvironmentProjection {
-  const selected = providerName(draft.requestedProviderId);
-  const recoveryRequired = draft.loginState !== "logged_in";
-  return {
-    id: draft.id,
-    name: draft.name,
-    siteName: siteLabel(draft.siteId),
-    siteId: draft.siteId,
-    origin: siteOrigin(draft.siteId),
-    accountLabel: draft.accountLabel,
-    source: "App local-only",
-    fetchedAt,
-    identityEnvironmentRef: draft.identityEnvironmentRef,
-    executionIdentityRef: draft.executionIdentityRef,
-    profileRef: draft.profileRef,
-    provider: {
-      selected,
-      role: selected === "CloakBrowser" ? "默认主力" : "受限后备",
-      state: catalog ? "unknown" : "warning",
-      reason: catalog ? "Provider 状态来自 Harbor 检测；身份环境配置来自 App 本地允许字段。" : "等待 Harbor provider 检测回读。",
-    },
-    login: {
-      state: loginLabel(draft.loginState),
-      recoveryRequired,
-      manualAuthenticationState: manualAuthLabel(draft.manualAuthenticationState),
-      recoveryActions: recoveryRequired ? [manualAuthLabel(draft.manualAuthenticationState)] : [],
-      reason: "App 只保存登录状态摘要；认证必须在 Harbor 浏览器现场人工完成。",
-    },
-    environment: {
-      proxy: draft.proxyLabel || draft.proxyRef || "缺失",
-      region: draft.region,
-      language: draft.language,
-      timezone: draft.timezone,
-      browser: selected,
-      userAgent: draft.userAgentSummary,
-      viewport: draft.viewport,
-      fingerprint: draft.fingerprintSummary,
-    },
-    storage: {
-      profileStorage: draft.profileStorageRef ? "存在" : "未知",
-      cookies: draft.loginState === "logged_in" ? "存在" : draft.loginState === "expired" ? "过期" : "未知",
-      credentialRef: draft.credentialRef ? "已绑定本机引用" : "未绑定",
-    },
-    readiness: {
-      state: draft.loginState === "logged_in" ? "ready" : "needs-auth",
-      label: draft.loginState === "logged_in" ? "可请求 Harbor 会话" : "需要人工认证",
-      reasons: ["本地只保存允许配置/选择；真实 session、provider 和登录恢复必须由 Harbor 回读。"],
-    },
-    siteBindings: siteBindings(draft.siteId),
-    browser: {
-      providers: providerList(catalog, null),
-      defaultProvider: selected === "官方 Chrome" ? "官方 Chrome" : "CloakBrowser",
-      targets: manualBrowserTargets,
-      session: emptySession(selected === "官方 Chrome" ? "官方 Chrome" : "CloakBrowser", draft.identityEnvironmentRef),
-      boundary: "App 本地配置不包含密码、Cookie、token、profile 原始内容或 raw evidence；启动后以 Harbor session facts 为准。",
-    },
-    taskEntries: taskEntries(draft.siteId),
   };
 }
 
@@ -191,35 +125,6 @@ export function projectHarborSession(
     title: result.current_page.title ?? "无标题",
     startedAt: result.created_at,
     message: result.current_error?.message ?? "Harbor 已返回真实本地身份浏览器会话事实。",
-  };
-}
-
-export function identityInputFromProjection(identity: IdentityEnvironmentProjection) {
-  return {
-    identity_environment_ref: identity.identityEnvironmentRef,
-    execution_identity_ref: identity.executionIdentityRef,
-    profile_ref: identity.profileRef,
-    site: {
-      site_id: identity.siteId,
-      origin: identity.origin,
-      display_name: identity.siteName,
-      account_identifier: identity.accountLabel,
-    },
-    login_state: reverseLoginLabel(identity.login.state),
-    storage_state: identity.storage.profileStorage === "存在" ? "present" : "unknown",
-    profile_storage_ref: `${identity.profileRef}:storage`,
-    proxy_label: identity.environment.proxy,
-    region: identity.environment.region,
-    language: identity.environment.language,
-    timezone: identity.environment.timezone,
-    browser_family: identity.provider.selected === "官方 Chrome" ? "chrome_official" : "cloakbrowser",
-    user_agent_summary: identity.environment.userAgent,
-    viewport: identity.environment.viewport,
-    fingerprint_summary: identity.environment.fingerprint,
-    login_method: "manual",
-    manual_authentication_state: identity.login.recoveryRequired ? "required" : "not_required",
-    human_verification: identity.login.recoveryRequired ? ["manual_login"] : [],
-    requested_provider_id: identity.provider.selected === "官方 Chrome" ? "chrome_official" : "cloakbrowser",
   };
 }
 
@@ -270,18 +175,6 @@ function emptySession(provider: BrowserSessionProjection["provider"], identityRe
   };
 }
 
-function taskEntries(siteId: SiteId) {
-  return siteId === "boss"
-    ? [
-        { id: "task-entry-boss-real-read", label: "启动 BOSS 职位搜索", taskId: "task-boss-real-read", inputSummary: "职位关键词：前端工程师；城市：上海；结果数：15。", readiness: "真实搜索结果来自 Core owner API；职位详情等待真实 detail_ref。", source: "Core fixture" as const },
-        { id: "task-entry-boss-write-preview", label: "查看 BOSS 打招呼写前验证", taskId: "task-boss-greeting-write-preview", inputSummary: "目标职位、候选人消息框和打招呼文案的真实页面写前验证。", readiness: "只展示 submitted=false / 未发送 的写前投影；不发送消息。", source: "Core fixture" as const },
-      ]
-    : [
-        { id: "task-entry-xhs-real-read", label: "启动小红书搜索/笔记读取", taskId: "task-xhs-real-read", inputSummary: "关键词：AI 工具；可继续读取指定笔记 URL。", readiness: "真实任务结果来自 Core owner API；离线时显示 fallback projection。", source: "Core fixture" as const },
-        { id: "task-entry-xhs-write-preview", label: "查看小红书发布草稿写前验证", taskId: "task-xhs-publish-write-preview", inputSummary: "草稿标题、正文、话题和发布器字段的真实页面写前验证。", readiness: "只展示 submitted=false / 未发布 的写前投影；不点击发布。", source: "Core fixture" as const },
-      ];
-}
-
 function siteBindings(siteId: SiteId) {
   return siteId === "boss" ? ["BOSS 职位搜索", "BOSS 打招呼写前预览"] : ["小红书搜索和笔记读取", "小红书发布草稿写前预览"];
 }
@@ -294,20 +187,12 @@ function siteLabel(siteId: SiteId): "小红书" | "BOSS" {
   return siteId === "boss" ? "BOSS" : "小红书";
 }
 
-function siteOrigin(siteId: SiteId) {
-  return siteId === "boss" ? "https://www.zhipin.com" : "https://www.xiaohongshu.com";
-}
-
 function providerName(providerId: ProviderId | null): "CloakBrowser" | "官方 Chrome" | "未可用" {
   return providerId === "chrome_official" ? "官方 Chrome" : providerId === "cloakbrowser" ? "CloakBrowser" : "未可用";
 }
 
 function loginLabel(state: string) {
   return state === "logged_in" ? "已登录" : state === "logged_out" ? "未登录" : state === "expired" ? "已过期" : state === "manual_auth_required" ? "需要人工认证" : "未知";
-}
-
-function reverseLoginLabel(label: string) {
-  return label === "已登录" ? "logged_in" : label === "未登录" ? "logged_out" : label === "已过期" ? "expired" : label === "需要人工认证" ? "manual_auth_required" : "unknown";
 }
 
 function manualAuthLabel(state: string) {
