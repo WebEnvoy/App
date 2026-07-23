@@ -3,18 +3,27 @@ const metadataKey =
   /(^|_)(capture_method|environment|id|kind|locator|metadata|mode|provenance|ref|refs|runtime|schema|source|type)($|_)/i;
 const metadataContainerKey = /(^|_)(locator|locators|provenance|ref|refs|source|sources)($|_)/i;
 
-export function fixtureOrDemoPayloadReason(value: unknown): string | null {
-  return fixtureOrDemoReason(value, "$", 0, false);
+type OwnerPayloadInspectionOptions = { maximumDepth?: number };
+
+export function fixtureOrDemoPayloadReason(value: unknown, options: OwnerPayloadInspectionOptions = {}): string | null {
+  const maximumDepth = options.maximumDepth ?? 8;
+  return fixtureOrDemoReason(value, "$", 0, false, maximumDepth);
 }
 
-function fixtureOrDemoReason(value: unknown, path: string, depth: number, metadataContext: boolean): string | null {
-  if (depth > 8) return `${path}=maximum metadata inspection depth exceeded`;
+function fixtureOrDemoReason(
+  value: unknown,
+  path: string,
+  depth: number,
+  metadataContext: boolean,
+  maximumDepth: number,
+): string | null {
+  if (depth > maximumDepth) return `${path}=maximum metadata inspection depth exceeded`;
   if (typeof value === "string" && metadataContext && fixtureToken.test(value)) {
     return `${path}=${value}`;
   }
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
-      const reason = fixtureOrDemoReason(value[index], `${path}[${index}]`, depth + 1, metadataContext);
+      const reason = fixtureOrDemoReason(value[index], `${path}[${index}]`, depth + 1, metadataContext, maximumDepth);
       if (reason) return reason;
     }
     return null;
@@ -30,7 +39,7 @@ function fixtureOrDemoReason(value: unknown, path: string, depth: number, metada
       return `${path}.${key}=${field}`;
     }
     if (isRecord(field) || Array.isArray(field)) {
-      const reason = fixtureOrDemoReason(field, `${path}.${key}`, depth + 1, childMetadataContext);
+      const reason = fixtureOrDemoReason(field, `${path}.${key}`, depth + 1, childMetadataContext, maximumDepth);
       if (reason) return reason;
     }
   }
