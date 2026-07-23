@@ -30,6 +30,7 @@ import type { TaskProjection } from "./taskThreadFixtures";
 export type CreateTaskSelection = {
   skill: LodeCatalogSkill;
   identityId?: string;
+  targetRef?: string;
 };
 
 type CheckCompatibility = (
@@ -98,7 +99,7 @@ function CreateTaskContent(props: CreateTaskShellProps) {
   }
   return (
     <CreateTaskComposer
-      key={`${selection.skill.packageRef}:${selection.skill.version}:${selection.identityId ?? "none"}`}
+      key={`${selection.skill.packageRef}:${selection.skill.version}:${selection.identityId ?? "none"}:${selection.targetRef ?? "manual"}`}
       compatibility={compatibilityBySkill[selection.skill.id]}
       identity={identity}
       selection={selection}
@@ -226,10 +227,12 @@ function CreateTaskComposer(props: CreateTaskComposerProps) {
     identity={identity}
     runtime={props.runtimeSupervisorState}
     skill={selection.skill}
+    fixedBusinessInput={selection.targetRef == null ? undefined : { label: "业务输入", summary: "读取所选搜索结果的详情" }}
     submitLabel="创建任务"
     onPreSubmit={async (draft: SkillInputDraft) => {
       const fieldId = compatibilityTargetFieldId(selection.skill);
-      const state = await props.onCheckCompatibility(selection.skill, identity.id, compatibilityTargetValue(draft, fieldId));
+      const targetRef = selection.targetRef ?? compatibilityTargetValue(draft, fieldId);
+      const state = await props.onCheckCompatibility(selection.skill, identity.id, targetRef);
       const candidate = compatibilityCandidate(identity, state ?? props.compatibility);
       return isCandidateUsable(candidate)
         ? { ok: true }
@@ -243,6 +246,7 @@ function CreateTaskComposer(props: CreateTaskComposerProps) {
       ownerRefs,
       executionPolicy,
       runtime: props.runtimeSupervisorState,
+      ownerTargetRef: selection.targetRef,
       threadModes,
       threadModeOverrides,
     })}

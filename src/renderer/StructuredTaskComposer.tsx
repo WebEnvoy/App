@@ -25,7 +25,12 @@ import { catalogSkillName, catalogSkillSiteName, type LodeCatalogSkill } from ".
 import { releaseLocalAttachments } from "./localFileClient";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
 import { validateSkillInputDraft, type SkillInputAttachment, type SkillInputDraft, type SkillInputValue } from "./skillInputDraft";
-import { releaseSkillInputOwnerRefs, sealSkillInput, type SkillInputOwnerRefs } from "./skillInputOwnerClient";
+import {
+  releaseSkillInputOwnerRefs,
+  sealSkillInput,
+  type SkillInputOwnerRefs,
+  type SkillInputProjectionRefs,
+} from "./skillInputOwnerClient";
 import {
   initialTaskThreadSubmitState,
   reconcileTaskThreadTurn,
@@ -45,11 +50,12 @@ export type StructuredTaskComposerProps = {
   threadRef?: string;
   submitBlockedReason?: string;
   activeTurnLabel?: string;
+  fixedBusinessInput?: { label: string; summary: string };
   submitLabel: string;
   onPreSubmit?: (draft: SkillInputDraft) => Promise<{ ok: true } | { ok: false; reason: string }>;
   onSubmit: (
     draft: SkillInputDraft,
-    ownerRefs: SkillInputOwnerRefs,
+    ownerRefs: SkillInputProjectionRefs,
     policy: EffectiveExecutionPolicy,
     modes: ExecutionPolicyModes,
     modeOverrides: ExecutionPolicyModes,
@@ -68,7 +74,7 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
   const [modes, setModes] = useState<ExecutionPolicyModes>({});
   const [modifiedCategories, setModifiedCategories] = useState<Set<ExecutionCategory>>(() => new Set());
   const formRef = useRef<HTMLFormElement>(null);
-  const errors = validateSkillInputDraft(props.skill, draft);
+  const errors = props.fixedBusinessInput == null ? validateSkillInputDraft(props.skill, draft) : {};
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +96,12 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
     input.dataset.webenvoyComposer = "";
     return registerComposerInput(input, { composerId: props.threadRef ? "task-thread-primary" : "create-task-primary", isPrimaryComposer: true });
   }, [props.skill.packageRef, props.threadRef]);
+
+  useEffect(() => {
+    if (props.fixedBusinessInput == null) return;
+    const frame = window.requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("[data-fixed-business-input]")?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [props.fixedBusinessInput?.summary]);
 
   if (loading) return <div className="composer-owner-state" role="status">正在恢复受保护草稿。</div>;
 
@@ -113,29 +125,41 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
       setSubmitState({ status: "blocked", summary: preflight.reason });
       return;
     }
-    setSubmitState({ status: "submitting", summary: "正在封存业务输入并提交 Core 任务回合。" });
-    const sealed = await sealSkillInput(props.skill, props.identity.id, draft);
-    if (!sealed.ok) {
-      setSubmitState({ status: "blocked", summary: sealed.reason });
-      return;
+    const submittedDraft = props.fixedBusinessInput == null ? draft : { values: {}, files: {} };
+    let sealedOwnerRefs: SkillInputOwnerRefs | undefined;
+    setSubmitState({
+      status: "submitting",
+      summary: props.fixedBusinessInput == null ? "正在封存业务输入并提交 Core 任务回合。" : "正在提交 Core 任务回合。",
+    });
+    if (props.fixedBusinessInput == null) {
+      const sealed = await sealSkillInput(props.skill, props.identity.id, submittedDraft);
+      if (!sealed.ok) {
+        setSubmitState({ status: "blocked", summary: sealed.reason });
+        return;
+      }
+      sealedOwnerRefs = sealed.refs;
     }
     const result = await props.onSubmit(
-      draft,
-      sealed.refs,
+      submittedDraft,
+      sealedOwnerRefs ?? { fieldOwnerRefs: {}, attachmentRefs: {} },
       policyState.policy,
       modes,
       executionPolicyModeMutation(modes, modifiedCategories),
     );
     setSubmitState(result);
     if ("task" in result && result.task != null) props.onTask(result.task);
-    if (result.status === "blocked" || result.status === "failed") {
-      await releaseSkillInputOwnerRefs([sealed.refs.ownerRef]);
+    if ((result.status === "blocked" || result.status === "failed") && sealedOwnerRefs != null) {
+      await releaseSkillInputOwnerRefs([sealedOwnerRefs.ownerRef]);
     }
     if (result.status !== "ready") return;
     await finishAcceptedTurn();
   }
 
   async function finishAcceptedTurn() {
+    if (props.fixedBusinessInput != null) {
+      setAnnouncement("任务回合已提交。");
+      return;
+    }
     const persistence = await clearDraft();
     setTouched(new Set());
     setSubmitted(false);
@@ -192,7 +216,7 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
   return (
     <form ref={formRef} className="thread-composer create-task-composer structured-task-composer" noValidate onSubmit={submit}>
       <div className="sr-only" aria-live="assertive" aria-atomic="true">{announcement}</div>
-      {restored.restored || restored.persistence === "unavailable" ? (
+      {props.fixedBusinessInput == null && (restored.restored || restored.persistence === "unavailable") ? (
         <div className="create-task-draft-state" role="status">
           {restored.restored ? "已恢复草稿。" : ""}
           {restored.omittedFieldIds.length > 0 ? "敏感字段需重新填写。" : ""}
@@ -200,16 +224,23 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
         </div>
       ) : null}
       <fieldset className="create-task-fieldset" disabled={clearing || submitState.status === "submitting"}>
-        <CreateTaskFields
-          draft={draft}
-          errors={errors}
-          submitted={submitted}
-          touched={touched}
-          onBlur={(fieldId) => setTouched((current) => new Set(current).add(fieldId))}
-          onFiles={updateFiles}
-          onValue={updateValue}
-          skill={props.skill}
-        />
+        {props.fixedBusinessInput == null ? (
+          <CreateTaskFields
+            draft={draft}
+            errors={errors}
+            submitted={submitted}
+            touched={touched}
+            onBlur={(fieldId) => setTouched((current) => new Set(current).add(fieldId))}
+            onFiles={updateFiles}
+            onValue={updateValue}
+            skill={props.skill}
+          />
+        ) : (
+          <div className="fixed-business-input" aria-label="业务输入" data-fixed-business-input tabIndex={-1}>
+            <span>{props.fixedBusinessInput.label}</span>
+            <strong>{props.fixedBusinessInput.summary}</strong>
+          </div>
+        )}
       </fieldset>
       <ComposerFooter
         {...props}
@@ -247,7 +278,7 @@ function ComposerFooter(props: StructuredTaskComposerProps & {
   const submitLocked = busy || props.submitState.status === "unknown";
   return (
     <div className="create-task-composer-toolbar">
-      <button className="composer-icon-button" type="button" disabled={busy} aria-label="清空业务输入" title="清空业务输入" onClick={props.onClear}><Trash2 size={14} /></button>
+      {props.fixedBusinessInput == null ? <button className="composer-icon-button" type="button" disabled={busy} aria-label="清空业务输入" title="清空业务输入" onClick={props.onClear}><Trash2 size={14} /></button> : null}
       <span className="create-task-context" title={`${catalogSkillSiteName(props.skill)} · ${catalogSkillName(props.skill)} · ${props.identity.accountLabel}`}>
         <strong>{catalogSkillName(props.skill)}</strong><small>{props.identity.accountLabel} · {catalogSkillSiteName(props.skill)}</small>
       </span>

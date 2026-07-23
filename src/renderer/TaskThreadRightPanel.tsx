@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Globe2,
   ShieldCheck,
+  ArrowRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -18,6 +19,7 @@ import type { CoreTaskSubmitState } from "./coreTaskSubmitClient";
 import { type RuntimeSupervisorState } from "./runtimeSupervisorState";
 import type { RunProjection, TaskProjection } from "./taskThreadFixtures";
 import type { TaskPreviewSelection } from "./useAppTasks";
+import { isOpaqueDetailRef } from "./resultDetailHandoff";
 
 type SourceHealth = {
   id: "core" | "harbor" | "lode";
@@ -54,6 +56,7 @@ export function TaskThreadRightPanel({
   selectedRun,
   selectedTask,
   previewSelection,
+  onReadDetail,
   skills,
   shellDiagnostics,
 }: {
@@ -64,6 +67,7 @@ export function TaskThreadRightPanel({
   selectedRun: RunProjection;
   selectedTask: TaskProjection;
   previewSelection: TaskPreviewSelection;
+  onReadDetail?: (detailRef: string) => Promise<boolean> | boolean;
   skills?: LodeCatalogSkill[];
   shellDiagnostics: ShellDiagnostics;
 }) {
@@ -80,7 +84,7 @@ export function TaskThreadRightPanel({
           ...tab,
           content:
             tab.id === "result" ? (
-              <ResultTab coreEndpoint={coreEndpoint} selectedItemIds={previewSelection.itemIds} selectedRun={selectedRun} skills={skills} />
+              <ResultTab coreEndpoint={coreEndpoint} selectedItemIds={previewSelection.itemIds} selectedRun={selectedRun} skills={skills} onReadDetail={onReadDetail} />
             ) : tab.id === "evidence" ? (
               <EvidenceTab selectedRun={selectedRun} />
             ) : tab.id === "session" ? (
@@ -108,13 +112,16 @@ export function TaskThreadRightPanel({
   );
 }
 
-function ResultTab({ coreEndpoint, selectedItemIds, selectedRun, skills }: {
+function ResultTab({ coreEndpoint, selectedItemIds, selectedRun, skills, onReadDetail }: {
   coreEndpoint: string;
   selectedItemIds?: string[];
   selectedRun: RunProjection;
   skills?: LodeCatalogSkill[];
+  onReadDetail?: (detailRef: string) => Promise<boolean> | boolean;
 }) {
   const [state, setState] = useState<CoreRunResultState | { status: "fixture" }>(() => selectedRun.source === "Core live" ? { status: "loading" } : { status: "fixture" });
+  const [handoffState, setHandoffState] = useState<"idle" | "loading" | "failed">("idle");
+  const detailRef = selectedItemIds?.length === 1 && isOpaqueDetailRef(selectedItemIds[0]) ? selectedItemIds[0] : undefined;
   useEffect(() => {
     if (selectedRun.source !== "Core live") {
       setState({ status: "fixture" });
@@ -127,10 +134,32 @@ function ResultTab({ coreEndpoint, selectedItemIds, selectedRun, skills }: {
     });
     return () => controller.abort();
   }, [coreEndpoint, selectedRun.id, selectedRun.source, selectedRun.updatedAt]);
+  useEffect(() => setHandoffState("idle"), [detailRef]);
   return (
     <div className="context-copy task-result-preview">
       <div className="card-title"><Box size={18} /><h3>{selectedRun.label}</h3></div>
       <TaskBusinessResult resultState={state} run={selectedRun} selectedItemIds={selectedItemIds} skills={skills} />
+      {detailRef != null && onReadDetail != null ? (
+        <div className="task-result-detail-action">
+          <button
+            type="button"
+            className="production-primary-button"
+            data-read-result-detail
+            disabled={handoffState === "loading"}
+            onClick={async () => {
+              setHandoffState("loading");
+              try {
+                setHandoffState(await onReadDetail(detailRef) ? "idle" : "failed");
+              } catch {
+                setHandoffState("failed");
+              }
+            }}
+          >
+            读取详情<ArrowRight size={14} />
+          </button>
+          {handoffState === "failed" ? <span role="status">当前无法创建详情任务。</span> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

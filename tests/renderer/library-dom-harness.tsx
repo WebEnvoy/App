@@ -193,6 +193,23 @@ async function runProductionShellFlow() {
     identities: [identity, identityB],
   });
   await waitUntil(() => controllerSnapshot?.skillWorkbench.compatibilityBySkill[xhsSkill.id]?.status === "ready", "initial compatibility");
+  await waitUntil(() => controllerSnapshot?.tasks.selectedTask?.threadContext?.accountIdentityKey === identity.identityEnvironmentRef, "thread identity binding");
+  const detailRef = "detail_ref_123e4567-e89b-42d3-a456-426614174000";
+  if (!await controllerSnapshot!.actions.openResultDetail(detailRef)) {
+    throw new Error("Production controller did not open the owner-ref detail handoff.");
+  }
+  await waitUntil(() => controllerSnapshot?.skillWorkbench.createTaskSelection?.targetRef === detailRef &&
+    controllerSnapshot?.navigation.workMode === "create" && document.activeElement?.matches("[data-fixed-business-input]") === true,
+  "detail handoff composer");
+  const detailSelection = controllerSnapshot!.skillWorkbench.createTaskSelection;
+  if (detailSelection?.identityId !== identity.id ||
+    detailSelection.skill.packageRef !== detailSkill.packageRef ||
+    !document.body.textContent?.includes("读取所选搜索结果的详情") ||
+    document.body.textContent?.includes(detailRef)) {
+    throw new Error("Detail handoff did not preserve the thread identity or keep the owner ref hidden.");
+  }
+  controllerSnapshot!.actions.openView("work");
+  await waitUntil(() => controllerSnapshot?.skillWorkbench.createTaskSelection == null, "detail handoff reset");
   controllerSnapshot!.skillWorkbench.recoverCandidate(xhsSkill, identityB.id, {
     identityEnvironmentRef: identityB.identityEnvironmentRef,
     status: "requires_setup",
@@ -270,6 +287,7 @@ async function runProductionShellFlow() {
     staleReadyRecomputed: true,
     abandonedRecoveryCleared: true,
     recoveryRequestConsumed: true,
+    resultDetailHandoff: true,
     horizontalOverflow: false,
   };
 }

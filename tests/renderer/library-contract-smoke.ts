@@ -6,7 +6,7 @@ import {
   parseSkillIdentityCompatibilityResponse,
   projectCompatibilityTarget,
 } from "../../src/renderer/coreIdentityCompatibilityClient";
-import { buildCoreThreadInputSnapshot } from "../../src/renderer/coreTaskThreadSubmitClient";
+import { buildCoreThreadInputSnapshot, prepareTaskTurnRequest } from "../../src/renderer/coreTaskThreadSubmitClient";
 import { coreTaskSubmitFailureSummary, coreTaskSubmitReadiness, readOnlyIdentityAdmissionBlockReason } from "../../src/renderer/coreTaskSubmitClient";
 import { projectCoreThreadResponse } from "../../src/renderer/coreThreadClient";
 import { parseCoreThreadInputSnapshot } from "../../src/renderer/coreThreadInputContract";
@@ -40,10 +40,62 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
   const request = checkRequestProjection(input);
   checkResponseProjection(request);
   checkTurnInputProjection(input.xhsSkill);
+  checkResultDetailTurn(input.detailSkill);
   checkExecutionPolicyMutation();
   await checkDraftProjection(input);
   await checkOwnerBoundaries(input.catalog);
   await checkRejectedAuthorizationDecisions();
+}
+
+function checkResultDetailTurn(detailSkill: LodeCatalogSkill) {
+  const detailRef = "detail_ref_123e4567-e89b-42d3-a456-426614174000";
+  const skill = detailSkill;
+  const executionPolicy = {
+    skillRef: skill.packageRef,
+    actions: [{
+      actionId: skill.actions[0]!.id,
+      category: "read" as const,
+      riskMarker: null,
+      targetScope: { siteSlug: skill.siteSlug, targetTypes: skill.actions[0]!.targetTypes, supportedOrigins: skill.actions[0]!.supportedOrigins },
+      policy: { mode: "auto" as const, source: "installed_skill_user_version" as const, sourceRef: "execution-policy:skill/xhs-detail", sourceVersion: "1" },
+    }],
+  };
+  const prepared = prepareTaskTurnRequest({
+    endpoint: "http://core.owner",
+    skill,
+    identity,
+    draft: { values: {}, files: {} },
+    ownerRefs: { ownerRef: "draft:app-protected/00000000-0000-4000-8000-000000000021", fieldOwnerRefs: {}, attachmentRefs: {} },
+    executionPolicy,
+    runtime,
+    ownerTargetRef: detailRef,
+  });
+  if (!prepared.ok) throw new Error(`Core detail turn handoff was rejected: ${prepared.reason}`);
+  const intent = prepared.request.task_intent as {
+    input?: { refs?: string[] };
+    scope?: { target_type?: string; target_ref?: string };
+  };
+  const harbor = prepared.request.harbor as { url?: string } | undefined;
+  if (
+    JSON.stringify(intent.input?.refs) !== JSON.stringify([detailRef]) ||
+    intent.scope?.target_type !== "xiaohongshu_note_detail" ||
+    intent.scope.target_ref !== detailRef ||
+    prepared.request.public_query !== undefined ||
+    harbor?.url !== undefined
+  ) {
+    throw new Error("Search-to-detail handoff did not use the Core-owned opaque detail-ref contract.");
+  }
+  const mismatched = prepareTaskTurnRequest({
+    endpoint: "http://core.owner",
+    skill: { ...skill, lockRef: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.1" },
+    identity,
+    draft: { values: {}, files: {} },
+    ownerRefs: { ownerRef: "draft:app-protected/00000000-0000-4000-8000-000000000021", fieldOwnerRefs: {}, attachmentRefs: {} },
+    executionPolicy,
+    runtime,
+    ownerTargetRef: detailRef,
+  });
+  if (mismatched.ok) throw new Error("A detail ref was accepted with a mismatched package lock.");
 }
 
 function checkExecutionPolicyMutation() {

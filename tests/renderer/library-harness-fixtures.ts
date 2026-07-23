@@ -63,6 +63,7 @@ export const detailSkill: LodeCatalogSkill = {
   ...xhsSkill,
   id: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
   packageRef: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+  lockRef: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.0",
   name: "Read note detail",
   category: "Content detail",
   inputFields: [{ id: "url", label: "Detail URL", kind: "text", required: true, description: "Exact detail URL", inputProjection: "owner_ref", format: "uri", pattern: "^https://www\\.xiaohongshu\\.com/(?:explore|search_result)/[A-Za-z0-9]+(?:\\?.*)?$", patternSafety: "linear" }],

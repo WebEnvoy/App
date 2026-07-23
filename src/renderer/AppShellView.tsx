@@ -225,6 +225,7 @@ function AppRightPanel({ controller }: { controller: AppController }) {
         coreReadState={tasks.effectiveCoreReadState} coreSubmitState={tasks.coreSubmitState}
         runtimeSupervisorState={sources.runtimeSupervisorState} selectedRun={tasks.previewRun} selectedTask={tasks.selectedTask}
         previewSelection={tasks.previewSelection} skills={sources.lodeCatalogState.skills}
+        onReadDetail={controller.actions.openResultDetail}
         shellDiagnostics={{ colorScheme: sources.shellContext?.colorScheme, configScope: sources.shellContext?.configScope, platform: sources.shellContext?.platform }}
       />
     </RightPanel>

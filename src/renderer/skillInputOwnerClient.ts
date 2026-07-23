@@ -9,6 +9,8 @@ export type SkillInputOwnerRefs = {
   attachmentRefs: Record<string, string[]>;
 };
 
+export type SkillInputProjectionRefs = Pick<SkillInputOwnerRefs, "fieldOwnerRefs" | "attachmentRefs">;
+
 export async function sealSkillInput(
   skill: LodeCatalogSkill,
   identityId: string,

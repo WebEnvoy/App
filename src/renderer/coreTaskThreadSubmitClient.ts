@@ -5,8 +5,13 @@ import type { HarborIdentityLoadState } from "./harborIdentityTypes";
 import type { LodeCatalogSkill } from "./lodeCatalogClient";
 import { requestOwnerJson } from "./ownerApiClient";
 import { runtimeService, type RuntimeSupervisorState } from "./runtimeSupervisorState";
+import {
+  isOpaqueDetailRef,
+  isXiaohongshuDetailHandoffSkill,
+  xiaohongshuDetailHandoff,
+} from "./resultDetailHandoff";
 import type { SkillInputDraft, SkillInputValue } from "./skillInputDraft";
-import type { SkillInputOwnerRefs } from "./skillInputOwnerClient";
+import type { SkillInputProjectionRefs } from "./skillInputOwnerClient";
 import { projectCoreThreadResponse } from "./coreThreadClient";
 import type { CoreThreadInputSnapshot } from "./coreThreadInputContract";
 import type { TaskProjection } from "./taskThreadFixtures";
@@ -35,7 +40,7 @@ export async function createTaskThreadTurn(options: SubmitOptions & {
   threadModes: ExecutionPolicyModes;
   threadModeOverrides: ExecutionPolicyModes;
 }) {
-  const prepared = prepareTaskTurn(options, options.threadModes);
+  const prepared = prepareTaskTurnRequest(options, options.threadModes);
   if (!prepared.ok) return blocked(prepared.reason);
   const created = await requestOwnerJson(options.endpoint, "/threads", {
     method: "POST",
@@ -78,7 +83,7 @@ export async function createTaskThreadTurn(options: SubmitOptions & {
 }
 
 export async function appendTaskThreadTurn(options: SubmitOptions & { threadRef: string }) {
-  const prepared = prepareTaskTurn(options);
+  const prepared = prepareTaskTurnRequest(options);
   if (!prepared.ok) return blocked(prepared.reason);
   return withExactSkillPackage(await appendPreparedTurn(options.endpoint, options.threadRef, prepared.request), options.skill);
 }
@@ -102,9 +107,10 @@ type SubmitOptions = {
   skill: LodeCatalogSkill;
   identity: Identity;
   draft: SkillInputDraft;
-  ownerRefs: SkillInputOwnerRefs;
+  ownerRefs: SkillInputProjectionRefs;
   executionPolicy: EffectiveExecutionPolicy;
   runtime: RuntimeSupervisorState;
+  ownerTargetRef?: string;
 };
 
 async function appendPreparedTurn(endpoint: string, threadRef: string, request: JsonRecord): Promise<TaskThreadSubmitState> {
@@ -152,11 +158,11 @@ export async function reconcileTaskThreadTurn(
   return { status: "ready", summary: "已按原提交标识确认任务回合由 Core 接受。", task };
 }
 
-function prepareTaskTurn(options: SubmitOptions, requestedModes?: ExecutionPolicyModes): { ok: true; capabilityRef: string; request: JsonRecord } | { ok: false; reason: string } {
+export function prepareTaskTurnRequest(options: SubmitOptions, requestedModes?: ExecutionPolicyModes): { ok: true; capabilityRef: string; request: JsonRecord } | { ok: false; reason: string } {
   const readiness = submissionReadiness(options, requestedModes);
   if (readiness != null) return { ok: false, reason: readiness };
   const action = options.skill.actions[0]!;
-  const target = taskTarget(options.skill, options.identity, options.draft);
+  const target = taskTarget(options.skill, options.identity, options.draft, options.ownerTargetRef);
   if (!target.ok) return target;
   const publicQuery = publicQueryForSkill(options.skill, options.draft);
   if (!publicQuery.ok) return publicQuery;
@@ -185,8 +191,8 @@ function prepareTaskTurn(options: SubmitOptions, requestedModes?: ExecutionPolic
           source_ref: options.skill.packageRef,
           ...(options.skill.lockRef ? { lock_ref: options.skill.lockRef } : {}),
         },
-        input: { summary: options.skill.name, refs: [target.url] },
-        scope: { target_type: target.targetType, target_ref: target.url },
+        input: { summary: options.skill.name, refs: [target.ref] },
+        scope: { target_type: target.targetType, target_ref: target.ref },
         policy: {
           risk: action.category === "read" ? "read" : "write",
           execution_intent: action.operationMode,
@@ -198,7 +204,7 @@ function prepareTaskTurn(options: SubmitOptions, requestedModes?: ExecutionPolic
       },
       harbor: {
         identity_environment_ref: options.identity.identityEnvironmentRef,
-        url: target.url,
+        ...(target.url == null ? {} : { url: target.url }),
         reuse_existing: true,
         timeout_ms: 60_000,
       },
@@ -244,8 +250,16 @@ function executionPolicyReadiness(skill: LodeCatalogSkill, policy: EffectiveExec
   return null;
 }
 
-function taskTarget(skill: LodeCatalogSkill, identity: Identity, draft: SkillInputDraft) {
+function taskTarget(skill: LodeCatalogSkill, identity: Identity, draft: SkillInputDraft, ownerTargetRef?: string) {
   const action = skill.actions[0]!;
+  if (ownerTargetRef != null) {
+    if (
+      !isXiaohongshuDetailHandoffSkill(skill) ||
+      identity.siteId !== xiaohongshuDetailHandoff.siteSlug ||
+      !isOpaqueDetailRef(ownerTargetRef)
+    ) return { ok: false as const, reason: "详情目标与技能、版本或账号身份不匹配。" };
+    return { ok: true as const, ref: ownerTargetRef, targetType: xiaohongshuDetailHandoff.targetType };
+  }
   const rawUrl = stringValue(draft.values.url) || identity.origin;
   let url: URL;
   try { url = new URL(rawUrl); } catch { return { ok: false as const, reason: "目标网址无效。" }; }
@@ -263,6 +277,7 @@ function taskTarget(skill: LodeCatalogSkill, identity: Identity, draft: SkillInp
   }
   return {
     ok: true as const,
+    ref: url.href,
     url: url.href,
     targetType: skill.packageRef.includes("/job-search@") ? "boss_job_search" : action.targetTypes[0]!,
   };
@@ -288,7 +303,7 @@ function publicQueryForSkill(skill: LodeCatalogSkill, draft: SkillInputDraft) {
 export function buildCoreThreadInputSnapshot(
   skill: LodeCatalogSkill,
   draft: SkillInputDraft,
-  refs: SkillInputOwnerRefs,
+  refs: SkillInputProjectionRefs,
 ): { ok: true; value: CoreThreadInputSnapshot } | { ok: false; reason: string } {
   const fields: CoreThreadInputSnapshot["fields"] = [];
   const attachmentRefs: string[] = [];
