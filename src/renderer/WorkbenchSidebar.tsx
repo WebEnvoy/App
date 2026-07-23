@@ -225,7 +225,7 @@ function TaskListHeading({
         >
           <MoreHorizontal size={15} />
         </button>
-        <button type="button" aria-label="新建任务" title="新建任务" onClick={onCreateTask}>
+        <button type="button" aria-label="新建任务" title="新建任务" onClick={() => onCreateTask()}>
           <Plus size={15} />
         </button>
         {menuOpen ? (

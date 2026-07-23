@@ -68,7 +68,9 @@ function checkTurnInputProjection(xhsSkill: LodeCatalogSkill) {
   };
   const historicalTask = projectCoreThreadResponse({ ok: true, thread });
   if (historicalTask == null ||
+    projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "identity-env-live-xhs-chrome-20260710" } }) == null ||
     projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "identity-env:legacy-safe" } }) == null ||
+    projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "identity-env-token-secret" } }) != null ||
     projectCoreThreadResponse({ ok: true, thread: { ...thread, identity_environment_ref: "harbor://identity-environment/unsafe" } }) != null) {
     throw new Error("Core thread projection did not distinguish canonical, safe legacy, and unsupported identity refs.");
   }

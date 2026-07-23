@@ -442,8 +442,9 @@ function isCapabilityRef(value: unknown): value is string {
 }
 
 function isIdentityEnvironmentRef(value: unknown): value is string {
-  return typeof value === "string" && (
+  return typeof value === "string" && !/(?:credential|password|secret|token|cookie)/i.test(value) && (
     /^identity-env_[a-f0-9]{24}$/.test(value) ||
+    /^identity-env-[A-Za-z0-9][A-Za-z0-9._~-]{0,2030}$/.test(value) ||
     /^identity-env:[A-Za-z0-9][A-Za-z0-9._~:/-]{0,2030}$/.test(value)
   );
 }

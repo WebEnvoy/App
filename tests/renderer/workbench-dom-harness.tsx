@@ -40,6 +40,7 @@ const consumerBoundary = "Core stores bounded field summaries and owner refs onl
 const authorizationDecisionRef = "authorization-decision:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const authorizationRequests: WebEnvoyOwnerApiJsonRequest[] = [];
 let singleActionAttempts = 0;
+let createTaskSelection: TaskProjection | undefined;
 const resultSkills = [{
   outputKind: "collection",
   outputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
@@ -312,7 +313,7 @@ function WorkbenchDomHarness() {
             taskLoadStatus={retainedState.status}
             tasks={tasks}
             onGroupingChange={() => {}}
-            onCreateTask={() => {}}
+            onCreateTask={(task) => { createTaskSelection = task; }}
             onOpenSettings={() => {}}
             onOpenTask={(task) => setSelectedTaskId(task.id)}
             onOpenView={() => {}}
@@ -478,6 +479,10 @@ async function runDesktopChecks() {
   assert(matchMedia("(prefers-reduced-motion: reduce)").matches, "Reduced motion was not emulated.");
   const menuActions = document.querySelector<HTMLElement>(".task-list-heading-actions");
   assert(menuActions && getComputedStyle(menuActions).transitionDuration === "0s", "Reduced-motion CSS did not disable transitions.");
+  document.querySelector<HTMLButtonElement>("[aria-label='新建任务']")?.click();
+  assert(createTaskSelection === undefined, "Global create-task entry leaked its click event into the task selection contract.");
+  document.querySelector<HTMLButtonElement>(".task-group-add")?.click();
+  assert(createTaskSelection?.id === taskAId, "Skill-group create-task entry did not preserve its task selection.");
   await waitFor(() => document.body.textContent?.includes("允许这一次") === true && document.body.textContent?.includes("拒绝这一次") === true,
     "Active Core confirmation did not render both single-action choices.");
   const denyOnce = Array.from(document.querySelectorAll<HTMLButtonElement>(".single-action-actions button"))
