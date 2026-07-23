@@ -223,6 +223,57 @@ window.webenvoyShell = {
         },
         evidence_refs: [],
       } } };
+      if (runId === "run-owner-nested-read-result") return { ok: true, body: { ok: true, result: {
+        schema_version: "webenvoy.result-query.v0",
+        run_id: runId,
+        status: "succeeded",
+        terminal: true,
+        result: {
+          envelope_state: "available",
+          payload_state: "available",
+          result_ref: `result:core/${runId}`,
+          result_envelope: {
+            schema_version: "webenvoy.result-envelope.v0",
+            run_record_ref: runId,
+            ok: true,
+            outcome: "success",
+            terminal: true,
+            capability_ref: "lode:capability/search-notes",
+            capability_version: "0.1.0",
+            capability_lock_ref: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+            package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+            result_kind: "xhs_note_search",
+            output_schema_id: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
+            projection_ref: "read_result_4bd7acd8-99eb-439d-bec7-ffc18b3d42b8",
+            data: {
+              projection: {
+                result_kind: "xhs_note_search",
+                status: "available",
+                classification: "success_result",
+                normalized: {
+                  schema_version: "webenvoy.core-harbor-read-operation-projection.v0",
+                  public_summary: {
+                    schema_version: "harbor-read-operation-public-summary/v0",
+                    operation_id: "xhs_search_notes",
+                    result_kind: "xiaohongshu_search_notes_surface",
+                    surface: "search_result",
+                    result_state: "operation_read_response_observed",
+                    response_status: 200,
+                    result_count: 15,
+                    detail_refs: ["detail_ref_ff55d94a-9558-4777-9624-e138ed2a76d8"],
+                    source_signals: ["pinia_store", "xhs_search_read_network"],
+                  },
+                  operation_ref: "read_operation_406187891879d3a4128ef8e7f0a036eb",
+                  public_summary_ref: "read_result_4bd7acd8-99eb-439d-bec7-ffc18b3d42b8",
+                },
+                source_refs: ["read_source_406187891879d3a4128ef8e7f0a036eb"],
+                evidence_refs: ["screenshot_5b809153-693d-43e9-ab8f-3edbada20214"],
+              },
+            },
+          },
+        },
+        evidence_refs: [],
+      } } };
       const job = runId.startsWith("run-owner-b-completed");
       return { ok: true, body: { ok: true, result: {
         schema_version: "webenvoy.result-query.v0",
@@ -508,18 +559,24 @@ async function runDesktopChecks() {
   ];
   assert(stateTitles.join(",") === "已取消,执行状态待确认,结果暂不可用,执行超时,结果引用缺失,结果不可读取,结果内容暂不可用", "Terminal result states are not distinct.");
   const forbiddenRuns = ["cookie", "access_token", "sessionToken", "Authorization", "password", "secret", "api_key", "access_key", "private_key", "encryption_key"];
-  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult] = await Promise.all([
+  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult, nestedReadResult] = await Promise.all([
     Promise.all(forbiddenRuns.map((field) => fetchCoreRunResult(coreEndpoint, `run-forbidden-${field}`))),
     fetchCoreRunResult(coreEndpoint, "run-contradictory"),
     fetchCoreRunResult(coreEndpoint, "run-not-persisted"),
     fetchCoreRunResult(coreEndpoint, "run-owner-unavailable"),
     fetchCoreRunResult(coreEndpoint, "run-result-ref-missing"),
+    fetchCoreRunResult(coreEndpoint, "run-owner-nested-read-result"),
   ]);
   assert(forbiddenResults.every((result) => result.status === "unavailable" && result.reason === "invalid") &&
     contradictoryResult.status === "unavailable" && contradictoryResult.reason === "invalid" &&
     notPersistedResult.status === "ready" && notPersistedResult.result.data == null && unavailableResult.status === "unavailable" && unavailableResult.reason === "owner" &&
     missingRefResult.status === "ready" && missingRefResult.result.unavailableReason === "result_ref_missing",
     "Core result client did not fail closed for unsafe or unavailable owner payloads.");
+  assert(
+    nestedReadResult.status === "ready" &&
+      nestedReadResult.result.projectionRef === "read_result_4bd7acd8-99eb-439d-bec7-ffc18b3d42b8",
+    "A valid nested Core owner result was rejected as fixture data.",
+  );
   assert(taskA.runs.some((run) => run.id === "run-owner-a-completed"), "Completed owner turn was not retained.");
   assert(taskA.runs.some((run) => run.id === `runtime-blocked-${taskAId}`), "Active owner turn did not fail closed.");
   assert(!taskA.runs.some((run) => run.id === "run-owner-a-running"), "Active owner turn remained usable after runtime loss.");

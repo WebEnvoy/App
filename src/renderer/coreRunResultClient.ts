@@ -2,6 +2,7 @@ import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 import { requestOwnerJson } from "./ownerApiClient";
 
 type JsonRecord = Record<string, unknown>;
+const coreResultOwnerInspectionDepth = 9;
 
 export type CoreRunResult = {
   outcome: string;
@@ -35,9 +36,6 @@ export async function fetchCoreRunResult(
   } catch (error) {
     return unavailable("owner", error instanceof Error ? error.message : String(error));
   }
-  const fixtureReason = fixtureOrDemoPayloadReason(response);
-  if (fixtureReason) return unavailable("invalid", "结果来源不是可用于生产展示的 owner 数据。");
-
   const envelope = asRecord(response);
   if (envelope?.ok === false) return unavailable("owner", string(envelope.error) ?? "暂时无法读取本回合结果。");
   const query = asRecord(envelope?.result);
@@ -49,6 +47,8 @@ export async function fetchCoreRunResult(
   if (resultEnvelope != null && (resultEnvelope.schema_version !== "webenvoy.result-envelope.v0" || resultEnvelope.run_record_ref !== runId)) {
     return unavailable("invalid", "Core 返回的结果与当前回合不匹配。");
   }
+  const fixtureReason = fixtureOrDemoPayloadReason(response, { maximumDepth: coreResultOwnerInspectionDepth });
+  if (fixtureReason) return unavailable("invalid", "结果来源不是可用于生产展示的 owner 数据。");
   const data = asRecord(resultEnvelope?.data);
   const payloadState = string(result.payload_state) ?? "unavailable";
   if (data != null && (resultEnvelope?.ok !== true || resultEnvelope.terminal !== true)) {
