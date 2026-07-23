@@ -9,6 +9,7 @@ type ResultField = { label: string; value: string };
 type ResultAsset = { name: string; detail: string; state?: string };
 type ResultRow = { id: string; cells: Record<string, string> };
 type ResultSkill = Pick<LodeCatalogSkill, "outputKind" | "outputSchemaId" | "packageRef" | "version" | "lockRef">;
+const emptyResultMessage = { tone: "neutral", title: "没有匹配数据", summary: "修改业务输入后可提交新的回合。" } as const;
 
 export type BusinessResultPreviewRequest = { itemIds?: string[] };
 
@@ -93,10 +94,10 @@ export function projectBusinessResultMessage(
   if (run.lifecycle === "queued") return { tone: "neutral", title: "等待执行", summary: "Core 已接收本回合，正在等待执行。" };
   if (run.lifecycle === "running") return { tone: "neutral", title: "正在生成结果", summary: "结果会在处理完成后显示。" };
   if (run.turnStatus === "waiting_for_user") return { tone: "warning", title: "等待本次决定", summary: "完成上方确认后继续处理当前动作。" };
-  if (run.outcome === "empty") return { tone: "neutral", title: "没有匹配数据", summary: "修改业务输入后可提交新的回合。" };
+  if (run.outcome === "empty") return emptyResultMessage;
   if (state.status === "ready") {
     const { envelopeState, payloadState } = state.result;
-    if (state.result.data?.status === "empty") return { tone: "neutral", title: "没有匹配数据", summary: "修改业务输入后可提交新的回合。" };
+    if (state.result.data?.status === "empty" || state.result.failure?.code === "empty_result") return emptyResultMessage;
     if (state.result.unavailableReason === "run_not_terminal") return { tone: "neutral", title: "结果尚未生成", summary: "本回合仍在处理中。" };
     if (state.result.unavailableReason === "result_ref_missing") return { tone: "warning", title: "结果引用缺失", summary: "本回合已结束，但 Core 没有提供可读取的结果引用。" };
     if (state.result.unavailableReason != null) return { tone: "warning", title: "结果不可读取", summary: "Core 已将本回合结果标记为不可用。" };

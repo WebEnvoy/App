@@ -100,6 +100,32 @@ const ownerPayload = {
           submission_state: "accepted",
           status: "running",
         },
+        {
+          turn_id: "turn_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3",
+          sequence: 3,
+          idempotency_key: "owner-a-turn-3",
+          run_id: "run-owner-a-empty-result",
+          creation_channel: "app",
+          input: {
+            schema_version: "webenvoy.task-turn-input.v0",
+            fields: [{ field_id: "keyword", kind: "scalar", summary: "不存在的关键词" }],
+            attachment_refs: [],
+            consumer_boundary: consumerBoundary,
+          },
+          created_at: "2026-07-20T09:20:00Z",
+          updated_at: "2026-07-20T09:20:26Z",
+          terminal_at: "2026-07-20T09:20:26Z",
+          submission_state: "accepted",
+          failure_code: "empty_result",
+          submission_error: {
+            category: "result_projection",
+            code: "empty_result",
+            phase: "projection",
+            recovery_hint: "fix_input",
+          },
+          status: "failed",
+          run_status: "failed",
+        },
       ],
     },
     {
@@ -163,6 +189,40 @@ window.webenvoyShell = {
     if (/^\/runs\/[^/]+\/result$/.test(request.path)) {
       const runId = decodeURIComponent(request.path.split("/")[2] ?? "");
       if (runId === "run-owner-unavailable") return { ok: false, error: "owner unavailable" };
+      if (runId === "run-owner-a-empty-result") return { ok: true, body: { ok: true, result: {
+        schema_version: "webenvoy.result-query.v0",
+        run_id: runId,
+        status: "failed",
+        terminal: true,
+        result: {
+          envelope_state: "available",
+          payload_state: "not_persisted_in_core",
+          result_envelope: {
+            schema_version: "webenvoy.result-envelope.v0",
+            run_record_ref: runId,
+            ok: false,
+            outcome: "failed",
+            terminal: true,
+            capability_ref: "lode:capability/search-notes",
+            capability_version: "0.1.0",
+            capability_lock_ref: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+            package_ref: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+            failure: {
+              category: "result_projection",
+              code: "empty_result",
+              phase: "projection",
+              recovery_hint: "fix_input",
+            },
+          },
+        },
+        failure: {
+          category: "result_projection",
+          code: "empty_result",
+          phase: "projection",
+          recovery_hint: "fix_input",
+        },
+        evidence_refs: [],
+      } } };
       const job = runId.startsWith("run-owner-b-completed");
       return { ok: true, body: { ok: true, result: {
         schema_version: "webenvoy.result-query.v0",
@@ -464,6 +524,10 @@ async function runDesktopChecks() {
   assert(taskA.runs.some((run) => run.id === `runtime-blocked-${taskAId}`), "Active owner turn did not fail closed.");
   assert(!taskA.runs.some((run) => run.id === "run-owner-a-running"), "Active owner turn remained usable after runtime loss.");
   await waitFor(() => Boolean(document.querySelector(".thread-content .business-result-table")), "Collection business result did not render.");
+  await waitFor(
+    () => Boolean(document.querySelector(".thread-content .business-result-message[aria-label='没有匹配数据']")),
+    "Core empty_result did not render the business empty state.",
+  );
   const firstTimestamp = document.querySelector<HTMLElement>(".task-turn-timestamp");
   assert(firstTimestamp?.textContent?.includes("API"), "Non-App creation channel is not visible beside the timestamp.");
   assert(!document.querySelector(".task-turn-timestamp")?.textContent?.includes("APP"), "App creation channel should stay implicit.");
