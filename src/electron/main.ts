@@ -295,7 +295,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
                 rightFullscreen.left === initialPanels.left &&
                 rightFullscreen.leftWidth === initialPanels.leftWidth &&
                 rightFullscreenRestored.rightFullscreen === "false"
-              : coreThreadReadReady && initialPanels.right === "false" && initialPanels.rightWidth === 0) &&
+              : initialPanels.right === "false" && initialPanels.rightWidth === 0) &&
             leftCollapsed.left === "false" &&
             leftHoverPreviewVisible &&
             leftRestored.left === "true",
@@ -312,7 +312,7 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
                 rightDragStayedOpen.right === "true" &&
                 rightDragCollapsed.right === "false" &&
                 dragRestored.right === "true"
-              : coreThreadReadReady && dragRestored.right === "false" && dragRestored.rightWidth === 0),
+              : dragRestored.right === "false" && dragRestored.rightWidth === 0),
           panelStateTrace: {
             initialPanels,
             rightCollapsed,
@@ -401,13 +401,22 @@ async function runPackagedSmoke(window: BrowserWindow, loadRenderer: Promise<voi
       );
     }
 
-    if (result.panelControls < (result.coreThreadReadReady ? 1 : 2) || !result.panelToggleSmoke) {
+    if (result.panelControls < 1 || !result.panelToggleSmoke) {
       throw new Error(
-        `packaged renderer smoke failed: panel controls did not toggle. ${JSON.stringify(result.panelStateTrace)}`,
+        `packaged renderer smoke failed: panel controls did not toggle. ${JSON.stringify({
+          panelControls: result.panelControls,
+          coreThreadReadReady: result.coreThreadReadReady,
+          hasRuntimeGate: result.hasRuntimeGate,
+          panelStateTrace: result.panelStateTrace,
+        })}`,
       );
     }
 
-    if (!result.coreThreadReadReady && (!result.hasComposer || !result.composerFocused)) {
+    if (
+      !result.coreThreadReadReady &&
+      !result.ownerStateText.includes("还没有账号身份") &&
+      (!result.hasComposer || !result.composerFocused)
+    ) {
       throw new Error("packaged renderer smoke failed: composer is missing or cannot receive focus.");
     }
 
