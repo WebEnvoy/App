@@ -122,8 +122,8 @@ if (
 }
 
 const expectedRuntimeHeads = {
-  core: "1f04c5f6cd350625f022689b95c1475fd41ac631",
-  harbor: "9660f2735a4de1361ba1650e7e160c6afe68730c",
+  core: "492dce0a22b4a1864adb0f96cc4c09b3d366b352",
+  harbor: "27bd06aa1debb0170198e09866f0efd517111079",
   lode: "1fbef74b4bf1b4f0a86aacd885386d7a62181207",
 };
 if (JSON.stringify(runtimeSourceLock) !== JSON.stringify(expectedRuntimeHeads) ||
