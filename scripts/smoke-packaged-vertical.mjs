@@ -10,6 +10,9 @@ const screenshotPath = path.resolve(
 );
 
 const core = await startJsonServer((pathname) => {
+  if (pathname === "/threads") {
+    return { ok: true, threads: [] };
+  }
   if (["/health", "/ready", "/runtime/health", "/admission/health", "/admission/ready", "/tasks/admission/health"].includes(pathname)) {
     return {
       service: "webenvoy-core-smoke",
@@ -53,6 +56,7 @@ try {
   }
 
   const fixtureCore = await startJsonServer((pathname) => {
+    if (pathname === "/threads") return { ok: true, threads: [] };
     if (["/health", "/admission/health"].includes(pathname)) {
       return {
         service: "webenvoy-core-smoke",
