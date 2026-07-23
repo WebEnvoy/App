@@ -72,6 +72,8 @@ export function projectStandardBusinessResult(
   if (data != null) {
     const normalized = isRecord(data.normalized) ? data.normalized : data;
     if (boundSkill == null) return { kind: "generic", fields: objectFields(normalized), resultKind };
+    const nestedReadCollection = nestedReadCollectionResult(data);
+    if (nestedReadCollection != null) return nestedReadCollection;
     const assets = assetResult(data, resultKind);
     if (assets != null) return assets;
     const collection = collectionResult(data);
@@ -174,6 +176,21 @@ function MediaResult({ items, onOpenPreview }: { items: Array<ResultAsset & { me
 
 function FileResult({ items, onOpenPreview }: { items: ResultAsset[]; onOpenPreview?: (request: BusinessResultPreviewRequest) => void }) {
   return <section className="business-asset-list" aria-label="文件结果">{items.map((item) => <div key={`${item.name}-${item.detail}`}><FileText size={18} /><span><strong>{item.name}</strong><small>{item.detail}</small></span>{item.state ? <em>{item.state}</em> : null}{onOpenPreview ? <button type="button" data-workbench-open-right onClick={() => onOpenPreview({})}>查看</button> : null}</div>)}</section>;
+}
+
+function nestedReadCollectionResult(data: Record<string, unknown>): StandardBusinessResult | null {
+  const projection = isRecord(data.projection) ? data.projection : undefined;
+  const normalized = projection != null && isRecord(projection.normalized) ? projection.normalized : undefined;
+  const summary = normalized != null && isRecord(normalized.public_summary) ? normalized.public_summary : undefined;
+  const detailRefs = summary?.detail_refs;
+  if (!Array.isArray(detailRefs) || !detailRefs.every((ref): ref is string => typeof ref === "string")) return null;
+  const rows = detailRefs.map((ref, index) => ({ id: ref, cells: { "结果": `结果 ${index + 1}` } }));
+  return {
+    kind: "collection",
+    columns: ["结果"],
+    rows,
+    total: summary == null ? rows.length : numberField(summary, "result_count") ?? rows.length,
+  };
 }
 
 function collectionResult(data: Record<string, unknown>): StandardBusinessResult | null {

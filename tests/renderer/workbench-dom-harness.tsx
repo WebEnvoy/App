@@ -577,6 +577,15 @@ async function runDesktopChecks() {
       nestedReadResult.result.projectionRef === "read_result_4bd7acd8-99eb-439d-bec7-ffc18b3d42b8",
     "A valid nested Core owner result was rejected as fixture data.",
   );
+  assert(nestedReadResult.status === "ready", "The nested Core owner result is unavailable for projection checks.");
+  const nestedReadModel = projectStandardBusinessResult(resultRun, nestedReadResult, resultSkills);
+  assert(
+    nestedReadModel.kind === "collection" &&
+      nestedReadModel.total === 15 &&
+      nestedReadModel.rows[0]?.id === "detail_ref_ff55d94a-9558-4777-9624-e138ed2a76d8" &&
+      nestedReadModel.rows[0]?.cells["结果"] === "结果 1",
+    "A nested read projection did not preserve owner detail refs behind business-facing collection rows.",
+  );
   assert(taskA.runs.some((run) => run.id === "run-owner-a-completed"), "Completed owner turn was not retained.");
   assert(taskA.runs.some((run) => run.id === `runtime-blocked-${taskAId}`), "Active owner turn did not fail closed.");
   assert(!taskA.runs.some((run) => run.id === "run-owner-a-running"), "Active owner turn remained usable after runtime loss.");
