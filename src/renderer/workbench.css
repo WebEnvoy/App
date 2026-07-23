@@ -83,6 +83,9 @@ summary:focus-visible {
 .create-task-composer { height: auto; min-height: 124px; gap: 10px; border-radius: 12px; }
 .create-task-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .create-task-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.fixed-business-input { display: grid; min-height: 38px; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 7px 9px; border: 1px solid var(--we-border); border-radius: 7px; background: var(--we-surface-primary); }
+.fixed-business-input span { color: var(--we-foreground-muted); font-size: 10px; }
+.fixed-business-input strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .create-task-field { display: grid; min-width: 0; gap: 5px; }
 .create-task-field.wide { grid-column: 1 / -1; }
 .create-task-field > label,
@@ -509,6 +512,9 @@ summary:focus-visible {
 .business-result-table .action-cell { width: 34px; padding: 0 4px; text-align: center; }
 .business-result-table .action-cell button { display: inline-grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; color: var(--we-foreground-muted); background: transparent; }
 .business-result-footer { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 10px; color: var(--we-foreground-muted); font-size: 10px; }
+.task-result-detail-action { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 10px; }
+.task-result-detail-action button { display: inline-flex; min-height: 30px; align-items: center; gap: 6px; padding: 5px 10px; }
+.task-result-detail-action span { color: var(--we-status-error); font-size: 10px; }
 
 .business-object-result { display: grid; }
 .business-object-result > div { display: grid; grid-template-columns: minmax(90px, 0.32fr) minmax(0, 1fr); gap: 14px; padding: 9px 2px; border-bottom: 1px solid var(--we-border-subtle); }

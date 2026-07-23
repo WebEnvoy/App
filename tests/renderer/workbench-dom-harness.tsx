@@ -41,6 +41,12 @@ const authorizationDecisionRef = "authorization-decision:aaaaaaaaaaaaaaaaaaaaaaa
 const authorizationRequests: WebEnvoyOwnerApiJsonRequest[] = [];
 let singleActionAttempts = 0;
 let createTaskSelection: TaskProjection | undefined;
+let selectedResultDetailRef: string | undefined;
+const nestedDetailRefs = Array.from({ length: 15 }, (_, index) =>
+  index === 0
+    ? "detail_ref_ff55d94a-9558-4777-9624-e138ed2a76d8"
+    : `detail_ref_00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+);
 const resultSkills = [{
   outputKind: "collection",
   outputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
@@ -223,7 +229,7 @@ window.webenvoyShell = {
         },
         evidence_refs: [],
       } } };
-      if (runId === "run-owner-nested-read-result") return { ok: true, body: { ok: true, result: {
+      if (runId === "run-owner-nested-read-result" || runId === "run-owner-a-completed") return { ok: true, body: { ok: true, result: {
         schema_version: "webenvoy.result-query.v0",
         run_id: runId,
         status: "succeeded",
@@ -260,7 +266,7 @@ window.webenvoyShell = {
                     result_state: "operation_read_response_observed",
                     response_status: 200,
                     result_count: 15,
-                    detail_refs: ["detail_ref_ff55d94a-9558-4777-9624-e138ed2a76d8"],
+                    detail_refs: nestedDetailRefs,
                     source_signals: ["pinia_store", "xhs_search_read_network"],
                   },
                   operation_ref: "read_operation_406187891879d3a4128ef8e7f0a036eb",
@@ -488,6 +494,7 @@ function WorkbenchDomHarness() {
             selectedRun={previewRun}
             selectedTask={displayedTask}
             skills={resultSkills}
+            onReadDetail={(detailRef) => { selectedResultDetailRef = detailRef; return true; }}
             shellDiagnostics={{ colorScheme: "light", configScope: "local-ui-only", platform: "darwin" }}
           />
         </RightPanel>
@@ -602,7 +609,7 @@ async function runDesktopChecks() {
   assertThreadContentGeometry(false);
   const selectionCell = document.querySelector<HTMLElement>(".thread-content .business-result-table .selection-cell");
   assert(selectionCell && selectionCell.getBoundingClientRect().width <= 40, "Collection selection column is wider than the compact contract.");
-  assert(document.querySelectorAll(".thread-content .business-result-table tbody tr").length === 5 && document.body.textContent?.includes("共 8 条，点击查看更多"),
+  assert(document.querySelectorAll(".thread-content .business-result-table tbody tr").length === 5 && document.body.textContent?.includes("共 15 条，点击查看更多"),
     "Collection pagination summary does not match the approved result pattern.");
   assert(appShell.dataset.rightPanelOpen === "false", "Right panel should be closed initially.");
   assert(appShell.dataset.leftPanelWidth === "300", "Corrupt left-panel width did not use the default.");
@@ -642,6 +649,11 @@ async function runDesktopChecks() {
     "A result preview did not activate the result tab.");
   await waitFor(() => document.querySelectorAll(".right-panel .business-result-table tbody tr").length === 1,
     "A row preview did not preserve the selected item in the right panel.");
+  const readDetail = document.querySelector<HTMLButtonElement>(".right-panel [data-read-result-detail]");
+  assert(readDetail, "A selected owner detail ref did not expose the business detail handoff.");
+  assert(!document.body.textContent?.includes(nestedDetailRefs[0]!), "An opaque detail ref leaked into visible UI text.");
+  readDetail.click();
+  assert(selectedResultDetailRef === nestedDetailRefs[0], "The business detail handoff did not preserve the selected owner ref.");
   assert(Number(appShell.dataset.rightPanelWidth) > 320, "Corrupt right-panel preferences did not use the default width.");
 
   const closeButton = document.querySelector<HTMLButtonElement>('[data-shell-panel-toggle="right"]');

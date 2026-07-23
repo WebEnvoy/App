@@ -21,6 +21,7 @@ import { createLatestRequestGate } from "./latestRequestGate";
 import { compatibilityRecoveryCopy } from "./skillCompatibilityPresentation";
 import type { IdentityRecoveryRequest, SiteSkillRecoveryRequest } from "./siteSkillRecovery";
 import type { RuntimeSupervisorState } from "./runtimeSupervisorState";
+import { isOpaqueDetailRef, isXiaohongshuDetailHandoffSkill } from "./resultDetailHandoff";
 
 type SkillWorkbenchOptions = {
   coreEndpoint: string;
@@ -70,6 +71,18 @@ export function useSkillWorkbench(options: SkillWorkbenchOptions) {
     options.onOpenCreate();
   }
 
+  async function useResultDetail(detailRef: string, identityEnvironmentRef?: string) {
+    if (!isOpaqueDetailRef(detailRef) || options.catalog.status !== "ready") return false;
+    const identity = options.identities.find((item) => item.identityEnvironmentRef === identityEnvironmentRef);
+    const skill = options.catalog.skills.find(isXiaohongshuDetailHandoffSkill);
+    if (identity == null || skill == null || identity.siteId !== skill.siteSlug) return false;
+    const resolved = await resolveCompatibility(skill, identity.id, detailRef);
+    if (resolved == null || resolved.compatibility.status !== "ready" || !isCandidateUsable(resolved.candidate)) return false;
+    setCreateTaskSelection({ skill: resolved.skill, identityId: resolved.identity.id, targetRef: detailRef });
+    options.onOpenCreate();
+    return true;
+  }
+
   function resetTargetCompatibility(skill: LodeCatalogSkill, identityId: string) {
     requestGateRef.current.invalidate();
     const identity = options.identities.find((item) => item.id === identityId);
@@ -99,6 +112,7 @@ export function useSkillWorkbench(options: SkillWorkbenchOptions) {
     resetTargetCompatibility,
     selectCreateTaskSkill: (skill?: LodeCatalogSkill) => setCreateTaskSelection(skill == null ? null : { skill }),
     useSiteSkill,
+    useResultDetail,
   };
 }
 

@@ -66,7 +66,6 @@ function useAppNavigation() {
       : null;
     setActiveView("settings");
   }
-
   useEffect(() => {
     if (activeView !== "settings") return;
     const frame = window.requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-settings-initial-focus]")?.focus());
@@ -136,12 +135,15 @@ function createAppActions(
     skillWorkbench.abandonSiteSkillRecovery();
     navigation.openSettings();
   }
+  async function openResultDetail(detailRef: string) {
+    return skillWorkbench.useResultDetail(detailRef, tasks.selectedTask?.threadContext?.accountIdentityKey);
+  }
   function updateEndpoint(field: keyof LocalConnectionConfig, value: string) {
     skillWorkbench.invalidateRequests();
     sources.updateEndpoint(field, value);
   }
   return {
-    acceptCreatedTask, createTask, openSettings, openTaskById, openView, selectTask, updateEndpoint,
+    acceptCreatedTask, createTask, openResultDetail, openSettings, openTaskById, openView, selectTask, updateEndpoint,
     onHarborStateChange: (state: typeof sources.harborIdentityState) => {
       skillWorkbench.invalidateRequests();
       sources.setHarborIdentityState(state);

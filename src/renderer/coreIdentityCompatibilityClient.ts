@@ -1,6 +1,7 @@
 import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 import type { LodeCatalogSkill } from "./lodeCatalogClient";
 import { requestOwnerJson } from "./ownerApiClient";
+import { isOpaqueDetailRef } from "./resultDetailHandoff";
 
 export type IdentityCompatibilityCandidate = {
   identityEnvironmentRef: string;
@@ -83,8 +84,6 @@ const recoveryActions = new Set([
 ]);
 const consumerBoundary =
   "Core returns bounded compatibility reasons and public freshness only; no task, thread, run, session, browser action, credential, cookie, token, profile storage, evidence body, or raw owner response is created or exposed.";
-const opaqueDetailRefPattern = /^detail_ref_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export function loadingSkillIdentityCompatibility(): SkillIdentityCompatibilityState {
   return { status: "loading", summary: "正在检查账号身份兼容性。", candidates: [] };
 }
@@ -191,7 +190,7 @@ export function createSkillIdentityCompatibilityRequest(
   const target = publicOrigin(action.supportedOrigins[0]!);
   if (target == null) return null;
   const compatibilityTarget = skillRequiresExactTarget(skill)
-    ? opaqueDetailRefPattern.test(targetRef ?? "") ? targetRef! : null
+    ? isOpaqueDetailRef(targetRef) ? targetRef : null
     : `${target}/`;
   if (compatibilityTarget == null) return null;
   return {
@@ -220,7 +219,7 @@ export function projectCompatibilityTarget(skill: LodeCatalogSkill, value?: stri
     return origin == null ? { status: "invalid", summary: "技能缺少可验证的目标来源。" } : { status: "ready", targetRef: `${origin}/` };
   }
   if (value == null || value.trim().length === 0) return { status: "awaiting_input" };
-  if (opaqueDetailRefPattern.test(value)) return { status: "ready", targetRef: value };
+  if (isOpaqueDetailRef(value)) return { status: "ready", targetRef: value };
   try {
     const url = new URL(value);
     if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.hash) {
