@@ -211,6 +211,7 @@ export function installLibraryShellMock() {
         if (publicQuery?.query === "server unavailable") {
           return { ok: false, status: 503, error: "owner_temporarily_unavailable", body: { ok: false, thread: coreThread(turns) } };
         }
+        const pageNotReady = publicQuery?.query === "page not ready";
         turns = [...turns, {
           turn_id: `turn_${String(turns.length + 1).padStart(32, "0")}`,
           sequence: turns.length + 1,
@@ -221,10 +222,27 @@ export function installLibraryShellMock() {
           created_at: "2026-07-20T00:01:00.000Z",
           updated_at: "2026-07-20T00:01:01.000Z",
           submission_state: "accepted",
-          status: unknown ? "status_unknown" : "completed",
-          run_status: unknown ? "unknown_outcome" : "succeeded",
+          ...(pageNotReady ? {
+            failure_code: "page_not_ready",
+            submission_error: {
+              category: "runtime_execution",
+              code: "page_not_ready",
+              phase: "execution",
+              recovery_hint: "retry_after_refresh",
+            },
+          } : {}),
+          status: pageNotReady ? "failed" : unknown ? "status_unknown" : "completed",
+          run_status: pageNotReady ? "failed" : unknown ? "unknown_outcome" : "succeeded",
           terminal_at: "2026-07-20T00:01:01.000Z",
         }];
+        if (pageNotReady) {
+          return {
+            ok: false,
+            status: 400,
+            error: "/threads/thread_11111111111111111111111111111111/turns returned 400",
+            body: { error: { category: "runtime_execution", code: "page_not_ready" } },
+          };
+        }
         return { ok: true, body: { ok: !unknown, ...(unknown ? { outcome: "submission_status_unknown" } : {}), thread: coreThread(turns) } };
       }
       if (request.path === "/identity-compatibility-preview") {

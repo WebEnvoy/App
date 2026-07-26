@@ -481,6 +481,14 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     acceptedSnapshot?.attachment_refs?.length === 0 &&
     !acceptedPayload.includes("library-harness-attachment.txt");
   setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
+  setInputValue(document.querySelector("[name='keyword']"), "page not ready");
+  await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === false, "terminal failure composer readiness");
+  document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
+  await waitUntil(() => document.querySelector(".create-task-submit-state.failed")?.textContent?.includes("Core 已确认") === true,
+    "terminal runtime failure reconciliation");
+  const terminalFailureReconciled = document.querySelector(".create-task-submit-state.failed")?.textContent?.includes("/turns returned 400") !== true &&
+    document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "page not ready";
+  setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
   setInputValue(document.querySelector("[name='keyword']"), "unknown outcome");
   await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === false, "thread composer readiness");
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
@@ -554,19 +562,19 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
   if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid < 2 || !attachmentAdded ||
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
-    !live.includes("字段需要修正") || !acceptedFlow || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
+    !live.includes("字段需要修正") || !acceptedFlow || !terminalFailureReconciled || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
     !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe || !resourceProfileBoundarySafe ||
     !submittedCard.includes("keyword") || !submittedCard.includes("历史字段") ||
     !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
     !unavailableDeleteWarning || mode === "narrow" && !longFileLayoutSafe) {
     throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({
       selection, initialInvalid, submittedInvalid, attachmentAdded, attachmentRestored, attachmentRemoved, restoredKeyword,
-      catalogRefreshPreserved, cleared, clearedDraftStayedDeleted, firstErrorFocused, live, acceptedFlow,
+      catalogRefreshPreserved, cleared, clearedDraftStayedDeleted, firstErrorFocused, live, acceptedFlow, terminalFailureReconciled,
       unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedCard, overflow,
       unavailableDeleteWarning, mode, longFileLayoutSafe, searchHeight,
     })}`);
   }
-  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
+  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, terminalFailureReconciled, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
 }
 
 async function checkResourceProfileSubmissionBoundary() {
