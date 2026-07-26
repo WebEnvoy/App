@@ -128,7 +128,7 @@ async function appendPreparedTurn(endpoint: string, threadRef: string, request: 
   const task = projectCoreThreadResponse(taskPayload);
   const status = typeof record?.status === "number" ? record.status : null;
   if (task == null) {
-    return status != null && status >= 400 && status < 500
+    return status != null && status >= 400 && status < 500 && !isTerminalRuntimeFailure(response)
       ? failed(response, "Core 未接受当前任务回合。")
       : reconcileTaskThreadTurn(endpoint, attempt);
   }
@@ -434,6 +434,13 @@ function failed(value: unknown, fallback: string): TaskThreadSubmitState {
 
 function ownerError(value: unknown, fallback: string) {
   return coreTaskSubmitFailureSummary(value, fallback);
+}
+
+function isTerminalRuntimeFailure(value: unknown) {
+  const record = asRecord(value);
+  const body = asRecord(record?.body);
+  const error = asRecord(body?.error);
+  return error?.category === "runtime_execution";
 }
 
 function asRecord(value: unknown): JsonRecord | null {
