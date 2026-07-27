@@ -236,6 +236,9 @@ async function runProductionShellFlow() {
   assertNoHorizontalOverflow("skill-only chooser");
   choices[0]!.click();
   await waitUntil(() => document.querySelector(".create-task-composer") != null, "identity selection composer");
+  const composerRect = document.querySelector(".create-task-composer")!.getBoundingClientRect();
+  const composerToolbarRect = document.querySelector(".create-task-composer-toolbar")!.getBoundingClientRect();
+  if (composerToolbarRect.bottom > composerRect.bottom + 1) throw new Error("Structured composer toolbar overflowed its frame.");
   assertNoHorizontalOverflow("create-task composer");
   controllerSnapshot!.actions.onHarborStateChange({
     status: "ready",

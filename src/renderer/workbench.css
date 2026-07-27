@@ -80,7 +80,7 @@ summary:focus-visible {
 .create-task-recommendations strong { font-size: 12px; }
 .create-task-recommendations small { color: var(--we-foreground-muted); font-size: 10px; }
 .create-task-recommendation-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; background: var(--we-surface-tertiary); }
-.create-task-composer { height: auto; min-height: 124px; gap: 10px; border-radius: 12px; }
+.thread-composer.create-task-composer { height: auto; min-height: 124px; gap: 10px; border-radius: 12px; }
 .create-task-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .create-task-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .fixed-business-input { display: grid; min-height: 38px; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 7px 9px; border: 1px solid var(--we-border); border-radius: 7px; background: var(--we-surface-primary); }
