@@ -40,6 +40,8 @@ function Harness() {
   const [selection, setSelection] = useState("");
   const [createSelection, setCreateSelection] = useState<CreateTaskSelection | null>(null);
   const [submittedTask, setSubmittedTask] = useState<TaskProjection>();
+  const [threadSkillAvailable, setThreadSkillAvailable] = useState(true);
+  const [threadIdentityAvailable, setThreadIdentityAvailable] = useState(true);
   const compatibilityBySkill = Object.fromEntries(catalog.skills.map((skill) => [
     skill.id,
     skill === detailSkill
@@ -61,10 +63,10 @@ function Harness() {
       {submittedTask != null ? (
         <TaskThreadComposer
           coreEndpoint="http://127.0.0.1:8787"
-          harborIdentityState={{ status: "ready", fetchedAt: "2026-07-20T00:00:00Z", summary: "ready", identities: [identity, identityB] }}
+          harborIdentityState={{ status: "ready", fetchedAt: "2026-07-20T00:00:00Z", summary: "ready", identities: threadIdentityAvailable ? [identity, identityB] : [identityB] }}
           runtimeSupervisorState={runtime}
           selectedTask={submittedTask}
-          skill={xhsSkill}
+          skill={threadSkillAvailable ? xhsSkill : undefined}
           onTask={setSubmittedTask}
         />
       ) : createSelection == null ? (
@@ -96,6 +98,10 @@ function Harness() {
         />
       )}
       {submittedTask?.runs[0]?.businessInput == null ? null : <TaskTurnBusinessInput input={submittedTask.runs[0].businessInput} />}
+      {submittedTask == null ? null : <button hidden data-hide-thread-skill type="button" onClick={() => setThreadSkillAvailable(false)}>隐藏技能合同</button>}
+      {submittedTask == null ? null : <button hidden data-show-thread-skill type="button" onClick={() => setThreadSkillAvailable(true)}>恢复技能合同</button>}
+      {submittedTask == null ? null : <button hidden data-hide-thread-identity type="button" onClick={() => setThreadIdentityAvailable(false)}>隐藏账号身份</button>}
+      {submittedTask == null ? null : <button hidden data-show-thread-identity type="button" onClick={() => setThreadIdentityAvailable(true)}>恢复账号身份</button>}
       {createSelection != null ? <button type="button" data-library-switch onClick={() => setCreateSelection(null)}>切换技能</button> : null}
       {createSelection != null ? <button type="button" data-catalog-refresh onClick={() => setCreateSelection((current) => current == null ? null : ({ ...current, skill: { ...current.skill, summary: `${current.skill.summary} refreshed` } }))}>刷新目录</button> : null}
       <output data-library-selection="">{selection}</output>
@@ -497,25 +503,37 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
   await waitUntil(() => document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome" &&
     document.querySelector(".create-task-submit-state.unknown")?.textContent?.includes("重新检查") === true, "unknown outcome draft preservation");
+  document.querySelector<HTMLButtonElement>("[data-hide-thread-skill]")?.click();
+  await waitUntil(() => document.querySelector(".composer-owner-state")?.textContent?.includes("站点技能合同不可用") === true &&
+    document.querySelector("[aria-label='重新检查当前回合']") != null &&
+    document.querySelector("[aria-label='停止当前回合']") != null, "missing skill recovery controls");
   const unknownPostCount = libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length;
-  document.querySelector<HTMLButtonElement>(".create-task-submit-state.unknown button")?.click();
+  document.querySelector<HTMLButtonElement>("[aria-label='重新检查当前回合']")?.click();
   await twoFrames();
   await waitUntil(() => libraryOwnerRequests.some((request) =>
     request.path === "/threads/thread_11111111111111111111111111111111" && request.method === "GET") &&
-    document.querySelector(".create-task-submit-state.unknown") != null, "unknown outcome reconciliation");
-  const unknownDraftPreserved = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome" &&
-    document.querySelector(".create-task-submit-state.unknown") != null &&
+    document.querySelector(".composer-owner-state") != null, "unknown outcome reconciliation");
+  const unknownDraftPreserved =
+    document.querySelector(".composer-owner-state") != null &&
     libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length === unknownPostCount;
-  await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === true &&
-    document.querySelector(".create-task-submit-state.unknown") != null, "active turn submit blocking");
-  const activeSubmitBlocked = document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === true &&
-    document.querySelector(".create-task-submit-state.unknown") != null;
+  document.querySelector<HTMLButtonElement>("[data-show-thread-skill]")?.click();
+  await waitUntil(() => document.querySelector(".create-task-submit-state.unknown")?.textContent?.includes("重新检查") === true,
+    "persisted unknown composer recovery");
+  document.querySelector<HTMLButtonElement>("[data-hide-thread-identity]")?.click();
+  await waitUntil(() => document.querySelector(".composer-owner-state")?.textContent?.includes("账号身份不可用") === true &&
+    document.querySelector("[aria-label='重新检查当前回合']") != null &&
+    document.querySelector("[aria-label='停止当前回合']") != null, "missing identity recovery controls");
+  const activeSubmitBlocked = document.querySelector(".create-task-submit") == null;
   const stopButton = document.querySelector<HTMLButtonElement>("[aria-label='停止当前回合']");
   stopButton?.click();
-  await waitUntil(() => document.querySelector(".create-task-submit-state")?.textContent?.includes("当前回合已停止") === true,
+  await waitUntil(() => document.querySelector(".composer-owner-state")?.textContent?.includes("当前回合已停止") === true,
     "active turn cancellation");
-  const cancellationPreservedDraft = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome";
+  await nextFrame();
+  const recoveryFocusRestored = document.activeElement?.matches(".composer-owner-state [role='status']") === true;
   const terminateRequest = libraryOwnerRequests.find((request) => request.path.endsWith("/terminate"));
+  document.querySelector<HTMLButtonElement>("[data-show-thread-identity]")?.click();
+  await waitUntil(() => document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome", "identity recovery");
+  const cancellationPreservedDraft = document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "unknown outcome";
   setInputValue(document.querySelector("[name='keyword']"), "server unavailable");
   const serverFailurePostCount = libraryOwnerRequests.filter((request) => request.path.endsWith("/turns") && request.method === "POST").length;
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
@@ -565,7 +583,7 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
   if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid < 2 || !attachmentAdded ||
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
-    !live.includes("字段需要修正") || !acceptedFlow || !terminalFailureReconciled || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown ||
+    !live.includes("字段需要修正") || !acceptedFlow || !terminalFailureReconciled || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown || !recoveryFocusRestored ||
     !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe || !resourceProfileBoundarySafe ||
     !submittedCard.includes("keyword") || !submittedCard.includes("历史字段") ||
     !submittedCard.includes("已提交受保护输入") || submittedCard.includes("Keyword") || submittedCard.includes("draft:app-protected") || overflow > 1 ||
@@ -573,11 +591,11 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     throw new Error(`Library composer recovery or responsive layout failed: ${JSON.stringify({
       selection, initialInvalid, submittedInvalid, attachmentAdded, attachmentRestored, attachmentRemoved, restoredKeyword,
       catalogRefreshPreserved, cleared, clearedDraftStayedDeleted, firstErrorFocused, live, acceptedFlow, terminalFailureReconciled,
-      unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedCard, overflow,
+      unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, recoveryFocusRestored, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedCard, overflow,
       unavailableDeleteWarning, mode, longFileLayoutSafe, searchHeight,
     })}`);
   }
-  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, terminalFailureReconciled, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
+  return { mode, selection, overflow, searchHeight, submittedInvalid, draftPreserved: restoredKeyword, catalogRefreshPreserved, attachmentAdded, attachmentRemoved, attachmentRestored, acceptedFlow, terminalFailureReconciled, unknownDraftPreserved, activeSubmitBlocked, cancellationPreservedDraft, recoveryFocusRestored, skillPolicyVersionSafe, reusedThreadSafe, resourceProfileBoundarySafe, submittedInputCard: true, cleared, clearedDraftStayedDeleted, firstErrorFocused, longFileLayoutSafe, unavailableDeleteWarning };
 }
 
 async function checkResourceProfileSubmissionBoundary() {

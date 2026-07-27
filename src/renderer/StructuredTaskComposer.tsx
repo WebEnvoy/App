@@ -34,6 +34,7 @@ import {
 import {
   initialTaskThreadSubmitState,
   reconcileTaskThreadTurn,
+  type TaskTurnSubmissionAttempt,
   type TaskThreadSubmitState,
 } from "./coreTaskThreadSubmitClient";
 import { registerComposerInput } from "./focusComposer";
@@ -50,6 +51,7 @@ export type StructuredTaskComposerProps = {
   threadRef?: string;
   submitBlockedReason?: string;
   activeTurnLabel?: string;
+  initialUnknownAttempt?: TaskTurnSubmissionAttempt;
   fixedBusinessInput?: { label: string; summary: string };
   submitLabel: string;
   onPreSubmit?: (draft: SkillInputDraft) => Promise<{ ok: true } | { ok: false; reason: string }>;
@@ -69,7 +71,9 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const [submitted, setSubmitted] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const [submitState, setSubmitState] = useState<TaskThreadSubmitState>(initialTaskThreadSubmitState);
+  const [submitState, setSubmitState] = useState<TaskThreadSubmitState>(() =>
+    props.initialUnknownAttempt == null ? initialTaskThreadSubmitState : persistedUnknownState(props.initialUnknownAttempt),
+  );
   const [policyState, setPolicyState] = useState<ExecutionPolicyLoadState>(loadingExecutionPolicyState);
   const [modes, setModes] = useState<ExecutionPolicyModes>({});
   const [modifiedCategories, setModifiedCategories] = useState<Set<ExecutionCategory>>(() => new Set());
@@ -89,6 +93,19 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
     });
     return () => { cancelled = true; };
   }, [props.endpoint, props.skill.packageRef, props.threadRef]);
+
+  useEffect(() => {
+    const attempt = props.initialUnknownAttempt;
+    setSubmitState((current) => {
+      if (attempt == null) return current.status === "unknown" ? initialTaskThreadSubmitState : current;
+      if (
+        current.status === "unknown" &&
+        current.attempt.threadRef === attempt.threadRef &&
+        current.attempt.idempotencyKey === attempt.idempotencyKey
+      ) return current;
+      return persistedUnknownState(attempt);
+    });
+  }, [props.initialUnknownAttempt?.idempotencyKey, props.initialUnknownAttempt?.threadRef]);
 
   useEffect(() => {
     const input = formRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input:not([type='hidden']), textarea, select");
@@ -415,6 +432,14 @@ function ComposerStatus({ blockedReason, state, onReconcile }: {
       ) : null}
     </div>
   );
+}
+
+function persistedUnknownState(attempt: TaskTurnSubmissionAttempt): TaskThreadSubmitState {
+  return {
+    status: "unknown",
+    summary: "Core 尚未确认当前回合状态；重新检查不会重复提交。",
+    attempt,
+  };
 }
 
 function policySummary(policy: EffectiveExecutionPolicy, category: ExecutionCategory | undefined) {

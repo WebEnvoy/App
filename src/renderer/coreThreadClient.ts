@@ -214,6 +214,7 @@ function projectCoreTurn(turn: CoreThreadTurn): RunProjection {
   return {
     id: turn.run_id,
     turnId: turn.turn_id,
+    idempotencyKey: turn.idempotency_key,
     label: `第 ${turn.sequence} 回合`,
     lifecycle,
     outcome,

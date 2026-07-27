@@ -128,6 +128,7 @@ summary:focus-visible {
 .create-task-submit-state button { min-width: auto; color: var(--we-foreground); }
 .structured-task-composer { position: relative; }
 .composer-owner-state { display: flex; min-height: 54px; align-items: center; gap: 8px; padding: 12px; color: var(--we-foreground-muted); font-size: 11px; }
+.composer-owner-state > span { flex: 1; min-width: 0; }
 .composer-execution-menu { position: relative; min-width: 0; }
 .composer-execution-menu > summary { display: flex; max-width: 240px; min-height: 30px; align-items: center; gap: 6px; padding: 4px 7px; border-radius: 6px; color: var(--we-foreground-muted); font-size: 10px; cursor: pointer; list-style: none; }
 .composer-execution-menu > summary::-webkit-details-marker { display: none; }
