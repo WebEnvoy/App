@@ -225,8 +225,15 @@ export function IdentityEnvironmentsPage({
     setSessionBusy("authentication");
     const session = sessionOverrides[selected.id] ?? selected.browser.session;
     const result = await completeHarborManualAuthentication(harborEndpoint, selected, session);
-    setMessage(result.ok ? "登录状态已由 Harbor 确认。" : result.error);
-    if (result.ok) await refreshHarborState();
+    if (!result.ok) {
+      setMessage(result.error);
+      setSessionBusy("");
+      return;
+    }
+    const released = await releaseHarborSession(harborEndpoint, session.browserSessionRef);
+    setSessionOverrides((current) => ({ ...current, [selected.id]: projectHarborSession(released, session) }));
+    setMessage("status" in released ? "登录已确认，但浏览器控制权未释放；请重试。" : "登录状态已由 Harbor 确认，任务可以继续。");
+    await refreshHarborState();
     setSessionBusy("");
   }
 

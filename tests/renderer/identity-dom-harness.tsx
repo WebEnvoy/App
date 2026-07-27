@@ -63,6 +63,12 @@ window.__runIdentityDomSmoke = async (mode) => {
   await twoFrames();
   document.querySelector<HTMLButtonElement>(".identity-catalog-row")?.click();
   await waitUntil(() => document.querySelector(".identity-detail-title") != null, "identity detail");
+  clickButton("打开浏览器");
+  await waitUntil(() => document.body.textContent?.includes("已完成，继续") === true, "browser takeover");
+  clickButton("已完成，继续");
+  await waitUntil(() => document.body.textContent?.includes("任务可以继续") === true, "authentication completion");
+  if (!requests.some((request) => request.path === "/runtime/sessions/session_public/release")) throw new Error("Authentication completion did not release the Harbor session.");
+  if (document.body.textContent?.includes("已完成，继续")) throw new Error("Authentication completion left the session in user takeover.");
   const copy = document.querySelector<HTMLDetailsElement>(".identity-copy-menu")!;
   const summary = copy.querySelector<HTMLElement>("summary")!;
   summary.click();
@@ -153,6 +159,11 @@ window.__runIdentityDomSmoke = async (mode) => {
 
 function installOwnerMock() {
   window.webenvoyShell = {
+    completeHarborManualAuthentication: async () => ({
+      ...facts[0],
+      login_state: { ...facts[0].login_state, manual_authentication_state: "completed" },
+      status: { authentication_provenance: "user_confirmed_managed_session" },
+    }),
     requestOwnerJson: async (request) => {
       requests.push(structuredClone(request));
       if (offline) return { ok: false, status: 503, error: "owner unavailable" };
@@ -161,6 +172,7 @@ function installOwnerMock() {
       if (request.path === "/runtime/identity-environments") return { ok: true, body: { items: facts } };
       if (request.path === "/runtime/identity-environment-mutations") return mutationResponse(request);
       if (request.path === "/runtime/identity-environment-sessions") return { ok: true, body: runtimeSession() };
+      if (request.path === "/runtime/sessions/session_public/release") return { ok: true, body: runtimeSession("none") };
       return { ok: false, status: 404, error: "not found" };
     },
   };
@@ -204,7 +216,7 @@ function identityFact(ref: string, account: string, siteId: "xiaohongshu" | "bos
 }
 
 function providerCatalog() { return { schema_version: "harbor-browser-provider-status/v0", providers: [{ provider_id: "cloakbrowser", display_name: "CloakBrowser", role: "primary", install: { status: "installed", path: null, version: "test", launchability: "launchable", reason: null }, capabilities: [{ key: "proxy", state: "supported", source: "runtime_verification" }, { key: "locale", state: "supported", source: "runtime_verification" }, { key: "timezone", state: "supported", source: "runtime_verification" }, { key: "viewport", state: "supported", source: "runtime_verification" }] }, { provider_id: "chrome_official", display_name: "官方 Chrome", role: "restricted_fallback", install: { status: "installed", path: null, version: "test", launchability: "launchable", reason: null }, capabilities: [] }], excluded_providers: [] } as const; }
-function runtimeSession() { return { schema_version: "harbor-runtime-facts/v0", runtime_session_ref: "session_public", provider_ref: "provider_public", lifecycle_state: "active", created_at: "2026-07-22T00:00:00Z", last_seen_at: "2026-07-22T00:00:01Z", current_page: { requested_url: "https://www.xiaohongshu.com", current_url: "https://www.xiaohongshu.com", title: "小红书", status: "ready" }, control_owner: "user", control_lock: { owner: "user", state: "held" }, current_error: null }; }
+function runtimeSession(controlOwner: "user" | "none" = "user") { return { schema_version: "harbor-runtime-facts/v0", runtime_session_ref: "session_public", provider_ref: "provider_public", lifecycle_state: "active", created_at: "2026-07-22T00:00:00Z", last_seen_at: "2026-07-22T00:00:01Z", current_page: { requested_url: "https://www.xiaohongshu.com", current_url: "https://www.xiaohongshu.com", title: "小红书", status: "ready" }, control_owner: controlOwner, control_lock: { owner: controlOwner, state: controlOwner === "user" ? "held" : "released" }, current_error: null }; }
 
 const tasks = [{ id: "task-a", title: "A", accountIdentity: "A", siteSkill: "A", businessInput: "", source: "Core live", packageSource: { name: "A", version: "1", capabilityRef: "A", sourceRef: "A", fetchedAt: "", source: "Core live", boundary: "" }, runs: [], updatedAt: "2026-07-20T00:00:00Z", threadContext: { siteLabel: "小红书", siteSkillKey: "A", accountIdentityKey: "identity-env_aaaaaaaaaaaaaaaaaaaaaaaa" } }, { id: "task-b", title: "B", accountIdentity: "B", siteSkill: "B", businessInput: "", source: "Core live", packageSource: { name: "B", version: "1", capabilityRef: "B", sourceRef: "B", fetchedAt: "", source: "Core live", boundary: "" }, runs: [], updatedAt: "2026-07-22T00:00:00Z", threadContext: { siteLabel: "BOSS", siteSkillKey: "B", accountIdentityKey: "identity-env_bbbbbbbbbbbbbbbbbbbbbbbb" } }] satisfies TaskProjection[];
 
