@@ -200,6 +200,19 @@ async function runProductionShellFlow() {
   });
   await waitUntil(() => controllerSnapshot?.skillWorkbench.compatibilityBySkill[xhsSkill.id]?.status === "ready", "initial compatibility");
   await waitUntil(() => controllerSnapshot?.tasks.selectedTask?.threadContext?.accountIdentityKey === identity.identityEnvironmentRef, "thread identity binding");
+  controllerSnapshot!.actions.selectTask(controllerSnapshot!.tasks.selectedTask!);
+  await waitUntil(() => controllerSnapshot?.navigation.workMode === "detail" &&
+    document.querySelector(".bottom-panel-slot") != null, "thread composer");
+  const contentFrame = document.querySelector<HTMLElement>(".main-content-frame");
+  const bottomPanel = document.querySelector<HTMLElement>(".bottom-panel-slot");
+  const contentRect = contentFrame?.getBoundingClientRect();
+  const bottomRect = bottomPanel?.getBoundingClientRect();
+  if (contentRect == null || bottomRect == null || contentRect.bottom > bottomRect.top + 1) {
+    throw new Error(`Thread composer overlaps the scrollable task timeline: ${JSON.stringify({
+      contentBottom: contentRect?.bottom,
+      bottomPanelTop: bottomRect?.top,
+    })}`);
+  }
   const detailRef = "detail_ref_123e4567-e89b-42d3-a456-426614174000";
   if (!await controllerSnapshot!.actions.openResultDetail(detailRef)) {
     throw new Error("Production controller did not open the owner-ref detail handoff.");
