@@ -145,7 +145,13 @@ export function mergeSubmittedCoreTaskOverrides(
     summary: `${current.summary} 已包含 UI 提交产生的 live run。`,
     tasks: [
       ...submitted.filter((override) => !existingIds.has(override.taskId)).map((override) => override.task),
-      ...current.tasks.map((task) => submittedTasksById.get(task.id) ?? task),
+      ...current.tasks.map((task) => {
+        const submittedTask = submittedTasksById.get(task.id);
+        if (submittedTask == null) return task;
+        return submittedTask.runs.every((submittedRun) => task.runs.some((run) => run.id === submittedRun.id))
+          ? task
+          : submittedTask;
+      }),
     ],
     liveTaskIds: Array.from(new Set([...current.liveTaskIds, ...submittedTasksById.keys()])),
   };
