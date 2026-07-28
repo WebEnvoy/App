@@ -290,7 +290,14 @@ function taskTarget(skill: LodeCatalogSkill, identity: Identity, draft: SkillInp
 function publicQueryForSkill(skill: LodeCatalogSkill, draft: SkillInputDraft) {
   if (skill.packageRef.includes("/search-notes@")) {
     const query = stringValue(draft.values.keyword).trim();
-    return query ? { ok: true as const, value: { query } } : { ok: false as const, reason: "搜索关键词不能为空。" };
+    const limitValue = stringValue(draft.values.limit).trim() ||
+      String(skill.inputFields.find((field) => field.id === "limit")?.defaultValue ?? "");
+    const limit = Number(limitValue);
+    if (!query) return { ok: false as const, reason: "搜索关键词不能为空。" };
+    if (limitValue && (!Number.isInteger(limit) || limit < 1 || limit > 15)) {
+      return { ok: false as const, reason: "小红书搜索数量必须为 1..15。" };
+    }
+    return { ok: true as const, value: { query, ...(limitValue ? { limit } : {}) } };
   }
   if (skill.packageRef.includes("/job-search@")) {
     const query = stringValue(draft.values.query).trim();
@@ -302,6 +309,15 @@ function publicQueryForSkill(skill: LodeCatalogSkill, draft: SkillInputDraft) {
       : { ok: false as const, reason: "职位搜索条件不符合当前 Core 合同。" };
   }
   return { ok: true as const, value: null };
+}
+
+export function projectTaskSubmissionSkill(skill: LodeCatalogSkill): LodeCatalogSkill {
+  if (skill.packageRef !== "lode://site-capability/xiaohongshu/search-notes@0.1.0") return skill;
+  return {
+    ...skill,
+    inputFields: skill.inputFields.map((field) =>
+      field.id === "limit" ? { ...field, maximum: Math.min(field.maximum ?? 15, 15) } : field),
+  };
 }
 
 export function buildCoreThreadInputSnapshot(

@@ -6,7 +6,7 @@ import {
   parseSkillIdentityCompatibilityResponse,
   projectCompatibilityTarget,
 } from "../../src/renderer/coreIdentityCompatibilityClient";
-import { buildCoreThreadInputSnapshot, prepareTaskTurnRequest } from "../../src/renderer/coreTaskThreadSubmitClient";
+import { buildCoreThreadInputSnapshot, prepareTaskTurnRequest, projectTaskSubmissionSkill } from "../../src/renderer/coreTaskThreadSubmitClient";
 import { coreTaskSubmitFailureSummary, coreTaskSubmitReadiness, readOnlyIdentityAdmissionBlockReason } from "../../src/renderer/coreTaskSubmitClient";
 import { projectCoreThreadResponse } from "../../src/renderer/coreThreadClient";
 import { parseCoreThreadInputSnapshot } from "../../src/renderer/coreThreadInputContract";
@@ -49,10 +49,33 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
 }
 
 function checkXhsSearchTarget(skill: LodeCatalogSkill) {
+  const prepareSearch = (limit: string) => {
+    const draft = createSkillInputDraft(skill);
+    draft.values.url = "https://www.xiaohongshu.com/search_result?source=web_search_result_notes";
+    draft.values.keyword = "AI tools";
+    draft.values.limit = limit;
+    return prepareTaskTurnRequest({
+      endpoint: "http://core.owner",
+      skill,
+      identity,
+      draft,
+      ownerRefs: {
+        ownerRef: "draft:app-protected/00000000-0000-4000-8000-000000000022",
+        fieldOwnerRefs: {
+          url: "draft:app-protected/00000000-0000-4000-8000-000000000022/url",
+          keyword: "draft:app-protected/00000000-0000-4000-8000-000000000022/keyword",
+        },
+        attachmentRefs: {},
+      },
+      executionPolicy: automaticExecutionPolicy(skill),
+      runtime,
+    });
+  };
   for (const pathname of ["/search_result", "/search_result/"]) {
     const draft = createSkillInputDraft(skill);
     draft.values.url = `https://www.xiaohongshu.com${pathname}?keyword=old&source=web_search_result_notes&xsec_token=must-not-pass`;
     draft.values.keyword = "AI tools";
+    draft.values.limit = "8";
     const prepared = prepareTaskTurnRequest({
       endpoint: "http://core.owner",
       skill,
@@ -72,10 +95,31 @@ function checkXhsSearchTarget(skill: LodeCatalogSkill) {
     if (!prepared.ok) throw new Error(`Core search turn target was rejected: ${prepared.reason}`);
     const target = (prepared.request.task_intent as { scope?: { target_ref?: string } }).scope?.target_ref;
     const harborUrl = (prepared.request.harbor as { url?: string } | undefined)?.url;
+    const publicQuery = prepared.request.public_query as { query?: string; limit?: number } | undefined;
     const expected = "https://www.xiaohongshu.com/search_result?keyword=AI+tools&source=web_search_result_notes";
-    if (target !== expected || harborUrl !== expected || `${target}${harborUrl}`.includes("xsec_token")) {
+    if (target !== expected || harborUrl !== expected || publicQuery?.query !== "AI tools" || publicQuery.limit !== 8 || `${target}${harborUrl}`.includes("xsec_token")) {
       throw new Error("Xiaohongshu search target did not preserve only the allowlisted source parameter.");
     }
+  }
+  for (const limit of ["1", "15"]) {
+    const prepared = prepareSearch(limit);
+    if (!prepared.ok || (prepared.request.public_query as { limit?: number }).limit !== Number(limit)) {
+      throw new Error(`Valid Xiaohongshu search limit ${limit} was rejected.`);
+    }
+  }
+  for (const limit of ["0", "1.5", "16"]) {
+    if (prepareSearch(limit).ok) throw new Error(`Invalid Xiaohongshu search limit ${limit} was accepted.`);
+  }
+  const submissionSkill = projectTaskSubmissionSkill(skill);
+  const draft = createSkillInputDraft(submissionSkill);
+  draft.values.limit = "16";
+  if (validateSkillInputDraft(submissionSkill, draft).limit == null ||
+    submissionSkill.inputFields.find((field) => field.id === "limit")?.maximum !== 15) {
+    throw new Error("Composer validation did not project the Xiaohongshu runtime limit.");
+  }
+  const defaulted = prepareSearch("");
+  if (!defaulted.ok || (defaulted.request.public_query as { limit?: number }).limit !== 10) {
+    throw new Error("An omitted Xiaohongshu search limit did not use the declared skill default.");
   }
 }
 
