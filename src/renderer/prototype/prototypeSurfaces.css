@@ -52,7 +52,6 @@
 .composer-action-confirmation button { border-color: var(--we-border); }
 .composer-action-confirmation button.primary { color: var(--we-inverted-foreground); background: var(--we-foreground); }
 .composer-stop { background: var(--we-status-error) !important; }
-.thread-workspace:has(.prototype-thread-composer) .main-content-frame { padding-bottom: 176px; }
 .prototype-task-thread-layout { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
 .prototype-task-thread-content { display: grid; min-width: 0; align-content: start; gap: 14px; }
 .prototype-task-thread-content > * { width: 100%; min-width: 0; max-width: 100%; }

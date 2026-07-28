@@ -168,6 +168,7 @@ function WorkDetail({ controller }: { controller: AppController }) {
     return (
       <ThreadWorkspace workspaceKey={`work:${tasks.selectedTask.id}`} composer={
         <TaskThreadComposer
+          key={tasks.selectedTask.id}
           coreEndpoint={sources.connectionConfig.coreEndpoint}
           harborIdentityState={sources.harborIdentityState}
           runtimeSupervisorState={sources.runtimeSupervisorState}
@@ -200,6 +201,7 @@ function WorkDetail({ controller }: { controller: AppController }) {
   return (
     <ThreadWorkspace workspaceKey={`work:${tasks.selectedTask.id}`} composer={
       <TaskThreadComposer
+        key={tasks.selectedTask.id}
         coreEndpoint={sources.connectionConfig.coreEndpoint} harborIdentityState={sources.harborIdentityState}
         runtimeSupervisorState={sources.runtimeSupervisorState} selectedTask={tasks.selectedSubmitTask}
         skill={skill} onTask={tasks.acceptTaskThreadProjection}

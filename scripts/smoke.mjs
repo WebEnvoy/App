@@ -122,8 +122,8 @@ if (
 }
 
 const expectedRuntimeHeads = {
-  core: "6b6b762540427709f1734e5b0ff2d2bd01fbe81d",
-  harbor: "0ae3dceee7dbffbbe312cd8c8f1d9dad060d6be6",
+  core: "2dcbda4e8bc206331c2dee73ed6da4924cbdc53a",
+  harbor: "b926653f90bec2f83a92cc5a1d8885a9599f1bc8",
   lode: "1fbef74b4bf1b4f0a86aacd885386d7a62181207",
 };
 if (JSON.stringify(runtimeSourceLock) !== JSON.stringify(expectedRuntimeHeads) ||
@@ -1403,6 +1403,66 @@ const submittedOverrideWhileOffline = coreThreadClientModule.mergeSubmittedCoreT
   retainedOfflineThreadState,
   [{ taskId: projectedOwnerThread.id, task: { ...projectedOwnerThread, title: "must not replace owner state" } }],
 );
+const pendingSubmittedRun = projectedOwnerThread.runs[1];
+const exactSubmittedPackageSource = {
+  ...projectedOwnerThread.packageSource,
+  version: "1.0.0",
+  sourceRef: "lode://site-capability/xiaohongshu/search-notes@1.0.0",
+};
+const submittedOverrideBeforeOwnerCatchup = coreThreadClientModule.mergeSubmittedCoreTaskOverrides(
+  {
+    ...coreThreadState,
+    tasks: [{ ...projectedOwnerThread, runs: projectedOwnerThread.runs.slice(0, 1) }, ...coreThreadState.tasks.slice(1)],
+  },
+  [{
+    taskId: projectedOwnerThread.id,
+    task: {
+      ...projectedOwnerThread,
+      title: "pending submitted run",
+      packageSource: exactSubmittedPackageSource,
+      runs: [pendingSubmittedRun],
+    },
+  }],
+);
+const submittedOverrideAfterOwnerCatchup = coreThreadClientModule.mergeSubmittedCoreTaskOverrides(
+  coreThreadState,
+  [{
+    taskId: projectedOwnerThread.id,
+    task: {
+      ...projectedOwnerThread,
+      title: "stale submitted run",
+      packageSource: exactSubmittedPackageSource,
+      runs: [pendingSubmittedRun],
+    },
+  }],
+);
+const submittedTerminalRun = {
+  ...pendingSubmittedRun,
+  turnStatus: "cancelled",
+  updatedAt: "2026-07-20T10:00:01Z",
+};
+const submittedOverrideBeforeStateCatchup = coreThreadClientModule.mergeSubmittedCoreTaskOverrides(
+  {
+    ...coreThreadState,
+    tasks: [{
+      ...projectedOwnerThread,
+      runs: [{
+        ...pendingSubmittedRun,
+        turnStatus: "running",
+        updatedAt: "2026-07-20T10:00:00Z",
+      }],
+    }, ...coreThreadState.tasks.slice(1)],
+  },
+  [{
+    taskId: projectedOwnerThread.id,
+    task: {
+      ...projectedOwnerThread,
+      title: "newer submitted terminal state",
+      packageSource: exactSubmittedPackageSource,
+      runs: [submittedTerminalRun],
+    },
+  }],
+);
 if (
   coreThreadState.status !== "ready" ||
   coreThreadState.tasks.length !== 2 ||
@@ -1418,9 +1478,14 @@ if (
   retainedOfflineThreadState.liveTaskIds.length !== 0 ||
   submittedOverrideWhileOffline.status !== "offline" ||
   submittedOverrideWhileOffline.liveTaskIds.length !== 0 ||
-  submittedOverrideWhileOffline.tasks[0]?.title === "must not replace owner state"
+  submittedOverrideWhileOffline.tasks[0]?.title === "must not replace owner state" ||
+  submittedOverrideBeforeOwnerCatchup.tasks[0]?.title !== "pending submitted run" ||
+  submittedOverrideAfterOwnerCatchup.tasks[0]?.title === "stale submitted run" ||
+  submittedOverrideAfterOwnerCatchup.tasks[0]?.packageSource.version !== "1.0.0" ||
+  submittedOverrideAfterOwnerCatchup.tasks[0]?.packageSource.sourceRef !== "lode://site-capability/xiaohongshu/search-notes@1.0.0" ||
+  submittedOverrideBeforeStateCatchup.tasks[0]?.title !== "newer submitted terminal state"
 ) {
-  throw new Error("Core thread projection smoke failed: owner schema, terminal state, empty thread, input validation, or offline fail-closed behavior regressed.");
+  throw new Error("Core thread projection smoke failed: owner schema, terminal state, submitted-run catch-up, empty thread, input validation, or offline fail-closed behavior regressed.");
 }
 for (const [value, kind] of [
   ["source_wrong_type", "session"],

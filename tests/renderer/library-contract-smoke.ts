@@ -40,6 +40,7 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
   const request = checkRequestProjection(input);
   checkResponseProjection(request);
   checkTurnInputProjection(input.xhsSkill);
+  checkXhsSearchTarget(input.xhsSkill);
   checkResultDetailTurn(input.detailSkill);
   checkExecutionPolicyMutation();
   await checkDraftProjection(input);
@@ -47,19 +48,41 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
   await checkRejectedAuthorizationDecisions();
 }
 
+function checkXhsSearchTarget(skill: LodeCatalogSkill) {
+  for (const pathname of ["/search_result", "/search_result/"]) {
+    const draft = createSkillInputDraft(skill);
+    draft.values.url = `https://www.xiaohongshu.com${pathname}?keyword=old&source=web_search_result_notes&xsec_token=must-not-pass`;
+    draft.values.keyword = "AI tools";
+    const prepared = prepareTaskTurnRequest({
+      endpoint: "http://core.owner",
+      skill,
+      identity,
+      draft,
+      ownerRefs: {
+        ownerRef: "draft:app-protected/00000000-0000-4000-8000-000000000022",
+        fieldOwnerRefs: {
+          url: "draft:app-protected/00000000-0000-4000-8000-000000000022/url",
+          keyword: "draft:app-protected/00000000-0000-4000-8000-000000000022/keyword",
+        },
+        attachmentRefs: {},
+      },
+      executionPolicy: automaticExecutionPolicy(skill),
+      runtime,
+    });
+    if (!prepared.ok) throw new Error(`Core search turn target was rejected: ${prepared.reason}`);
+    const target = (prepared.request.task_intent as { scope?: { target_ref?: string } }).scope?.target_ref;
+    const harborUrl = (prepared.request.harbor as { url?: string } | undefined)?.url;
+    const expected = "https://www.xiaohongshu.com/search_result?keyword=AI+tools&source=web_search_result_notes";
+    if (target !== expected || harborUrl !== expected || `${target}${harborUrl}`.includes("xsec_token")) {
+      throw new Error("Xiaohongshu search target did not preserve only the allowlisted source parameter.");
+    }
+  }
+}
+
 function checkResultDetailTurn(detailSkill: LodeCatalogSkill) {
   const detailRef = "detail_ref_123e4567-e89b-42d3-a456-426614174000";
   const skill = detailSkill;
-  const executionPolicy = {
-    skillRef: skill.packageRef,
-    actions: [{
-      actionId: skill.actions[0]!.id,
-      category: "read" as const,
-      riskMarker: null,
-      targetScope: { siteSlug: skill.siteSlug, targetTypes: skill.actions[0]!.targetTypes, supportedOrigins: skill.actions[0]!.supportedOrigins },
-      policy: { mode: "auto" as const, source: "installed_skill_user_version" as const, sourceRef: "execution-policy:skill/xhs-detail", sourceVersion: "1" },
-    }],
-  };
+  const executionPolicy = automaticExecutionPolicy(skill);
   const prepared = prepareTaskTurnRequest({
     endpoint: "http://core.owner",
     skill,
@@ -96,6 +119,19 @@ function checkResultDetailTurn(detailSkill: LodeCatalogSkill) {
     ownerTargetRef: detailRef,
   });
   if (mismatched.ok) throw new Error("A detail ref was accepted with a mismatched package lock.");
+}
+
+function automaticExecutionPolicy(skill: LodeCatalogSkill) {
+  return {
+    skillRef: skill.packageRef,
+    actions: [{
+      actionId: skill.actions[0]!.id,
+      category: "read" as const,
+      riskMarker: null,
+      targetScope: { siteSlug: skill.siteSlug, targetTypes: skill.actions[0]!.targetTypes, supportedOrigins: skill.actions[0]!.supportedOrigins },
+      policy: { mode: "auto" as const, source: "installed_skill_user_version" as const, sourceRef: `execution-policy:skill/${skill.id}`, sourceVersion: "1" },
+    }],
+  };
 }
 
 function checkExecutionPolicyMutation() {

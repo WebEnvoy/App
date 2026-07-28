@@ -24,6 +24,7 @@ export type OutcomeKind =
 export type RunProjection = {
   id: string;
   turnId?: string;
+  idempotencyKey?: string;
   label: string;
   lifecycle: "queued" | "running" | "completed" | "needs-action" | "blocked";
   outcome: OutcomeKind;

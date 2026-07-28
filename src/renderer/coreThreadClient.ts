@@ -145,10 +145,29 @@ export function mergeSubmittedCoreTaskOverrides(
     summary: `${current.summary} 已包含 UI 提交产生的 live run。`,
     tasks: [
       ...submitted.filter((override) => !existingIds.has(override.taskId)).map((override) => override.task),
-      ...current.tasks.map((task) => submittedTasksById.get(task.id) ?? task),
+      ...current.tasks.map((task) => {
+        const submittedTask = submittedTasksById.get(task.id);
+        if (submittedTask == null) return task;
+        if (!submittedTask.runs.every((submittedRun) => ownerRunHasCaughtUp(task, submittedRun))) {
+          return submittedTask;
+        }
+        return { ...task, packageSource: submittedTask.packageSource };
+      }),
     ],
     liveTaskIds: Array.from(new Set([...current.liveTaskIds, ...submittedTasksById.keys()])),
   };
+}
+
+function ownerRunHasCaughtUp(task: TaskProjection, submittedRun: RunProjection) {
+  const ownerRun = task.runs.find((run) => run.id === submittedRun.id);
+  if (ownerRun == null) return false;
+  const ownerUpdatedAt = Date.parse(ownerRun.updatedAt ?? "");
+  const submittedUpdatedAt = Date.parse(submittedRun.updatedAt ?? "");
+  if (Number.isFinite(submittedUpdatedAt)) {
+    if (!Number.isFinite(ownerUpdatedAt) || ownerUpdatedAt < submittedUpdatedAt) return false;
+    if (ownerUpdatedAt > submittedUpdatedAt) return true;
+  }
+  return ownerRun.turnStatus === submittedRun.turnStatus;
 }
 
 export function projectCoreThreads(threads: CoreThread[], fetchedAt: string): TaskProjection[] {
@@ -214,6 +233,7 @@ function projectCoreTurn(turn: CoreThreadTurn): RunProjection {
   return {
     id: turn.run_id,
     turnId: turn.turn_id,
+    idempotencyKey: turn.idempotency_key,
     label: `第 ${turn.sequence} 回合`,
     lifecycle,
     outcome,
