@@ -47,6 +47,12 @@ const nestedDetailRefs = Array.from({ length: 15 }, (_, index) =>
     ? "detail_ref_ff55d94a-9558-4777-9624-e138ed2a76d8"
     : `detail_ref_00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
 );
+const nestedSearchItems = nestedDetailRefs.map((detailRef, index) => ({
+  detail_ref: detailRef,
+  title: index === 0 ? "让 AI 自动整理资料的 5 个方法" : `公开笔记 ${index + 1}`,
+  author_display_name: index === 0 ? "一只产品汪" : `公开作者 ${index + 1}`,
+  interaction_metrics: { likes: String(2481 - index), comments: String(80 - index), collects: String(320 - index) },
+}));
 const resultSkills = [{
   outputKind: "collection",
   outputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
@@ -308,7 +314,9 @@ window.webenvoyShell = {
                 normalized: {
                   schema_version: "webenvoy.core-harbor-read-operation-projection.v0",
                   public_summary: {
-                    schema_version: "harbor-read-operation-public-summary/v0",
+                    schema_version: runId === "run-owner-nested-read-result"
+                      ? "harbor-read-operation-public-summary/v0"
+                      : "harbor-read-operation-public-summary/v1",
                     operation_id: "xhs_search_notes",
                     result_kind: "xiaohongshu_search_notes_surface",
                     surface: "search_result",
@@ -316,6 +324,7 @@ window.webenvoyShell = {
                     response_status: 200,
                     result_count: 15,
                     detail_refs: nestedDetailRefs,
+                    ...(runId === "run-owner-nested-read-result" ? {} : { items: nestedSearchItems }),
                     source_signals: ["pinia_store", "xhs_search_read_network"],
                   },
                   operation_ref: "read_operation_406187891879d3a4128ef8e7f0a036eb",
@@ -615,13 +624,14 @@ async function runDesktopChecks() {
   ];
   assert(stateTitles.join(",") === "已取消,执行状态待确认,结果暂不可用,执行超时,结果引用缺失,结果不可读取,结果内容暂不可用", "Terminal result states are not distinct.");
   const forbiddenRuns = ["cookie", "access_token", "sessionToken", "Authorization", "password", "secret", "api_key", "access_key", "private_key", "encryption_key"];
-  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult, nestedReadResult, detailReadResult] = await Promise.all([
+  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult, nestedReadResult, publicReadResult, detailReadResult] = await Promise.all([
     Promise.all(forbiddenRuns.map((field) => fetchCoreRunResult(coreEndpoint, `run-forbidden-${field}`))),
     fetchCoreRunResult(coreEndpoint, "run-contradictory"),
     fetchCoreRunResult(coreEndpoint, "run-not-persisted"),
     fetchCoreRunResult(coreEndpoint, "run-owner-unavailable"),
     fetchCoreRunResult(coreEndpoint, "run-result-ref-missing"),
     fetchCoreRunResult(coreEndpoint, "run-owner-nested-read-result"),
+    fetchCoreRunResult(coreEndpoint, "run-owner-a-completed"),
     fetchCoreRunResult(coreEndpoint, "run-owner-detail-read-result"),
   ]);
   assert(forbiddenResults.every((result) => result.status === "unavailable" && result.reason === "invalid") &&
@@ -644,16 +654,68 @@ async function runDesktopChecks() {
   assert(nestedReadResult.status === "ready", "The nested Core owner result is unavailable for projection checks.");
   const nestedReadModel = projectStandardBusinessResult(resultRun, nestedReadResult, resultSkills);
   assert(
-    nestedReadModel.kind === "collection" &&
-      nestedReadModel.total === 15 &&
-      nestedReadModel.rows[0]?.id === "detail_ref_ff55d94a-9558-4777-9624-e138ed2a76d8" &&
-      nestedReadModel.rows[0]?.cells["结果"] === "结果 1",
-    "A nested read projection did not preserve owner detail refs behind business-facing collection rows.",
+    nestedReadModel.kind === "object" &&
+      nestedReadModel.fields.some((field) => field.label === "历史结果" && field.value.includes("无法恢复标题")),
+    "A v0 nested read projection was presented as current structured business data.",
   );
+  assert(publicReadResult.status === "ready", "The v1 Core search result is unavailable for projection checks.");
+  const publicReadModel = projectStandardBusinessResult(resultRun, publicReadResult, resultSkills);
+  assert(
+    publicReadModel.kind === "collection" &&
+      publicReadModel.total === 15 &&
+      publicReadModel.rows[0]?.id === nestedDetailRefs[0] &&
+      publicReadModel.rows[0]?.cells["标题"] === "让 AI 自动整理资料的 5 个方法" &&
+      publicReadModel.rows[0]?.cells["作者"] === "一只产品汪" &&
+      publicReadModel.rows[0]?.cells["互动"] === "赞 2481 · 评论 80 · 收藏 320",
+    "A v1 nested read projection did not render the public search card while preserving its hidden detail ref.",
+  );
+  const validSummary = {
+    schema_version: "harbor-read-operation-public-summary/v1",
+    operation_id: "xhs_search_notes",
+    result_kind: "xiaohongshu_search_notes_surface",
+    surface: "search_result",
+    result_count: 2,
+    detail_refs: nestedDetailRefs.slice(0, 2),
+    items: nestedSearchItems.slice(0, 2),
+  };
+  const { schema_version: _missingVersion, ...missingVersion } = validSummary;
+  const { items: _v0Items, ...validV0Summary } = validSummary;
+  const invalidSummaries = [
+    { ...validSummary, schema_version: "harbor-read-operation-public-summary/v2" },
+    missingVersion,
+    { ...validSummary, schema_version: "harbor-read-operation-public-summary/v0" },
+    { ...validV0Summary, schema_version: "harbor-read-operation-public-summary/v0", result_count: 1 },
+    { ...validSummary, items: [...validSummary.items].reverse() },
+    { ...validSummary, detail_refs: [nestedDetailRefs[0], nestedDetailRefs[0]] },
+    { ...validSummary, detail_refs: ["not-an-opaque-ref", nestedDetailRefs[1]] },
+    { ...validSummary, items: [{ ...validSummary.items[0], interaction_metrics: { likes: 10 } }, validSummary.items[1]] },
+  ];
+  assert(invalidSummaries.every((summary) => {
+    const model = projectStandardBusinessResult(resultRun, readyXhsSearchResult(summary), resultSkills);
+    return model.kind === "object" && model.fields.some((field) => field.label === "结果不可用");
+  }), "Unknown, damaged, reordered, duplicate, or non-public XHS search summaries did not fail closed.");
+  const bossModel = projectStandardBusinessResult(resultRun, {
+    status: "ready",
+    result: {
+      outcome: "success",
+      resultKind: "object",
+      outputSchemaId: "lode://schema/site-capability/boss/job-search/output@0.1.0",
+      packageRef: "lode://site-capability/boss/job-search@0.1.0",
+      capabilityVersion: "0.1.0",
+      capabilityLockRef: "lode://lock/site-capability/boss/job-search@0.1.0",
+      data: { jobs: [{ title: "AI 工程师" }] },
+      payloadState: "available",
+      envelopeState: "available",
+    },
+  }, resultSkills);
+  assert(bossModel.kind === "collection" && bossModel.rows[0]?.cells.title === "AI 工程师",
+    "A BOSS result was incorrectly routed through the Xiaohongshu search-card renderer.");
   assert(taskA.runs.some((run) => run.id === "run-owner-a-completed"), "Completed owner turn was not retained.");
   assert(taskA.runs.some((run) => run.id === `runtime-blocked-${taskAId}`), "Active owner turn did not fail closed.");
   assert(!taskA.runs.some((run) => run.id === "run-owner-a-running"), "Active owner turn remained usable after runtime loss.");
   await waitFor(() => Boolean(document.querySelector(".thread-content .business-result-table")), "Collection business result did not render.");
+  assert(document.body.textContent?.includes("让 AI 自动整理资料的 5 个方法") && document.body.textContent?.includes("一只产品汪"),
+    "The task turn did not show actual Xiaohongshu search content.");
   await waitFor(
     () => Boolean(document.querySelector(".thread-content .business-result-message[aria-label='没有匹配数据']")),
     "Core empty_result did not render the business empty state.",
@@ -781,6 +843,23 @@ function readyResult(data: Record<string, unknown> | undefined, resultKind: stri
       capabilityVersion: "1.0.0",
       capabilityLockRef: "lock:result@1.0.0",
       ...(data == null ? {} : { data }),
+      payloadState: "available",
+      envelopeState: "available",
+    },
+  };
+}
+
+function readyXhsSearchResult(publicSummary: Record<string, unknown>) {
+  return {
+    status: "ready" as const,
+    result: {
+      outcome: "success",
+      resultKind: "xhs_note_search",
+      outputSchemaId: "lode://schema/site-capability/xiaohongshu/search-notes/output@0.1.0",
+      packageRef: "lode://site-capability/xiaohongshu/search-notes@0.1.0",
+      capabilityVersion: "0.1.0",
+      capabilityLockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
+      data: { projection: { normalized: { public_summary: publicSummary } } },
       payloadState: "available",
       envelopeState: "available",
     },

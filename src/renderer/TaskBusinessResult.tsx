@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import type { CoreRunResult, CoreRunResultState } from "./coreRunResultClient";
 import type { LodeCatalogSkill } from "./lodeCatalogClient";
+import { isOpaqueDetailRef } from "./resultDetailHandoff";
 import type { RunProjection } from "./taskThreadFixtures";
 
 type ResultField = { label: string; value: string };
@@ -72,7 +73,7 @@ export function projectStandardBusinessResult(
   if (data != null) {
     const normalized = nestedReadNormalizedResult(data) ?? (isRecord(data.normalized) ? data.normalized : data);
     if (boundSkill == null) return { kind: "generic", fields: objectFields(normalized), resultKind };
-    const nestedReadCollection = nestedReadCollectionResult(data);
+    const nestedReadCollection = nestedReadCollectionResult(data, boundSkill);
     if (nestedReadCollection != null) return nestedReadCollection;
     const assets = assetResult(data, resultKind);
     if (assets != null) return assets;
@@ -178,19 +179,93 @@ function FileResult({ items, onOpenPreview }: { items: ResultAsset[]; onOpenPrev
   return <section className="business-asset-list" aria-label="文件结果">{items.map((item) => <div key={`${item.name}-${item.detail}`}><FileText size={18} /><span><strong>{item.name}</strong><small>{item.detail}</small></span>{item.state ? <em>{item.state}</em> : null}{onOpenPreview ? <button type="button" data-workbench-open-right onClick={() => onOpenPreview({})}>查看</button> : null}</div>)}</section>;
 }
 
-function nestedReadCollectionResult(data: Record<string, unknown>): StandardBusinessResult | null {
+function nestedReadCollectionResult(data: Record<string, unknown>, skill: ResultSkill): StandardBusinessResult | null {
+  if (
+    skill.packageRef !== `lode://site-capability/xiaohongshu/search-notes@${skill.version}` ||
+    skill.outputSchemaId !== `lode://schema/site-capability/xiaohongshu/search-notes/output@${skill.version}`
+  ) return null;
   const projection = isRecord(data.projection) ? data.projection : undefined;
   const normalized = projection != null && isRecord(projection.normalized) ? projection.normalized : undefined;
   const summary = normalized != null && isRecord(normalized.public_summary) ? normalized.public_summary : undefined;
-  const detailRefs = summary?.detail_refs;
-  if (!Array.isArray(detailRefs) || !detailRefs.every((ref): ref is string => typeof ref === "string")) return null;
-  const rows = detailRefs.map((ref, index) => ({ id: ref, cells: { "结果": `结果 ${index + 1}` } }));
+  if (
+    summary == null ||
+    summary.operation_id !== "xhs_search_notes" ||
+    summary.result_kind !== "xiaohongshu_search_notes_surface" ||
+    summary.surface !== "search_result"
+  ) return unavailableSearchCollection();
+  const detailRefs = summary.detail_refs;
+  if (
+    !Array.isArray(detailRefs) ||
+    detailRefs.length < 1 ||
+    detailRefs.length > 15 ||
+    !detailRefs.every(isOpaqueDetailRef) ||
+    new Set(detailRefs).size !== detailRefs.length
+  ) return unavailableSearchCollection();
+  if (summary.schema_version === "harbor-read-operation-public-summary/v0") {
+    if ("items" in summary || numberField(summary, "result_count") !== detailRefs.length) return unavailableSearchCollection();
+    return {
+      kind: "object",
+      fields: [{ label: "历史结果", value: "此回合仅保留旧版结果引用，无法恢复标题、作者和互动信息。" }],
+    };
+  }
+  if (summary.schema_version !== "harbor-read-operation-public-summary/v1") return unavailableSearchCollection();
+  if (!Array.isArray(summary.items) || summary.items.length !== detailRefs.length) return unavailableSearchCollection();
+  const rows: ResultRow[] = [];
+  for (const [index, item] of summary.items.entries()) {
+    if (
+      !isRecord(item) ||
+      !Object.keys(item).every((key) => ["detail_ref", "title", "author_display_name", "interaction_metrics"].includes(key)) ||
+      item.detail_ref !== detailRefs[index] ||
+      !publicText(item.title, 200) ||
+      ("author_display_name" in item && !publicText(item.author_display_name, 100)) ||
+      !validInteractionMetrics(item.interaction_metrics)
+    ) return unavailableSearchCollection();
+    rows.push({
+      id: detailRefs[index]!,
+      cells: {
+        "标题": item.title,
+        "作者": publicText(item.author_display_name, 100) ? item.author_display_name : "—",
+        "互动": interactionSummary(item.interaction_metrics),
+      },
+    });
+  }
+  const total = numberField(summary, "result_count");
+  if (total !== rows.length) return unavailableSearchCollection();
   return {
     kind: "collection",
-    columns: ["结果"],
+    columns: ["标题", "作者", "互动"],
     rows,
-    total: summary == null ? rows.length : numberField(summary, "result_count") ?? rows.length,
+    total,
   };
+}
+
+function unavailableSearchCollection(): StandardBusinessResult {
+  return {
+    kind: "object",
+    fields: [{ label: "结果不可用", value: "Core 返回的搜索卡片不完整，已停止展示。" }],
+  };
+}
+
+function interactionSummary(value: unknown) {
+  if (!isRecord(value)) return "—";
+  const entries = [
+    ["赞", value.likes],
+    ["评论", value.comments],
+    ["收藏", value.collects],
+  ].flatMap(([label, count]) => publicText(count, 40) ? [`${label} ${count}`] : []);
+  return entries.join(" · ") || "—";
+}
+
+function validInteractionMetrics(value: unknown) {
+  if (value === undefined) return true;
+  return isRecord(value) &&
+    Object.keys(value).length > 0 &&
+    Object.keys(value).every((key) => ["likes", "comments", "collects"].includes(key)) &&
+    Object.values(value).every((count) => publicText(count, 40));
+}
+
+function publicText(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= max && value === value.trim() && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
 function nestedReadNormalizedResult(data: Record<string, unknown>) {

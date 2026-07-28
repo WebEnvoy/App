@@ -33,6 +33,7 @@ import {
 } from "./skillInputOwnerClient";
 import {
   initialTaskThreadSubmitState,
+  projectTaskSubmissionSkill,
   reconcileTaskThreadTurn,
   type TaskTurnSubmissionAttempt,
   type TaskThreadSubmitState,
@@ -68,6 +69,7 @@ export type StructuredTaskComposerProps = {
 
 export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
   const { clearDraft, clearing, draft, loading, restored, setDraft } = useCreateTaskDraft(props.skill, props.identity.id);
+  const submissionSkill = projectTaskSubmissionSkill(props.skill);
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const [submitted, setSubmitted] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -78,7 +80,7 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
   const [modes, setModes] = useState<ExecutionPolicyModes>({});
   const [modifiedCategories, setModifiedCategories] = useState<Set<ExecutionCategory>>(() => new Set());
   const formRef = useRef<HTMLFormElement>(null);
-  const errors = props.fixedBusinessInput == null ? validateSkillInputDraft(props.skill, draft) : {};
+  const errors = props.fixedBusinessInput == null ? validateSkillInputDraft(submissionSkill, draft) : {};
 
   useEffect(() => {
     let cancelled = false;
@@ -250,7 +252,7 @@ export function StructuredTaskComposer(props: StructuredTaskComposerProps) {
             onBlur={(fieldId) => setTouched((current) => new Set(current).add(fieldId))}
             onFiles={updateFiles}
             onValue={updateValue}
-            skill={props.skill}
+            skill={submissionSkill}
           />
         ) : (
           <div className="fixed-business-input" aria-label="业务输入" data-fixed-business-input tabIndex={-1}>
