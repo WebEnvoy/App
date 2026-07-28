@@ -148,13 +148,26 @@ export function mergeSubmittedCoreTaskOverrides(
       ...current.tasks.map((task) => {
         const submittedTask = submittedTasksById.get(task.id);
         if (submittedTask == null) return task;
-        return submittedTask.runs.every((submittedRun) => task.runs.some((run) => run.id === submittedRun.id))
-          ? task
-          : submittedTask;
+        if (!submittedTask.runs.every((submittedRun) => ownerRunHasCaughtUp(task, submittedRun))) {
+          return submittedTask;
+        }
+        return { ...task, packageSource: submittedTask.packageSource };
       }),
     ],
     liveTaskIds: Array.from(new Set([...current.liveTaskIds, ...submittedTasksById.keys()])),
   };
+}
+
+function ownerRunHasCaughtUp(task: TaskProjection, submittedRun: RunProjection) {
+  const ownerRun = task.runs.find((run) => run.id === submittedRun.id);
+  if (ownerRun == null) return false;
+  const ownerUpdatedAt = Date.parse(ownerRun.updatedAt ?? "");
+  const submittedUpdatedAt = Date.parse(submittedRun.updatedAt ?? "");
+  if (Number.isFinite(submittedUpdatedAt)) {
+    if (!Number.isFinite(ownerUpdatedAt) || ownerUpdatedAt < submittedUpdatedAt) return false;
+    if (ownerUpdatedAt > submittedUpdatedAt) return true;
+  }
+  return ownerRun.turnStatus === submittedRun.turnStatus;
 }
 
 export function projectCoreThreads(threads: CoreThread[], fetchedAt: string): TaskProjection[] {
