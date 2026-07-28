@@ -70,7 +70,7 @@ export function projectStandardBusinessResult(
   const resultKind = boundSkill?.outputKind ?? result?.resultKind;
   const data = result?.data;
   if (data != null) {
-    const normalized = isRecord(data.normalized) ? data.normalized : data;
+    const normalized = nestedReadNormalizedResult(data) ?? (isRecord(data.normalized) ? data.normalized : data);
     if (boundSkill == null) return { kind: "generic", fields: objectFields(normalized), resultKind };
     const nestedReadCollection = nestedReadCollectionResult(data);
     if (nestedReadCollection != null) return nestedReadCollection;
@@ -191,6 +191,13 @@ function nestedReadCollectionResult(data: Record<string, unknown>): StandardBusi
     rows,
     total: summary == null ? rows.length : numberField(summary, "result_count") ?? rows.length,
   };
+}
+
+function nestedReadNormalizedResult(data: Record<string, unknown>) {
+  const projection = isRecord(data.projection) ? data.projection : undefined;
+  const normalized = projection != null && isRecord(projection.normalized) ? projection.normalized : undefined;
+  const summary = normalized != null && isRecord(normalized.public_summary) ? normalized.public_summary : undefined;
+  return summary != null && isRecord(summary.normalized) ? summary.normalized : undefined;
 }
 
 function collectionResult(data: Record<string, unknown>): StandardBusinessResult | null {

@@ -55,6 +55,12 @@ const resultSkills = [{
   lockRef: "lode://lock/site-capability/xiaohongshu/search-notes@0.1.0",
 }, {
   outputKind: "object",
+  outputSchemaId: "lode://schema/site-capability/xiaohongshu/read-note-detail/output@0.1.0",
+  packageRef: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+  version: "0.1.0",
+  lockRef: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.0",
+}, {
+  outputKind: "object",
   outputSchemaId: "lode://schema/site-capability/boss/job-search/output@0.1.0",
   packageRef: "lode://site-capability/boss/job-search@0.1.0",
   version: "0.1.0",
@@ -226,6 +232,49 @@ window.webenvoyShell = {
           code: "empty_result",
           phase: "projection",
           recovery_hint: "fix_input",
+        },
+        evidence_refs: [],
+      } } };
+      if (runId === "run-owner-detail-read-result") return { ok: true, body: { ok: true, result: {
+        schema_version: "webenvoy.result-query.v0",
+        run_id: runId,
+        status: "succeeded",
+        terminal: true,
+        result: {
+          envelope_state: "available",
+          payload_state: "available",
+          result_ref: `result:core/${runId}`,
+          result_envelope: {
+            schema_version: "webenvoy.result-envelope.v0",
+            run_record_ref: runId,
+            ok: true,
+            outcome: "success",
+            terminal: true,
+            capability_ref: "lode:capability/read-note-detail",
+            capability_version: "0.1.0",
+            capability_lock_ref: "lode://lock/site-capability/xiaohongshu/read-note-detail@0.1.0",
+            package_ref: "lode://site-capability/xiaohongshu/read-note-detail@0.1.0",
+            result_kind: "read-note-detail.read_result",
+            output_schema_id: "lode://schema/site-capability/xiaohongshu/read-note-detail/output@0.1.0",
+            data: {
+              projection: {
+                normalized: {
+                  public_summary: {
+                    normalized: {
+                      kind: "xiaohongshu_note_detail",
+                      title: "杭州最美轻徒步路线Top10，请收好！",
+                      source_citation: {
+                        kind: "xhs_note_detail_ref",
+                        note_id: "6a0d5c0c0000000008000fa2",
+                        url: "https://www.xiaohongshu.com/explore/6a0d5c0c0000000008000fa2",
+                        field_sources: ["pinia_store_summary", "network_summary"],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         evidence_refs: [],
       } } };
@@ -566,13 +615,14 @@ async function runDesktopChecks() {
   ];
   assert(stateTitles.join(",") === "已取消,执行状态待确认,结果暂不可用,执行超时,结果引用缺失,结果不可读取,结果内容暂不可用", "Terminal result states are not distinct.");
   const forbiddenRuns = ["cookie", "access_token", "sessionToken", "Authorization", "password", "secret", "api_key", "access_key", "private_key", "encryption_key"];
-  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult, nestedReadResult] = await Promise.all([
+  const [forbiddenResults, contradictoryResult, notPersistedResult, unavailableResult, missingRefResult, nestedReadResult, detailReadResult] = await Promise.all([
     Promise.all(forbiddenRuns.map((field) => fetchCoreRunResult(coreEndpoint, `run-forbidden-${field}`))),
     fetchCoreRunResult(coreEndpoint, "run-contradictory"),
     fetchCoreRunResult(coreEndpoint, "run-not-persisted"),
     fetchCoreRunResult(coreEndpoint, "run-owner-unavailable"),
     fetchCoreRunResult(coreEndpoint, "run-result-ref-missing"),
     fetchCoreRunResult(coreEndpoint, "run-owner-nested-read-result"),
+    fetchCoreRunResult(coreEndpoint, "run-owner-detail-read-result"),
   ]);
   assert(forbiddenResults.every((result) => result.status === "unavailable" && result.reason === "invalid") &&
     contradictoryResult.status === "unavailable" && contradictoryResult.reason === "invalid" &&
@@ -583,6 +633,13 @@ async function runDesktopChecks() {
     nestedReadResult.status === "ready" &&
       nestedReadResult.result.projectionRef === "read_result_4bd7acd8-99eb-439d-bec7-ffc18b3d42b8",
     "A valid nested Core owner result was rejected as fixture data.",
+  );
+  assert(detailReadResult.status === "ready", "A valid nested Core detail result exceeded the owner inspection depth.");
+  const detailReadModel = projectStandardBusinessResult(resultRun, detailReadResult, resultSkills);
+  assert(
+    detailReadModel.kind === "object" &&
+      detailReadModel.fields.some((field) => field.label === "title" && field.value === "杭州最美轻徒步路线Top10，请收好！"),
+    "A nested Core detail result did not render its public business fields.",
   );
   assert(nestedReadResult.status === "ready", "The nested Core owner result is unavailable for projection checks.");
   const nestedReadModel = projectStandardBusinessResult(resultRun, nestedReadResult, resultSkills);

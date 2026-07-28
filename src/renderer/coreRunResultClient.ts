@@ -2,7 +2,7 @@ import { fixtureOrDemoPayloadReason } from "./ownerPayloadGuards";
 import { requestOwnerJson } from "./ownerApiClient";
 
 type JsonRecord = Record<string, unknown>;
-const coreResultOwnerInspectionDepth = 9;
+const coreResultOwnerInspectionDepth = 12;
 
 export type CoreRunResult = {
   outcome: string;
