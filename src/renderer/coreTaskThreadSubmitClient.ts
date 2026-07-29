@@ -267,12 +267,9 @@ function taskTarget(skill: LodeCatalogSkill, identity: Identity, draft: SkillInp
     return { ok: false as const, reason: "目标网址与技能或账号身份声明的站点不匹配。" };
   }
   if (skill.packageRef.includes("/search-notes@")) {
-    const source = ["/search_result", "/search_result/"].includes(url.pathname) && url.searchParams.get("source") === "web_search_result_notes"
-      ? "web_search_result_notes"
-      : null;
     url = new URL("/search_result", url.origin);
     url.searchParams.set("keyword", stringValue(draft.values.keyword));
-    if (source != null) url.searchParams.set("source", source);
+    url.searchParams.set("source", "web_search_result_notes");
   }
   if (skill.packageRef.includes("/job-search@")) {
     url = new URL("/web/geek/job", url.origin);
