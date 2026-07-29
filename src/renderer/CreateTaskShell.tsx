@@ -14,6 +14,7 @@ import { runtimeSupervisorIsChecking, type RuntimeSupervisorState } from "./runt
 import {
   compatibilityTargetFieldId,
   isCandidateUsable,
+  skillRequiresExactTarget,
   type IdentityCompatibilityCandidate,
   type SkillIdentityCompatibilityState,
 } from "./coreIdentityCompatibilityClient";
@@ -90,6 +91,17 @@ function CreateTaskContent(props: CreateTaskShellProps) {
   if (catalog.status === "loading") return <OwnerState title="正在读取站点技能" summary={catalog.summary} />;
   if (catalog.status === "offline") return <OwnerState title="站点技能暂不可用" summary={catalog.summary} onRecover={onRecover} />;
   if (catalog.status === "stale") return <OwnerState title="站点技能目录需要刷新" summary={catalog.summary} onRecover={onRecover} />;
+  if (selection != null && selection.targetRef == null && skillRequiresExactTarget(selection.skill)) {
+    const matchingIdentity = identity ?? candidateIdentityList(selection.skill, identities)[0];
+    return <OwnerState
+      title="请先从搜索结果选择笔记"
+      summary="详情读取只接受搜索结果生成的安全引用，不能直接填写网址。"
+      actionLabel={matchingIdentity == null ? "管理账号身份" : "选择搜索技能"}
+      onRecover={matchingIdentity == null
+        ? props.onCreateIdentity
+        : () => props.onRecoverExactTarget(selection.skill, matchingIdentity.id)}
+    />;
+  }
   if (selection == null || identity == null) {
     return <CreateTaskChooser
       {...props}
@@ -119,9 +131,10 @@ function CreateTaskContent(props: CreateTaskShellProps) {
 function CreateTaskChooser(props: CreateTaskShellProps & { focusIdentitySelection?: boolean; selectedSkill?: LodeCatalogSkill }) {
   const chooserRef = useRef<HTMLDivElement>(null);
   const selectedSkill = props.selectedSkill;
+  const selectableSkills = props.catalog.skills.filter((skill) => !skillRequiresExactTarget(skill));
   const skills = selectedSkill == null
-    ? props.catalog.skills
-    : props.catalog.skills.filter((skill) => skill.packageRef === selectedSkill.packageRef);
+    ? selectableSkills
+    : selectableSkills.filter((skill) => skill.packageRef === selectedSkill.packageRef);
   const combinations = createTaskCombinations(skills, props.compatibilityBySkill, props.identities);
   const compatibilityLoading = skills.some((skill) =>
     skill.availability === "available" &&
@@ -236,7 +249,7 @@ function CreateTaskComposer(props: CreateTaskComposerProps) {
       const candidate = compatibilityCandidate(identity, state ?? props.compatibility);
       return isCandidateUsable(candidate)
         ? { ok: true }
-        : { ok: false, reason: candidate == null ? "Core 未返回账号身份兼容性。" : compatibilityCandidateLabel(candidate) };
+        : { ok: false, reason: candidate == null ? state?.summary ?? "Core 未返回账号身份兼容性。" : compatibilityCandidateLabel(candidate) };
     }}
     onSubmit={(draft, ownerRefs, executionPolicy, threadModes, threadModeOverrides) => createTaskThreadTurn({
       endpoint: props.coreEndpoint,
