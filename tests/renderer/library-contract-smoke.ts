@@ -51,7 +51,7 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
 function checkXhsSearchTarget(skill: LodeCatalogSkill) {
   const prepareSearch = (limit: string) => {
     const draft = createSkillInputDraft(skill);
-    draft.values.url = "https://www.xiaohongshu.com/search_result?source=web_search_result_notes";
+    draft.values.url = "https://example.test/stale-hidden-search-target";
     draft.values.keyword = "AI tools";
     draft.values.limit = limit;
     return prepareTaskTurnRequest({
