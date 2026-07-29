@@ -18,6 +18,7 @@ import type { TaskProjection } from "./taskThreadFixtures";
 
 type Identity = HarborIdentityLoadState["identities"][number];
 type JsonRecord = Record<string, unknown>;
+const xiaohongshuSearchPackageRef = "lode://site-capability/xiaohongshu/search-notes@0.1.0";
 
 export type TaskThreadSubmitState =
   | { status: "idle"; summary: string }
@@ -260,19 +261,18 @@ function taskTarget(skill: LodeCatalogSkill, identity: Identity, draft: SkillInp
     ) return { ok: false as const, reason: "详情目标与技能、版本或账号身份不匹配。" };
     return { ok: true as const, ref: ownerTargetRef, targetType: xiaohongshuDetailHandoff.targetType };
   }
-  const rawUrl = stringValue(draft.values.url) || identity.origin;
+  const rawUrl = skill.packageRef === xiaohongshuSearchPackageRef
+    ? identity.origin
+    : stringValue(draft.values.url) || identity.origin;
   let url: URL;
   try { url = new URL(rawUrl); } catch { return { ok: false as const, reason: "目标网址无效。" }; }
   if (url.username || url.password || !action.supportedOrigins.includes(url.origin) || url.origin !== new URL(identity.origin).origin) {
     return { ok: false as const, reason: "目标网址与技能或账号身份声明的站点不匹配。" };
   }
   if (skill.packageRef.includes("/search-notes@")) {
-    const source = ["/search_result", "/search_result/"].includes(url.pathname) && url.searchParams.get("source") === "web_search_result_notes"
-      ? "web_search_result_notes"
-      : null;
     url = new URL("/search_result", url.origin);
     url.searchParams.set("keyword", stringValue(draft.values.keyword));
-    if (source != null) url.searchParams.set("source", source);
+    url.searchParams.set("source", "web_search_result_notes");
   }
   if (skill.packageRef.includes("/job-search@")) {
     url = new URL("/web/geek/job", url.origin);
@@ -312,11 +312,12 @@ function publicQueryForSkill(skill: LodeCatalogSkill, draft: SkillInputDraft) {
 }
 
 export function projectTaskSubmissionSkill(skill: LodeCatalogSkill): LodeCatalogSkill {
-  if (skill.packageRef !== "lode://site-capability/xiaohongshu/search-notes@0.1.0") return skill;
+  if (skill.packageRef !== xiaohongshuSearchPackageRef) return skill;
   return {
     ...skill,
-    inputFields: skill.inputFields.map((field) =>
-      field.id === "limit" ? { ...field, maximum: Math.min(field.maximum ?? 15, 15) } : field),
+    inputFields: skill.inputFields
+      .filter((field) => field.id !== "url")
+      .map((field) => field.id === "limit" ? { ...field, maximum: Math.min(field.maximum ?? 15, 15) } : field),
   };
 }
 

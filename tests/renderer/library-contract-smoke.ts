@@ -51,7 +51,7 @@ export async function runLibraryContractSmoke(input: SmokeInput) {
 function checkXhsSearchTarget(skill: LodeCatalogSkill) {
   const prepareSearch = (limit: string) => {
     const draft = createSkillInputDraft(skill);
-    draft.values.url = "https://www.xiaohongshu.com/search_result?source=web_search_result_notes";
+    draft.values.url = "https://example.test/stale-hidden-search-target";
     draft.values.keyword = "AI tools";
     draft.values.limit = limit;
     return prepareTaskTurnRequest({
@@ -114,8 +114,9 @@ function checkXhsSearchTarget(skill: LodeCatalogSkill) {
   const draft = createSkillInputDraft(submissionSkill);
   draft.values.limit = "16";
   if (validateSkillInputDraft(submissionSkill, draft).limit == null ||
+    submissionSkill.inputFields.some((field) => field.id === "url") ||
     submissionSkill.inputFields.find((field) => field.id === "limit")?.maximum !== 15) {
-    throw new Error("Composer validation did not project the Xiaohongshu runtime limit.");
+    throw new Error("Composer did not project keyword-only Xiaohongshu search inputs and the runtime limit.");
   }
   const defaulted = prepareSearch("");
   if (!defaulted.ok || (defaulted.request.public_query as { limit?: number }).limit !== 10) {

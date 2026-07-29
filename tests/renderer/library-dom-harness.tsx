@@ -491,9 +491,8 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
   await nextFrame();
   const submittedInvalid = document.querySelectorAll(".create-task-field [aria-invalid='true']").length;
-  const firstErrorFocused = document.activeElement?.getAttribute("name") === "url";
+  const firstErrorFocused = document.activeElement?.getAttribute("name") === "keyword";
   const live = document.querySelector("[aria-live='assertive']")?.textContent ?? "";
-  setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
   setInputValue(document.querySelector("[name='keyword']"), "AI tools");
   document.querySelector<HTMLButtonElement>("[data-catalog-refresh]")?.click();
   await twoFrames();
@@ -514,12 +513,11 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const acceptedTaskIntent = (acceptedTurnRequest?.body as { task_intent?: { resource_requirement_profile_id?: string } })?.task_intent;
   const acceptedFields = Object.fromEntries((acceptedSnapshot?.fields ?? []).map((field) => [field.field_id, field]));
   const acceptedFlow = createIndex >= 0 && policyIndex === -1 && turnIndex > createIndex &&
-    acceptedFields.url?.kind === "long_text" && acceptedFields.url?.owner_ref != null &&
+    acceptedFields.url == null &&
     acceptedFields.keyword?.kind === "long_text" && acceptedFields.keyword?.owner_ref != null &&
     acceptedTaskIntent?.resource_requirement_profile_id === xhsSkill.actions[0]?.resourceRequirementProfileIds[0] &&
     acceptedSnapshot?.attachment_refs?.length === 0 &&
     !acceptedPayload.includes("library-harness-attachment.txt");
-  setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
   setInputValue(document.querySelector("[name='keyword']"), "page not ready");
   await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === false, "terminal failure composer readiness");
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
@@ -527,7 +525,6 @@ async function runComposerFlow(mode: string, searchHeight: number) {
     "terminal runtime failure reconciliation");
   const terminalFailureReconciled = document.querySelector(".create-task-submit-state.failed")?.textContent?.includes("/turns returned 400") !== true &&
     document.querySelector<HTMLInputElement>("[name='keyword']")?.value === "page not ready";
-  setInputValue(document.querySelector("[name='url']"), "https://www.xiaohongshu.com/explore");
   setInputValue(document.querySelector("[name='keyword']"), "unknown outcome");
   await waitUntil(() => document.querySelector<HTMLButtonElement>(".create-task-submit")?.disabled === false, "thread composer readiness");
   document.querySelector<HTMLButtonElement>(".create-task-submit")?.click();
@@ -611,7 +608,7 @@ async function runComposerFlow(mode: string, searchHeight: number) {
   const unavailableDeleteWarning = document.querySelector("[aria-live='assertive']")?.textContent?.includes("无法确认系统受保护存储中的旧记录已删除") === true;
   setProtectedDraftDeleteStatus("ready");
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
-  if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid < 2 || !attachmentAdded ||
+  if (!selection.includes("xiaohongshu/search-notes") || initialInvalid !== 0 || submittedInvalid !== 1 || !attachmentAdded ||
     !attachmentRestored || !attachmentRemoved || restoredKeyword !== "AI tools" || !catalogRefreshPreserved || !cleared || !clearedDraftStayedDeleted || !firstErrorFocused ||
     !live.includes("字段需要修正") || !acceptedFlow || !terminalFailureReconciled || !unknownDraftPreserved || !activeSubmitBlocked || !serverFailureStayedUnknown || !recoveryFocusRestored ||
     !cancellationPreservedDraft || terminateRequest?.method !== "POST" || !skillPolicyVersionSafe || !reusedThreadSafe || !resourceProfileBoundarySafe ||
