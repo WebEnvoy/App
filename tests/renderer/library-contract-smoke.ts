@@ -114,8 +114,9 @@ function checkXhsSearchTarget(skill: LodeCatalogSkill) {
   const draft = createSkillInputDraft(submissionSkill);
   draft.values.limit = "16";
   if (validateSkillInputDraft(submissionSkill, draft).limit == null ||
+    submissionSkill.inputFields.some((field) => field.id === "url") ||
     submissionSkill.inputFields.find((field) => field.id === "limit")?.maximum !== 15) {
-    throw new Error("Composer validation did not project the Xiaohongshu runtime limit.");
+    throw new Error("Composer did not project keyword-only Xiaohongshu search inputs and the runtime limit.");
   }
   const defaulted = prepareSearch("");
   if (!defaulted.ok || (defaulted.request.public_query as { limit?: number }).limit !== 10) {

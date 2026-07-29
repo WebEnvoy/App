@@ -315,8 +315,9 @@ export function projectTaskSubmissionSkill(skill: LodeCatalogSkill): LodeCatalog
   if (skill.packageRef !== "lode://site-capability/xiaohongshu/search-notes@0.1.0") return skill;
   return {
     ...skill,
-    inputFields: skill.inputFields.map((field) =>
-      field.id === "limit" ? { ...field, maximum: Math.min(field.maximum ?? 15, 15) } : field),
+    inputFields: skill.inputFields
+      .filter((field) => field.id !== "url")
+      .map((field) => field.id === "limit" ? { ...field, maximum: Math.min(field.maximum ?? 15, 15) } : field),
   };
 }
 
