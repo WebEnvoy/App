@@ -229,6 +229,22 @@ async function runProductionShellFlow() {
   }
   controllerSnapshot!.actions.openView("work");
   await waitUntil(() => controllerSnapshot?.skillWorkbench.createTaskSelection == null, "detail handoff reset");
+  const globalChoices = Array.from(document.querySelectorAll<HTMLButtonElement>(".create-task-recommendations > button"));
+  if (globalChoices.some((choice) => choice.textContent?.includes(detailSkill.name))) {
+    throw new Error("Global task creation exposed an exact-target detail skill.");
+  }
+  await controllerSnapshot!.skillWorkbench.useSiteSkill(detailSkill, identity.id);
+  await waitUntil(() => document.querySelector(".owner-state")?.textContent?.includes("请先从搜索结果选择笔记") === true,
+    "exact-target shortcut recovery");
+  if (document.querySelector(".create-task-composer") != null ||
+    document.body.textContent?.includes("Core 未返回账号身份兼容性")) {
+    throw new Error("Exact-target shortcut exposed the direct URL composer or a false Core compatibility error.");
+  }
+  document.querySelector<HTMLButtonElement>(".owner-state button")?.click();
+  await waitUntil(() => controllerSnapshot?.navigation.activeView === "library" &&
+    controllerSnapshot.skillWorkbench.createTaskSelection == null, "exact-target library recovery");
+  controllerSnapshot!.actions.openView("work");
+  await waitUntil(() => controllerSnapshot?.navigation.workMode === "create", "resume global task creation");
   controllerSnapshot!.skillWorkbench.recoverCandidate(xhsSkill, identityB.id, {
     identityEnvironmentRef: identityB.identityEnvironmentRef,
     status: "requires_setup",
@@ -310,6 +326,7 @@ async function runProductionShellFlow() {
     abandonedRecoveryCleared: true,
     recoveryRequestConsumed: true,
     resultDetailHandoff: true,
+    exactTargetEntryRestricted: true,
     horizontalOverflow: false,
   };
 }
