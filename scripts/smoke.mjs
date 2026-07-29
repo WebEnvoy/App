@@ -122,7 +122,7 @@ if (
 }
 
 const expectedRuntimeHeads = {
-  core: "bc8af167c2a195927fe3bf8980a7c71433338ef3",
+  core: "0c210f7eb3874b013757d60f7980d1991272ca9f",
   harbor: "766b5aa574c1f29fd968f33469504a1bc73debfc",
   lode: "1fbef74b4bf1b4f0a86aacd885386d7a62181207",
 };
