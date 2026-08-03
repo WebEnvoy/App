@@ -1,3 +1,5 @@
+> **迁移入口提示**：产品代码、PR 与新的执行 Work Item 的 canonical 入口为 [`WebEnvoy/WebEnvoy`](https://github.com/WebEnvoy/WebEnvoy) 的 [`apps/desktop`](https://github.com/WebEnvoy/WebEnvoy/tree/main/apps/desktop)。本仓库保留历史、现有 backlog locator 与回滚路径，当前未归档且不接受新的实现；Core 与 Harbor 仍保持独立进程和 owner API，Lode 继续作为独立 MIT 仓库按 version/hash pin 消费。相关治理项：[WebEnvoy/.github#10](https://github.com/WebEnvoy/.github/issues/10)。
+
 # WebEnvoy App
 
 WebEnvoy App 是 WebEnvoy 的统一人类用户入口。
